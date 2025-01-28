@@ -41,7 +41,7 @@ fun AmethystPlugin(
                 .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
         ) {
             Text(
-                text = "Preview",
+                text = title,
                 style = MaterialTheme.typography.labelLarge,
                 lineHeight = MaterialTheme.typography.labelLarge.fontSize,
                 modifier = Modifier

@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.preview
+package dev.anthonyhfm.amethyst.editor.plugins.filter
 
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
@@ -17,7 +17,7 @@ import dev.anthonyhfm.amethyst.ui.previewdevices.rememberPreviewState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
-class PreviewEffectPlugin : EffectPlugin() {
+class FilterEffectPlugin : EffectPlugin() {
     override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
 
     private var previewState: PreviewState? = null
@@ -29,7 +29,7 @@ class PreviewEffectPlugin : EffectPlugin() {
         previewState = rememberPreviewState()
 
         AmethystPlugin(
-            title = "Preview",
+            title = "Filter",
             enabled = isEnabled.collectAsState().value,
             modifier = Modifier
                 .width(230.dp),

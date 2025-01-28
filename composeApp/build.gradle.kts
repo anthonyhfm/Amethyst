@@ -60,6 +60,7 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktmidi.jvm.desktop)
+            implementation("uk.co.xfactory-librarians:coremidi4j:1.6")
 
             api(libs.rtmidi.javacpp.platform)
             api(libs.libremidi.javacpp.platform)

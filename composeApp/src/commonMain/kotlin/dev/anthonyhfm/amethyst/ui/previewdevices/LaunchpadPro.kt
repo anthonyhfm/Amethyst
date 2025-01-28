@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.ui.previewdevices
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +28,7 @@ import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 @Composable
 fun LaunchpadPro(
     previewState: PreviewState,
+    onClick: (x: Int, y: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by previewState.grid.collectAsState()
@@ -110,13 +110,7 @@ private fun CircularPad(effectData: MidiEffectData) {
         modifier = Modifier
             .clip(CircleShape)
             .fillMaxSize(0.8f)
-            .background(
-                if (effectData.b == 0) {
-                    Color(0xFF505050)
-                } else {
-                    Color.Cyan
-                }
-            ),
+            .background(computeColor(effectData)),
 
         contentAlignment = Alignment.Center
     ) {
@@ -135,13 +129,7 @@ private fun RegularPad(effectData: MidiEffectData) {
         modifier = Modifier
             .clip(RoundedCornerShape(10))
             .fillMaxSize(0.9f)
-            .background(
-                if (effectData.b == 0) {
-                    Color(0xFF505050)
-                } else {
-                    Color.Cyan
-                }
-            )
+            .background(computeColor(effectData))
     )
 }
 
@@ -165,12 +153,22 @@ private fun ClippedPad(
                 )
             )
             .fillMaxSize(0.9f)
-            .background(
-                if (effectData.b == 0) {
-                    Color(0xFF505050)
-                } else {
-                    Color.Cyan
-                }
-            )
+            .background(computeColor(effectData))
     )
+}
+
+private fun computeColor(effectData: MidiEffectData): Color {
+    val minComponent = 0x50 // Dunkelste Komponente
+    val maxComponent = 0xFF // Hellste Komponente
+
+    fun scaleColor(component: Int): Int {
+        // Skaliert den Farbwert von 0..63 auf 0x50..0xFF
+        return ((component / 63f) * (maxComponent - minComponent) + minComponent).toInt()
+    }
+
+    val red = scaleColor(effectData.r)
+    val green = scaleColor(effectData.g)
+    val blue = scaleColor(effectData.b)
+
+    return Color(red, green, blue)
 }

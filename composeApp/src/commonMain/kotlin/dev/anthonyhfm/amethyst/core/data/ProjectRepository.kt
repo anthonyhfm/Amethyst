@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.core.data
 import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.data.tracks.EffectTrack
 import dev.anthonyhfm.amethyst.core.data.tracks.Track
+import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
+import dev.anthonyhfm.amethyst.core.midi.devices.novation.LaunchpadProMk3Device
 import dev.anthonyhfm.amethyst.editor.plugins.BasePlugin
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -11,7 +13,7 @@ class ProjectRepository {
         MutableStateFlow(
             listOf(
                 ProjectDeviceConfig(
-                    name = "Launchpad 1"
+                    name = "Launchpad 1",
                 )
             )
         )

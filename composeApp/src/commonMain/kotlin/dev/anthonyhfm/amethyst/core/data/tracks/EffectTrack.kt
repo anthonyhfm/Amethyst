@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
+import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
 import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
 import dev.atsushieno.ktmidi.MidiOutput
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +18,7 @@ class EffectTrack(
     val projectDeviceIndex: Int? = null
 ) : Track {
     var midiOutput: MidiOutput? = null
+    var deviceType: DeviceType? = null
 
     private val _effects = MutableStateFlow<List<EffectPlugin>>(emptyList())
     val effects = _effects.asStateFlow()
@@ -50,12 +52,14 @@ class EffectTrack(
     }
 
     fun processMidiInputData(midiInputData: MidiInputData) {
+        val white = if (midiInputData.velocity == 0) 0 else 63
+
         val midiEffectData = MidiEffectData(
             x = midiInputData.pitch % 10,
             y = midiInputData.pitch / 10,
-            r = 0,
-            g = 0,
-            b = if (midiInputData.velocity == 0) 0 else 63
+            r = white,
+            g = white,
+            b = white
         )
 
         if (effects.value.isEmpty()) {
@@ -69,13 +73,11 @@ class EffectTrack(
 
     private fun outputMidiEffectData(data: MidiEffectData) {
         CoroutineScope(Dispatchers.IO).launch {
-            val byteData = byteArrayOf(
-                144.toByte(), (data.y * 10 + data.x).toByte(), if (data.b == 0) 0.toByte() else 77.toByte()
-            )
+            val outputData = deviceType?.getEffectSysEx(data) ?: return@launch
 
             midiOutput?.send(
-                mevent = byteData,
-                length = byteData.size,
+                mevent = outputData,
+                length = outputData.size,
                 offset = 0,
                 timestampInNanoseconds = 0
             )

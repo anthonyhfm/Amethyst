@@ -1,9 +1,9 @@
 package dev.anthonyhfm.amethyst.core.midi
 
+import dev.anthonyhfm.amethyst.core.midi.mac.CoreMidi4JAccess
 import dev.atsushieno.ktmidi.AlsaMidiAccess
 import dev.atsushieno.ktmidi.JvmMidiAccess
 import dev.atsushieno.ktmidi.MidiAccess
-import dev.atsushieno.ktmidi.RtMidiAccess
 import java.io.File
 
 actual val platformMidiAccess: MidiAccess =
@@ -12,4 +12,4 @@ actual val platformMidiAccess: MidiAccess =
     else if (System.getProperty("os.name").contains("Windows"))
         JvmMidiAccess()
     else
-        JvmMidiAccess()
+        CoreMidi4JAccess()

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 import dev.anthonyhfm.amethyst.core.data.tracks.EffectTrack
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
+import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
 import dev.atsushieno.ktmidi.MidiAccess
 import dev.atsushieno.ktmidi.MidiInput
 import kotlinx.coroutines.launch
@@ -24,6 +25,7 @@ class EditorViewModel(
                         projectRepository.tracks.value.filterIsInstance<EffectTrack>().map {
                             if (it.projectDeviceIndex == deviceIndex) {
                                 it.midiOutput = deviceConfig.output
+                                it.deviceType = deviceConfig.type
 
                                 return@map it
                             } else {
@@ -46,12 +48,9 @@ class EditorViewModel(
         projectRepository.tracks.value.filterIsInstance<EffectTrack>().forEach { track ->
             track.projectDeviceIndex?.let { projectDeviceIndex ->
                 if (projectRepository.launchpadConfigs.value[projectDeviceIndex].input == midiInput) {
-                    track.processMidiInputData(
-                        midiInputData = MidiInputData(
-                            pitch = data[1].toInt(),
-                            velocity = data[2].toInt()
-                        )
-                    )
+                    getMidiInputData(data)?.let {
+                        track.processMidiInputData(it)
+                    }
                 }
             }
         }

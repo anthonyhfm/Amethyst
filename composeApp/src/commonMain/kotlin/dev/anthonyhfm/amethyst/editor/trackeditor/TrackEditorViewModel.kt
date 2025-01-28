@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 import dev.anthonyhfm.amethyst.core.data.tracks.EffectTrack
 import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.group.GroupPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.offset.OffsetEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.preview.PreviewEffectPlugin
 import kotlinx.coroutines.launch
@@ -36,22 +37,12 @@ class TrackEditorViewModel(
         }
     }
 
-    val elementList = listOf(
-        PreviewEffectPlugin(),
-        OffsetEffectPlugin(),
-        PreviewEffectPlugin(),
-    )
-
-    var elementIndex: Int = 0
-
     fun onAddEffect() {
         state.value.selectedTrack?.let { selectedTrack ->
             (projectRepository.tracks.value[selectedTrack] as EffectTrack).addEffect(
-                effect = elementList[elementIndex]
+                effect = PreviewEffectPlugin()
             )
         }
-
-        elementIndex += 1
     }
 }
 

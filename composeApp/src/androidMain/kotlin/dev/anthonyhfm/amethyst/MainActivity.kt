@@ -11,9 +11,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        context = this
+
         setContent {
             App()
         }
+    }
+
+    companion object {
+        lateinit var context: Context
     }
 }
 

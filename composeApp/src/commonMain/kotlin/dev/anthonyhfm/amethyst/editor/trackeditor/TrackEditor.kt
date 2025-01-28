@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.editor.trackeditor
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -52,7 +54,8 @@ fun TrackEditor(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(0.5.dp))
             .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp), RoundedCornerShape(12.dp))
-            .padding(12.dp),
+            .padding(12.dp)
+            .horizontalScroll(rememberScrollState()),
 
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
