@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.core.data.tracks
 
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
