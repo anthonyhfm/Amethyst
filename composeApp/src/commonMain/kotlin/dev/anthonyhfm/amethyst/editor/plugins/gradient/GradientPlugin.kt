@@ -37,11 +37,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
+import dev.anthonyhfm.amethyst.ui.components.TextDial
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -79,14 +81,14 @@ class GradientPlugin : EffectPlugin() {
                 }
             },
             modifier = Modifier
-                .width(350.dp)
+                .width(300.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
 
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
             ) {
                 Box(
                     modifier = Modifier
@@ -96,7 +98,7 @@ class GradientPlugin : EffectPlugin() {
                             .padding(horizontal = 12.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .fillMaxWidth()
-                            .height(32.dp)
+                            .height(28.dp)
                     ) {
                         drawRect(
                             brush = Brush.horizontalGradient(
@@ -128,7 +130,7 @@ class GradientPlugin : EffectPlugin() {
 
                             Box(
                                 modifier = Modifier
-                                    .offset(x = -6.dp, y = -3.dp)
+                                    .offset(x = -6.dp, y = -5.dp)
                                     .offset(
                                         x = maxWidth * pos
                                     )
@@ -160,17 +162,27 @@ class GradientPlugin : EffectPlugin() {
 
                 Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                        .fillMaxWidth(),
+
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    val controller = rememberColorPickerController()
+                    var duration: Float by remember { mutableStateOf(0f) }
+                    var steps: Float by remember { mutableStateOf(0f) }
 
-                    HsvColorPicker(
-                        controller = controller,
+                    TextDial(
+                        text = "Duration",
+                        value = duration,
+                        onValueChange = {
+                            duration = it
+                        }
+                    )
 
-                        modifier = Modifier
-                            .aspectRatio(1 / 1f)
-                            .fillMaxHeight()
+                    TextDial(
+                        text = "Steps",
+                        value = steps,
+                        onValueChange = {
+                            steps = it
+                        }
                     )
                 }
             }
