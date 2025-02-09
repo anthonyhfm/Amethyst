@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 class EffectTrack(
     override val name: String,
-    val projectDeviceIndex: Int? = null
+    var projectDeviceIndex: Int? = null
 ) : Track {
     var midiOutput: MidiOutput? = null
     var deviceType: DeviceType? = null

@@ -3,27 +3,42 @@ package dev.anthonyhfm.amethyst.editor.plugins.gradient
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.github.skydoves.colorpicker.compose.HsvColorPicker
+import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
@@ -38,11 +53,11 @@ import kotlin.time.Duration.Companion.milliseconds
 class GradientPlugin : EffectPlugin() {
     override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
 
-    private val gradientData: MutableStateFlow<Map<Float, Color>> = MutableStateFlow(
-        value = mapOf(
-            0f to Color.White,
-            0.5f to Color.Red,
-            1f to Color.Black
+    private val gradientData: MutableStateFlow<List<GradientColor>> = MutableStateFlow(
+        value = listOf(
+            GradientColor(0f, Color.White),
+            GradientColor(0.5f, Color.Red),
+            GradientColor(1f, Color.Black)
         )
     )
 
@@ -52,7 +67,8 @@ class GradientPlugin : EffectPlugin() {
     @Composable
     override fun Content() {
         val scope = rememberCoroutineScope()
-        val colors = gradientData.collectAsState().value.toList().sortedBy { it.first }
+        val density = LocalDensity.current
+        val colors by gradientData.collectAsState()
 
         AmethystPlugin(
             title = "Gradient",
@@ -63,55 +79,99 @@ class GradientPlugin : EffectPlugin() {
                 }
             },
             modifier = Modifier
-                .width(400.dp)
+                .width(350.dp)
         ) {
             Column(
                 modifier = Modifier
-                    .padding(16.dp)
-                    .padding(vertical = 12.dp)
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-            ) {
-                Canvas(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .fillMaxWidth()
-                        .height(32.dp)
-                ) {
-                    drawRect(
-                        brush = Brush.horizontalGradient(
-                            colors = colors.map { it.second },
-                            startX = 0f,
-                            endX = size.width
-                        ),
-                        size = size
-                    )
-                }
+                    .fillMaxSize()
+                    .padding(16.dp),
 
-                BoxWithConstraints(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
                     modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .fillMaxWidth()
                 ) {
-                    colors.forEach { color ->
-                        Box(
-                            modifier = Modifier
-                                .offset(x = -10.dp)
-                                .offset(
-                                    x = maxWidth * color.first
-                                )
-                                .shadow(
-                                    elevation = 6.dp,
-                                    shape = CutCornerShape(topStartPercent = 50, topEndPercent = 50)
-                                )
-                                .clip(CutCornerShape(topStartPercent = 50, topEndPercent = 50))
-                                .height(28.dp)
-                                .width(20.dp)
-                                .background(MaterialTheme.colorScheme.surfaceDim)
-                                .border(2.dp, Color.White, CutCornerShape(topStartPercent = 50, topEndPercent = 50))
+                    Canvas(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .fillMaxWidth()
+                            .height(32.dp)
+                    ) {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colorStops = colors.sortedBy { it.position }
+                                    .map { it.position to it.color }
+                                    .toTypedArray(), // Hier setzen wir die Farben exakt an ihre Positionen
+                                startX = 0f,
+                                endX = size.width
+                            ),
+                            size = size
                         )
                     }
+
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        colors.forEachIndexed { index, color ->
+                            var pos: Float by remember { mutableStateOf(color.position) }
+
+                            LaunchedEffect(pos) {
+                                gradientData.emit(
+                                    value = colors.mapIndexed { i, it ->
+                                        if (i == index) it.copy(position = pos) else it
+                                    }
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = -6.dp, y = -3.dp)
+                                    .offset(
+                                        x = maxWidth * pos
+                                    )
+                                    .shadow(
+                                        elevation = 6.dp,
+                                        shape = CircleShape
+                                    )
+                                    .clip(CircleShape)
+                                    .height(38.dp)
+                                    .width(12.dp)
+                                    .background(color.color)
+                                    .border(2.dp, Color.White, CircleShape)
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDrag = { input, offset ->
+                                                input.consume()
+
+                                                val pct = (offset.x / density.density).dp / maxWidth
+                                                val newPos = (pos + pct).coerceIn(0f, 1f)
+
+                                                pos = newPos
+                                            }
+                                        )
+                                    }
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    val controller = rememberColorPickerController()
+
+                    HsvColorPicker(
+                        controller = controller,
+
+                        modifier = Modifier
+                            .aspectRatio(1 / 1f)
+                            .fillMaxHeight()
+                    )
                 }
             }
         }
@@ -121,7 +181,7 @@ class GradientPlugin : EffectPlugin() {
         if (data.r != 0 || data.g != 0 || data.b != 0) {
             CoroutineScope(Dispatchers.IO).launch {
                 val stepLength = gradientDuration.value / gradientSteps.value
-                val colors = gradientData.value.toList().sortedBy { it.first }
+                val colors = gradientData.value.toList().sortedBy { it.position }.map { it.position to it.color }
 
                 for (step in 0..gradientSteps.value) {
                     val progress = step.toFloat() / gradientSteps.value
@@ -154,4 +214,9 @@ class GradientPlugin : EffectPlugin() {
             blue = start.second.blue * (1 - t) + end.second.blue * t
         )
     }
+
+    data class GradientColor(
+        var position: Float,
+        var color: Color,
+    )
 }

@@ -20,7 +20,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.data.tracks.Track
+import dev.anthonyhfm.amethyst.editor.tracks.ui.CreateTrackButton
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -30,6 +32,7 @@ fun Tracks(
 ) {
     val viewModel = koinViewModel<TracksViewModel>()
     val tracks: List<Track> by viewModel.tracks.collectAsState()
+    val deviceConfigs: List<ProjectDeviceConfig> by viewModel.deviceConfigs.collectAsState()
 
     Column(
         modifier = Modifier
@@ -49,8 +52,18 @@ fun Tracks(
                 onSelect = {
                     onSelectTrack(index)
                 },
-                track = track
+                track = track,
+                deviceConfigs = deviceConfigs,
+                onChangeDeviceConfig = {
+                    viewModel.changeDeviceConfig(index, it)
+                }
             )
         }
+
+        CreateTrackButton(
+            onCreate = {
+                viewModel.createTrack(it)
+            }
+        )
     }
 }
