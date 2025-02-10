@@ -16,6 +16,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +33,12 @@ fun Dial(
     value: Float,
     onValueChange: (Float) -> Unit
 ) {
+    var dialValue by remember { mutableStateOf(value) }
+
+    LaunchedEffect(dialValue) {
+        onValueChange(dialValue)
+    }
+
     val background = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp)
     val dialColor = MaterialTheme.colorScheme.tertiary
 
@@ -37,7 +48,7 @@ fun Dial(
             .size(52.dp)
             .pointerInput(Unit) {
                 detectDragGestures { input, offset ->
-                    TODO("NOT IMPLEMENTED YET")
+                    dialValue = (dialValue + offset.y * 0.01f).coerceIn(0f, 1f)
                 }
             }
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp))
@@ -58,7 +69,7 @@ fun Dial(
             drawArc(
                 color = dialColor,
                 startAngle = 135f - 16f,
-                sweepAngle = (270f + 32f) * value,
+                sweepAngle = (270f + 32f) * dialValue,
                 useCenter = true
             )
 

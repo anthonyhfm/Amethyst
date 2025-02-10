@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.editor.trackeditor.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Filter
 import androidx.compose.material.icons.filled.Gradient
@@ -22,6 +23,7 @@ import dev.anthonyhfm.amethyst.editor.plugins.color.ColorEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.filter.FilterEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.gradient.GradientPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.group.GroupPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.keyframes.KeyframesEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.offset.OffsetEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.preview.PreviewEffectPlugin
 import kotlin.reflect.KClass
@@ -63,6 +65,11 @@ fun ComponentPicker(
             name = "Gradient",
             icon = Icons.Default.Gradient,
             plugin = GradientPlugin()
+        ),
+        PickableComponent(
+            name = "Keyframes",
+            icon = Icons.Default.Animation,
+            plugin = KeyframesEffectPlugin()
         ),
         PickableComponent(
             name = "Preview",

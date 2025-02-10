@@ -136,11 +136,15 @@ class GroupPlugin : EffectPlugin() {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 8.dp),
         ) {
             groupsState.forEachIndexed { index, groupData ->
+                AddGroupButton(
+                    onAddGroup = {
+                        createGroup(index)
+                    }
+                )
+
                 ContextMenuArea(
                     items = listOf(
                         ContextMenuItem("Copy") { },

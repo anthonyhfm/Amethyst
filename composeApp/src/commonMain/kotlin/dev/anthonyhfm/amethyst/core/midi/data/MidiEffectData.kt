@@ -6,4 +6,8 @@ data class MidiEffectData(
     val r: Int,
     val g: Int,
     val b: Int
-)
+) {
+    fun isEmpty(): Boolean {
+        return r == 0 && g == 0 && b == 0
+    }
+}

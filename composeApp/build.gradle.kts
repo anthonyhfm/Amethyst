@@ -7,7 +7,6 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.javacppPlatformPlugin)
 }
 
 kotlin {
@@ -63,9 +62,6 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)
-
-            api(libs.rtmidi.javacpp.platform)
-            api(libs.libremidi.javacpp.platform)
         }
     }
 }

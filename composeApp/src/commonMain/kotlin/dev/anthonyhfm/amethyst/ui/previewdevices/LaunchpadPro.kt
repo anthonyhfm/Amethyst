@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,13 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 
 @Composable
 fun LaunchpadPro(
     previewState: PreviewState,
-    onClick: (x: Int, y: Int) -> Unit,
+    onClick: ((x: Int, y: Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val state by previewState.grid.collectAsState()
@@ -56,9 +58,18 @@ fun LaunchpadPro(
                 Spacer(modifier = Modifier.weight(0.5f))
 
                 for (x in 0..9) {
-                    GridPad(x, y, state[x][y]) {
-                        onClick(x, y)
-                    }
+                    GridPad(
+                        x = x,
+                        y = y,
+                        effectData = state[x][y],
+                        onClick = if (onClick == null) {
+                            null
+                        } else {
+                            {
+                                onClick(x, y)
+                            }
+                        }
+                    )
 
                     if (x != 9) {
                         Spacer(modifier = Modifier.weight(0.1f))
@@ -68,9 +79,7 @@ fun LaunchpadPro(
                 Spacer(modifier = Modifier.weight(0.5f))
             }
 
-            if (y != 9) {
-                Spacer(modifier = Modifier.weight(0.1f))
-            }
+            Spacer(modifier = Modifier.weight(0.1f))
         }
 
         Spacer(modifier = Modifier.weight(0.5f))
@@ -83,17 +92,23 @@ private fun RowScope.GridPad(
     x: Int,
     y: Int,
     effectData: MidiEffectData,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
 ) {
     Box(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .combinedClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {
-                    onClick()
+            .then(
+                if (onClick != null) {
+                    Modifier.combinedClickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            onClick()
+                        }
+                    )
+                } else {
+                    Modifier
                 }
             ),
 
