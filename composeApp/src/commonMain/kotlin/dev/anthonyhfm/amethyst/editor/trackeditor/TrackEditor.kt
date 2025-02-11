@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.surfaceColorAtElevation
@@ -41,7 +42,7 @@ fun TrackEditor(
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(0.5.dp))
             .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp), RoundedCornerShape(12.dp))
             .padding(vertical = 12.dp)
-            .horizontalScroll(rememberScrollState()),
+            .horizontalScroll(rememberScrollState())
     ) {
         if (state.trackSelected && state.effects != null) {
             val effects by state.effects!!.collectAsState()
