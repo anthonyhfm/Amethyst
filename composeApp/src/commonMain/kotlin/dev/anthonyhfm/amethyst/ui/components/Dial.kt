@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,8 +48,8 @@ fun Dial(
             .clip(CircleShape)
             .size(52.dp)
             .pointerInput(Unit) {
-                detectDragGestures { input, offset ->
-                    dialValue = (dialValue + offset.y * 0.01f).coerceIn(0f, 1f)
+                detectVerticalDragGestures { input, offset ->
+                    dialValue = (dialValue + (offset * -1) * 0.01f).coerceIn(0f, 1f)
                 }
             }
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp))
@@ -84,6 +85,7 @@ fun Dial(
 @Composable
 fun TextDial(
     text: String,
+    headline: String? = null,
     value: Float,
     onValueChange: (Float) -> Unit
 ) {
@@ -91,6 +93,13 @@ fun TextDial(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        headline?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+
         Dial(
             value = value,
             onValueChange = {
