@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.filter
+package dev.anthonyhfm.amethyst.devices.effects.filter
 
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
@@ -9,7 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import dev.anthonyhfm.amethyst.ui.previewdevices.LaunchpadPro
 import dev.anthonyhfm.amethyst.ui.previewdevices.rememberPreviewState

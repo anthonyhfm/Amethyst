@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.delay
+package dev.anthonyhfm.amethyst.devices.effects.delay
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -8,7 +8,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import kotlinx.coroutines.delay

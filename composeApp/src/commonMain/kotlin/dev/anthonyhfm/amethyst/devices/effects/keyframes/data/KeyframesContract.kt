@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.keyframes.data
+package dev.anthonyhfm.amethyst.devices.effects.keyframes.data
 
 import androidx.compose.ui.graphics.Color
 

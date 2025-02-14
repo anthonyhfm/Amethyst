@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.gradient
+package dev.anthonyhfm.amethyst.devices.effects.gradient
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -43,7 +43,7 @@ import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import kotlinx.coroutines.CoroutineScope

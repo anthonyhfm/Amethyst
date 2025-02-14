@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.keyframes
+package dev.anthonyhfm.amethyst.devices.effects.keyframes
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
@@ -14,10 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.data.Keyframe
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.KeyframeEditorDialog
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.KeyframeEditorViewModel
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.data.Keyframe
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.KeyframeEditorDialog
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.KeyframeEditorViewModel
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi

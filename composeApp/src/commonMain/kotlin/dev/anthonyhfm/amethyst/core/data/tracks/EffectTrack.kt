@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.atsushieno.ktmidi.MidiOutput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

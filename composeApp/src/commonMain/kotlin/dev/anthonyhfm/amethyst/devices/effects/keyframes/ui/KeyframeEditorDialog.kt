@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui
+package dev.anthonyhfm.amethyst.devices.effects.keyframes.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,16 +32,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.window.PopupProperties
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.viewModelFactory
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.data.Keyframe
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.components.KeyframeColorPicker
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.components.KeyframesPlaybackControls
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.components.VerticalKeyframeList
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframeColorPicker
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPlaybackControls
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.VerticalKeyframeList
 import dev.anthonyhfm.amethyst.ui.modifier.platformPaddingTop
 import dev.anthonyhfm.amethyst.ui.previewdevices.LaunchpadPro
 import dev.anthonyhfm.amethyst.ui.previewdevices.rememberPreviewState
-import kotlinx.coroutines.flow.MutableStateFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +51,6 @@ fun KeyframeEditorDialog(
     val state by viewModel.state.collectAsState()
 
     if (visible) {
-
         LaunchedEffect(keyframes[state.selectedKeyframe].frame) {
             keyframes[state.selectedKeyframe].frame.forEach {
                 it.forEach {

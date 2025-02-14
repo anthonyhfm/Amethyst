@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.components
+package dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState

@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 import dev.anthonyhfm.amethyst.core.data.tracks.EffectTrack
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import kotlinx.coroutines.launch
 
 class TrackEditorViewModel(

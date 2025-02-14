@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.group
+package dev.anthonyhfm.amethyst.devices.effects.group
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -44,7 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.anthonyhfm.amethyst.editor.trackeditor.ui.AddComponentSpacer
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuArea

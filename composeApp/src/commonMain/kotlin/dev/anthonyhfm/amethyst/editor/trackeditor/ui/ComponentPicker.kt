@@ -15,15 +15,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.color.ColorEffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.delay.DelayEffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.filter.FilterEffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.gradient.GradientEffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.group.GroupEffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.KeyframesEffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.offset.OffsetEffectDevice
-import dev.anthonyhfm.amethyst.editor.plugins.preview.PreviewEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.color.ColorEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.delay.DelayEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.filter.FilterEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetEffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewEffectDevice
 
 data class PickableComponent(
     val name: String,

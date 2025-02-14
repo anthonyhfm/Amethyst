@@ -1,12 +1,13 @@
-package dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui
+package dev.anthonyhfm.amethyst.devices.effects.keyframes.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.data.Keyframe
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.data.Keyframe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.collections.get
 
 class KeyframeEditorViewModel(
     val keyframeData: MutableStateFlow<List<Keyframe>>

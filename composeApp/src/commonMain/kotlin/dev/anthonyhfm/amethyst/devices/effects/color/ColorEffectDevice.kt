@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.color
+package dev.anthonyhfm.amethyst.devices.effects.color
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +18,7 @@ import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 
 class ColorEffectDevice : EffectDevice() {

@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.editor.plugins.offset
+package dev.anthonyhfm.amethyst.devices.effects.offset
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 
 class OffsetEffectDevice : EffectDevice() {
