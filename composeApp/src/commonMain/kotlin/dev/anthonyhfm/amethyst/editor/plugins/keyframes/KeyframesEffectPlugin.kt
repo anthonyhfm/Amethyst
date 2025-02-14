@@ -47,7 +47,7 @@ class KeyframesEffectPlugin : EffectPlugin() {
     override fun Content() {
         val scope = rememberCoroutineScope()
         var editorVisible: Boolean by remember { mutableStateOf(false) }
-        val editorViewModel = viewModel { KeyframeEditorViewModel(keyframeData) }
+        val editorViewModel = remember { KeyframeEditorViewModel(keyframeData) }
 
         LaunchedEffect(keyframeData.collectAsState().value) {
             prerenderKeyframes()
