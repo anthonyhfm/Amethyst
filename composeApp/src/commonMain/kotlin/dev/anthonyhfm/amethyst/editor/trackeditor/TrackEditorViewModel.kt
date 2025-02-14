@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 import dev.anthonyhfm.amethyst.core.data.tracks.EffectTrack
-import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
 import kotlinx.coroutines.launch
 
 class TrackEditorViewModel(
@@ -34,7 +34,7 @@ class TrackEditorViewModel(
         }
     }
 
-    fun onAddEffect(effect: EffectPlugin, atIndex: Int? = null) {
+    fun onAddEffect(effect: EffectDevice, atIndex: Int? = null) {
         state.value.selectedTrack?.let { selectedTrack ->
             (projectRepository.tracks.value[selectedTrack] as EffectTrack).addEffect(
                 effect = effect,
@@ -47,5 +47,5 @@ class TrackEditorViewModel(
 data class TrackEditorState(
     val trackSelected: Boolean = false,
     val selectedTrack: Int? = null,
-    val effects: StateFlow<List<EffectPlugin>>? = null
+    val effects: StateFlow<List<EffectDevice>>? = null
 )

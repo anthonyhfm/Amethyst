@@ -26,12 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
 
 @Composable
 fun AddComponentSpacer(
     expanded: Boolean = false,
-    onAddComponent: (EffectPlugin) -> Unit
+    onAddComponent: (EffectDevice) -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovering: Boolean by interaction.collectIsHoveredAsState()

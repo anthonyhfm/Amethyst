@@ -13,12 +13,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.vector.ImageVector
-import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
 import dev.anthonyhfm.amethyst.editor.plugins.color.ColorEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.filter.FilterEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.gradient.GradientPlugin
@@ -26,18 +22,17 @@ import dev.anthonyhfm.amethyst.editor.plugins.group.GroupPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.keyframes.KeyframesEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.offset.OffsetEffectPlugin
 import dev.anthonyhfm.amethyst.editor.plugins.preview.PreviewEffectPlugin
-import kotlin.reflect.KClass
 
 data class PickableComponent(
     val name: String,
     val icon: ImageVector,
-    val plugin: EffectPlugin
+    val plugin: EffectDevice
 )
 
 @Composable
 fun ComponentPicker(
     visible: Boolean,
-    onPickComponent: (EffectPlugin) -> Unit,
+    onPickComponent: (EffectDevice) -> Unit,
     onDismiss: () -> Unit
 ) {
     val pickableComponents: Array<PickableComponent> = arrayOf(

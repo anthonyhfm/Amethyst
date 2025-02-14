@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.HoverInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
 import dev.anthonyhfm.amethyst.editor.trackeditor.ui.AddComponentSpacer
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuArea
@@ -55,14 +54,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlin.math.exp
 
 /**
  * # The Group Plugin
  *
  * The Group Plugin is very different to the other plugins because of its ability to contain other plugins
  */
-class GroupPlugin : EffectPlugin() {
+class GroupPlugin : EffectDevice() {
     private val groups: MutableStateFlow<List<GroupData>> = MutableStateFlow(
         value = listOf(
             GroupData(
@@ -323,7 +321,7 @@ class GroupPlugin : EffectPlugin() {
         }
     }
 
-    fun addEffectToGroup(groupIndex: Int, effect: EffectPlugin, atIndex: Int? = null) {
+    fun addEffectToGroup(groupIndex: Int, effect: EffectDevice, atIndex: Int? = null) {
         CoroutineScope(Dispatchers.Main).launch {
             if (atIndex == null) {
                 groups.value[groupIndex].effects.emit(

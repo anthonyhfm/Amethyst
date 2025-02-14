@@ -5,22 +5,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
 import dev.anthonyhfm.amethyst.editor.plugins.keyframes.data.Keyframe
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.data.KeyframesContract
-import dev.anthonyhfm.amethyst.editor.plugins.keyframes.data.KeyframesContract.Event
 import dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.KeyframeEditorDialog
 import dev.anthonyhfm.amethyst.editor.plugins.keyframes.ui.KeyframeEditorViewModel
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
@@ -34,7 +29,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-class KeyframesEffectPlugin : EffectPlugin() {
+class KeyframesEffectPlugin : EffectDevice() {
     val keyframeData: MutableStateFlow<List<Keyframe>> = MutableStateFlow(
         value = listOf(
             Keyframe()

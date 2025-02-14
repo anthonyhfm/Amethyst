@@ -1,5 +1,5 @@
 package dev.anthonyhfm.amethyst.editor.plugins
 
-interface BasePlugin <Data> {
+interface BaseDevice <Data> {
     suspend fun passData(data: Data)
 }

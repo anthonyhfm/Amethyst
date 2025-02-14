@@ -4,21 +4,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
-import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import dev.anthonyhfm.amethyst.ui.previewdevices.LaunchpadPro
-import dev.anthonyhfm.amethyst.ui.previewdevices.PreviewState
 import dev.anthonyhfm.amethyst.ui.previewdevices.rememberPreviewState
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
-class FilterEffectPlugin : EffectPlugin() {
+class FilterEffectPlugin : EffectDevice() {
     private val filterData: MutableList<MutableList<Boolean>> = MutableList(
         size = 10,
         init = {

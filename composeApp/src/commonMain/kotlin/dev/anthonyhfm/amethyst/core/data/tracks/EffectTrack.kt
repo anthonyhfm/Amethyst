@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
-import dev.anthonyhfm.amethyst.editor.plugins.EffectPlugin
+import dev.anthonyhfm.amethyst.editor.plugins.EffectDevice
 import dev.atsushieno.ktmidi.MidiOutput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,10 +19,10 @@ class EffectTrack(
     var midiOutput: MidiOutput? = null
     var deviceType: DeviceType? = null
 
-    private val _effects = MutableStateFlow<List<EffectPlugin>>(emptyList())
+    private val _effects = MutableStateFlow<List<EffectDevice>>(emptyList())
     val effects = _effects.asStateFlow()
 
-    fun <T : EffectPlugin> addEffect(effect: T, atIndex: Int? = null) {
+    fun <T : EffectDevice> addEffect(effect: T, atIndex: Int? = null) {
         CoroutineScope(Dispatchers.Main).launch {
             if (atIndex == null) {
                 _effects.emit(
