@@ -27,8 +27,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class ColorEffectPlugin : EffectPlugin() {
-    override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
-
     var color: Color = Color.White
 
     @Composable
@@ -43,14 +41,8 @@ class ColorEffectPlugin : EffectPlugin() {
 
         AmethystPlugin(
             title = "Color",
-            enabled = isEnabled.collectAsState().value,
             modifier = Modifier
                 .width(200.dp),
-            onChangeEnabled = {
-                scope.launch {
-                    isEnabled.emit(it)
-                }
-            }
         ) {
             Column(
                 modifier = Modifier

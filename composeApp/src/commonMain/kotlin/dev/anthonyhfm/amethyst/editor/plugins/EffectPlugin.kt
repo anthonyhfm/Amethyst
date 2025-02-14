@@ -5,8 +5,6 @@ import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import kotlinx.coroutines.flow.MutableStateFlow
 
 abstract class EffectPlugin : BasePlugin<MidiEffectData> {
-    override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
-
     var midiOutput: (MidiEffectData) -> Unit = { }
 
     @Composable

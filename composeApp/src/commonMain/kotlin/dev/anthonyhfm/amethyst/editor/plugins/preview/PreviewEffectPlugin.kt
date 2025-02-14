@@ -18,26 +18,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class PreviewEffectPlugin : EffectPlugin() {
-    override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
-
     private var previewState: PreviewState? = null
 
     @Composable
     override fun Content() {
-        val scope = rememberCoroutineScope()
-
         previewState = rememberPreviewState()
 
         AmethystPlugin(
             title = "Preview",
-            enabled = isEnabled.collectAsState().value,
             modifier = Modifier
                 .width(230.dp),
-            onChangeEnabled = {
-                scope.launch {
-                    isEnabled.emit(it)
-                }
-            }
         ) {
             previewState?.let {
                 LaunchpadPro(

@@ -63,8 +63,6 @@ import kotlin.math.exp
  * The Group Plugin is very different to the other plugins because of its ability to contain other plugins
  */
 class GroupPlugin : EffectPlugin() {
-    override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(false)
-
     private val groups: MutableStateFlow<List<GroupData>> = MutableStateFlow(
         value = listOf(
             GroupData(
@@ -77,8 +75,6 @@ class GroupPlugin : EffectPlugin() {
 
     @Composable
     override fun Content() {
-        val scope = rememberCoroutineScope()
-
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
@@ -87,14 +83,8 @@ class GroupPlugin : EffectPlugin() {
         ) {
             AmethystPlugin(
                 title = "Group",
-                enabled = isEnabled.collectAsState().value,
                 modifier = Modifier
                     .width(180.dp),
-                onChangeEnabled = {
-                    scope.launch {
-                        isEnabled.emit(it)
-                    }
-                }
             ) {
                 Row {
                     Box(

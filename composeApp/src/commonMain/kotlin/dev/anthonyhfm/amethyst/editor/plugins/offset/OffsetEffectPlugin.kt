@@ -33,23 +33,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class OffsetEffectPlugin : EffectPlugin() {
-    override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
-
     private val offsetX: MutableState<Int> = mutableStateOf(0)
     private val offsetY: MutableState<Int> = mutableStateOf(0)
 
     @Composable
     override fun Content() {
-        val scope = rememberCoroutineScope()
-
         AmethystPlugin(
             title = "Offset",
-            enabled = isEnabled.collectAsState().value,
-            onChangeEnabled = {
-                scope.launch {
-                    isEnabled.emit(it)
-                }
-            },
             modifier = Modifier
                 .width(145.dp)
         ) {

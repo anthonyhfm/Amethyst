@@ -38,7 +38,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
@@ -56,8 +55,6 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 class GradientPlugin : EffectPlugin() {
-    override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
-
     private val gradientData: MutableStateFlow<List<GradientColor>> = MutableStateFlow(
         value = listOf(
             GradientColor(0f, Color.White),
@@ -88,12 +85,6 @@ class GradientPlugin : EffectPlugin() {
 
         AmethystPlugin(
             title = "Gradient",
-            enabled = isEnabled.collectAsState().value,
-            onChangeEnabled = {
-                scope.launch {
-                    isEnabled.emit(it)
-                }
-            },
             modifier = Modifier
                 .width(
                     width = if (selectedColor != null) {

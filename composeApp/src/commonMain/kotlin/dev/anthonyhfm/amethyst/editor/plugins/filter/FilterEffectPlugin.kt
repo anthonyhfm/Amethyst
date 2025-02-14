@@ -19,8 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class FilterEffectPlugin : EffectPlugin() {
-    override var isEnabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
-
     private val filterData: MutableList<MutableList<Boolean>> = MutableList(
         size = 10,
         init = {
@@ -56,14 +54,8 @@ class FilterEffectPlugin : EffectPlugin() {
 
         AmethystPlugin(
             title = "Filter",
-            enabled = isEnabled.collectAsState().value,
             modifier = Modifier
                 .width(230.dp),
-            onChangeEnabled = {
-                scope.launch {
-                    isEnabled.emit(it)
-                }
-            }
         ) {
             LaunchpadPro(
                 previewState = previewState,

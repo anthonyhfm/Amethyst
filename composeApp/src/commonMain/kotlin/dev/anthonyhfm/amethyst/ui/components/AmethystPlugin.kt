@@ -21,8 +21,6 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AmethystPlugin(
     title: String,
-    enabled: Boolean,
-    onChangeEnabled: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {

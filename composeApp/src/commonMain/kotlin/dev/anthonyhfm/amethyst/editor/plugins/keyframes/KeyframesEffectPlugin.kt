@@ -45,7 +45,6 @@ class KeyframesEffectPlugin : EffectPlugin() {
 
     @Composable
     override fun Content() {
-        val scope = rememberCoroutineScope()
         var editorVisible: Boolean by remember { mutableStateOf(false) }
         val editorViewModel = remember { KeyframeEditorViewModel(keyframeData) }
 
@@ -55,12 +54,6 @@ class KeyframesEffectPlugin : EffectPlugin() {
 
         AmethystPlugin(
             title = "Keyframes",
-            enabled = isEnabled.collectAsState().value,
-            onChangeEnabled = {
-                scope.launch {
-                    isEnabled.emit(it)
-                }
-            },
             modifier = Modifier
                 .width(120.dp)
         ) {
