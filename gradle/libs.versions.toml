@@ -48,12 +48,7 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 ktmidi = { module = "dev.atsushieno:ktmidi", version.ref = "ktmidi" }
 ktmidi-jvm-desktop = { module = "dev.atsushieno:ktmidi-jvm-desktop", version.ref = "ktmidi" }
-alsa-javacpp = { module = "dev.atsushieno:alsa-javacpp", version.ref = "alsa-javacpp" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
-rtmidi-javacpp = { module = "dev.atsushieno:rtmidi-javacpp", version.ref = "rtmidi-javacpp" }
-rtmidi-javacpp-platform = { module = "dev.atsushieno:rtmidi-javacpp-platform", version.ref = "rtmidi-javacpp" }
-libremidi-javacpp = { module = "dev.atsushieno:libremidi-javacpp", version.ref = "libremidi-javacpp" }
-libremidi-javacpp-platform = { module = "dev.atsushieno:libremidi-javacpp-platform", version.ref = "libremidi-javacpp" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -61,4 +56,3 @@ androidLibrary = { id = "com.android.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-javacppPlatformPlugin = { id = "org.bytedeco.gradle-javacpp-platform", version.ref = "javacpp-platform-plugin" }
