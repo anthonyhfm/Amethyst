@@ -29,6 +29,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
+import dev.anthonyhfm.amethyst.core.midi.devices.novation.LaunchpadMiniMk3Device
+import dev.anthonyhfm.amethyst.core.midi.devices.novation.LaunchpadMk2Device
 import dev.anthonyhfm.amethyst.core.midi.devices.novation.LaunchpadProMk3Device
 import dev.anthonyhfm.amethyst.core.midi.devices.novation.LaunchpadXDevice
 import dev.anthonyhfm.amethyst.core.midi.devices.others.MatrixDevice
@@ -294,7 +296,9 @@ fun TypeSelectionDialog(
         listOf(
             LaunchpadProMk3Device(),
             LaunchpadXDevice(),
+            LaunchpadMiniMk3Device(),
             MatrixDevice(),
+            LaunchpadMk2Device()
         )
     ) }
 
