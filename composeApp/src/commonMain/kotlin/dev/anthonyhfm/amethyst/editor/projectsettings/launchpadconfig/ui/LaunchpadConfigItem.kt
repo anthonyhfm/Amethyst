@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.novation.LaunchpadProMk3Device
+import dev.anthonyhfm.amethyst.core.midi.devices.novation.LaunchpadXDevice
 import dev.anthonyhfm.amethyst.core.midi.devices.others.MatrixDevice
 import dev.atsushieno.ktmidi.MidiAccess
 import dev.atsushieno.ktmidi.MidiPortDetails
@@ -292,6 +293,7 @@ fun TypeSelectionDialog(
     val deviceTypes by remember { mutableStateOf(
         listOf(
             LaunchpadProMk3Device(),
+            LaunchpadXDevice(),
             MatrixDevice(),
         )
     ) }
