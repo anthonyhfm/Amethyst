@@ -63,7 +63,10 @@ kotlin {
             implementation(libs.filekit.core)
         }
         desktopMain.dependencies {
-            implementation(compose.desktop.currentOs)
+            implementation(compose.desktop.currentOs) {
+                exclude(compose.material)
+            }
+
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)

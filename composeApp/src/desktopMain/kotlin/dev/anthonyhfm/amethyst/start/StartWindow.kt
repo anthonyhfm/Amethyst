@@ -1,17 +1,24 @@
 package dev.anthonyhfm.amethyst.start
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.start.ui.AmethystWelcome
+import dev.anthonyhfm.amethyst.start.ui.ProjectsView
 import dev.anthonyhfm.amethyst.ui.modifier.platformPaddingTop
 
 @Composable
@@ -23,9 +30,13 @@ fun StartWindow(
         title = "Amethyst",
         state = rememberWindowState(
             width = 700.dp,
-            height = 450.dp
+            height = 450.dp,
+            position = WindowPosition.Aligned(Alignment.Center)
         ),
+        resizable = false
     ) {
+        val viewModel = viewModel { StartWindowViewModel() }
+
         if(DesktopPlatform.get() == DesktopPlatform.MacOS) {
             window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
             window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
@@ -42,7 +53,20 @@ fun StartWindow(
                     modifier = Modifier
                         .platformPaddingTop()
                 ) {
-                    AmethystWelcome()
+                    AmethystWelcome(
+                        onClickGitHub = {
+                            viewModel.openGitHubWebsite()
+                        }
+                    )
+
+                    ProjectsView(
+                        onClickCreateProject = {
+                            viewModel.onClickCreateProject()
+                        },
+                        onClickOpenProject = {
+                            viewModel.onClickOpenProject()
+                        }
+                    )
                 }
             }
         }
