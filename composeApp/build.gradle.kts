@@ -113,8 +113,14 @@ compose.desktop {
                 iconFile.set(project.file("../icons/amethyst_macos.icns"))
             }
 
+            windows {
+                iconFile.set(project.file("../icons/amethyst_windows.ico"))
+            }
+
             linux {
                 modules("jdk.security.auth") // Required for FileKit
+
+                iconFile.set(project.file("../icons/amethyst_linux.png"))
             }
 
             packageName = "Amethyst"
