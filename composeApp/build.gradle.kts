@@ -58,7 +58,9 @@ kotlin {
 
             implementation(libs.colorpicker.compose)
             implementation(libs.reorderable)
+
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.0")
+            implementation(libs.filekit.core)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
@@ -109,6 +111,10 @@ compose.desktop {
 
             macOS {
                 iconFile.set(project.file("../icons/amethyst_macos.icns"))
+            }
+
+            linux {
+                modules("jdk.security.auth") // Required for FileKit
             }
 
             packageName = "Amethyst"
