@@ -4,18 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class LaunchpadConfigViewModel(
     private val projectRepository: ProjectRepository
 ) : ViewModel() {
     fun createDevice() {
-        viewModelScope.launch {
-            projectRepository.launchpadConfigs.emit(
-                projectRepository.launchpadConfigs.value.plus(
-                    ProjectDeviceConfig(
-                        name = "Launchpad ${projectRepository.launchpadConfigs.value.size + 1}"
-                    )
+        projectRepository.launchpadConfigs.update {
+            it.plus(
+                ProjectDeviceConfig(
+                    name = "Launchpad ${projectRepository.launchpadConfigs.value.size + 1}"
                 )
             )
         }
@@ -30,16 +29,14 @@ class LaunchpadConfigViewModel(
             before.output?.close()
         }
 
-        viewModelScope.launch {
-            projectRepository.launchpadConfigs.emit(
-                projectRepository.launchpadConfigs.value.map {
-                    if (it == before) {
-                        after
-                    } else {
-                        it
-                    }
+        projectRepository.launchpadConfigs.update {
+            it.map {
+                if (it == before) {
+                    after
+                } else {
+                    it
                 }
-            )
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 import dev.anthonyhfm.amethyst.core.data.tracks.EffectTrack
 import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
 import dev.atsushieno.ktmidi.MidiInput
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class EditorViewModel(
@@ -18,18 +19,20 @@ class EditorViewModel(
         viewModelScope.launch {
             projectRepository.launchpadConfigs.collect {
                 it.forEachIndexed { deviceIndex, deviceConfig ->
-                    projectRepository.tracks.emit(
-                        projectRepository.tracks.value.filterIsInstance<EffectTrack>().map {
+                    projectRepository.tracks.update {
+                        it.map {
                             if (it.projectDeviceIndex == deviceIndex) {
-                                it.midiOutput = deviceConfig.output
-                                it.deviceType = deviceConfig.type
+                                if (it is EffectTrack) {
+                                    it.midiOutput = deviceConfig.output
+                                    it.deviceType = deviceConfig.type
+                                }
 
                                 return@map it
                             } else {
                                 return@map it
                             }
                         }
-                    )
+                    }
 
                     deviceConfig.input?.setMessageReceivedListener(
                         listener = { bytes, b, c, d ->

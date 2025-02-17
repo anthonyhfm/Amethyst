@@ -14,7 +14,10 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import java.awt.Desktop
 import java.net.URI
 
-class StartWindowViewModel : ViewModel() {
+class StartWindowViewModel(
+    val amethystWriter: AmethystWriter,
+    val amethystReader: AmethystReader
+) : ViewModel() {
     var onOpenEditor: (() -> Unit)? = null
 
     fun openGitHubWebsite() {
@@ -29,14 +32,14 @@ class StartWindowViewModel : ViewModel() {
             val file = FileKit.saveFile(
                 bytes = ProtoBuf.encodeToByteArray(
                     serializer = AmethystProject.serializer(),
-                    value = AmethystWriter.getTemplateProject()
+                    value = amethystWriter.getTemplateProject()
                 ),
                 extension = "aspj",
                 baseName = "project",
             )
 
             file?.readBytes()?.let { bytes ->
-                AmethystReader.readFromFile(bytes)
+                amethystReader.readFromFile(bytes)
             }
 
             onOpenEditor?.invoke()
@@ -56,7 +59,7 @@ class StartWindowViewModel : ViewModel() {
             )
 
             file?.readBytes()?.let { bytes ->
-                AmethystReader.readFromFile(bytes)
+                amethystReader.readFromFile(bytes)
             }
 
             onOpenEditor?.invoke()

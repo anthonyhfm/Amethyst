@@ -1,8 +1,10 @@
 package dev.anthonyhfm.amethyst.core.data.project
 
-import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
+import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 
-object AmethystWriter {
+class AmethystWriter(
+    private val projectRepository: ProjectRepository
+) {
     fun getTemplateProject(): AmethystProject {
         return AmethystProject(
             name = "New Project",

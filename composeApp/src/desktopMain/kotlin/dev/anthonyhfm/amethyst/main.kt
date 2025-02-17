@@ -1,19 +1,26 @@
 package dev.anthonyhfm.amethyst
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import dev.anthonyhfm.amethyst.core.koin.amethystKoinModule
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
+import dev.anthonyhfm.amethyst.editor.Editor
+import dev.anthonyhfm.amethyst.editor.EditorWindow
 import dev.anthonyhfm.amethyst.start.StartWindow
+import org.koin.compose.KoinApplication
 
 fun main() {
     val platform = DesktopPlatform.get()
@@ -24,39 +31,21 @@ fun main() {
     }
 
     application {
-        var showEditor: Boolean by remember { mutableStateOf(false) }
+        KoinApplication(
+            application = {
+                modules(amethystKoinModule)
+            }
+        ) {
+            var showEditor: Boolean by remember { mutableStateOf(false) }
 
-        if (!showEditor) {
-            StartWindow(
-                onOpenEditor = {
-                    showEditor = true
-                }
-            )
-        } else {
-            Window(
-                onCloseRequest = ::exitApplication,
-                title = "Amethyst",
-                state = rememberWindowState(
-                    width = 1200.dp,
-                    height = 800.dp
-                )
-            ) {
-                if(platform == DesktopPlatform.MacOS) {
-                    window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
-                    window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
-                }
-
-                MaterialTheme(
-                    colorScheme = darkColorScheme()
-                ) {
-                    Column {
-                        if (platform == DesktopPlatform.MacOS) {
-                            OSXTitleBar()
-                        }
-
-                        App()
+            if (!showEditor) {
+                StartWindow(
+                    onOpenEditor = {
+                        showEditor = true
                     }
-                }
+                )
+            } else {
+                EditorWindow()
             }
         }
     }
