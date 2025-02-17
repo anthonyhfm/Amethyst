@@ -3,8 +3,9 @@ package dev.anthonyhfm.amethyst.devices.effects.filter
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -16,7 +17,6 @@ import dev.anthonyhfm.amethyst.ui.previewdevices.LaunchpadPro
 import dev.anthonyhfm.amethyst.ui.previewdevices.rememberPreviewState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 class FilterEffectDevice : EffectDevice<FilterEffectDeviceState>() {
@@ -24,11 +24,11 @@ class FilterEffectDevice : EffectDevice<FilterEffectDeviceState>() {
 
     @Composable
     override fun Content() {
-        val scope = rememberCoroutineScope()
         val previewState = rememberPreviewState()
+        val deviceState by state.collectAsState()
 
-        LaunchedEffect(Unit) { // Loads the saved filterData into a new previewState when recomposed
-            state.value.filterData.forEachIndexed { x, data ->
+        LaunchedEffect(deviceState.filterData) { // Loads the saved filterData into a new previewState when recomposed
+            deviceState.filterData.forEachIndexed { x, data ->
                 data.forEachIndexed { y, enabled ->
                     previewState.sendToPreview(
                         data = MidiEffectData(
@@ -51,38 +51,18 @@ class FilterEffectDevice : EffectDevice<FilterEffectDeviceState>() {
             LaunchpadPro(
                 previewState = previewState,
                 onClick = { x, y ->
-                    scope.launch {
-                        if (state.value.filterData[x][y]) {
-                            previewState.sendToPreview(
-                                data = MidiEffectData(
-                                    x = x,
-                                    y = y,
-                                    r = 0,
-                                    g = 0,
-                                    b = 0,
-                                )
-                            )
-                        } else {
-                            previewState.sendToPreview(
-                                data = MidiEffectData(
-                                    x = x,
-                                    y = y,
-                                    r = 20,
-                                    g = 20,
-                                    b = 63,
-                                )
-                            )
-                        }
-
-                        state.update {
-                            it.copy(
-                                filterData = it.filterData.toMutableList().apply {
-                                    this[x].toMutableList().apply {
-                                        this[y] = !it.filterData[x][y]
+                    state.update {
+                        it.copy(
+                            filterData = it.filterData.mapIndexed { x_index, y_list ->
+                                y_list.mapIndexed { y_index, enabled ->
+                                    if (x_index == x && y_index == y) {
+                                        !enabled
+                                    } else {
+                                        enabled
                                     }
                                 }
-                            )
-                        }
+                            }
+                        )
                     }
                 },
                 modifier = Modifier
