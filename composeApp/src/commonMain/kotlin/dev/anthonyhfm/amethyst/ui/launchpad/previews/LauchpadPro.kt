@@ -1,10 +1,9 @@
-package dev.anthonyhfm.amethyst.ui.previewdevices
+package dev.anthonyhfm.amethyst.ui.launchpad.previews
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,68 +18,73 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
+import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadButton
+import dev.anthonyhfm.amethyst.ui.previewdevices.rememberPreviewState
 
 @Composable
 fun LaunchpadPro(
-    previewState: PreviewState,
-    onClick: ((x: Int, y: Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val state by previewState.grid.collectAsState()
+    val state = rememberPreviewState().grid.value
 
-    Column(
+    Box(
         modifier = modifier
+            .shadow(12.dp, RoundedCornerShape(6))
             .clip(RoundedCornerShape(6))
             .aspectRatio(1f / 1f)
-            .background(Color(0xFF0d0d0d)),
+            .background(Color(0xFF0d0d0d))
     ) {
-        Spacer(modifier = Modifier.weight(0.5f))
+        GenericLaunchpadButton(
+            effect = state[9][9],
+            enableLightSpot = false,
+            sizeModifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(0.02f)
+                .aspectRatio(1 / 1f)
+        )
 
-        for (y in 9 downTo 0) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                Spacer(modifier = Modifier.weight(0.5f))
+        Column(
+            modifier = modifier
+        ) {
+            Spacer(modifier = Modifier.weight(0.5f))
 
-                for (x in 0..9) {
-                    GridPad(
-                        x = x,
-                        y = y,
-                        effectData = state[x][y],
-                        onClick = if (onClick == null) {
-                            null
-                        } else {
-                            {
-                                onClick(x, y)
-                            }
+            for (y in 9 downTo 0) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    Spacer(modifier = Modifier.weight(0.5f))
+
+                    for (x in 0..9) {
+                        GridPad(
+                            x = x,
+                            y = y,
+                            effectData = state[x][y],
+                            onClick = null
+                        )
+
+                        if (x != 9) {
+                            Spacer(modifier = Modifier.weight(0.1f))
                         }
-                    )
-
-                    if (x != 9) {
-                        Spacer(modifier = Modifier.weight(0.1f))
                     }
+
+                    Spacer(modifier = Modifier.weight(0.5f))
                 }
 
-                Spacer(modifier = Modifier.weight(0.5f))
+                Spacer(modifier = Modifier.weight(0.1f))
             }
 
-            Spacer(modifier = Modifier.weight(0.1f))
+            Spacer(modifier = Modifier.weight(0.5f))
         }
-
-        Spacer(modifier = Modifier.weight(0.5f))
     }
 }
 
@@ -129,9 +133,13 @@ private fun RowScope.GridPad(
                 effectData = effectData
             )
         } else if (x in 1..8 && y in 1..8) {
-            RegularPad(
-                effectData = effectData
+            GenericLaunchpadButton(
+                sizeModifier = Modifier
+                    .fillMaxSize(0.9f),
+                effect = effectData
             )
+        } else if (x == 0 && y == 9) {
+            SetupButton()
         }
     }
 }
@@ -140,29 +148,25 @@ private fun RowScope.GridPad(
 private fun CircularPad(effectData: MidiEffectData) {
     Box(
         modifier = Modifier
-            .clip(CircleShape)
-            .fillMaxSize(0.8f)
-            .background(computeColor(effectData)),
+            .fillMaxSize(0.8f),
 
         contentAlignment = Alignment.Center
     ) {
+        GenericLaunchpadButton(
+            sizeModifier = Modifier
+                .fillMaxSize(0.9f),
+            enableLightSpot = false,
+            shape = CircleShape,
+            effect = effectData
+        )
+
         Box(
             modifier = Modifier
                 .clip(CircleShape)
-                .fillMaxSize(0.8f)
+                .fillMaxSize(0.75f)
                 .background(Color(0xFF0A0A0A))
         )
     }
-}
-
-@Composable
-private fun RegularPad(effectData: MidiEffectData) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10))
-            .fillMaxSize(0.9f)
-            .background(computeColor(effectData))
-    )
 }
 
 @Composable
@@ -173,9 +177,8 @@ private fun ClippedPad(
     bottomRight: Boolean,
     effectData: MidiEffectData
 ) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10))
+    GenericLaunchpadButton(
+        sizeModifier = Modifier
             .clip(
                 CutCornerShape(
                     bottomEndPercent = if (topLeft) 30 else 0,
@@ -184,22 +187,18 @@ private fun ClippedPad(
                     topStartPercent = if (bottomRight) 30 else 0,
                 )
             )
-            .fillMaxSize(0.9f)
-            .background(computeColor(effectData))
+            .fillMaxSize(0.9f),
+        effect = effectData
     )
 }
 
-private fun computeColor(effectData: MidiEffectData): Color {
-    val minComponent = 0x50
-    val maxComponent = 0xFF
-
-    fun scaleColor(component: Int): Int {
-        return ((component / 63f) * (maxComponent - minComponent) + minComponent).toInt()
-    }
-
-    val red = scaleColor(effectData.r)
-    val green = scaleColor(effectData.g)
-    val blue = scaleColor(effectData.b)
-
-    return Color(red, green, blue)
+@Composable
+private fun SetupButton() {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .fillMaxSize(0.4f)
+            .background(Color(0xFF121212))
+            .border(1.dp, Color(0xFF171717), CircleShape),
+    )
 }

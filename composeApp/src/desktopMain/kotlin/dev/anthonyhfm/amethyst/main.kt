@@ -7,8 +7,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.application
 import dev.anthonyhfm.amethyst.core.koin.amethystKoinModule
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
-import dev.anthonyhfm.amethyst.advanced_editor.EditorWindow
 import dev.anthonyhfm.amethyst.start.StartWindow
+import dev.anthonyhfm.amethyst.workspace.WorkspaceWindow
 import org.koin.compose.KoinApplication
 
 fun main() {
@@ -25,7 +25,7 @@ fun main() {
                 modules(amethystKoinModule)
             }
         ) {
-            var showEditor: Boolean by remember { mutableStateOf(false) }
+            var showEditor: Boolean by remember { mutableStateOf(true) }
 
             if (!showEditor) {
                 StartWindow(
@@ -34,7 +34,7 @@ fun main() {
                     }
                 )
             } else {
-                EditorWindow()
+                WorkspaceWindow()
             }
         }
     }

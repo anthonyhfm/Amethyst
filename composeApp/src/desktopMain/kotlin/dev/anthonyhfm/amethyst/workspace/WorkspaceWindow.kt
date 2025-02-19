@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.advanced_editor
+package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
@@ -8,13 +8,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
+import dev.anthonyhfm.amethyst.advanced_editor.AdvancedEditor
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
-import dev.anthonyhfm.amethyst.advanced_editor.ui.EditorMenuBar
+import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
 import kotlin.system.exitProcess
 
 @Composable
-fun EditorWindow() {
+fun WorkspaceWindow() {
     Window(
         onCloseRequest = {
             exitProcess(0)
@@ -25,7 +26,7 @@ fun EditorWindow() {
             height = 800.dp
         )
     ) {
-        EditorMenuBar()
+        WorkspaceMenuBar()
 
         LaunchedEffect(Unit) {
             if(DesktopPlatform.get() == DesktopPlatform.MacOS) {
@@ -42,7 +43,7 @@ fun EditorWindow() {
                     OSXTitleBar()
                 }
 
-                AdvancedEditor()
+                Workspace()
             }
         }
     }
