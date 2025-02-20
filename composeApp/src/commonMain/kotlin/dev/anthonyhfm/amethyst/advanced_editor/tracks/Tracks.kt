@@ -29,7 +29,7 @@ fun Tracks(
     onSelectTrack: (Int) -> Unit
 ) {
     val viewModel = koinViewModel<TracksViewModel>()
-    val tracks: List<Track<*>> by viewModel.tracks.collectAsState()
+    // val tracks: List<Track<*>> by viewModel.tracks.collectAsState()
     val deviceConfigs: List<ProjectDeviceConfig> by viewModel.deviceConfigs.collectAsState()
 
     val verticalScrollState = rememberScrollState()
@@ -55,7 +55,7 @@ fun Tracks(
                 modifier = Modifier
                     .verticalScroll(verticalScrollState)
             ) {
-                tracks.forEachIndexed { index, track ->
+                /*tracks.forEachIndexed { index, track ->
                     TrackElement(
                         selected = selectedTrack == index,
                         onSelect = {
@@ -67,7 +67,7 @@ fun Tracks(
                             viewModel.changeDeviceConfig(index, it)
                         }
                     )
-                }
+                }*/
 
                 CreateTrackButton(
                     onCreate = {

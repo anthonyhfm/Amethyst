@@ -42,15 +42,6 @@ fun LaunchpadPro(
             .aspectRatio(1f / 1f)
             .background(Color(0xFF0d0d0d))
     ) {
-        GenericLaunchpadButton(
-            effect = state[9][9],
-            enableLightSpot = false,
-            sizeModifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(0.02f)
-                .aspectRatio(1 / 1f)
-        )
-
         Column(
             modifier = modifier
         ) {

@@ -19,7 +19,7 @@ class TrackEditorViewModel(
 
     fun selectTrack(index: Int? = null) {
         viewModelScope.launch {
-            state.emit(
+            /*state.emit(
                 state.value.copy(
                     trackSelected = index != null,
                     selectedTrack = index,
@@ -27,12 +27,12 @@ class TrackEditorViewModel(
                         projectRepository.tracks.value[index].devices
                     }
                 )
-            )
+            )*/
         }
     }
 
     fun onAddDevice(device: BaseDevice<*, *>, atIndex: Int? = null) {
-        state.value.selectedTrack?.let { selectedTrack ->
+        /*state.value.selectedTrack?.let { selectedTrack ->
             when (projectRepository.tracks.value[selectedTrack]) {
                 is EffectTrack -> {
                     projectRepository.tracks.value[selectedTrack].addDevice(
@@ -48,7 +48,7 @@ class TrackEditorViewModel(
                     )
                 }
             }
-        }
+        }*/
     }
 }
 

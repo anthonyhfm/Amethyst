@@ -4,9 +4,7 @@ import dev.anthonyhfm.amethyst.core.data.ProjectRepository
 import dev.anthonyhfm.amethyst.core.data.project.AmethystReader
 import dev.anthonyhfm.amethyst.core.data.project.AmethystWriter
 import dev.anthonyhfm.amethyst.core.midi.midiKoinModule
-import dev.anthonyhfm.amethyst.advanced_editor.AdvancedEditorViewModel
-import dev.anthonyhfm.amethyst.advanced_editor.trackeditor.TrackEditorViewModel
-import dev.anthonyhfm.amethyst.advanced_editor.tracks.TracksViewModel
+import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -18,7 +16,5 @@ val amethystKoinModule = module {
     single { AmethystReader(get()) }
     single { AmethystWriter(get()) }
 
-    viewModel { AdvancedEditorViewModel(get()) }
-    viewModel { TracksViewModel(get()) }
-    viewModel { TrackEditorViewModel(get()) }
+    viewModel { WorkspaceViewModel(get()) }
 }

@@ -15,32 +15,32 @@ import kotlinx.coroutines.launch
 class TracksViewModel(
     private val projectRepository: ProjectRepository
 ) : ViewModel() {
-    val tracks: StateFlow<List<Track<*>>> = projectRepository.tracks
+    // val tracks: StateFlow<List<Track<*>>> = projectRepository.tracks
     val deviceConfigs: StateFlow<List<ProjectDeviceConfig>> = projectRepository.launchpadConfigs
 
     fun createTrack(trackType: CreateTrackType) {
         when (trackType) {
             CreateTrackType.Effect -> {
                 viewModelScope.launch {
-                    projectRepository.tracks.update {
+                    /*projectRepository.tracks.update {
                         it.plus(
                             EffectTrack(
                                 name = "Effect Track ${it.size + 1}"
                             )
                         )
-                    }
+                    }*/
                 }
             }
 
             CreateTrackType.Audio -> {
                 viewModelScope.launch {
-                    projectRepository.tracks.update {
+                    /*projectRepository.tracks.update {
                         it.plus(
                             AudioTrack(
                                 name = "Audio Track ${it.size + 1}"
                             )
                         )
-                    }
+                    }*/
                 }
             }
         }
@@ -48,7 +48,7 @@ class TracksViewModel(
 
     fun changeDeviceConfig(trackIndex: Int, deviceIndex: Int) {
         viewModelScope.launch {
-            projectRepository.tracks.update {
+            /*projectRepository.tracks.update {
                 it.mapIndexed { index, track ->
                     if (index == trackIndex && track is EffectTrack) {
                         track.projectDeviceIndex = deviceIndex
@@ -58,7 +58,7 @@ class TracksViewModel(
 
                     track
                 }
-            }
+            }*/
         }
     }
 }

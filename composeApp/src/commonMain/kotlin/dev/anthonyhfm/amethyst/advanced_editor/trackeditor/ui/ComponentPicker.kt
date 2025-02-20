@@ -23,7 +23,6 @@ import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientEffectDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupEffectDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesEffectDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetEffectDevice
-import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewEffectDevice
 
 data class PickableComponent(
     val name: String,
@@ -72,11 +71,6 @@ fun ComponentPicker(
             name = "Keyframes",
             icon = Icons.Default.Animation,
             plugin = KeyframesEffectDevice()
-        ),
-        PickableComponent(
-            name = "Preview",
-            icon = Icons.Default.Preview,
-            plugin = PreviewEffectDevice()
         ),
     )
 

@@ -21,7 +21,7 @@ class AmethystReader(
     }
 
     fun loadTracks(tracks: List<TrackData>) {
-        projectRepository.tracks.update {
+        /*projectRepository.tracks.update {
             tracks.map { trackData ->
                 when (trackData.type) {
                     TrackData.TrackType.EFFECT -> {
@@ -37,6 +37,6 @@ class AmethystReader(
                     }
                 }
             }
-        }
+        }*/
     }
 }

@@ -19,7 +19,7 @@ class AdvancedEditorViewModel(
         viewModelScope.launch {
             projectRepository.launchpadConfigs.collect {
                 it.forEachIndexed { deviceIndex, deviceConfig ->
-                    projectRepository.tracks.update {
+                    /*projectRepository.tracks.update {
                         it.map {
                             if (it.projectDeviceIndex == deviceIndex) {
                                 if (it is EffectTrack) {
@@ -32,7 +32,7 @@ class AdvancedEditorViewModel(
                                 return@map it
                             }
                         }
-                    }
+                    }*/
 
                     deviceConfig.input?.setMessageReceivedListener(
                         listener = { bytes, b, c, d ->
@@ -45,7 +45,7 @@ class AdvancedEditorViewModel(
     }
 
     private fun handleMidiInput(midiInput: MidiInput, data: ByteArray) {
-        projectRepository.tracks.value.forEach { track ->
+        /*projectRepository.tracks.value.forEach { track ->
             track.projectDeviceIndex?.let { projectDeviceIndex ->
                 if (projectRepository.launchpadConfigs.value[projectDeviceIndex].input == midiInput) {
                     getMidiInputData(data)?.let {
@@ -53,7 +53,7 @@ class AdvancedEditorViewModel(
                     }
                 }
             }
-        }
+        }*/
     }
 
     fun selectTrack(trackIndex: Int) {
