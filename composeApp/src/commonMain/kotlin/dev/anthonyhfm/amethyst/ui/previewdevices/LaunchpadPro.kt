@@ -37,7 +37,7 @@ fun LaunchpadPro(
     onClick: ((x: Int, y: Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val state by previewState.grid.collectAsState()
+    val state by previewState.grid
 
     Column(
         modifier = modifier
@@ -59,7 +59,7 @@ fun LaunchpadPro(
                     GridPad(
                         x = x,
                         y = y,
-                        effectData = state[x][y],
+                        effectData = state[x + y * 10],
                         onClick = if (onClick == null) {
                             null
                         } else {

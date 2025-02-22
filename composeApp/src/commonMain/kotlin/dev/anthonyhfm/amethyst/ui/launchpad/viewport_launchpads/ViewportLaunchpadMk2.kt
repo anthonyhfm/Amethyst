@@ -33,7 +33,7 @@ class ViewportLaunchpadMk2(
     override var size: Size = Size(9f, 9f),
 ) : LaunchpadViewportElement() {
     override val content: @Composable (() -> Unit) = {
-        val previewGrid by previewState.grid.collectAsState()
+        val previewGrid by previewState.grid
 
         GenericLaunchpadLayout(
             layoutType = LaunchpadLayout.LAYOUT_9X9,
@@ -46,7 +46,7 @@ class ViewportLaunchpadMk2(
             GridPad(
                 x = x,
                 y = y,
-                effectData = previewGrid[x][y],
+                effectData = previewGrid[x + y * 10],
                 onClick = null
             )
         }
