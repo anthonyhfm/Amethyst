@@ -90,9 +90,8 @@ private fun GridPad(
         } else {
             GenericLaunchpadButton(
                 sizeModifier = Modifier
-                    .fillMaxSize(0.86f),
+                    .fillMaxSize(0.82f),
                 effect = effectData,
-                shape = RoundedCornerShape(4)
             )
         }
     }
@@ -116,8 +115,7 @@ private fun ClippedPad(
                     topStartPercent = if (bottomRight) 30 else 0,
                 )
             )
-            .fillMaxSize(0.86f),
+            .fillMaxSize(0.82f),
         effect = effectData,
-        shape = RoundedCornerShape(4)
     )
 }

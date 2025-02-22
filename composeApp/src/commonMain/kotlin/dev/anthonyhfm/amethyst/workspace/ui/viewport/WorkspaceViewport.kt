@@ -27,6 +27,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlin.math.abs
@@ -137,7 +138,10 @@ fun WorkspaceViewport(
 
                     if (viewportState.selectedElement == index) {
                         Row(
-                            modifier = Modifier.align(Alignment.TopCenter).offset(y = -56.dp),
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .offset(y = -56.dp)
+                                .zIndex(1000f),
                         ) {
                             element.actions(this)
                         }
