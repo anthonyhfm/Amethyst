@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.ui.launchpad.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,29 +7,33 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 
 @Composable
-fun GenericLaunchpadLayout(modifier: Modifier = Modifier) {
+fun GenericLaunchpadLayout(
+    modifier: Modifier = Modifier,
+    layoutType: LaunchpadLayout = LaunchpadLayout.LAYOUT_10X10,
+    buttonContent: @Composable (x: Int, y: Int) -> Unit
+) {
     Box(
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize(),
         ) {
-            for (row in 0 until 10) {
+            for (row in (layoutType.y - 1) downTo 0) {
                 Row(
                     modifier = Modifier
                         .weight(1f)
                 ) {
-                    for (col in 0 until 10) {
+                    for (col in 0 until layoutType.x) {
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1 / 1f)
-                                .background(if ((row + col) % 2 == 0) Color.Black else Color.White)
-                        )
+                        ) {
+                            buttonContent(col + layoutType.offsetX, row + layoutType.offsetY)
+                        }
                     }
                 }
             }

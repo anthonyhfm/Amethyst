@@ -8,29 +8,39 @@ interface WorkspaceContract {
         data object AddDeviceToViewport : Event
 
         data class ChangeWorkspaceMode(val mode: WorkspaceMode) : Event
+        data class OnSelectDevice(val index: Int?) : Event
         data class ChangeViewportElementPosition(
             val index: Int,
             val offset: Offset
         ) : Event
+        data class OnPanViewport(val offset: Offset) : Event
         data class OnClickDeviceConfigure(val index: Int) : Event
         data object OnDismissDeviceConfigure : Event
     }
 
-    sealed interface Effect {
-
-    }
+    sealed interface Effect
 
     data class State(
-        val mode: WorkspaceMode = WorkspaceMode.PREVIEW,
+        val mode: WorkspaceMode = WorkspaceMode.LAYOUT,
         val showDeviceConfigurator: Int? = null,
+        val viewportState: ViewportState = ViewportState(),
         val viewportElements: List<LaunchpadViewportElement> = emptyList()
+    )
+
+    data class ViewportState(
+        val offset: Offset = Offset.Zero,
+        val zoom: Float = 1f,
+        val selectedElement: Int? = null,
     )
 
     enum class WorkspaceMode(
         val displayName: String,
-        // If selectable, it will be displayed in the Workspace Mode Switcher list.
         val selectable: Boolean
     ) {
+        LAYOUT(
+            displayName = "Layout Mode",
+            selectable = true
+        ),
         PREVIEW(
             displayName = "Preview Mode",
             selectable = true

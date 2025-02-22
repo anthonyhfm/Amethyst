@@ -1,87 +1,61 @@
-package dev.anthonyhfm.amethyst.ui.launchpad.previews
+package dev.anthonyhfm.amethyst.ui.launchpad.viewport_launchpads
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadButton
-import dev.anthonyhfm.amethyst.ui.previewdevices.rememberPreviewState
+import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadLayout
+import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
-@Composable
-fun LaunchpadPro(
-    modifier: Modifier = Modifier
-) {
-    val state = rememberPreviewState().grid.value
+class ViewportLaunchpadX(
+    override var shape: Shape = RoundedCornerShape(2),
+    override var size: Size = Size(9f, 9f),
+) : LaunchpadViewportElement() {
+    override val content: @Composable (() -> Unit) = {
+        val previewGrid by previewState.grid.collectAsState()
 
-    Box(
-        modifier = modifier
-            .shadow(12.dp, RoundedCornerShape(6))
-            .clip(RoundedCornerShape(6))
-            .aspectRatio(1f / 1f)
-            .background(Color(0xFF0d0d0d))
-    ) {
-        Column(
-            modifier = modifier
-        ) {
-            Spacer(modifier = Modifier.weight(0.5f))
-
-            for (y in 9 downTo 0) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
-                    Spacer(modifier = Modifier.weight(0.5f))
-
-                    for (x in 0..9) {
-                        GridPad(
-                            x = x,
-                            y = y,
-                            effectData = state[x][y],
-                            onClick = null
-                        )
-
-                        if (x != 9) {
-                            Spacer(modifier = Modifier.weight(0.1f))
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.weight(0.5f))
-                }
-
-                Spacer(modifier = Modifier.weight(0.1f))
-            }
-
-            Spacer(modifier = Modifier.weight(0.5f))
+        GenericLaunchpadLayout(
+            layoutType = LaunchpadLayout.LAYOUT_9X9,
+            modifier = Modifier
+                .size(width = size.width.dp * 40, height = size.height.dp * 40)
+                .clip(shape)
+                .background(Color(0xFF0d0d0d))
+                .padding(12.dp),
+        ) { x, y ->
+            GridPad(
+                x = x,
+                y = y,
+                effectData = previewGrid[x][y],
+                onClick = null
+            )
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RowScope.GridPad(
+private fun GridPad(
     x: Int,
     y: Int,
     effectData: MidiEffectData,
@@ -89,8 +63,7 @@ private fun RowScope.GridPad(
 ) {
     Box(
         modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight()
+            .fillMaxSize()
             .then(
                 if (onClick != null) {
                     Modifier.combinedClickable(
@@ -107,12 +80,12 @@ private fun RowScope.GridPad(
 
         contentAlignment = Alignment.Center
     ) {
-        if ((y == 0 || y == 9) && x > 0 && x < 9) {
-            CircularPad(
+        if (y == 9 && x > 0 && x < 9) {
+            EdgePad(
                 effectData = effectData
             )
-        } else if ((x == 0 || x == 9) && y > 0 && y < 9) {
-            CircularPad(
+        } else if ( x == 9 && y > 0 && y < 9) {
+            EdgePad(
                 effectData = effectData
             )
         } else if (x in 4..5 && y in 4..5) {
@@ -126,35 +99,33 @@ private fun RowScope.GridPad(
         } else if (x in 1..8 && y in 1..8) {
             GenericLaunchpadButton(
                 sizeModifier = Modifier
-                    .fillMaxSize(0.9f),
-                effect = effectData
+                    .fillMaxSize(0.86f),
+                effect = effectData,
+                shape = RoundedCornerShape(4)
             )
-        } else if (x == 0 && y == 9) {
-            SetupButton()
         }
     }
 }
 
 @Composable
-private fun CircularPad(effectData: MidiEffectData) {
+private fun EdgePad(effectData: MidiEffectData) {
     Box(
         modifier = Modifier
-            .fillMaxSize(0.8f),
+            .fillMaxSize(),
 
         contentAlignment = Alignment.Center
     ) {
         GenericLaunchpadButton(
             sizeModifier = Modifier
-                .fillMaxSize(0.9f),
+                .fillMaxSize(0.86f),
             enableLightSpot = false,
-            shape = CircleShape,
-            effect = effectData
+            effect = effectData,
+            shape = RoundedCornerShape(4)
         )
 
         Box(
             modifier = Modifier
-                .clip(CircleShape)
-                .fillMaxSize(0.75f)
+                .fillMaxSize(0.76f)
                 .background(Color(0xFF0A0A0A))
         )
     }
@@ -178,18 +149,8 @@ private fun ClippedPad(
                     topStartPercent = if (bottomRight) 30 else 0,
                 )
             )
-            .fillMaxSize(0.9f),
-        effect = effectData
-    )
-}
-
-@Composable
-private fun SetupButton() {
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .fillMaxSize(0.4f)
-            .background(Color(0xFF121212))
-            .border(1.dp, Color(0xFF171717), CircleShape),
+            .fillMaxSize(0.86f),
+        effect = effectData,
+        shape = RoundedCornerShape(4)
     )
 }

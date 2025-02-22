@@ -36,12 +36,14 @@ fun Workspace() {
         },
 
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    viewModel.onEvent(Event.AddDeviceToViewport)
+            if (state.mode == WorkspaceContract.WorkspaceMode.LAYOUT) {
+                FloatingActionButton(
+                    onClick = {
+                        viewModel.onEvent(Event.AddDeviceToViewport)
+                    }
+                ) {
+                    Icon(Icons.Default.Add, null)
                 }
-            ) {
-                Icon(Icons.Default.Add, null)
             }
         }
     ) {
@@ -53,6 +55,7 @@ fun Workspace() {
         }
 
         WorkspaceViewport(
+            viewportState = state.viewportState,
             elements = state.viewportElements,
             onEvent = {
                 viewModel.onEvent(it)

@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -12,12 +11,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -26,29 +23,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
-import kotlin.math.min
-import kotlin.math.max
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun WorkspaceViewport(
     modifier: Modifier = Modifier,
+    viewportState: WorkspaceContract.ViewportState,
     elements: List<ViewportElement>,
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
-    var scale by remember { mutableStateOf(1f) }
+    val gridSize = 40
     val color = MaterialTheme.colorScheme.onSurface.copy(0.2f)
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    val density = LocalDensity.current.density
-    val step = (20.dp.value * density * scale).toInt()
-    var selectedElement by remember { mutableStateOf<ViewportElement?>(null) }
     val viewportSize = remember { mutableStateOf(Size.Zero) }
 
     Box(
@@ -56,44 +48,27 @@ fun WorkspaceViewport(
             .fillMaxSize()
             .onSizeChanged { size ->
                 viewportSize.value = Size(size.width.toFloat(), size.height.toFloat())
-                offset = Offset(viewportSize.value.width / 2f, viewportSize.value.height / 2f)
-            }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Final)
-                        val scrollDelta = event.changes.firstOrNull()?.scrollDelta
-                        if (scrollDelta != null) {
-                            offset += Offset(scrollDelta.x, scrollDelta.y)
-                        }
-                    }
-                }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = {
-                        selectedElement = null
-                    }
-                )
-
-                detectDragGestures(onDrag = { change, dragAmount ->
-                    change.consume()
-                    offset += dragAmount
-                })
-            }
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    if (zoom != 1f) {
-                        scale = max(0.5f, min(1.5f, scale * zoom))
-                    } else {
-                        offset += pan
-                    }
-                }
             }
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            for (x in (((offset.x * scale) % step).toInt() - step) until size.width.toInt() step step) {
-                for (y in (((offset.y * scale) % step).toInt() - step) until size.height.toInt() step step) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDrag = { input, offset ->
+                            onEvent(WorkspaceContract.Event.OnPanViewport(offset))
+                        }
+                    )
+                }
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {
+                    onEvent(WorkspaceContract.Event.OnSelectDevice(null))
+                }
+        ) {
+            for (x in ((viewportState.offset.x % gridSize).toInt() - gridSize) until size.width.toInt() step gridSize) {
+                for (y in ((viewportState.offset.y % gridSize).toInt() - gridSize) until size.height.toInt() step gridSize) {
                     drawCircle(
                         color = color,
                         radius = 2f,
@@ -103,73 +78,71 @@ fun WorkspaceViewport(
             }
         }
         elements.forEachIndexed { index, element ->
+            var draggingOffset by remember { mutableStateOf(Offset.Zero) }
+
             BoxWithConstraints(
                 modifier = Modifier
                     .offset {
-                        val xOffset = if (selectedElement == element) {
-                            offset.x - (5 * density)
-                        } else offset.x
-
-                        val yOffset = if (selectedElement == element) {
-                            offset.y - (5 * density)
-                        } else offset.y
-
-                        IntOffset(
-                            ((element.position.value.x + xOffset) * scale - (element.size.width / 2 * density) * scale).toInt(),
-                            ((element.position.value.y + yOffset) * scale - (element.size.height / 2 * density) * scale).toInt()
-                        )
+                        val xOffset = (element.position.value.x * gridSize + viewportState.offset.x).roundToInt()
+                        val yOffset = (element.position.value.y * gridSize + viewportState.offset.y).roundToInt()
+                        IntOffset(xOffset, yOffset)
                     }
-                    .scale(scale)
+                    .scale(1f)
                     .then(
-                        other = if (selectedElement == element) {
+                        other = if (viewportState.selectedElement == index) {
                             Modifier
                                 .border(2.dp, MaterialTheme.colorScheme.primary, element.shape)
-                                .padding(5.dp)
-                        } else {
-                            Modifier
-                        }
+                        } else Modifier
                     )
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
                     ) {
-                        selectedElement = element
+                        onEvent(WorkspaceContract.Event.OnSelectDevice(index))
                     }
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = {
-                                selectedElement = element
+                                onEvent(WorkspaceContract.Event.OnSelectDevice(index))
                             },
                             onDrag = { input, offset ->
                                 input.consume()
 
-                                onEvent(
-                                    WorkspaceContract.Event.ChangeViewportElementPosition(
-                                        index = index,
-                                        offset = element.position.value.copy(
-                                            x = element.position.value.x + offset.x * scale,
-                                            y = element.position.value.y + offset.y * scale,
+                                draggingOffset += offset
+
+                                if (abs(draggingOffset.x / gridSize).roundToInt() > 0 || abs(draggingOffset.y / gridSize).roundToInt() > 0) {
+                                    val newX = (element.position.value.x + draggingOffset.x / gridSize).roundToInt()
+                                    val newY = (element.position.value.y + draggingOffset.y / gridSize).roundToInt()
+
+                                    draggingOffset = Offset.Zero
+
+                                    onEvent(
+                                        WorkspaceContract.Event.ChangeViewportElementPosition(
+                                            index = index,
+                                            offset = Offset(newX.toFloat(), newY.toFloat())
                                         )
                                     )
-                                )
+                                }
+                            },
+                            onDragEnd = {
+                                draggingOffset = Offset.Zero
                             }
                         )
                     }
             ) {
-                if (element is LaunchpadViewportElement && element == selectedElement) {
+                if (element is LaunchpadViewportElement) {
                     LaunchedEffect(index) {
                         element.indexInViewport = index
                     }
 
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .offset(y = -56.dp),
-                    ) {
-                        element.actions(this)
+                    if (viewportState.selectedElement == index) {
+                        Row(
+                            modifier = Modifier.align(Alignment.TopCenter).offset(y = -56.dp),
+                        ) {
+                            element.actions(this)
+                        }
                     }
                 }
-
                 element.content()
             }
         }
