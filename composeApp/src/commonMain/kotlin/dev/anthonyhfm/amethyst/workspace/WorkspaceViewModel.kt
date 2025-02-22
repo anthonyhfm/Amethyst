@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.workspace
 
 import androidx.lifecycle.ViewModel
 import dev.anthonyhfm.amethyst.core.data.ProjectRepository
-import dev.anthonyhfm.amethyst.ui.launchpad.viewport_launchpads.ViewportMidiFighter64
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport_launchpads.ViewportLaunchpadPro
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -14,7 +14,7 @@ class WorkspaceViewModel(
     fun onEvent(event: WorkspaceContract.Event) {
         when (event) {
             is WorkspaceContract.Event.AddDeviceToViewport -> {
-                val device = ViewportMidiFighter64()
+                val device = ViewportLaunchpadPro()
 
                 device.onEvent = { onEvent(it) }
 
@@ -32,6 +32,8 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.ChangeViewportElementPosition -> {
+                if (state.value.mode != WorkspaceContract.WorkspaceMode.LAYOUT) return
+
                 state.update {
                     it.copy(
                         viewportElements = it.viewportElements.toMutableList().apply {
