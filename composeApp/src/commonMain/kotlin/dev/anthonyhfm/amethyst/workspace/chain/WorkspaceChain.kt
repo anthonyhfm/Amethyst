@@ -1,13 +1,17 @@
 package dev.anthonyhfm.amethyst.workspace.chain
 
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
-import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlin.collections.plus
 import kotlin.math.abs
 
 class WorkspaceChain {
@@ -15,7 +19,7 @@ class WorkspaceChain {
 
     val devices: MutableStateFlow<List<EffectDevice<*>>> = MutableStateFlow(listOf())
 
-    fun onMidiInput(inputData: MidiInputData, layout: LaunchpadLayout, offset: Offset) {
+    fun onMidiInput(inputData: MidiInputData, offset: Offset) {
         val x = inputData.pitch % 10
         val y = inputData.pitch / 10
 
@@ -31,7 +35,13 @@ class WorkspaceChain {
             b = if (inputData.velocity == 0) 0 else 63
         )
 
-        sendToOutput(effect)
+        if (devices.value.isEmpty()) {
+            sendToOutput(effect)
+        } else {
+            CoroutineScope(Dispatchers.IO).launch {
+                devices.value[0].passData(effect)
+            }
+        }
     }
 
     fun sendToOutput(effect: MidiEffectData) {
@@ -43,12 +53,51 @@ class WorkspaceChain {
                 val x: Int = effect.x - device.position.value.x.toInt()
                 val y: Int = abs(effect.y - 9 - device.position.value.y.toInt())
 
-                device.deviceConfig.type?.getEffectSysEx(effect.copy(x = x, y = y))?.let {
-                    device.deviceConfig.output?.send(it, 0, it.size, 0L)
+                effect.copy(x = x, y = y).let { correctedEffect ->
+                    device.previewState.sendToPreview(correctedEffect)
+
+                    device.deviceConfig.type?.getEffectSysEx(correctedEffect)?.let {
+                        device.deviceConfig.output?.send(it, 0, it.size, 0L)
+                    }
                 }
 
                 return
             }
+        }
+    }
+
+    fun addDevice(device: EffectDevice<*>, atIndex: Int?) {
+        runBlocking {
+            if (atIndex == null) {
+                devices.emit(
+                    value = devices.value.plus(device)
+                )
+            } else {
+                val mutableList = devices.value.toMutableList()
+                mutableList.add(atIndex, device)
+
+                devices.emit(mutableList)
+            }
+
+            devices.emit(
+                devices.value.mapIndexed { index, effectPlugin ->
+                    if (index + 1 < devices.value.size) {
+                        effectPlugin.midiOutput = {
+                            CoroutineScope(Dispatchers.IO).launch {
+                                devices.value[index + 1].passData(it)
+                            }
+                        }
+
+                        return@mapIndexed effectPlugin
+                    } else {
+                        effectPlugin.midiOutput = {
+                            sendToOutput(it)
+                        }
+
+                        return@mapIndexed effectPlugin
+                    }
+                }
+            )
         }
     }
 }

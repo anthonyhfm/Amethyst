@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.workspace.ui.components
+package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,9 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
 @Composable
-fun WorkspaceChainEditor() {
+fun WorkspaceChainEditor(
+    devices: List<EffectDevice<*>>,
+    onEvent: (WorkspaceContract.Event) -> Unit
+) {
     Row(
         modifier = Modifier
             .padding(12.dp)
@@ -29,6 +34,22 @@ fun WorkspaceChainEditor() {
             .padding(vertical = 12.dp)
             .horizontalScroll(rememberScrollState())
     ) {
+        devices.forEachIndexed { index, device ->
+            HiddenDevicePickerButton(
+                expanded = false,
+                onAddComponent = {
+                    onEvent(WorkspaceContract.Event.AddChainDevice(it, index))
+                }
+            )
 
+            device.Content()
+        }
+
+        HiddenDevicePickerButton(
+            expanded = true,
+            onAddComponent = {
+                onEvent(WorkspaceContract.Event.AddChainDevice(it))
+            }
+        )
     }
 }

@@ -1,7 +1,6 @@
 package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animation
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -22,7 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
-import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceChainEditor
+import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
 import org.koin.compose.viewmodel.koinViewModel
@@ -91,7 +90,10 @@ fun Workspace() {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
             ) {
-                WorkspaceChainEditor()
+                WorkspaceChainEditor(
+                    devices = viewModel.chain.devices.collectAsState().value,
+                    onEvent = { viewModel.onEvent(it) }
+                )
             }
         }
     }

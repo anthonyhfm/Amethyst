@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.workspace
 import androidx.compose.ui.geometry.Offset
 import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
+import dev.anthonyhfm.amethyst.devices.effects.EffectDevice
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.atsushieno.ktmidi.MidiPortDetails
 
@@ -26,6 +27,8 @@ interface WorkspaceContract {
             var outputPort: MidiPortDetails?,
             var deviceType: DeviceType?
         ) : Event
+
+        data class AddChainDevice(val device: EffectDevice<*>, val atIndex: Int? = null) : Event
     }
 
     sealed interface Effect

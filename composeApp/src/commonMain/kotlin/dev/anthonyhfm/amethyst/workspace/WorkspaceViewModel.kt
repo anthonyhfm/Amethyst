@@ -37,7 +37,7 @@ class WorkspaceViewModel(
     fun onEvent(event: WorkspaceContract.Event) {
         when (event) {
             is WorkspaceContract.Event.AddDeviceToViewport -> {
-                val device = ViewportMystrix()
+                val device = ViewportLaunchpadPro()
 
                 device.onEvent = { onEvent(it) }
 
@@ -118,7 +118,6 @@ class WorkspaceViewModel(
                                 getMidiInputData(bytes)?.let {
                                     chain.onMidiInput(
                                         inputData = it,
-                                        layout = this@apply.layout,
                                         offset = this@apply.position.value
                                     )
                                 }
@@ -136,6 +135,10 @@ class WorkspaceViewModel(
                         )
                     }
                 }
+            }
+
+            is WorkspaceContract.Event.AddChainDevice -> {
+                chain.addDevice(event.device, event.atIndex)
             }
         }
     }
