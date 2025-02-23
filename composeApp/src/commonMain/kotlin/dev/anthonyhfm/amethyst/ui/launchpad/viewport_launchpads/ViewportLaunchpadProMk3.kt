@@ -31,11 +31,13 @@ class ViewportLaunchpadProMk3(
     override var shape: Shape = RoundedCornerShape(2),
     override var size: Size = Size(10f, 10f),
 ) : LaunchpadViewportElement() {
+    override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_10X10
+
     override val content: @Composable (() -> Unit) = {
         val previewGrid by previewState.grid
 
         GenericLaunchpadLayout(
-            layoutType = LaunchpadLayout.LAYOUT_10X10,
+            layoutType = layout,
             modifier = Modifier
                 .size(width = size.width.dp * 40, height = size.height.dp * 40)
                 .clip(shape)

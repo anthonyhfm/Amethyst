@@ -26,16 +26,20 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
 import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadButton
 import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadLayout
+import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
 class ViewportLaunchpadPro(
     override var shape: Shape = RoundedCornerShape(6),
     override var size: Size = Size(10f, 10f),
 ) : LaunchpadViewportElement() {
+    override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_10X10
+
     override val content: @Composable (() -> Unit) = {
         val previewGrid by previewState.grid
 
         GenericLaunchpadLayout(
+            layoutType = layout,
             modifier = Modifier
                 .size(width = size.width.dp * 40, height = size.height.dp * 40)
                 .clip(shape)

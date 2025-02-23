@@ -1,5 +1,14 @@
 package dev.anthonyhfm.amethyst.workspace
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animation
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -9,9 +18,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
+import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceChainEditor
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
 import org.koin.compose.viewmodel.koinViewModel
@@ -34,9 +45,12 @@ fun Workspace() {
                 }
             )
         },
-
         floatingActionButton = {
-            if (state.mode == WorkspaceContract.WorkspaceMode.LAYOUT) {
+            AnimatedVisibility(
+                visible = state.mode == WorkspaceContract.WorkspaceMode.LAYOUT,
+                enter = scaleIn() + fadeIn(),
+                exit = scaleOut() + fadeOut()
+            ) {
                 FloatingActionButton(
                     onClick = {
                         viewModel.onEvent(Event.AddDeviceToViewport)
@@ -54,12 +68,31 @@ fun Workspace() {
             )
         }
 
-        WorkspaceViewport(
-            viewportState = state.viewportState,
-            elements = state.viewportElements,
-            onEvent = {
-                viewModel.onEvent(it)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+        ) {
+            WorkspaceViewport(
+                viewportState = state.viewportState,
+                elements = state.viewportElements,
+                onEvent = {
+                    viewModel.onEvent(it)
+                }
+            )
+
+            AnimatedVisibility(
+                visible = state.mode == WorkspaceContract.WorkspaceMode.CHAIN,
+                enter = slideInVertically {
+                    it
+                },
+                exit = slideOutVertically {
+                    it
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+            ) {
+                WorkspaceChainEditor()
             }
-        )
+        }
     }
 }

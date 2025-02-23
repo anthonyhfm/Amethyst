@@ -69,38 +69,7 @@ fun LaunchpadConfigItem(
                     style = MaterialTheme.typography.labelLarge
                 )
 
-                BasicTextField(
-                    value = if (!showPlaceholder) {
-                        item.name
-                    } else {
-                        "Enter device name"
-                    },
-                    onValueChange = {
-                        onChangeItemProperties(
-                            item.copy(
-                                name = it
-                            )
-                        )
-                    },
-                    singleLine = true,
-                    cursorBrush = SolidColor(Color.White),
-                    textStyle = MaterialTheme.typography.labelLarge.copy(
-                        color = if (showPlaceholder) {
-                            MaterialTheme.colorScheme.secondary.copy(0.6f)
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged {
-                            if (!it.isFocused && (item.name.isEmpty() || item.name.isBlank())) {
-                                showPlaceholder = true
-                            } else {
-                                showPlaceholder = false
-                            }
-                        }
-                )
+
             }
 
             Row(

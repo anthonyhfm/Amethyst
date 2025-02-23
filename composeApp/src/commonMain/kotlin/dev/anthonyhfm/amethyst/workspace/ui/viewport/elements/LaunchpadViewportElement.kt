@@ -13,6 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shape
+import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
+import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.ui.previewdevices.PreviewState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportElement
@@ -22,36 +24,23 @@ abstract class LaunchpadViewportElement(
 ) : ViewportElement {
     abstract override var shape: Shape
     abstract override var size: Size
+    abstract val layout: LaunchpadLayout
 
+    var deviceConfig: ProjectDeviceConfig = ProjectDeviceConfig()
     val previewState: PreviewState = PreviewState()
 
     var onEvent: ((WorkspaceContract.Event) -> Unit)? = null
+
     var indexInViewport: Int = 0
 
     override val actions: @Composable RowScope.() -> Unit
         get() = {
             FilledIconButton(
                 onClick = {
-
-                }
-            ) {
-                Icon(Icons.AutoMirrored.Filled.RotateLeft, null)
-            }
-
-            FilledIconButton(
-                onClick = {
                     onEvent?.invoke(WorkspaceContract.Event.OnClickDeviceConfigure(indexInViewport))
                 }
             ) {
                 Icon(Icons.Default.Settings, null)
-            }
-
-            FilledIconButton(
-                onClick = {
-
-                }
-            ) {
-                Icon(Icons.Default.Delete, null)
             }
         }
 

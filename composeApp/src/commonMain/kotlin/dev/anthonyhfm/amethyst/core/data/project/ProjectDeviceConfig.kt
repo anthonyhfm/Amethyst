@@ -8,7 +8,6 @@ import kotlinx.serialization.Transient
 
 @Serializable
 data class ProjectDeviceConfig(
-    val name: String,
     @Transient
     val input: MidiInput? = null,
     @Transient

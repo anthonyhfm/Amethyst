@@ -24,7 +24,7 @@ class AmethystWriter(
             ),
             deviceConfig = listOf(
                 ProjectDeviceConfig(
-                    name = "Launchpad"
+
                 )
             )
         )

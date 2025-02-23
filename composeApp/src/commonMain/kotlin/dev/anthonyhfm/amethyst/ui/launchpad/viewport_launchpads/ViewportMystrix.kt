@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -27,20 +26,22 @@ import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadLayout
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
-class ViewportMatrix(
+class ViewportMystrix(
     override var shape: Shape = RoundedCornerShape(2),
     override var size: Size = Size(8f, 8f),
 ) : LaunchpadViewportElement() {
+    override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_8X8
+
     override val content: @Composable (() -> Unit) = {
         val previewGrid by previewState.grid
 
         GenericLaunchpadLayout(
-            layoutType = LaunchpadLayout.LAYOUT_8X8,
+            layoutType = layout,
             modifier = Modifier
                 .size(width = size.width.dp * 40, height = size.height.dp * 40)
                 .clip(shape)
                 .background(Color(0xFF0d0d0d))
-                .padding(12.dp),
+                .padding(10.dp),
         ) { x, y ->
             GridPad(
                 x = x,

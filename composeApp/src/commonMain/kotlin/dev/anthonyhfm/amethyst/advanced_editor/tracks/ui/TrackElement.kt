@@ -115,15 +115,7 @@ fun TrackElement(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = deviceConfigs.getOrNull(track.projectDeviceIndex ?: -1)?.name ?: "Select",
-                style = MaterialTheme.typography.labelMedium,
-                lineHeight = MaterialTheme.typography.labelMedium.fontSize,
-                overflow = TextOverflow.Ellipsis,
-                maxLines = 1,
-                modifier = Modifier
-                    .padding(start = 8.dp)
-            )
+
 
             Icon(
                 imageVector = Icons.Default.ChevronRight,
@@ -142,7 +134,7 @@ fun TrackElement(
                 deviceConfigs.forEachIndexed { i, it ->
                     DropdownMenuItem(
                         text = {
-                            Text(it.name)
+
                         },
                         onClick = {
                             onChangeDeviceConfig(i)

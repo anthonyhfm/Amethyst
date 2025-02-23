@@ -1,7 +1,10 @@
 package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.ui.geometry.Offset
+import dev.anthonyhfm.amethyst.core.data.project.ProjectDeviceConfig
+import dev.anthonyhfm.amethyst.core.midi.devices.DeviceType
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.atsushieno.ktmidi.MidiPortDetails
 
 interface WorkspaceContract {
     sealed interface Event {
@@ -16,6 +19,13 @@ interface WorkspaceContract {
         data class OnPanViewport(val offset: Offset) : Event
         data class OnClickDeviceConfigure(val index: Int) : Event
         data object OnDismissDeviceConfigure : Event
+
+        data class OnChangeDeviceConfig(
+            val index: Int,
+            var inputPort: MidiPortDetails?,
+            var outputPort: MidiPortDetails?,
+            var deviceType: DeviceType?
+        ) : Event
     }
 
     sealed interface Effect

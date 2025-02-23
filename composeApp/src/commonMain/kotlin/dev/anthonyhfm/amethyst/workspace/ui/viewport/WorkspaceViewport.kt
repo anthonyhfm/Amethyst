@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,6 +24,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -40,7 +40,8 @@ fun WorkspaceViewport(
     elements: List<ViewportElement>,
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
-    val gridSize = 40
+    val density = LocalDensity.current.density
+    val gridSize = (40 * density).toInt()
     val color = MaterialTheme.colorScheme.onSurface.copy(0.2f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
 
@@ -72,7 +73,7 @@ fun WorkspaceViewport(
                 for (y in ((viewportState.offset.y % gridSize).toInt() - gridSize) until size.height.toInt() step gridSize) {
                     drawCircle(
                         color = color,
-                        radius = 2f,
+                        radius = 2f * density,
                         center = Offset(x.toFloat(), y.toFloat())
                     )
                 }

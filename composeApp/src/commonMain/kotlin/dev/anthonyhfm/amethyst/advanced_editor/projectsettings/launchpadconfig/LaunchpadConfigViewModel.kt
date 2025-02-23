@@ -11,9 +11,7 @@ class LaunchpadConfigViewModel(
     fun createDevice() {
         projectRepository.launchpadConfigs.update {
             it.plus(
-                ProjectDeviceConfig(
-                    name = "Launchpad ${projectRepository.launchpadConfigs.value.size + 1}"
-                )
+                ProjectDeviceConfig()
             )
         }
     }
