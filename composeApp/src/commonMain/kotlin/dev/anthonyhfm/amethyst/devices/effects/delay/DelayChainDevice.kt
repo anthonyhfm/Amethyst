@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.devices.effects_old.delay
+package dev.anthonyhfm.amethyst.devices.effects.delay
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -6,19 +6,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
+import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects_old.EffectDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
 import dev.anthonyhfm.amethyst.ui.components.TextDial
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.math.roundToInt
 
-class DelayEffectDevice : EffectDevice<DelayEffectDeviceState>() {
-    override val state = MutableStateFlow(DelayEffectDeviceState())
+class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
+    override val state = MutableStateFlow(DelayChainDeviceState())
 
     @Composable
     override fun Content() {
@@ -31,12 +30,12 @@ class DelayEffectDevice : EffectDevice<DelayEffectDeviceState>() {
         ) {
             TextDial(
                 headline = "Delay",
-                text = "${deviceState.delayMs} ms",
-                value = deviceState.delayMs / 1000f,
-                onValueChange = {
+                text = "${deviceState.delayMs.roundToInt()} ms",
+                value = deviceState.delayMs.toInt() / 1000f,
+                onValueChange = { change ->
                     state.update {
                         it.copy(
-                            delayMs = (it.delayMs * 1000).toInt()
+                            delayMs = (change * 1000).toDouble()
                         )
                     }
                 }
@@ -44,14 +43,17 @@ class DelayEffectDevice : EffectDevice<DelayEffectDeviceState>() {
         }
     }
 
-    override suspend fun passData(data: MidiEffectData) {
-        delay(state.value.delayMs.milliseconds)
-
-        midiOutput(data)
+    override fun midiEnter(n: List<Signal>) {
+        Heaven.schedule(
+            job = {
+                midiExit?.invoke(n)
+            },
+            time = state.value.delayMs
+        )
     }
 }
 
 @Serializable
-data class DelayEffectDeviceState(
-    val delayMs: Int = 200
+data class DelayChainDeviceState(
+    val delayMs: Double = 200.0
 ) : DeviceState()

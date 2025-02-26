@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
 
 data class PickableComponent(
     val name: String,
@@ -29,6 +30,11 @@ fun ChainDevicePicker(
 ) {
     val pickableComponents: Array<PickableComponent> = arrayOf(
         PickableComponent(
+            name = "Delay",
+            icon = Icons.Default.MoreTime,
+            plugin = DelayChainDevice()
+        ),
+        PickableComponent(
             name = "Color",
             icon = Icons.Default.ColorLens,
             plugin = ColorChainDevice()
@@ -37,11 +43,6 @@ fun ChainDevicePicker(
             name = "Offset",
             icon = Icons.Default.GridOn,
             plugin = OffsetEffectDevice()
-        ),*/
-        /*PickableComponent(
-            name = "Delay",
-            icon = Icons.Default.MoreTime,
-            plugin = DelayChainDevice()
         ),*/
     )
 
