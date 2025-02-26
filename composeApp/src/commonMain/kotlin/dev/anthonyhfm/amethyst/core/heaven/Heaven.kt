@@ -4,8 +4,11 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevice
 import dev.anthonyhfm.amethyst.core.util.StopWatch
 
 import kotlinx.coroutines.*
-import kotlin.collections.MutableList
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.collections.ArrayList
+import kotlin.collections.MutableList
+import kotlin.collections.mutableMapOf
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -15,6 +18,8 @@ object Heaven {
     private val signalQueue: ArrayDeque<List<Signal>> = ArrayDeque()
     private val jobs: MutableMap<Long, MutableList<() -> Unit>> = mutableMapOf()
     private val jobQueue: ArrayDeque<Pair<Long, () -> Unit>> = ArrayDeque()
+
+    private val jobMutex = Mutex()
 
     private var prev: Long = 0L
     private var lastRender: Long = -1L
@@ -58,54 +63,76 @@ object Heaven {
         prev = stopWatch.elapsedTicks() - 1
 
         renderJob = GlobalScope.launch {
-            prev = stopWatch.elapsedTicks() - 1
+            try {
+                while (true) {
+                    prev = max(0, stopWatch.elapsedTicks())
 
-            while (renderAt >= 0 || jobQueue.isNotEmpty() || jobs.isNotEmpty() || signalQueue.isNotEmpty()) {
-                while (jobQueue.isNotEmpty()) {
-                    val (time, job) = jobQueue.removeFirst()
-                    jobs.getOrPut(time) { ArrayList() }.add(job)
-                }
+                    if (renderAt < 0 && jobQueue.isEmpty() && jobs.isEmpty() && signalQueue.isEmpty()) {
+                        delay(1)
+                        continue
+                    }
 
-                prev = stopWatch.elapsedTicks()
+                    while (jobQueue.isNotEmpty()) {
+                        val (time, job) = jobQueue.removeFirst()
+                        jobs.getOrPut(time) { ArrayList() }.add(job)
+                    }
 
-                jobs.keys.filter { it <= prev }.toList().forEach { key ->
-                    jobs[key]?.forEach { it.invoke() }
-                    jobs.remove(key)
-                }
+                    prev = max(0, stopWatch.elapsedTicks())
 
-                var changed = false
-
-                while (signalQueue.isNotEmpty()) {
-                    val signals = signalQueue.removeFirst()
-
-                    signals.forEach { signal ->
-                        devices.forEach {
-                            if (signal.x in it.position.first until it.position.first + 10 && signal.y in it.position.second until it.position.second + 10) {
-                                val posX = signal.x - it.position.first
-                                val posY = abs(signal.y - 9 - it.position.second)
-
-                                changed = true
-
-                                it.screen.midiEnter(signal.copy(
-                                    x = posX,
-                                    y = posY
-                                ))
+                    jobMutex.withLock {
+                        val keysToProcess = jobs.keys.filter { it <= prev }.toList()
+                        keysToProcess.forEach { key ->
+                            val jobList = jobs[key]
+                            if (jobList != null) {
+                                jobList.forEach { it.invoke() }
+                                jobs.remove(key)
                             }
                         }
                     }
-                }
 
-                if (changed && renderAt < 0) {
-                    renderAt = max(
-                        prev + msToTicks(250.0 / 60),
-                        lastRender + msToTicks(1000.0 / 60)
-                    )
-                } else if (renderAt >= 0 && prev > renderAt) {
-                    Screen.draw()
+                    var changed = false
 
-                    lastRender = prev
-                    renderAt = -1L
+                    while (signalQueue.isNotEmpty()) {
+                        val signals = signalQueue.removeFirst()
+
+                        signals.forEach { signal ->
+                            devices.forEach { device ->
+                                if (signal.x in device.position.first until device.position.first + 10 &&
+                                    signal.y in device.position.second until device.position.second + 10) {
+
+                                    val posX = signal.x - device.position.first
+                                    val posY = abs(signal.y - 9 - device.position.second)
+
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        device.screen.midiEnter(signal.copy(
+                                            x = posX,
+                                            y = posY
+                                        ))
+                                    }
+
+                                    changed = true
+                                }
+                            }
+                        }
+                    }
+
+                    if (changed && renderAt < 0) {
+                        renderAt = max(
+                            prev + msToTicks(250.0 / 60),
+                            lastRender + msToTicks(1000.0 / 60)
+                        )
+                    } else if (renderAt >= 0 && prev > renderAt) {
+                        Screen.draw()
+
+                        lastRender = prev
+                        renderAt = -1L
+                    }
+
+                    delay(1) // Vermeidet Busy-Waiting und verbessert die Performance
                 }
+            } catch (e: Exception) {
+                println("RenderJob Exception: ${e.message}")
+                e.printStackTrace()
             }
         }
     }
