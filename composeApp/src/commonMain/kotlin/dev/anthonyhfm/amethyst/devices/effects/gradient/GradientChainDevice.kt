@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.devices.effects_old.gradient
+package dev.anthonyhfm.amethyst.devices.effects.gradient
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,24 +26,18 @@ import androidx.compose.ui.unit.dp
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
-import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
+import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects_old.EffectDevice
-import dev.anthonyhfm.amethyst.devices.effects_old.gradient.ui.GradientEditorBar
-import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
+import dev.anthonyhfm.amethyst.devices.effects.gradient.ui.GradientEditorBar
+import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.TextDial
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlin.time.Duration.Companion.milliseconds
 
-class GradientEffectDevice : EffectDevice<GradientEffectDeviceState>() {
-    override val state = MutableStateFlow(GradientEffectDeviceState())
+class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
+    override val state = MutableStateFlow(GradientChainDeviceState())
 
     @Composable
     override fun Content() {
@@ -68,7 +62,7 @@ class GradientEffectDevice : EffectDevice<GradientEffectDeviceState>() {
             }
         }
 
-        AmethystPlugin(
+        AmethystDevice(
             title = "Gradient",
             modifier = Modifier
                 .width(
@@ -114,12 +108,12 @@ class GradientEffectDevice : EffectDevice<GradientEffectDeviceState>() {
                     ) {
                         TextDial(
                             headline = "Duration",
-                            text = "${duration}ms",
-                            value = duration / 1000f,
+                            text = "${duration.toInt()}ms",
+                            value = duration.toFloat() / 1000f,
                             onValueChange = { duration ->
                                 state.update {
                                     it.copy(
-                                        durationMs = (duration * 1000).toInt()
+                                        durationMs = (duration * 1000).toDouble()
                                     )
                                 }
                             }
@@ -185,31 +179,6 @@ class GradientEffectDevice : EffectDevice<GradientEffectDeviceState>() {
         }
     }
 
-    override suspend fun passData(data: MidiEffectData) {
-        if (data.r != 0 || data.g != 0 || data.b != 0) {
-            CoroutineScope(Dispatchers.IO).launch {
-                val stepLength = state.value.durationMs / state.value.steps
-                val colors = state.value.gradientData.sortedBy { it.position }.map { it.position to Color(it.r,  it.g, it.b) }
-
-                for (step in 0..state.value.steps) {
-                    val progress = step.toFloat() / state.value.steps
-                    val color = interpolateGradient(colors, progress)
-
-                    val midiData = data.copy(
-                        r = (color.red * 63).toInt().coerceIn(0, 63),
-                        g = (color.green * 63).toInt().coerceIn(0, 63),
-                        b = (color.blue * 63).toInt().coerceIn(0, 63)
-                    )
-
-                    midiOutput(midiData)
-
-                    delay(stepLength.milliseconds)
-                }
-                midiOutput(data.copy(r = 0, g = 0, b = 0))
-            }
-        }
-    }
-
     private fun interpolateGradient(gradient: List<Pair<Float, Color>>, progress: Float): Color {
         val (start, end) = gradient.zipWithNext().find { (a, b) -> progress in a.first..b.first }
             ?: return gradient.last().second
@@ -222,17 +191,61 @@ class GradientEffectDevice : EffectDevice<GradientEffectDeviceState>() {
             blue = start.second.blue * (1 - t) + end.second.blue * t
         )
     }
+
+    override fun midiEnter(n: List<Signal>) {
+        val stepLength = state.value.durationMs / state.value.steps
+        val colors = state.value.gradientData.sortedBy { it.position }.map { it.position to Color(it.r,  it.g, it.b) }
+
+        n.forEach { signal ->
+            if (signal.color != Color.Black) {
+                for (step in 0..state.value.steps) {
+                    val progress = step.toFloat() / state.value.steps
+                    val color = interpolateGradient(colors, progress)
+
+                    Heaven.schedule(
+                        job = {
+                            midiExit?.invoke(
+                                listOf(signal.copy(color = color))
+                            )
+                        },
+                        delayInMs = stepLength * step
+                    )
+                }
+            }
+        }
+
+        /*
+        val stepLength = state.value.durationMs / state.value.steps
+        val colors = state.value.gradientData.sortedBy { it.position }.map { it.position to Color(it.r,  it.g, it.b) }
+
+        for (step in 0..state.value.steps) {
+            val progress = step.toFloat() / state.value.steps
+            val color = interpolateGradient(colors, progress)
+
+            val midiData = data.copy(
+                r = (color.red * 63).toInt().coerceIn(0, 63),
+                g = (color.green * 63).toInt().coerceIn(0, 63),
+                b = (color.blue * 63).toInt().coerceIn(0, 63)
+            )
+
+            midiOutput(midiData)
+
+            delay(stepLength.milliseconds)
+        }
+        midiOutput(data.copy(r = 0, g = 0, b = 0))
+         */
+    }
 }
 
 @Serializable
-data class GradientEffectDeviceState(
+data class GradientChainDeviceState(
     val gradientData: List<GradientColor> = listOf(
         GradientColor(0f, 1f, 1f, 1f),
         GradientColor(0.5f, 1f, 0f, 0f),
         GradientColor(1f, 0f, 0f, 0f)
     ),
     val steps: Int = 20,
-    val durationMs: Int = 300
+    val durationMs: Double = 300.0
 ) : DeviceState() {
     @Serializable
     data class GradientColor(

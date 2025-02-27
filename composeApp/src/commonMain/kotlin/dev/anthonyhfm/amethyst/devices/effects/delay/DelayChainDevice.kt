@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
+import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -23,7 +23,7 @@ class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
     override fun Content() {
         val deviceState by state.collectAsState()
 
-        AmethystPlugin(
+        AmethystDevice(
             title = "Delay",
             modifier = Modifier
                 .width(100.dp)

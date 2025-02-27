@@ -19,7 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AmethystPlugin(
+fun AmethystDevice(
     title: String,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit

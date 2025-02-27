@@ -19,7 +19,7 @@ import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
+import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -42,7 +42,7 @@ class ColorChainDevice : ChainDevice<ColorEffectDeviceState>() {
             )
         }
 
-        AmethystPlugin(
+        AmethystDevice(
             title = "Color",
             modifier = Modifier
                 .width(200.dp),
