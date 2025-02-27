@@ -58,6 +58,10 @@ import kotlinx.serialization.Serializable
 class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
     override val state = MutableStateFlow(GroupChainDeviceState())
 
+    init {
+        createGroup()
+    }
+
     @Composable
     override fun Content() {
         Row(
@@ -246,7 +250,7 @@ class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
                 HiddenDevicePickerButton(
                     expanded = true,
                     onAddComponent = {
-                        groupsState.groups[groupsState.selectionIndex].chain.add(it, groupsState.selectionIndex)
+                        groupsState.groups[groupsState.selectionIndex].chain.add(it)
                     }
                 )
             }
@@ -258,7 +262,7 @@ class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
                 groupsState.groups[groupsState.selectionIndex].chain.devices.value.forEachIndexed { index, device ->
                     HiddenDevicePickerButton(
                         onAddComponent = {
-                            groupsState.groups[groupsState.selectionIndex].chain.add(it, groupsState.selectionIndex)
+                            groupsState.groups[groupsState.selectionIndex].chain.add(it, index)
                         }
                     )
 
@@ -267,7 +271,7 @@ class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
 
                 HiddenDevicePickerButton(
                     onAddComponent = {
-                        groupsState.groups[groupsState.selectionIndex].chain.add(it, groupsState.selectionIndex)
+                        groupsState.groups[groupsState.selectionIndex].chain.add(it)
                     }
                 )
             }
@@ -286,6 +290,16 @@ class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
                 }
             )
         }
+
+        if (atIndex != null) {
+            state.value.groups[atIndex].chain.midiExit = {
+                midiExit?.invoke(it)
+            }
+        } else {
+            state.value.groups.last().chain.midiExit = {
+                midiExit?.invoke(it)
+            }
+        }
     }
 
     override fun midiEnter(n: List<Signal>) {
@@ -298,5 +312,5 @@ class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
 @Serializable
 data class GroupChainDeviceState(
     val selectionIndex: Int = 0,
-    val groups: List<Group> = listOf(Group("Chain 1"))
+    val groups: List<Group> = emptyList()
 ) : DeviceState()
