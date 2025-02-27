@@ -2,10 +2,13 @@ package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Gradient
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreTime
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -15,6 +18,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 
 data class PickableComponent(
     val name: String,
@@ -30,20 +36,30 @@ fun ChainDevicePicker(
 ) {
     val pickableComponents: Array<PickableComponent> = arrayOf(
         PickableComponent(
-            name = "Delay",
-            icon = Icons.Default.MoreTime,
-            plugin = DelayChainDevice()
-        ),
-        PickableComponent(
             name = "Color",
             icon = Icons.Default.ColorLens,
             plugin = ColorChainDevice()
         ),
-        /*PickableComponent(
+        PickableComponent(
+            name = "Gradient",
+            icon = Icons.Default.Gradient,
+            plugin = GradientChainDevice()
+        ),
+        PickableComponent(
+            name = "Group",
+            icon = Icons.Default.Link,
+            plugin = GroupChainDevice()
+        ),
+        PickableComponent(
             name = "Offset",
-            icon = Icons.Default.GridOn,
-            plugin = OffsetEffectDevice()
-        ),*/
+            icon = Icons.Default.OpenWith,
+            plugin = OffsetChainDevice()
+        ),
+        PickableComponent(
+            name = "Delay",
+            icon = Icons.Default.MoreTime,
+            plugin = DelayChainDevice()
+        ),
     )
 
     DropdownMenu(

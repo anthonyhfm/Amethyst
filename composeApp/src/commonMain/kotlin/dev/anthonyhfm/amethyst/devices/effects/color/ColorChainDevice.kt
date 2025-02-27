@@ -24,8 +24,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 
-class ColorChainDevice : ChainDevice<ColorEffectDeviceState>() {
-    override val state = MutableStateFlow(ColorEffectDeviceState())
+class ColorChainDevice : ChainDevice<ColorChainDeviceState>() {
+    override val state = MutableStateFlow(ColorChainDeviceState())
 
     @Composable
     override fun Content() {
@@ -96,7 +96,7 @@ class ColorChainDevice : ChainDevice<ColorEffectDeviceState>() {
 }
 
 @Serializable
-data class ColorEffectDeviceState(
+data class ColorChainDeviceState(
     val r: Float = 1f,
     val g: Float = 1f,
     val b: Float = 1f

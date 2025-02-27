@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.devices.effects_old.group
+package dev.anthonyhfm.amethyst.devices.effects.group
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -43,36 +43,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.midi.data.MidiEffectData
+import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects_old.EffectDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystPlugin
+import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuArea
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuItem
 import dev.anthonyhfm.amethyst.workspace.chain.ui.HiddenDevicePickerButton
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
-/**
- * # The Group Plugin
- *
- * The Group Plugin is very different to the other plugins because of its ability to contain other plugins
- */
-class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
-    override val state = MutableStateFlow(GroupEffectDeviceState())
-
-    private val groups: MutableStateFlow<List<GroupData>> = MutableStateFlow(
-        value = listOf(
-            GroupData(
-                name = "Group 1",
-            ),
-        )
-    )
+class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
+    override val state = MutableStateFlow(GroupChainDeviceState())
 
     @Composable
     override fun Content() {
@@ -82,7 +66,7 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
                 .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surface)
         ) {
-            AmethystPlugin(
+            AmethystDevice(
                 title = "Group",
                 modifier = Modifier
                     .width(180.dp),
@@ -119,8 +103,7 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
     @Composable
     private fun GroupList() {
         val scope = rememberCoroutineScope()
-        val groupsState by groups.collectAsState()
-        val selectionIndex = state.collectAsState().value.selectionIndex
+        val groupsState by state.collectAsState()
         val scrollState = rememberScrollState()
 
         Column(
@@ -129,7 +112,7 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
                 .verticalScroll(scrollState)
                 .padding(horizontal = 8.dp),
         ) {
-            groupsState.forEachIndexed { index, groupData ->
+            groupsState.groups.forEachIndexed { index, group ->
                 AddGroupButton(
                     onAddGroup = {
                         createGroup(index)
@@ -145,8 +128,8 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
                     )
                 ) {
                     GroupItem(
-                        groupData = groupData,
-                        selected = selectionIndex == index,
+                        group = group,
+                        selected = groupsState.selectionIndex == index,
                         onSelect = {
                             state.update {
                                 it.copy(
@@ -169,7 +152,7 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
 
     @Composable
     private fun GroupItem(
-        groupData: GroupData,
+        group: Group,
         selected: Boolean,
         onSelect: () -> Unit
     ) {
@@ -190,7 +173,7 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
                 }
         ) {
             Text(
-                text = groupData.name,
+                text = group.name,
                 style = MaterialTheme.typography.labelLarge,
                 lineHeight = MaterialTheme.typography.labelLarge.fontSize,
                 modifier = Modifier
@@ -249,9 +232,8 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
 
     @Composable
     private fun GroupContent() {
-        val groupsState by groups.collectAsState()
-        val selectionIndex = state.collectAsState().value.selectionIndex
-        val effects by groupsState[selectionIndex].devices.collectAsState()
+        val groupsState by state.collectAsState()
+        val effects by groupsState.groups[groupsState.selectionIndex].chain.devices
 
         if (effects.isEmpty()) {
             Box(
@@ -261,124 +243,60 @@ class GroupEffectDevice : EffectDevice<GroupEffectDeviceState>() {
 
                 contentAlignment = Alignment.Center
             ) {
-                /*HiddenDevicePickerButton(
+                HiddenDevicePickerButton(
                     expanded = true,
                     onAddComponent = {
-                        addEffectToGroup(selectionIndex, it)
+                        groupsState.groups[groupsState.selectionIndex].chain.add(it, groupsState.selectionIndex)
                     }
-                )*/
+                )
             }
         } else {
             Row(
                 modifier = Modifier
                     .fillMaxHeight(),
             ) {
-                groupsState[selectionIndex].devices.value.forEachIndexed { index, effectPlugin ->
-                    /*HiddenDevicePickerButton(
+                groupsState.groups[groupsState.selectionIndex].chain.devices.value.forEachIndexed { index, device ->
+                    HiddenDevicePickerButton(
                         onAddComponent = {
-                            addEffectToGroup(selectionIndex, it, index)
+                            groupsState.groups[groupsState.selectionIndex].chain.add(it, groupsState.selectionIndex)
                         }
-                    )*/
+                    )
 
-                    effectPlugin.Content()
+                    device.Content()
                 }
 
-                /*HiddenDevicePickerButton(
+                HiddenDevicePickerButton(
                     onAddComponent = {
-                        addEffectToGroup(selectionIndex, it)
+                        groupsState.groups[groupsState.selectionIndex].chain.add(it, groupsState.selectionIndex)
                     }
-                )*/
+                )
             }
         }
     }
 
     fun createGroup(atIndex: Int? = null) {
-        CoroutineScope(Dispatchers.Main).launch {
-            if (atIndex == null) {
-                groups.emit(
-                    groups.value.plus(
-                        GroupData(
-                            name = "Group ${groups.value.size + 1}"
-                        )
-                    )
-                )
-            } else {
-                val mutableList = groups.value.toMutableList()
-
-                mutableList.add(
-                    index = atIndex,
-                    element = GroupData(
-                        name = "Group ${groups.value.size + 1}"
-                    )
-                )
-
-                groups.emit(mutableList)
-            }
-        }
-    }
-
-    fun deleteGroup(index: Int) {
-        CoroutineScope(Dispatchers.Main).launch {
-            val mutableList = groups.value.toMutableList()
-            mutableList.removeAt(index)
-
-            groups.emit(mutableList)
-        }
-    }
-
-    fun addEffectToGroup(groupIndex: Int, effect: EffectDevice<*>, atIndex: Int? = null) {
-        CoroutineScope(Dispatchers.Main).launch {
-            if (atIndex == null) {
-                groups.value[groupIndex].devices.emit(
-                    value = groups.value[groupIndex].devices.value.plus(effect)
-                )
-            } else {
-                val mutableList = groups.value[groupIndex].devices.value.toMutableList()
-
-                mutableList.add(atIndex, effect)
-
-                groups.value[groupIndex].devices.emit(
-                    value = mutableList
-                )
-            }
-
-            groups.value[groupIndex].devices.emit(
-                groups.value[groupIndex].devices.value.mapIndexed { index, effectPlugin ->
-                    if (index + 1 < groups.value[groupIndex].devices.value.size) {
-                        effectPlugin.midiOutput = {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                groups.value[groupIndex].devices.value[index + 1].passData(it)
-                            }
-                        }
-
-                        return@mapIndexed effectPlugin
+        state.update {
+            it.copy(
+                groups = it.groups.toMutableList().apply {
+                    if (atIndex == null) {
+                        add(Group("Chain ${it.groups.size + 1}"))
                     } else {
-                        effectPlugin.midiOutput = {
-                            midiOutput(it)
-                        }
-
-                        return@mapIndexed effectPlugin
+                        add(atIndex, Group("Chain ${it.groups.size + 1}"))
                     }
                 }
             )
         }
     }
 
-    override suspend fun passData(data: MidiEffectData) {
-        groups.value.forEach {
-            val effect = it.devices.value.getOrNull(0)
-
-            if (effect != null) {
-                effect.passData(data)
-            } else {
-                midiOutput(data)
-            }
+    override fun midiEnter(n: List<Signal>) {
+        state.value.groups.forEach {
+            it.chain.midiEnter(n)
         }
     }
 }
 
 @Serializable
-data class GroupEffectDeviceState(
+data class GroupChainDeviceState(
     val selectionIndex: Int = 0,
-    val groups: List<GroupData> = emptyList()
+    val groups: List<Group> = listOf(Group("Chain 1"))
 ) : DeviceState()

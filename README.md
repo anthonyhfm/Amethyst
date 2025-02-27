@@ -9,5 +9,5 @@ Amethyst is an Application for creating and playing stunning Launchpad Performan
 
 ## Credits
 
-- [Apollo Studio](https://github.com/mat1jaczyyy/apollo-studio) by [Mat1jaczyyy](https://github.com/mat1jaczyyy)
-  - `For creating the first launchpad lightshow studio with full rgb access`
+- [Mat1jaczyyy](https://github.com/mat1jaczyyy)
+  - `For letting me use the Heaven Engine from Apollo Studio`
