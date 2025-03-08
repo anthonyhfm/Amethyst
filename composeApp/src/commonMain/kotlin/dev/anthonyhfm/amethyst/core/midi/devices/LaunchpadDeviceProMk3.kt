@@ -5,13 +5,13 @@ import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
 import dev.atsushieno.ktmidi.MidiOutput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class LaunchpadDeviceProMk3(
     override var midiOutput: MidiOutput,
 ) : LaunchpadDevice() {
-    val outscope = CoroutineScope(Dispatchers.IO)
+    val outscope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     override fun clear() {
         val clearSysEx = byteArrayOf(0xF0.toByte(), 0x00.toByte(), 0x20.toByte(), 0x29.toByte(), 0x02.toByte(), 0x0E.toByte(), 0x03.toByte(), 0x00.toByte(), 0xF7.toByte())

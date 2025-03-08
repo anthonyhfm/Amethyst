@@ -15,7 +15,7 @@ import dev.atsushieno.ktmidi.MidiInput
 import dev.atsushieno.ktmidi.MidiOutput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -112,7 +112,7 @@ class WorkspaceViewModel(
                     deviceConfig.input?.close()
                     deviceConfig.launchpadDevice?.midiOutput?.close()
 
-                    CoroutineScope(Dispatchers.IO).launch {
+                    CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
                         var inputDevice: MidiInput? = null
                         var outputDevice: MidiOutput? = null
 

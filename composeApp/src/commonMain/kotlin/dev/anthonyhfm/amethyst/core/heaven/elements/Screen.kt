@@ -1,7 +1,7 @@
 package dev.anthonyhfm.amethyst.core.heaven.elements
 
 import androidx.compose.ui.graphics.Color
-import co.touchlab.stately.concurrency.AtomicReference
+import androidx.lifecycle.AtomicReference
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -16,7 +16,7 @@ class Screen : AutoCloseable {
         fun clear() {
             signals.clear()
             signals[10000] = Signal(null, null, x = index % 10, y = index / 10, color = Color.Black, layer = -100)
-            currentColor.set(Color.Black)
+            currentColor.compareAndSet(currentColor.get(), Color.Black)
         }
 
         fun getColor(): Color = currentColor.get()
@@ -32,9 +32,8 @@ class Screen : AutoCloseable {
                 signals.remove(layer)
             }
 
-            // Aktualisiere die aktuelle Farbe ohne zusätzliche Sperren
             val newColor = signals.entries.minByOrNull { it.key }?.value?.color ?: Color.Black
-            currentColor.set(newColor)
+            currentColor.compareAndSet(currentColor.get(), newColor)
         }
     }
 
