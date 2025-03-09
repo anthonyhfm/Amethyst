@@ -115,17 +115,21 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnPressVirtualDevice -> {
-                chain.onMidiInput(
-                    inputData = MidiInputData(event.y * 10 + event.x, 127),
-                    offset = event.offset
-                )
+                if (state.value.mode != WorkspaceContract.WorkspaceMode.LAYOUT) {
+                    chain.onMidiInput(
+                        inputData = MidiInputData(event.y * 10 + event.x, 127),
+                        offset = event.offset
+                    )
+                }
             }
 
             is WorkspaceContract.Event.OnReleaseVirtualDevice -> {
-                chain.onMidiInput(
-                    inputData = MidiInputData(event.y * 10 + event.x, 0),
-                    offset = event.offset
-                )
+                if (state.value.mode != WorkspaceContract.WorkspaceMode.LAYOUT) {
+                    chain.onMidiInput(
+                        inputData = MidiInputData(event.y * 10 + event.x, 0),
+                        offset = event.offset
+                    )
+                }
             }
         }
     }
