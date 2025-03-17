@@ -1,11 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Filter
 import androidx.compose.material.icons.filled.Gradient
-import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.OpenWith
@@ -17,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -35,6 +34,11 @@ fun ChainDevicePicker(
     onDismiss: () -> Unit
 ) {
     val pickableComponents: Array<PickableComponent> = arrayOf(
+        PickableComponent(
+            name = "Coordinate Filter",
+            icon = Icons.Default.Filter,
+            plugin = CoordinateFilterChainDevice()
+        ),
         PickableComponent(
             name = "Color",
             icon = Icons.Default.ColorLens,

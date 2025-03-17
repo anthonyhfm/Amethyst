@@ -20,9 +20,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class WorkspaceViewModel(
-    private val midiAccess: MidiAccess
+    private val midiAccess: MidiAccess,
+    private val controller: WorkspaceController
 ) : ViewModel() {
-    val state = MutableStateFlow(WorkspaceContract.State())
+    val state = MutableStateFlow(
+        WorkspaceContract.State(
+            mode = controller.mode.value
+        )
+    )
 
     val chain: WorkspaceChain = WorkspaceChain()
 
@@ -33,6 +38,14 @@ class WorkspaceViewModel(
 
                 chain.launchpadElements.update {
                     state.viewportElements
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            controller.mode.collect { newMode ->
+                state.update {
+                    it.copy(mode = newMode)
                 }
             }
         }
@@ -53,13 +66,11 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.ChangeWorkspaceMode -> {
-                state.update {
-                    it.copy(mode = event.mode)
-                }
+                controller.switchMode(event.mode)
             }
 
             is WorkspaceContract.Event.ChangeViewportElementPosition -> {
-                if (state.value.mode != WorkspaceContract.WorkspaceMode.LAYOUT) return
+                if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) return
 
                 state.update {
                     it.copy(
@@ -115,7 +126,7 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnPressVirtualDevice -> {
-                if (state.value.mode != WorkspaceContract.WorkspaceMode.LAYOUT) {
+                if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) {
                     chain.onMidiInput(
                         inputData = MidiInputData(event.y * 10 + event.x, 127),
                         offset = event.offset
@@ -124,7 +135,7 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnReleaseVirtualDevice -> {
-                if (state.value.mode != WorkspaceContract.WorkspaceMode.LAYOUT) {
+                if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) {
                     chain.onMidiInput(
                         inputData = MidiInputData(event.y * 10 + event.x, 0),
                         offset = event.offset

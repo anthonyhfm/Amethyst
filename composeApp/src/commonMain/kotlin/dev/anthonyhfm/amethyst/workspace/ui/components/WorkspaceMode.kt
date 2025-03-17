@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceController
+import org.koin.compose.koinInject
 
 @Composable
 fun WorkspaceMode(
@@ -92,11 +94,17 @@ private fun ModeSwitchDialog(
     onDismiss: () -> Unit,
     onSelect: (WorkspaceContract.WorkspaceMode) -> Unit
 ) {
+    val selectableModes = listOf(
+        WorkspaceContract.WorkspaceMode.Layout(),
+        WorkspaceContract.WorkspaceMode.Preview(),
+        WorkspaceContract.WorkspaceMode.Chain(),
+    )
+
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss
     ) {
-        WorkspaceContract.WorkspaceMode.entries.filter { it.selectable }.forEach {
+        selectableModes.forEach {
             DropdownMenuItem(
                 text = {
                     Text(it.displayName)

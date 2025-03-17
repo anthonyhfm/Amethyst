@@ -46,7 +46,7 @@ fun Workspace() {
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = state.mode == WorkspaceContract.WorkspaceMode.LAYOUT,
+                visible = state.mode is WorkspaceContract.WorkspaceMode.Layout,
                 enter = scaleIn() + fadeIn(),
                 exit = scaleOut() + fadeOut()
             ) {
@@ -80,7 +80,7 @@ fun Workspace() {
             )
 
             AnimatedVisibility(
-                visible = state.mode == WorkspaceContract.WorkspaceMode.CHAIN,
+                visible = state.mode is WorkspaceContract.WorkspaceMode.Chain,
                 enter = slideInVertically { it },
                 exit = slideOutVertically { it },
                 modifier = Modifier

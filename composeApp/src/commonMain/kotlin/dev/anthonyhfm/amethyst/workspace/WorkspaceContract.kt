@@ -34,7 +34,7 @@ interface WorkspaceContract {
     }
 
     data class State(
-        val mode: WorkspaceMode = WorkspaceMode.LAYOUT,
+        val mode: WorkspaceMode,
         val showDeviceConfigurator: Int? = null,
         val viewportState: ViewportState = ViewportState(),
         val viewportElements: List<LaunchpadViewportElement> = emptyList()
@@ -46,21 +46,23 @@ interface WorkspaceContract {
         val selectedElement: Int? = null,
     )
 
-    enum class WorkspaceMode(
-        val displayName: String,
+    interface WorkspaceMode {
+        val displayName: String
         val selectable: Boolean
-    ) {
-        LAYOUT(
-            displayName = "Layout Mode",
-            selectable = true
-        ),
-        PREVIEW(
-            displayName = "Preview Mode",
-            selectable = true
-        ),
-        CHAIN(
-            displayName = "Chain Editor",
-            selectable = true
-        ),
+
+        data class Layout(
+            override val displayName: String = "Layout Editor",
+            override val selectable: Boolean = true
+        ) : WorkspaceMode
+
+        data class Preview(
+            override val displayName: String = "Preview",
+            override val selectable: Boolean = true
+        ) : WorkspaceMode
+
+        data class Chain(
+            override val displayName: String = "Chain Editor",
+            override val selectable: Boolean = true
+        ) : WorkspaceMode
     }
 }
