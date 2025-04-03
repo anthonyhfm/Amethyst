@@ -96,12 +96,6 @@ fun WorkspaceViewport(
                                 .border(2.dp, MaterialTheme.colorScheme.primary, element.shape)
                         } else Modifier
                     )
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) {
-                        onEvent(WorkspaceContract.Event.OnSelectDevice(index))
-                    }
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = {
@@ -112,24 +106,47 @@ fun WorkspaceViewport(
 
                                 draggingOffset += offset
 
-                                if (abs(draggingOffset.x / gridSize).roundToInt() > 0 || abs(draggingOffset.y / gridSize).roundToInt() > 0) {
-                                    val newX = (element.position.value.x + draggingOffset.x / gridSize).roundToInt()
-                                    val newY = (element.position.value.y + draggingOffset.y / gridSize).roundToInt()
+                                // Calculate accumulated movement in grid units
+                                val accumulatedGridX = draggingOffset.x / gridSize
+                                val accumulatedGridY = draggingOffset.y / gridSize
 
-                                    draggingOffset = Offset.Zero
+                                // Check if we've moved at least one grid unit in any direction
+                                if (abs(accumulatedGridX) >= 1f || abs(accumulatedGridY) >= 1f) {
+                                    // Calculate grid movement (whole grid units only)
+                                    val gridMoveX = accumulatedGridX.toInt()
+                                    val gridMoveY = accumulatedGridY.toInt()
 
-                                    onEvent(
-                                        WorkspaceContract.Event.ChangeViewportElementPosition(
-                                            index = index,
-                                            offset = Offset(newX.toFloat(), newY.toFloat())
+                                    // Only move if we have at least one whole grid unit of movement
+                                    if (gridMoveX != 0 || gridMoveY != 0) {
+                                        // Calculate new position in grid units
+                                        val newX = element.position.value.x + gridMoveX
+                                        val newY = element.position.value.y + gridMoveY
+
+                                        // Subtract the applied movement from the accumulated offset
+                                        draggingOffset = Offset(
+                                            draggingOffset.x - (gridMoveX * gridSize),
+                                            draggingOffset.y - (gridMoveY * gridSize)
                                         )
-                                    )
+
+                                        onEvent(
+                                            WorkspaceContract.Event.ChangeViewportElementPosition(
+                                                index = index,
+                                                offset = Offset(newX, newY)
+                                            )
+                                        )
+                                    }
                                 }
                             },
                             onDragEnd = {
                                 draggingOffset = Offset.Zero
                             }
                         )
+                    }
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {
+                        onEvent(WorkspaceContract.Event.OnSelectDevice(index))
                     }
             ) {
                 if (element is LaunchpadViewportElement) {

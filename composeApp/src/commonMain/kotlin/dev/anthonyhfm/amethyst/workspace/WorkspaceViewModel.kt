@@ -110,10 +110,13 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnClickDeviceConfigure -> {
-                state.update {
-                    it.copy(
-                        showDeviceConfigurator = event.index
-                    )
+                // Only allow device configuration in layout mode
+                if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
+                    state.update {
+                        it.copy(
+                            showDeviceConfigurator = event.index
+                        )
+                    }
                 }
             }
 
@@ -126,21 +129,30 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnSelectDevice -> {
-                state.update {
-                    it.copy(
-                        viewportState = it.viewportState.copy(
-                            selectedElement = event.index
+                // Only allow selection in layout mode
+                if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
+                    state.update {
+                        it.copy(
+                            viewportState = it.viewportState.copy(
+                                selectedElement = event.index
+                            )
                         )
-                    )
+                    }
                 }
             }
 
             is WorkspaceContract.Event.OnChangeDeviceConfig -> {
-                changeDeviceConfig(event)
+                // Only allow device configuration in layout mode
+                if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
+                    changeDeviceConfig(event)
+                }
             }
 
             is WorkspaceContract.Event.AddChainDevice -> {
-                chain.addDevice(event.device, event.atIndex)
+                // Only allow adding chain devices in modes other than layout mode
+                if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) {
+                    chain.addDevice(event.device, event.atIndex)
+                }
             }
 
             is WorkspaceContract.Event.OnPressVirtualDevice -> {
