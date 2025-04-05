@@ -63,6 +63,10 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         createGroup()
     }
 
+    companion object {
+        private var copiedGroupName: String? = null
+    }
+
     @Composable
     override fun Content() {
         Row(
@@ -137,10 +141,10 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                 ReorderableItem(reorderableLazyListState, key = group) {
                     ContextMenuArea(
                         items = listOf(
-                            ContextMenuItem("Copy") { },
-                            ContextMenuItem("Paste") { },
-                            ContextMenuItem("Duplicate") { },
-                            ContextMenuItem("Remove") { },
+                            ContextMenuItem("Copy") { copyGroup(group) },
+                            ContextMenuItem("Paste") { pasteGroup(index) },
+                            ContextMenuItem("Duplicate") { duplicateGroup(index) },
+                            ContextMenuItem("Remove") { removeGroup(index) },
                         )
                     ) {
                         GroupItem(
@@ -321,6 +325,74 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
     override fun midiEnter(n: List<Signal>) {
         state.value.groups.forEach {
             it.chain.midiEnter(n)
+        }
+    }
+
+    fun removeGroup(index: Int) {
+        if (state.value.groups.size <= 1) {
+            // Don't remove the last group
+            return
+        }
+
+        state.update {
+            val newGroups = it.groups.toMutableList().apply {
+                removeAt(index)
+            }
+
+            // Adjust selection index if needed
+            val newSelectionIndex = when {
+                it.selectionIndex >= newGroups.size -> newGroups.size - 1
+                it.selectionIndex > index -> it.selectionIndex - 1
+                else -> it.selectionIndex
+            }
+
+            it.copy(
+                groups = newGroups,
+                selectionIndex = newSelectionIndex
+            )
+        }
+    }
+
+    fun copyGroup(group: Group) {
+        copiedGroupName = group.name
+    }
+
+    fun pasteGroup(index: Int) {
+        copiedGroupName?.let { name ->
+            createGroup(index)
+
+            // Rename the newly created group
+            state.update {
+                it.copy(
+                    groups = it.groups.toMutableList().apply {
+                        this[index] = this[index].copy(name = name)
+                    }
+                )
+            }
+        }
+    }
+
+    fun renameGroup(index: Int, newName: String) {
+        state.update {
+            it.copy(
+                groups = it.groups.toMutableList().apply {
+                    this[index] = this[index].copy(name = newName)
+                }
+            )
+        }
+    }
+
+    fun duplicateGroup(index: Int) {
+        val group = state.value.groups[index]
+        createGroup(index + 1)
+
+        // Rename the newly created group
+        state.update {
+            it.copy(
+                groups = it.groups.toMutableList().apply {
+                    this[index + 1] = this[index + 1].copy(name = "${group.name} (Copy)")
+                }
+            )
         }
     }
 }
