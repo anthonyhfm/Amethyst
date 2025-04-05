@@ -9,6 +9,7 @@ class CoordinateFilterWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     var onVirtualDevicePress: ((x: Int, y: Int, offset: Offset) -> Unit)? = null
     var modeWakeup: (() -> Unit)? = null
+    var modeClose: (() -> Unit)? = null
 
     fun virtualDevicePress(x: Int, y: Int, offset: Offset) {
         onVirtualDevicePress?.invoke(x, y, offset)
@@ -16,5 +17,9 @@ class CoordinateFilterWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     fun wake() {
         modeWakeup?.invoke()
+    }
+
+    fun close() {
+        modeClose?.invoke()
     }
 }

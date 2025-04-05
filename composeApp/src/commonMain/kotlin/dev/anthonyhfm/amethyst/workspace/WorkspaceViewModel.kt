@@ -45,10 +45,6 @@ class WorkspaceViewModel(
 
         viewModelScope.launch {
             controller.mode.collect { newMode ->
-                state.update {
-                    it.copy(mode = newMode)
-                }
-
                 when (newMode) {
                     is CoordinateFilterWorkspaceMode -> {
                         chain.launchpadElements.value.forEach {
@@ -60,10 +56,18 @@ class WorkspaceViewModel(
                     }
 
                     else -> {
+                        if (state.value.mode is CoordinateFilterWorkspaceMode) {
+                            (state.value.mode as CoordinateFilterWorkspaceMode).close()
+                        }
+
                         chain.launchpadElements.value.forEach {
                             it.mirrorLaunchpad = true
                         }
                     }
+                }
+
+                state.update {
+                    it.copy(mode = newMode)
                 }
             }
         }
@@ -195,7 +199,7 @@ class WorkspaceViewModel(
                 event.inputPort?.let { input ->
                     inputDevice = midiAccess.openInput(input.id)
 
-                    inputDevice.setMessageReceivedListener { bytes, _, _, _ ->
+                    inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
                         getMidiInputData(bytes)?.let {
                             chain.onMidiInput(
                                 inputData = it,
