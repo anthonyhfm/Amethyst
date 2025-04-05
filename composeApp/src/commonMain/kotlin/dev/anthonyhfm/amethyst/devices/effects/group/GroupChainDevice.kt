@@ -14,18 +14,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
@@ -38,7 +37,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,8 +52,11 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.HiddenDevicePickerButton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import sh.calvin.reorderable.ReorderableCollectionItemScope
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
-class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
+class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
     override val state = MutableStateFlow(GroupChainDeviceState())
 
     init {
@@ -106,62 +107,77 @@ class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
 
     @Composable
     private fun GroupList() {
-        val scope = rememberCoroutineScope()
         val groupsState by state.collectAsState()
         val scrollState = rememberScrollState()
 
-        Column(
+        val lazyListState = rememberLazyListState()
+
+        val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
+            state.update {
+                it.copy(
+                    groups = it.groups.toMutableList().apply {
+                        add(to.index, removeAt(from.index))
+                    }
+                )
+            }
+        }
+
+        LazyColumn(
+            state = lazyListState,
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 8.dp)
         ) {
-            groupsState.groups.forEachIndexed { index, group ->
+            itemsIndexed(groupsState.groups, key = { _, group -> group }) { index, group ->
                 AddGroupButton(
                     onAddGroup = {
                         createGroup(index)
                     }
                 )
 
-                ContextMenuArea(
-                    items = listOf(
-                        ContextMenuItem("Copy") { },
-                        ContextMenuItem("Paste") { },
-                        ContextMenuItem("Duplicate") { },
-                        ContextMenuItem("Remove") { },
-                    )
-                ) {
-                    GroupItem(
-                        group = group,
-                        selected = groupsState.selectionIndex == index,
-                        onSelect = {
-                            state.update {
-                                it.copy(
-                                    selectionIndex = index
-                                )
+                ReorderableItem(reorderableLazyListState, key = group) {
+                    ContextMenuArea(
+                        items = listOf(
+                            ContextMenuItem("Copy") { },
+                            ContextMenuItem("Paste") { },
+                            ContextMenuItem("Duplicate") { },
+                            ContextMenuItem("Remove") { },
+                        )
+                    ) {
+                        GroupItem(
+                            group = group,
+                            selected = groupsState.selectionIndex == index,
+                            onSelect = {
+                                state.update {
+                                    it.copy(
+                                        selectionIndex = index
+                                    )
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
 
-            AddGroupButton(
-                expanded = true,
-                onAddGroup = {
-                    createGroup()
-                }
-            )
+            item {
+                AddGroupButton(
+                    expanded = true,
+                    onAddGroup = {
+                        createGroup()
+                    }
+                )
+            }
         }
     }
 
     @Composable
-    private fun GroupItem(
+    private fun ReorderableCollectionItemScope.GroupItem(
         group: Group,
         selected: Boolean,
         onSelect: () -> Unit
     ) {
         Box(
             modifier = Modifier
+                .draggableHandle()
                 .clip(RoundedCornerShape(2.dp))
                 .fillMaxWidth()
                 .height(28.dp)
@@ -194,7 +210,7 @@ class GroupChainDevice() : ChainDevice<GroupChainDeviceState>() {
     }
 
     @Composable
-    private fun ColumnScope.AddGroupButton(
+    private fun AddGroupButton(
         expanded: Boolean = false,
         onAddGroup: () -> Unit
     ) {
