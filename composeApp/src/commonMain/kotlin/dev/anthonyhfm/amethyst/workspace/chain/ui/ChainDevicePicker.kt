@@ -1,12 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.Filter
-import androidx.compose.material.icons.filled.Gradient
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.MoreTime
-import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -19,6 +14,7 @@ import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilte
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 
 data class PickableComponent(
@@ -63,6 +59,11 @@ fun ChainDevicePicker(
             name = "Delay",
             icon = Icons.Default.MoreTime,
             plugin = DelayChainDevice()
+        ),
+        PickableComponent(
+            name = "Keyframes",
+            icon = Icons.Default.Animation,
+            plugin = KeyframesChainDevice()
         ),
     )
 

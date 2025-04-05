@@ -11,6 +11,7 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
 import dev.anthonyhfm.amethyst.workspace.chain.WorkspaceChain
 import dev.atsushieno.ktmidi.MidiAccess
@@ -46,7 +47,7 @@ class WorkspaceViewModel(
         viewModelScope.launch {
             controller.mode.collect { newMode ->
                 when (newMode) {
-                    is CoordinateFilterWorkspaceMode -> {
+                    is KeyframesWorkspaceMode -> {
                         chain.launchpadElements.value.forEach {
                             it.mirrorLaunchpad = false
                             it.previewState.clear()
@@ -58,6 +59,10 @@ class WorkspaceViewModel(
                     else -> {
                         if (state.value.mode is CoordinateFilterWorkspaceMode) {
                             (state.value.mode as CoordinateFilterWorkspaceMode).close()
+                        }
+
+                        if (state.value.mode is KeyframesWorkspaceMode) {
+                            (state.value.mode as KeyframesWorkspaceMode).close()
                         }
 
                         chain.launchpadElements.value.forEach {
@@ -161,6 +166,10 @@ class WorkspaceViewModel(
 
             is WorkspaceContract.Event.OnPressVirtualDevice -> {
                 when (state.value.mode) {
+                    is KeyframesWorkspaceMode -> {
+                        (state.value.mode as KeyframesWorkspaceMode).virtualDevicePress(event.x, event.y, event.offset)
+                    }
+
                     is CoordinateFilterWorkspaceMode -> {
                         (state.value.mode as CoordinateFilterWorkspaceMode).virtualDevicePress(event.x, event.y, event.offset)
                     }

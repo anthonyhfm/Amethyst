@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.devices.effects.coordinate_filter
+package dev.anthonyhfm.amethyst.devices.effects.keyframes
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
@@ -12,7 +12,6 @@ import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceController
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,10 +19,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
-class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState>() {
-    override val state = MutableStateFlow(CoordinateFilterChainDeviceState())
+class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
+    override val state = MutableStateFlow(KeyframesChainDeviceState())
 
-    private val customMode: CoordinateFilterWorkspaceMode = CoordinateFilterWorkspaceMode()
+    private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
 
     init {
         customMode.modeWakeup = {
@@ -46,7 +45,7 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
         val controller = koinInject<WorkspaceController>()
 
         AmethystDevice(
-            title = "Coordinate Filter",
+            title = "Keyframes",
             modifier = Modifier
                 .width(200.dp)
         ) {
@@ -58,7 +57,7 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
                 }
             ) {
                 Text(
-                    text = "Pick coordinates"
+                    text = "Edit keyframes",
                 )
             }
         }
@@ -120,6 +119,6 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
 }
 
 @Serializable
-data class CoordinateFilterChainDeviceState(
+data class KeyframesChainDeviceState(
     val filters: List<Pair<Int, Int>> = emptyList()
 ) : DeviceState()

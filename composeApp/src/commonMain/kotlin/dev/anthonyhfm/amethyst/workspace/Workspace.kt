@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
@@ -90,6 +91,10 @@ fun Workspace() {
                     devices = viewModel.chain.heavenChain.devices.value,
                     onEvent = { viewModel.onEvent(it) }
                 )
+            }
+
+            if (state.mode is KeyframesWorkspaceMode) {
+                (state.mode as KeyframesWorkspaceMode).EditorUI()
             }
         }
     }
