@@ -13,8 +13,6 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dev.anthonyhfm.amethyst.core.data.project.AmethystReader
-import dev.anthonyhfm.amethyst.core.data.project.AmethystWriter
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.start.ui.AmethystWelcome
 import dev.anthonyhfm.amethyst.start.ui.ProjectsView
@@ -38,9 +36,7 @@ fun StartWindow(
         ),
         resizable = false
     ) {
-        val writer: AmethystWriter = koinInject()
-        val reader: AmethystReader = koinInject()
-        val viewModel = viewModel { StartWindowViewModel(writer, reader) }
+        val viewModel = viewModel { StartWindowViewModel() }
 
         viewModel.onOpenEditor = {
             onOpenEditor()
