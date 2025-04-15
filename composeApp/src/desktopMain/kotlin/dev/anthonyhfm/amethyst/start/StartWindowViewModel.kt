@@ -2,9 +2,7 @@ package dev.anthonyhfm.amethyst.start
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.anthonyhfm.amethyst.core.data.project.AmethystProject
-import dev.anthonyhfm.amethyst.core.data.project.AmethystReader
-import dev.anthonyhfm.amethyst.core.data.project.AmethystWriter
+import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import io.github.vinceglb.filekit.core.FileKit
 import io.github.vinceglb.filekit.core.PickerMode
 import io.github.vinceglb.filekit.core.PickerType
@@ -14,10 +12,7 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import java.awt.Desktop
 import java.net.URI
 
-class StartWindowViewModel(
-    val amethystWriter: AmethystWriter,
-    val amethystReader: AmethystReader
-) : ViewModel() {
+class StartWindowViewModel() : ViewModel() {
     var onOpenEditor: (() -> Unit)? = null
 
     fun openGitHubWebsite() {
@@ -31,15 +26,15 @@ class StartWindowViewModel(
         viewModelScope.launch {
             val file = FileKit.saveFile(
                 bytes = ProtoBuf.encodeToByteArray(
-                    serializer = AmethystProject.serializer(),
-                    value = amethystWriter.getTemplateProject()
+                    serializer = SaveableWorkspaceData.serializer(),
+                    value = SaveableWorkspaceData("New Project", "")
                 ),
                 extension = "aspj",
                 baseName = "project",
             )
 
             file?.readBytes()?.let { bytes ->
-                amethystReader.readFromFile(bytes)
+                // amethystReader.readFromFile(bytes)
             }
 
             onOpenEditor?.invoke()
@@ -59,7 +54,7 @@ class StartWindowViewModel(
             )
 
             file?.readBytes()?.let { bytes ->
-                amethystReader.readFromFile(bytes)
+                // amethystReader.readFromFile(bytes)
             }
 
             onOpenEditor?.invoke()
