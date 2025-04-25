@@ -6,4 +6,6 @@ import org.koin.dsl.module
 
 val midiKoinModule = module {
     single { platformMidiAccess } bind MidiAccess::class
+
+    single { AmethystMidiManager() }
 }

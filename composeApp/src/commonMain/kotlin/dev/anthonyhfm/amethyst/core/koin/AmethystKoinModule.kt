@@ -11,5 +11,5 @@ val amethystKoinModule = module {
 
     single { WorkspaceController() }
 
-    viewModel { WorkspaceViewModel(get(), get()) }
+    viewModel { WorkspaceViewModel(get(), get(), get()) }
 }

@@ -35,5 +35,5 @@ enum class LaunchpadDeviceType(val label: String) {
     ),
     MYSTRIX(
         label = "Mystrix"
-    )
+    ),
 }

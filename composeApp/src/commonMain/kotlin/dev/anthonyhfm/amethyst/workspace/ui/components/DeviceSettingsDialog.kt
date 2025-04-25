@@ -38,9 +38,7 @@ fun DeviceSettingsDialog(
 
     var expandedInput: Boolean by remember { mutableStateOf(false) }
     var expandedOutput: Boolean by remember { mutableStateOf(false) }
-    var expandedDeviceType: Boolean by remember { mutableStateOf(false) }
 
-    var midiDeviceType: LaunchpadDeviceType? by remember { mutableStateOf(null) }
     var midiInputPort: MidiPortDetails? by remember { mutableStateOf(null) }
     var midiOutputPort: MidiPortDetails? by remember { mutableStateOf(null) }
 
@@ -128,41 +126,7 @@ fun DeviceSettingsDialog(
                     }
                 }
 
-                ExposedDropdownMenuBox(
-                    expanded = expandedDeviceType,
-                    onExpandedChange = {
-                        expandedDeviceType = it
-                    }
-                ) {
-                    OutlinedTextField(
-                        value = midiDeviceType?.label ?: "",
-                        onValueChange = { },
-                        label = { Text("Midi Device Type") },
-                        readOnly = true,
-                        singleLine = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDeviceType) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                    )
-
-                    ExposedDropdownMenu(
-                        expanded = expandedDeviceType,
-                        onDismissRequest = { expandedDeviceType = false },
-                    ) {
-                        val deviceTypes by remember { mutableStateOf(LaunchpadDeviceType.entries) }
-
-                        deviceTypes.forEach {
-                            DropdownMenuItem(
-                                text = { Text(it.label) },
-                                onClick = {
-                                    midiDeviceType = it
-                                    expandedDeviceType = false
-                                }
-                            )
-                        }
-                    }
-                }
+                Text("The device type will be recognized automatically")
             }
         },
         dismissButton = {
@@ -186,7 +150,6 @@ fun DeviceSettingsDialog(
                             index = index,
                             inputPort = midiInputPort,
                             outputPort = midiOutputPort,
-                            deviceType = midiDeviceType
                         )
                     )
                     onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)

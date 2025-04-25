@@ -24,7 +24,6 @@ interface WorkspaceContract {
             val index: Int,
             var inputPort: MidiPortDetails?,
             var outputPort: MidiPortDetails?,
-            var deviceType: LaunchpadDeviceType?
         ) : Event
 
         data class AddChainDevice(val device: ChainDevice<*>, val atIndex: Int? = null) : Event

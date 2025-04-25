@@ -60,7 +60,7 @@ fun Workspace() {
                 }
             }
         }
-    ) {
+    ) { paddingValues ->
         if (state.showDeviceConfigurator != null) {
             DeviceSettingsDialog(
                 index = state.showDeviceConfigurator!!,
@@ -94,7 +94,7 @@ fun Workspace() {
             }
 
             if (state.mode is KeyframesWorkspaceMode) {
-                (state.mode as KeyframesWorkspaceMode).EditorUI()
+                (state.mode as KeyframesWorkspaceMode).EditorUI(paddingValues)
             }
         }
     }

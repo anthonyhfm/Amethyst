@@ -17,12 +17,13 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.koin.compose.koinInject
 
 class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     override val state = MutableStateFlow(KeyframesChainDeviceState())
 
-    private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
+    private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode(this)
 
     init {
         customMode.modeWakeup = {

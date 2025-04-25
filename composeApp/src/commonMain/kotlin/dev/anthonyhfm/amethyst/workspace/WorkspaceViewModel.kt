@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.workspace
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anthonyhfm.amethyst.core.midi.AmethystMidiManager
 import dev.anthonyhfm.amethyst.core.midi.IO_COROUTINE
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
@@ -23,7 +24,8 @@ import kotlinx.coroutines.launch
 
 class WorkspaceViewModel(
     private val midiAccess: MidiAccess,
-    private val controller: WorkspaceController
+    private val controller: WorkspaceController,
+    private val amethystMidiManager: AmethystMidiManager
 ) : ViewModel() {
     val state = MutableStateFlow(
         WorkspaceContract.State(
@@ -207,25 +209,31 @@ class WorkspaceViewModel(
 
                 event.inputPort?.let { input ->
                     inputDevice = midiAccess.openInput(input.id)
-
-                    inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
-                        getMidiInputData(bytes)?.let {
-                            chain.onMidiInput(
-                                inputData = it,
-                                offset = this@apply.position.value
-                            )
-                        }
-                    }
                 }
 
                 event.outputPort?.let { output ->
                     outputDevice = midiAccess.openOutput(output.id)
                 }
 
+                var deviceType: LaunchpadDeviceType? = null
+
+                if (inputDevice != null && outputDevice != null) {
+                    deviceType = amethystMidiManager.detect(inputDevice!!, outputDevice!!)
+                }
+
+                /*inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
+                    getMidiInputData(bytes)?.let {
+                        chain.onMidiInput(
+                            inputData = it,
+                            offset = this@apply.position.value
+                        )
+                    }
+                */
+
                 deviceConfig = deviceConfig.copy(
                     input = inputDevice,
                     launchpadDevice = outputDevice?.let { output ->
-                        event.deviceType?.mapLaunchpadDevice(output)
+                        deviceType?.mapLaunchpadDevice(output)
                     },
                 )
             }
