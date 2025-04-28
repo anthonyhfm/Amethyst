@@ -39,4 +39,11 @@ class LaunchpadDeviceX(
             midiOutput.send(data, 0, data.size, 0)
         }
     }
+
+    companion object {
+        @OptIn(ExperimentalUnsignedTypes::class)
+        fun identify(inquiry: UByteArray): Boolean {
+            return false
+        }
+    }
 }
