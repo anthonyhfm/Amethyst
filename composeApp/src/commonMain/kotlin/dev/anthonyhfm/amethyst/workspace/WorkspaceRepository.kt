@@ -5,9 +5,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class WorkspaceController {
+class WorkspaceRepository {
     private val _mode: MutableStateFlow<WorkspaceContract.WorkspaceMode> = MutableStateFlow(WorkspaceContract.WorkspaceMode.Layout())
     val mode: StateFlow<WorkspaceContract.WorkspaceMode> = _mode.asStateFlow()
+
+    private val _bpm = MutableStateFlow(120.00)
+    val bpm: StateFlow<Double> = _bpm.asStateFlow()
 
     // Keep track of the previous mode
     private var previousMode: WorkspaceContract.WorkspaceMode = WorkspaceContract.WorkspaceMode.Layout()
@@ -25,6 +28,12 @@ class WorkspaceController {
     fun switchToPreviousMode() {
         _mode.update {
             previousMode
+        }
+    }
+
+    fun setBpm(bpm: Double) {
+        _bpm.update {
+            bpm
         }
     }
 }
