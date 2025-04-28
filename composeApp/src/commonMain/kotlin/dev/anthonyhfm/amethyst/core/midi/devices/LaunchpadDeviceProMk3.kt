@@ -52,9 +52,7 @@ class LaunchpadDeviceProMk3(
             try {
                 val cutdown = inquiry.copyOfRange(2, inquiry.lastIndex - 4)
 
-                cutdown[6] = 19u
-
-                return cutdown.contentEquals(ubyteArrayOf(0u, 6u, 2u, 0u, 32u, 41u, 19u, 1u, 0u, 0u))
+                return cutdown.contentEquals(ubyteArrayOf(0u, 6u, 2u, 0u, 32u, 41u, 35u, 1u, 0u, 0u))
             } catch (e: Exception) {
                 return false
             }

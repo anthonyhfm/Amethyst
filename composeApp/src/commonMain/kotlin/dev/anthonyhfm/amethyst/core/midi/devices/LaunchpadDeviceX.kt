@@ -43,7 +43,15 @@ class LaunchpadDeviceX(
     companion object {
         @OptIn(ExperimentalUnsignedTypes::class)
         fun identify(inquiry: UByteArray): Boolean {
-            return false
+            if (inquiry.size > 18) return false
+
+            try {
+                val cutdown = inquiry.copyOfRange(2, inquiry.lastIndex - 4)
+
+                return cutdown.contentEquals(ubyteArrayOf(0u, 6u, 2u, 0u, 32u, 41u, 19u, 1u, 0u, 0u))
+            } catch (e: Exception) {
+                return false
+            }
         }
     }
 }
