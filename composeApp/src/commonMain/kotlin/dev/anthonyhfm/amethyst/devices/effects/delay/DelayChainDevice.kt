@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.delay
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -12,7 +14,9 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -30,18 +34,39 @@ class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
             modifier = Modifier
                 .width(100.dp)
         ) {
-            TimeDial(
-                headline = "Delay",
-                timing = deviceState.timing,
-                onSelectTiming = { timing, msValue ->
-                    state.update {
-                        it.copy(
-                            timing = timing,
-                            delayMs = msValue
-                        )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                TimeDial(
+                    headline = "Delay",
+                    timing = deviceState.timing,
+                    onSelectTiming = { timing, msValue ->
+                        state.update {
+                            it.copy(
+                                timing = timing,
+                                delayMs = msValue
+                            )
+                        }
                     }
-                }
-            )
+                )
+
+                TextDial(
+                    headline = "Gate",
+                    text = "${(deviceState.gate * 200).toInt()}%",
+                    value = deviceState.gate,
+                    onValueChange = { value ->
+                        state.update {
+                            it.copy(gate = value)
+                        }
+                    },
+                    modifier = Modifier
+                        .rightClickable {
+                            state.update {
+                                it.copy(gate = 0.5f) // Reset gate to its original state
+                            }
+                        },
+                )
+            }
         }
     }
 
@@ -50,7 +75,7 @@ class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
             job = {
                 midiExit?.invoke(n)
             },
-            delayInMs = state.value.delayMs.toDouble()
+            delayInMs = state.value.delayMs.toDouble() * (state.value.gate * 2)
         )
     }
 }
@@ -59,4 +84,5 @@ class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
 data class DelayChainDeviceState(
     val timing: Timing = Timing.Duration(200.milliseconds),
     val delayMs: Int = 200,
+    val gate: Float = 0.5f, // 100% = 0.5f, 200% = 1.0f
 ) : DeviceState()
