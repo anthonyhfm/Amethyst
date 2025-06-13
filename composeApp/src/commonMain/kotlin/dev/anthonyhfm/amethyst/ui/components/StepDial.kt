@@ -33,6 +33,8 @@ fun <T> StepDial(
     steps: List<T>,
     value: T,
     onValueChange: (T) -> Unit,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp),
+    dialColor: Color = MaterialTheme.colorScheme.tertiary,
     modifier: Modifier = Modifier,
 ) {
     var dialValue by remember { mutableStateOf(0f) }
@@ -48,9 +50,6 @@ fun <T> StepDial(
         onValueChange(steps[(dialValue * (steps.size - 1)).toInt()])
     }
 
-    val background = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp)
-    val dialColor = MaterialTheme.colorScheme.tertiary
-
     Box(
         modifier = modifier
             .clip(CircleShape)
@@ -60,7 +59,7 @@ fun <T> StepDial(
                     dialValue = (dialValue + (offset * -1) * 0.01f).coerceIn(0f, 1f)
                 }
             }
-            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp))
+            .background(containerColor)
             .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(48.dp), CircleShape)
             .padding(6.dp)
     ) {
@@ -83,7 +82,7 @@ fun <T> StepDial(
             )
 
             drawCircle(
-                color = background,
+                color = containerColor,
                 radius = 30f
             )
         }
@@ -97,6 +96,8 @@ fun <T> StepTextDial(
     steps: List<T>,
     value: T,
     onValueChange: (T) -> Unit,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp),
+    dialColor: Color = MaterialTheme.colorScheme.tertiary,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -114,6 +115,8 @@ fun <T> StepTextDial(
             modifier = modifier,
             steps = steps,
             value = value,
+            containerColor = containerColor,
+            dialColor = dialColor,
             onValueChange = {
                 onValueChange(it)
             }

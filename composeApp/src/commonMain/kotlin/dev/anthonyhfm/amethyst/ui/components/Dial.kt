@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 fun Dial(
     value: Float,
     onValueChange: (Float) -> Unit,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp),
+    dialColor: Color = MaterialTheme.colorScheme.tertiary,
     modifier: Modifier = Modifier,
 ) {
     var dialValue by remember { mutableStateOf(value) }
@@ -45,9 +47,6 @@ fun Dial(
         onValueChange(dialValue)
     }
 
-    val background = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp)
-    val dialColor = MaterialTheme.colorScheme.tertiary
-
     Box(
         modifier = modifier
             .clip(CircleShape)
@@ -57,7 +56,7 @@ fun Dial(
                     dialValue = (dialValue + (offset * -1) * 0.01f).coerceIn(0f, 1f)
                 }
             }
-            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp))
+            .background(containerColor)
             .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(48.dp), CircleShape)
             .padding(6.dp)
     ) {
@@ -80,7 +79,7 @@ fun Dial(
             )
 
             drawCircle(
-                color = background,
+                color = containerColor,
                 radius = 30f
             )
         }
@@ -93,6 +92,8 @@ fun TextDial(
     headline: String? = null,
     value: Float,
     onValueChange: (Float) -> Unit,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp),
+    dialColor: Color = MaterialTheme.colorScheme.tertiary,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -109,6 +110,8 @@ fun TextDial(
         Dial(
             modifier = modifier,
             value = value,
+            containerColor = containerColor,
+            dialColor = dialColor,
             onValueChange = {
                 onValueChange(it)
             }

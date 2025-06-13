@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.ui.components
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,6 +40,7 @@ fun TimeDial(
                 )
             },
             headline = headline,
+            dialColor = MaterialTheme.colorScheme.secondary,
             text = "${timing.toMsValue(bpm)} ms",
             modifier = Modifier
                 .rightClickable {
@@ -46,7 +48,7 @@ fun TimeDial(
                 },
         )
     } else {
-        StepTextDial<Timing.Rythm.RythmTiming>(
+        StepTextDial(
             text = if (timing is Timing.Rythm) {
                 timing.timing.text
             } else {
