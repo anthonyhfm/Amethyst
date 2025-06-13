@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
@@ -28,21 +26,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 
 @Composable
-fun Dial(
-    value: Float,
-    onValueChange: (Float) -> Unit,
+fun <T> StepDial(
+    steps: List<T>,
+    value: T,
+    onValueChange: (T) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var dialValue by remember { mutableStateOf(value) }
-    
+    var dialValue by remember { mutableStateOf(0f) }
+    var displayValue by remember { mutableStateOf(0f) }
+
     LaunchedEffect(value) {
-        dialValue = value
+        dialValue = steps.indexOf(value).toFloat() / (steps.size - 1)
+
+        displayValue = (dialValue * (steps.size)) / (steps.size)
     }
 
     LaunchedEffect(dialValue) {
-        onValueChange(dialValue)
+        onValueChange(steps[(dialValue * (steps.size - 1)).toInt()])
     }
 
     val background = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp)
@@ -75,7 +78,7 @@ fun Dial(
             drawArc(
                 color = dialColor,
                 startAngle = 135f - 16f,
-                sweepAngle = (270f + 32f) * dialValue,
+                sweepAngle = (270f + 32f) * displayValue,
                 useCenter = true
             )
 
@@ -88,11 +91,12 @@ fun Dial(
 }
 
 @Composable
-fun TextDial(
+fun <T> StepTextDial(
     text: String,
     headline: String? = null,
-    value: Float,
-    onValueChange: (Float) -> Unit,
+    steps: List<T>,
+    value: T,
+    onValueChange: (T) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -106,8 +110,9 @@ fun TextDial(
             )
         }
 
-        Dial(
+        StepDial(
             modifier = modifier,
+            steps = steps,
             value = value,
             onValueChange = {
                 onValueChange(it)

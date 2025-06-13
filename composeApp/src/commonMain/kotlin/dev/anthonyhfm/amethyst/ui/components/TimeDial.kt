@@ -46,34 +46,21 @@ fun TimeDial(
                 },
         )
     } else {
-        val stepDialState = rememberStepDialState(
-            values = Timing.Rythm.RythmTiming.entries,
-            initialIndex = if (timing is Timing.Rythm) {
-                Timing.Rythm.RythmTiming.entries.indexOf(timing.timing)
-            } else {
-                0
-            }
-        )
-
-        LaunchedEffect(stepDialState.current) {
-            val selectedTiming = stepDialState.current
-
-            println("Selected timing: $selectedTiming")
-
-            onSelectTiming(
-                Timing.Rythm(selectedTiming),
-                Timing.Rythm(selectedTiming).toMsValue(bpm)
-            )
-        }
-
-        StepTextDial(
-            state = stepDialState,
+        StepTextDial<Timing.Rythm.RythmTiming>(
             text = if (timing is Timing.Rythm) {
                 timing.timing.text
             } else {
                 ""
             },
+            steps = Timing.Rythm.RythmTiming.entries,
+            value = (timing as? Timing.Rythm)?.timing ?: Timing.Rythm.RythmTiming._1_128,
             headline = headline,
+            onValueChange = {
+                onSelectTiming(
+                    Timing.Rythm(it),
+                    Timing.Rythm(it).toMsValue(bpm)
+                )
+            },
             modifier = Modifier
                 .rightClickable {
                     millisecondMode = !millisecondMode
