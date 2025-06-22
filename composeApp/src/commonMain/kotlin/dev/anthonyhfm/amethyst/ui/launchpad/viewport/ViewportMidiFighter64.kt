@@ -34,6 +34,8 @@ class ViewportMidiFighter64(
     override var shape: Shape = RoundedCornerShape(8),
     override var size: Size = Size(8f, 8f),
 ) : LaunchpadViewportElement() {
+    override val name: String = "Midi Fighter 64"
+
     override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_8X8
 
     override val content: @Composable (() -> Unit) = {

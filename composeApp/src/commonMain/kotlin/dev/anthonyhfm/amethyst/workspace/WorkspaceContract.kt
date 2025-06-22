@@ -8,6 +8,7 @@ import dev.atsushieno.ktmidi.MidiPortDetails
 
 interface WorkspaceContract {
     sealed interface Event {
+        data object OpenVirtualDevicePicker : Event
         data object AddDeviceToViewport : Event
 
         data class ChangeWorkspaceMode(val mode: WorkspaceMode) : Event
@@ -26,6 +27,8 @@ interface WorkspaceContract {
             var outputPort: MidiPortDetails?,
         ) : Event
 
+
+
         data class AddChainDevice(val device: ChainDevice<*>, val atIndex: Int? = null) : Event
         data class ReorderChainDevice(val fromIndex: Int, val toIndex: Int) : Event
 
@@ -36,6 +39,7 @@ interface WorkspaceContract {
     data class State(
         val mode: WorkspaceMode,
         val showDeviceConfigurator: Int? = null,
+        val showDevicePicker: Boolean = false,
         val viewportState: ViewportState = ViewportState(),
         val viewportElements: List<LaunchpadViewportElement> = emptyList()
     )

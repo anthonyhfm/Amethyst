@@ -85,6 +85,12 @@ class WorkspaceViewModel(
 
     fun onEvent(event: WorkspaceContract.Event) {
         when (event) {
+            is WorkspaceContract.Event.OpenVirtualDevicePicker -> {
+                state.update {
+                    it.copy(showDevicePicker = true)
+                }
+            }
+
             is WorkspaceContract.Event.AddDeviceToViewport -> {
                 val device = ViewportLaunchpadPro()
 
@@ -124,7 +130,6 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnClickDeviceConfigure -> {
-                // Only allow device configuration in layout mode
                 if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
                     state.update {
                         it.copy(
@@ -143,7 +148,6 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnSelectDevice -> {
-                // Only allow selection in layout mode
                 if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
                     state.update {
                         it.copy(
@@ -156,21 +160,18 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnChangeDeviceConfig -> {
-                // Only allow device configuration in layout mode
                 if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
                     changeDeviceConfig(event)
                 }
             }
 
             is WorkspaceContract.Event.AddChainDevice -> {
-                // Only allow adding chain devices in modes other than layout mode
                 if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) {
                     chain.addDevice(event.device, event.atIndex)
                 }
             }
 
             is WorkspaceContract.Event.ReorderChainDevice -> {
-                // Nur im Chain-Modus das Neuordnen der Geräte erlauben
                 if (state.value.mode is WorkspaceContract.WorkspaceMode.Chain) {
                     chain.reorderDevice(event.fromIndex, event.toIndex)
                 }

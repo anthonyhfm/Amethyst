@@ -34,6 +34,8 @@ class ViewportMystrix(
     override var shape: Shape = RoundedCornerShape(2),
     override var size: Size = Size(8f, 8f),
 ) : LaunchpadViewportElement() {
+    override val name: String = "Mystrix"
+
     override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_8X8
 
     override val content: @Composable (() -> Unit) = {

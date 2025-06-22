@@ -26,6 +26,7 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
+import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
 import org.koin.compose.viewmodel.koinViewModel
@@ -59,7 +60,7 @@ fun Workspace() {
             ) {
                 FloatingActionButton(
                     onClick = {
-                        viewModel.onEvent(Event.AddDeviceToViewport)
+                        viewModel.onEvent(Event.OpenVirtualDevicePicker)
                     }
                 ) {
                     Icon(Icons.Default.Add, null)
@@ -72,6 +73,10 @@ fun Workspace() {
                 index = state.showDeviceConfigurator!!,
                 onEvent = { viewModel.onEvent(it) }
             )
+        }
+
+        if (state.showDevicePicker) {
+            InsertLaunchpadDialog()
         }
 
         Box(

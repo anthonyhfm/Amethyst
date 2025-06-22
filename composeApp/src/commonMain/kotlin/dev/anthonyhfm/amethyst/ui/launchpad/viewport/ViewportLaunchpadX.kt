@@ -34,6 +34,8 @@ class ViewportLaunchpadX(
     override var shape: Shape = RoundedCornerShape(2),
     override var size: Size = Size(9f, 9f),
 ) : LaunchpadViewportElement() {
+    override val name: String = "Launchpad X"
+
     override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_9X9
 
     override val content: @Composable (() -> Unit) = {

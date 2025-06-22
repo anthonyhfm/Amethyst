@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 abstract class LaunchpadViewportElement(
     override var position: MutableState<Offset> = mutableStateOf(Offset(0f, 0f)),
 ) : ViewportElement {
+    abstract val name: String
     abstract override var shape: Shape
     abstract override var size: Size
     abstract val layout: LaunchpadLayout
