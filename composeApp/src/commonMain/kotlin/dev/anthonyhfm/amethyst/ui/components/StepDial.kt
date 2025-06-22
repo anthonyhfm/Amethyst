@@ -63,27 +63,31 @@ fun <T> StepDial(
             .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(48.dp), CircleShape)
             .padding(6.dp)
     ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 5.dp.toPx()
+            val outerRadius = size.minDimension / 2f
+            val innerRadius = outerRadius - strokeWidth
+            val arcStart = 135f - 16f
+            val arcSweep = 270f + 32f
+
             drawArc(
-                color = Color.LightGray.copy(0.2f),
-                startAngle = 135f - 16f,
-                sweepAngle = 270f + 32f,
+                color = Color.LightGray.copy(alpha = 0.2f),
+                startAngle = arcStart,
+                sweepAngle = arcSweep,
                 useCenter = true
             )
 
             drawArc(
                 color = dialColor,
-                startAngle = 135f - 16f,
-                sweepAngle = (270f + 32f) * displayValue,
+                startAngle = arcStart,
+                sweepAngle = arcSweep * displayValue,
                 useCenter = true
             )
 
             drawCircle(
                 color = containerColor,
-                radius = 30f
+                radius = innerRadius,
+                center = center
             )
         }
     }
