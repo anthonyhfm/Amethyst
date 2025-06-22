@@ -16,7 +16,12 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.workspace.chain.WorkspaceChain
 import dev.atsushieno.ktmidi.MidiAccess
 import dev.atsushieno.ktmidi.MidiInput
@@ -91,13 +96,29 @@ class WorkspaceViewModel(
                 }
             }
 
+            is WorkspaceContract.Event.DismissVirtualDevicePicker -> {
+                state.update {
+                    it.copy(showDevicePicker = false)
+                }
+            }
+
             is WorkspaceContract.Event.AddDeviceToViewport -> {
-                val device = ViewportLaunchpadPro()
+                val device = when (event.device) {
+                    is ViewportLaunchpadPro -> ViewportLaunchpadPro()
+                    is ViewportLaunchpadMk2 -> ViewportLaunchpadMk2()
+                    is ViewportLaunchpadProMk3 -> ViewportLaunchpadProMk3()
+                    is ViewportLaunchpadX -> ViewportLaunchpadX()
+                    is ViewportMystrix -> ViewportMystrix()
+                    is ViewportMidiFighter64 -> ViewportMidiFighter64()
+
+                    else -> return
+                }
 
                 device.onEvent = { onEvent(it) }
 
                 state.update {
                     it.copy(
+                        showDevicePicker = false,
                         viewportElements = it.viewportElements.plus(device)
                     )
                 }

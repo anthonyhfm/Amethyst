@@ -4,11 +4,11 @@ import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.novation
 import amethyst.composeapp.generated.resources.piano
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,14 +20,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DevicesOther
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LeadingIconTab
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,8 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
@@ -48,6 +43,7 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -56,7 +52,9 @@ import kotlin.collections.mapOf
 import kotlin.to
 
 @Composable
-fun InsertLaunchpadDialog() {
+fun InsertLaunchpadDialog(
+    onEvent: (WorkspaceContract.Event) -> Unit
+) {
     val virtualDevices: Map<LaunchpadTab, List<LaunchpadViewportElement>> by remember {
         mutableStateOf(
             mapOf(
@@ -78,14 +76,16 @@ fun InsertLaunchpadDialog() {
 
     AlertDialog(
         onDismissRequest = {
-
+            onEvent(WorkspaceContract.Event.DismissVirtualDevicePicker)
         },
         title = {
             Text("Add a virtual Launchpad device")
         },
         dismissButton = {
             Button(
-                onClick = { }
+                onClick = {
+                    onEvent(WorkspaceContract.Event.DismissVirtualDevicePicker)
+                }
             ) {
                 Text("Cancel")
             }
@@ -129,6 +129,9 @@ fun InsertLaunchpadDialog() {
                                 Box(
                                     modifier = Modifier
                                         .aspectRatio(1f)
+                                        .clickable {
+                                            onEvent(WorkspaceContract.Event.AddDeviceToViewport(device))
+                                        }
                                 ) {
                                     device.content()
                                 }

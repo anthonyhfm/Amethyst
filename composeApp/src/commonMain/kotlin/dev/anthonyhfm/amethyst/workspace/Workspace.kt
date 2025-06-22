@@ -76,7 +76,11 @@ fun Workspace() {
         }
 
         if (state.showDevicePicker) {
-            InsertLaunchpadDialog()
+            InsertLaunchpadDialog(
+                onEvent = {
+                    viewModel.onEvent(it)
+                }
+            )
         }
 
         Box(
