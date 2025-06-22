@@ -234,8 +234,8 @@ data class GradientChainDeviceState(
         GradientColor(0.5f, 1f, 0f, 0f),
         GradientColor(1f, 0f, 0f, 0f)
     ),
-    val timing: Timing = Timing.Duration(300.milliseconds),
-    val durationMs: Double = 300.0,
+    val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
+    val durationMs: Double = 0.0,
     val gate: Float = 0.5f, // 100% = 0.5f, 200% = 1.0f
 ) : DeviceState() {
     @Serializable

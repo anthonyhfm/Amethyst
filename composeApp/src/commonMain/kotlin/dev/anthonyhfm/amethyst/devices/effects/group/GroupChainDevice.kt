@@ -85,7 +85,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                         modifier = Modifier
                             .fillMaxHeight()
                             .width(28.dp)
-                            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(0.2.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     )
 
                     GroupList()
@@ -103,7 +103,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                     .clip(RoundedCornerShape(6.dp))
                     .fillMaxHeight()
                     .width(28.dp)
-                    .background(MaterialTheme.colorScheme.surfaceColorAtElevation(0.2.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp), RoundedCornerShape(6.dp))
             )
         }

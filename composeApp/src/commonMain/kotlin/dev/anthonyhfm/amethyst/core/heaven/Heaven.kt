@@ -46,7 +46,7 @@ object Heaven {
         wake()
     }
 
-    fun schedule(job: () -> Unit, delayInMs: Double) {
+    fun schedule(delayInMs: Double, job: () -> Unit) {
         val targetTime = prev + msToTicks(delayInMs)
         renderScope.launch {
             jobMutex.withLock {
