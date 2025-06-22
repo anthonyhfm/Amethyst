@@ -204,9 +204,6 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
         // jesus christ, this is a lot of math
         val gradientSteps = ((GlobalSettings.perforanceFPS / GlobalSettings.gradientSmoothness) * (state.value.durationMs * (state.value.gate * 2)).toInt() / 1000).toInt()
 
-        println("Gradient steps: $gradientSteps")
-        println("Duration: ${state.value.durationMs} ms")
-
         val stepLength = (state.value.durationMs * (state.value.gate * 2)) / gradientSteps
         val colors = state.value.gradientData.sortedBy { it.position }.map { it.position to Color(it.r,  it.g, it.b) }
 
