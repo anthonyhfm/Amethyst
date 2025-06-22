@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.core.midi
 
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMystrix
+import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePro
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
@@ -19,6 +20,8 @@ class AmethystMidiManager {
     val inquiryTests: Map<LaunchpadDeviceType, (UByteArray) -> Boolean> = mapOf(
         LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 to { LaunchpadDeviceProMk3.identify(it) },
         LaunchpadDeviceType.LAUNCHPAD_X to { LaunchpadDeviceX.identify(it) },
+        LaunchpadDeviceType.LAUNCHPAD_PRO_CFW to { LaunchpadDevicePro.identifyCFW(it) },
+        LaunchpadDeviceType.LAUNCHPAD_PRO to { LaunchpadDevicePro.identify(it) },
         LaunchpadDeviceType.MYSTRIX to { LaunchpadDeviceMystrix.identify(it) }
     )
 

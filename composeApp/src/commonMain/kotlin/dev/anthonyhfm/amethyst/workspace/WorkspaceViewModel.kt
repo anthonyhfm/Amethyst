@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevice
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMystrix
+import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePro
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
@@ -253,6 +254,8 @@ private fun LaunchpadDeviceType.mapLaunchpadDevice(output: MidiOutput): Launchpa
     return when (this) {
         LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 -> LaunchpadDeviceProMk3(output)
         LaunchpadDeviceType.LAUNCHPAD_X -> LaunchpadDeviceX(output)
+        LaunchpadDeviceType.LAUNCHPAD_PRO -> LaunchpadDevicePro(output)
+        LaunchpadDeviceType.LAUNCHPAD_PRO_CFW -> LaunchpadDevicePro(output, true)
         LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(output)
 
         else -> null

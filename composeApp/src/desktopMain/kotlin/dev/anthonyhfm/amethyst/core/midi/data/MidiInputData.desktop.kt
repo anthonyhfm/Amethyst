@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.core.midi.data
 
 @OptIn(ExperimentalUnsignedTypes::class)
 actual fun getMidiInputData(byteArray: ByteArray): MidiInputData? {
-    println(byteArray.toUByteArray().contentToString())
+    println("ByteArray: ${byteArray.toUByteArray().contentToString()}")
 
     if (byteArray.size == 3 && byteArray[0] in 144.toByte() .. 159.toByte()) {
         return MidiInputData(
