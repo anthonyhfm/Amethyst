@@ -24,6 +24,7 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
@@ -34,6 +35,10 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesC
     private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
 
     init {
+        customMode.state = state.asStateFlow()
+
+        customMode.onEvent = { onEvent(it) }
+
         customMode.modeWakeup = {
             refreshVirtualDevices()
         }
@@ -160,29 +165,6 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesC
             }
         }
     }
-
-    /*fun onSetKeyFilter(x: Int, y: Int, offset: Offset) {
-        val globalX = offset.x.toInt() + x
-        val globalY = offset.y.toInt() + (9 - y)
-
-        val coordinatePair = Pair(globalX, globalY)
-
-        val isAlreadyFiltered = state.value.filters.contains(coordinatePair)
-
-        state.update { currentState ->
-            if (isAlreadyFiltered) {
-                currentState.copy(
-                    filters = currentState.filters.filter { it != coordinatePair }
-                )
-            } else {
-                currentState.copy(
-                    filters = currentState.filters + coordinatePair
-                )
-            }
-        }
-
-        refreshVirtualDevices()
-    }*/
 
     override fun midiEnter(n: List<Signal>) {
         /*val filteredSignals = n.filter { signal ->
