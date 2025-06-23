@@ -37,13 +37,13 @@ fun AmethystDevice(
             .clip(RoundedCornerShape(6.dp))
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp), RoundedCornerShape(6.dp))
+            .border(1.dp, MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(28.dp)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
                 .then(titleModifier)
         ) {
             Text(
