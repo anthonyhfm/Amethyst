@@ -15,6 +15,8 @@ import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 
 data class PickableComponent(
@@ -54,6 +56,16 @@ fun ChainDevicePicker(
             name = "Offset",
             icon = Icons.Default.OpenWith,
             plugin = OffsetChainDevice()
+        ),
+        PickableComponent(
+            name = "Layer",
+            icon = Icons.Default.Layers,
+            plugin = LayerChainDevice()
+        ),
+        PickableComponent(
+            name = "Layer Filter",
+            icon = Icons.Default.Layers,
+            plugin = LayerFilterChainDevice()
         ),
         PickableComponent(
             name = "Delay",

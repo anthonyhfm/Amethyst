@@ -7,7 +7,7 @@ object GlobalSettings {
     private val settings: Settings = Settings()
 
     var perforanceFPS: Int
-        get() = settings.getInt("framesPerSecond", 100)
+        get() = settings.getInt("framesPerSecond", 120)
         set(value) {
             settings.putInt("framesPerSecond", value)
 
