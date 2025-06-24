@@ -16,7 +16,7 @@ sealed interface KeyframesChainDeviceContract {
         data class OnColorUpdate(val color: Color) : Event
         data class OnSelectFrame(val frameIndex: Int) : Event
         data class OnAddFrame(val atIndex: Int? = null) : Event
-        data class OnChangeFrameTiming(val frameIndex: Int, val timing: Timing) : Event
+        data class OnChangeFrameTiming(val frameIndex: Int, val timing: Timing, val gate: Float) : Event
         data class OnChangeFramePosition(
             val from: Int,
             val to: Int
@@ -39,6 +39,7 @@ sealed interface KeyframesChainDeviceContract {
     @Serializable
     data class Frame(
         val timing: Timing,
+        val gate: Float = 0.5f,
         val entries: List<KeyframesEntry> = emptyList(),
         val _internalUuid: String = UUID.randomUUID()
     )

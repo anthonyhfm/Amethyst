@@ -12,6 +12,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
+import dev.anthonyhfm.amethyst.ui.modifier.EditorEvent
+import dev.anthonyhfm.amethyst.ui.modifier.editorEventListener
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import kotlinx.coroutines.flow.StateFlow
 
@@ -34,6 +36,27 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
+                .editorEventListener {
+                    when (it) {
+                        is EditorEvent.Up -> {
+                            onEvent?.invoke(
+                                KeyframesChainDeviceContract.Event.OnSelectFrame(state.selectedFrameIndex - 1)
+                            )
+                        }
+
+                        is EditorEvent.Down -> {
+                            onEvent?.invoke(
+                                KeyframesChainDeviceContract.Event.OnSelectFrame(state.selectedFrameIndex + 1)
+                            )
+                        }
+
+                        is EditorEvent.Duplicate -> {
+
+                        }
+
+                        else -> { }
+                    }
+                }
         ) {
             FrameListPanel(
                 state = state,

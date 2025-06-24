@@ -131,19 +131,6 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                 refreshVirtualDevices()
             }
 
-            is Event.OnChangeFrameTiming -> {
-                state.update {
-                    it.copy(
-                        frames = it.frames.toMutableList().apply {
-                            set(
-                                index = event.frameIndex,
-                                element = it.frames[event.frameIndex].copy(timing = event.timing)
-                            )
-                        }
-                    )
-                }
-            }
-
             is Event.OnColorUpdate -> {
                 state.update {
                     it.copy(selectedColor = Triple(event.color.red, event.color.green, event.color.blue))
@@ -201,6 +188,19 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
 
                 refreshVirtualDevices()
             }
+
+            is Event.OnChangeFrameTiming -> {
+                state.update {
+                    it.copy(
+                        frames = it.frames.toMutableList().apply {
+                            set(
+                                index = event.frameIndex,
+                                element = it.frames[event.frameIndex].copy(timing = event.timing, gate = event.gate)
+                            )
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -236,7 +236,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
         var animationMs = 0
 
         state.value.frames.plus(Frame(Timing.Rythm(Timing.Rythm.RythmTiming._1_16))).forEachIndexed { index, frame ->
-            animationMs += state.value.frames.getOrNull(index - 1)?.timing?.toMsValue(WorkspaceRepository.bpm.value) ?: 0
+            animationMs += ((state.value.frames.getOrNull(index - 1)?.timing?.toMsValue(WorkspaceRepository.bpm.value) ?: 0) * (frame.gate * 2)).toInt()
 
             renderedAnimation.add(
                 Pair(

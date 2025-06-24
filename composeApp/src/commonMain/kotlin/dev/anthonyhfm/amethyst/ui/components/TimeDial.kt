@@ -19,12 +19,11 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun TimeDial(
     headline: String = "Duration",
-    workspaceRepository: WorkspaceRepository = koinInject(),
     timing: Timing,
     onSelectTiming: (timing: Timing, msValue: Int) -> Unit
 ) {
     var millisecondMode: Boolean by remember { mutableStateOf(false) }
-    val bpm by workspaceRepository.bpm.collectAsState()
+    val bpm by WorkspaceRepository.bpm.collectAsState()
 
     LaunchedEffect(bpm) {
         onSelectTiming(timing, timing.toMsValue(bpm))

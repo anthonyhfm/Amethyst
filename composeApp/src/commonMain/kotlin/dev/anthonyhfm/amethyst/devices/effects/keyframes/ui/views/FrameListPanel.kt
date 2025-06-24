@@ -55,27 +55,6 @@ fun BoxScope.FrameListPanel(
             .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp)
             .padding(top = 4.dp)
-            .editorEventListener {
-                when (it) {
-                    is EditorEvent.Up -> {
-                        onEvent(
-                            KeyframesChainDeviceContract.Event.OnSelectFrame(state.selectedFrameIndex - 1)
-                        )
-                    }
-
-                    is EditorEvent.Down -> {
-                        onEvent(
-                            KeyframesChainDeviceContract.Event.OnSelectFrame(state.selectedFrameIndex + 1)
-                        )
-                    }
-
-                    is EditorEvent.Duplicate -> {
-
-                    }
-
-                    else -> { }
-                }
-            }
     ) {
         itemsIndexed(state.frames, key = { _, frame -> frame }) { index, frame ->
             FrameCreationButton(

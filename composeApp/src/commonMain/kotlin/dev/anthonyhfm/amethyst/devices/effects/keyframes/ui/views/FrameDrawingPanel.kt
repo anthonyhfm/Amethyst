@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.ColorControls
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.TimingControls
 
 @Composable
 fun BoxScope.FrameDrawingPanel(
@@ -41,6 +43,31 @@ fun BoxScope.FrameDrawingPanel(
             onColorChange = {
                 onEvent(
                     KeyframesChainDeviceContract.Event.OnColorUpdate(it)
+                )
+            }
+        )
+
+        Spacer(Modifier.weight(1f))
+
+        TimingControls(
+            timing = state.frames[state.selectedFrameIndex].timing,
+            onTimingChanged = { timing ->
+                onEvent(
+                    KeyframesChainDeviceContract.Event.OnChangeFrameTiming(
+                        frameIndex = state.selectedFrameIndex,
+                        timing = timing,
+                        gate = state.frames[state.selectedFrameIndex].gate
+                    )
+                )
+            },
+            gate = state.frames[state.selectedFrameIndex].gate,
+            onGateChanged = {
+                onEvent(
+                    KeyframesChainDeviceContract.Event.OnChangeFrameTiming(
+                        frameIndex = state.selectedFrameIndex,
+                        timing = state.frames[state.selectedFrameIndex].timing,
+                        gate = it
+                    )
                 )
             }
         )
