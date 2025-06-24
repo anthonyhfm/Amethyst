@@ -21,6 +21,7 @@ import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.*
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +30,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
-class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesChainDeviceState>() {
-    override val state = MutableStateFlow(KeyframesChainDeviceContract.KeyframesChainDeviceState())
+class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
+    override val state = MutableStateFlow(KeyframesChainDeviceState())
 
     private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
 
@@ -50,7 +51,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesC
         }
 
         customMode.onVirtualDevicePress = { x, y, offset ->
-            onEvent(KeyframesChainDeviceContract.Event.OnPaintButton(x, y, offset))
+            onEvent(Event.OnPaintButton(x, y, offset))
         }
     }
 
@@ -80,9 +81,9 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesC
         }
     }
 
-    fun onEvent(event: KeyframesChainDeviceContract.Event) {
+    fun onEvent(event: Event) {
         when (event) {
-            is KeyframesChainDeviceContract.Event.OnPaintButton -> {
+            is Event.OnPaintButton -> {
                 val globalX = event.offset.x.toInt() + event.x
                 val globalY = event.offset.y.toInt() + (9 - event.y)
 
@@ -100,7 +101,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesC
                                         }
 
                                         add(
-                                            element = KeyframesChainDeviceContract.KeyframesEntry(
+                                            element = KeyframesEntry(
                                                 x = globalX,
                                                 y = globalY,
                                                 r = state.selectedColor.first,
@@ -118,7 +119,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesC
                 refreshVirtualDevices()
             }
 
-            is KeyframesChainDeviceContract.Event.OnChangeFrameTiming -> {
+            is Event.OnChangeFrameTiming -> {
                 state.update {
                     it.copy(
                         frames = it.frames.toMutableList().apply {
@@ -131,15 +132,57 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceContract.KeyframesC
                 }
             }
 
-            is KeyframesChainDeviceContract.Event.OnColorUpdate -> {
+            is Event.OnColorUpdate -> {
                 state.update {
                     it.copy(selectedColor = Triple(event.color.red, event.color.green, event.color.blue))
                 }
             }
 
-            is KeyframesChainDeviceContract.Event.OnSelectFrame -> {
+            is Event.OnSelectFrame -> {
                 state.update {
-                    it.copy(selectedFrameIndex = event.frameIndex)
+                    it.copy(
+                        selectedFrameIndex = if (event.frameIndex < 0) {
+                            0
+                        } else if (event.frameIndex >= it.frames.size) {
+                            it.frames.size - 1
+                        } else {
+                            event.frameIndex
+                        }
+                    )
+                }
+            }
+
+            is Event.OnAddFrame -> {
+                state.update {
+                    it.copy(
+                        frames = it.frames.toMutableList().apply {
+                            if (event.atIndex != null) {
+                                add(
+                                    index = event.atIndex,
+                                    element = Frame(
+                                        timing = state.value.frames.getOrNull(event.atIndex - 1)?.timing
+                                            ?: state.value.frames[state.value.selectedFrameIndex].timing
+                                    )
+                                )
+                            } else {
+                                add(Frame(state.value.frames[state.value.selectedFrameIndex].timing))
+                            }
+                        },
+                    )
+                }
+
+                onEvent(Event.OnSelectFrame(event.atIndex ?: (state.value.frames.size - 1)))
+
+                refreshVirtualDevices()
+            }
+
+            is Event.OnChangeFramePosition -> {
+                state.update {
+                    it.copy(
+                        frames = it.frames.toMutableList().apply {
+                            add(event.to, removeAt(event.from))
+                        }
+                    )
                 }
             }
         }

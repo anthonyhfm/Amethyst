@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -24,6 +25,7 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceCon
 @Composable
 fun FramePreviewButton(
     index: Int,
+    selected: Boolean,
     timing: Timing,
     onEvent: (KeyframesChainDeviceContract.Event) -> Unit
 ) {
@@ -31,7 +33,16 @@ fun FramePreviewButton(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .background(
+                if (selected) {
+                    MaterialTheme.colorScheme.tertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                }
+            )
+            .clickable {
+                onEvent(KeyframesChainDeviceContract.Event.OnSelectFrame(index))
+            }
             .padding(4.dp),
 
         verticalAlignment = Alignment.CenterVertically,
@@ -50,20 +61,34 @@ fun FramePreviewButton(
             modifier = Modifier
                 .clip(RoundedCornerShape(4.dp))
                 .width(56.dp)
-                .background(MaterialTheme.colorScheme.tertiary)
+                .background(
+                    if (selected) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.tertiaryContainer
+                    }
+                )
                 .padding(vertical = 4.dp),
             style = MaterialTheme.typography.labelLarge,
             textAlign = TextAlign.Center,
             lineHeight = MaterialTheme.typography.labelLarge.fontSize,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onTertiary
+            color = if (selected) {
+                MaterialTheme.colorScheme.onTertiary
+            } else {
+                MaterialTheme.colorScheme.onTertiaryContainer
+            },
         )
 
         Text(
             text = "Frame ${index + 1}",
             style = MaterialTheme.typography.labelLarge,
             lineHeight = MaterialTheme.typography.labelLarge.fontSize,
-            color = MaterialTheme.colorScheme.onTertiaryContainer
+            color = if (selected) {
+                MaterialTheme.colorScheme.onTertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
         )
     }
 }

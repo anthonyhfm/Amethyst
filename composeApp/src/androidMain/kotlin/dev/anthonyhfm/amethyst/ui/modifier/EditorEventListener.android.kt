@@ -1,0 +1,9 @@
+package dev.anthonyhfm.amethyst.ui.modifier
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+
+@Composable
+actual fun Modifier.editorEventListener(onEvent: (EditorEvent) -> Unit): Modifier {
+    return this
+}

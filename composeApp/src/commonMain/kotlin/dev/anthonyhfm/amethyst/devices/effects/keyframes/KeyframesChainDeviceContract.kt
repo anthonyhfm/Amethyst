@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.devices.effects.keyframes
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.util.Timing
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import kotlinx.serialization.Serializable
 
@@ -11,7 +13,12 @@ sealed interface KeyframesChainDeviceContract {
         data class OnPaintButton(val x: Int, val y: Int, val offset: Offset) : Event
         data class OnColorUpdate(val color: Color) : Event
         data class OnSelectFrame(val frameIndex: Int) : Event
+        data class OnAddFrame(val atIndex: Int? = null) : Event
         data class OnChangeFrameTiming(val frameIndex: Int, val timing: Timing) : Event
+        data class OnChangeFramePosition(
+            val from: Int,
+            val to: Int
+        ) : Event
     }
 
     @Serializable
@@ -28,7 +35,8 @@ sealed interface KeyframesChainDeviceContract {
     @Serializable
     data class Frame(
         val timing: Timing,
-        val entries: List<KeyframesEntry> = emptyList()
+        val entries: List<KeyframesEntry> = emptyList(),
+        val _internalUuid: String = UUID.randomUUID()
     )
 
     @Serializable

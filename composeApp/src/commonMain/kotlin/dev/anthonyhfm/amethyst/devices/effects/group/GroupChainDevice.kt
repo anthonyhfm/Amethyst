@@ -112,7 +112,6 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
     @Composable
     private fun GroupList() {
         val groupsState by state.collectAsState()
-        val scrollState = rememberScrollState()
 
         val lazyListState = rememberLazyListState()
 
