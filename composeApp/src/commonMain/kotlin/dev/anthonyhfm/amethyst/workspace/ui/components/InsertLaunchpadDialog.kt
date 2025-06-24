@@ -59,14 +59,14 @@ fun InsertLaunchpadDialog(
         mutableStateOf(
             mapOf(
                 LaunchpadTab.Novation to listOf(
-                    ViewportLaunchpadPro(),
-                    ViewportLaunchpadX(),
-                    ViewportLaunchpadProMk3(),
-                    ViewportLaunchpadMk2()
+                    ViewportLaunchpadPro(interactive = false),
+                    ViewportLaunchpadX(interactive = false),
+                    ViewportLaunchpadProMk3(interactive = false),
+                    ViewportLaunchpadMk2(interactive = false)
                 ),
                 LaunchpadTab.Other to listOf(
-                    ViewportMystrix(),
-                    ViewportMidiFighter64()
+                    ViewportMystrix(interactive = false),
+                    ViewportMidiFighter64(interactive = false)
                 ),
             )
         )

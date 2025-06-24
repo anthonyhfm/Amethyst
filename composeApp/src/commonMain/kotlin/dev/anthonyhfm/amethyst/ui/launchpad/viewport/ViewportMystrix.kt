@@ -33,6 +33,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportE
 class ViewportMystrix(
     override var shape: Shape = RoundedCornerShape(2),
     override var size: Size = Size(8f, 8f),
+    val interactive: Boolean = true
 ) : LaunchpadViewportElement() {
     override val name: String = "Mystrix"
 
@@ -41,30 +42,37 @@ class ViewportMystrix(
     override val content: @Composable (() -> Unit) = {
         val previewGrid by previewState.grid
 
-        GenericLaunchpadLayout(
-            layoutType = layout,
+        Box(
             modifier = Modifier
                 .size(width = size.width.dp * 40, height = size.height.dp * 40)
                 .clip(shape)
-                .background(Color(0xFF0d0d0d))
-                .padding(10.dp),
-        ) { x, y ->
-            GridPad(
-                x = x,
-                y = y,
-                effectData = previewGrid[x + y * 10],
-                onClick = null,
+                .background(Color(0xFF0d0d0d)),
+            contentAlignment = Alignment.Center
+        ) {
+            GenericLaunchpadLayout(
+                layoutType = layout,
                 modifier = Modifier
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = { offset: Offset ->
-                                onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
-                                tryAwaitRelease()
-                                onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
+                    .fillMaxSize(0.92f)
+            ) { x, y ->
+                GridPad(
+                    x = x,
+                    y = y,
+                    effectData = previewGrid[x + y * 10],
+                    onClick = null,
+                    modifier = if (interactive) {
+                        Modifier
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = { offset: Offset ->
+                                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
+                                        tryAwaitRelease()
+                                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
+                                    }
+                                )
                             }
-                        )
-                    }
-            )
+                    } else Modifier
+                )
+            }
         }
     }
 }
@@ -76,7 +84,7 @@ private fun GridPad(
     y: Int,
     effectData: RawUpdate,
     onClick: (() -> Unit)?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
@@ -121,7 +129,7 @@ private fun ClippedPad(
     topRight: Boolean,
     bottomLeft: Boolean,
     bottomRight: Boolean,
-    effectData: RawUpdate
+    effectData: RawUpdate,
 ) {
     GenericLaunchpadButton(
         sizeModifier = Modifier
