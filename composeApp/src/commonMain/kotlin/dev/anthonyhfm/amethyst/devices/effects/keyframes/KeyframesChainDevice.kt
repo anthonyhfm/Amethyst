@@ -150,6 +150,8 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                         }
                     )
                 }
+
+                refreshVirtualDevices()
             }
 
             is Event.OnAddFrame -> {
@@ -184,6 +186,8 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                         }
                     )
                 }
+
+                refreshVirtualDevices()
             }
         }
     }
