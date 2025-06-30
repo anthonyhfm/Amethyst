@@ -20,7 +20,7 @@ class HoldChainDevice : ChainDevice<HoldChainDeviceState>() {
     override fun Content() {
         AmethystDevice(
             title = "Hold",
-            modifier = Modifier.width(200.dp)
+            modifier = Modifier.width(140.dp)
         ) {
 
         }
@@ -33,5 +33,5 @@ class HoldChainDevice : ChainDevice<HoldChainDeviceState>() {
 
 @Serializable
 data class HoldChainDeviceState(
-    val hold: Timing = Timing.Duration(1000.milliseconds),
+    val hold: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
 ) : DeviceState()

@@ -11,12 +11,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.hold.HoldChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 
 data class PickableComponent(
@@ -58,6 +61,11 @@ fun ChainDevicePicker(
             plugin = OffsetChainDevice()
         ),
         PickableComponent(
+            name = "Copy",
+            icon = Icons.Default.Add,
+            plugin = CopyChainDevice()
+        ),
+        PickableComponent(
             name = "Layer",
             icon = Icons.Default.Layers,
             plugin = LayerChainDevice()
@@ -71,6 +79,16 @@ fun ChainDevicePicker(
             name = "Delay",
             icon = Icons.Default.MoreTime,
             plugin = DelayChainDevice()
+        ),
+        PickableComponent(
+            name = "Loop",
+            icon = Icons.Default.Loop,
+            plugin = LoopChainDevice()
+        ),
+        PickableComponent(
+            name = "Hold",
+            icon = Icons.Default.Pause,
+            plugin = HoldChainDevice()
         ),
         PickableComponent(
             name = "Keyframes",
