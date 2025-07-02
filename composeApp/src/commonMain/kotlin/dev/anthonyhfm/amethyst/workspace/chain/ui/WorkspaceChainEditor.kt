@@ -33,6 +33,7 @@ import sh.calvin.reorderable.ReorderableScope
 
 @Composable
 fun WorkspaceChainEditor(
+    sampling: Boolean,
     devices: List<ChainDevice<*>>,
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
@@ -62,6 +63,7 @@ fun WorkspaceChainEditor(
             ) {
                 // First HiddenDevicePickerButton at the beginning of the chain
                 HiddenDevicePickerButton(
+                    sampling = sampling,
                     expanded = false && !isDraggingAny, // Collapse during dragging
                     onAddComponent = {
                         onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
@@ -96,6 +98,7 @@ fun WorkspaceChainEditor(
 
                         // Use the new forceOff parameter instead of animation
                         HiddenDevicePickerButton(
+                            sampling = sampling,
                             expanded = index == devices.lastIndex,
                             forceOff = isDraggingAny, // Hide immediately during dragging
                             onAddComponent = {
@@ -108,6 +111,7 @@ fun WorkspaceChainEditor(
         } else {
             // If no devices exist, show only the expanded picker
             HiddenDevicePickerButton(
+                sampling = sampling,
                 expanded = true,
                 onAddComponent = {
                     onEvent(WorkspaceContract.Event.AddChainDevice(it))

@@ -56,7 +56,9 @@ import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
+class GroupChainDevice(
+    private val sampling: Boolean = false
+) : ChainDevice<GroupChainDeviceState>() {
     override val state = MutableStateFlow(GroupChainDeviceState())
 
     init {
@@ -267,6 +269,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                 contentAlignment = Alignment.Center
             ) {
                 HiddenDevicePickerButton(
+                    sampling = sampling,
                     expanded = true,
                     onAddComponent = {
                         groupsState.groups[groupsState.selectionIndex].chain.add(it)
@@ -280,6 +283,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
             ) {
                 groupsState.groups[groupsState.selectionIndex].chain.devices.value.forEachIndexed { index, device ->
                     HiddenDevicePickerButton(
+                        sampling = sampling,
                         onAddComponent = {
                             groupsState.groups[groupsState.selectionIndex].chain.add(it, index)
                         }
@@ -289,6 +293,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                 }
 
                 HiddenDevicePickerButton(
+                    sampling = sampling,
                     onAddComponent = {
                         groupsState.groups[groupsState.selectionIndex].chain.add(it)
                     }

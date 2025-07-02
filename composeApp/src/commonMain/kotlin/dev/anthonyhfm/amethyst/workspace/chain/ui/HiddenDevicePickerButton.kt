@@ -31,6 +31,7 @@ import dev.anthonyhfm.amethyst.devices.ChainDevice
 @Composable
 fun HiddenDevicePickerButton(
     expanded: Boolean = false,
+    sampling: Boolean = false,
     forceOff: Boolean = false,
     onAddComponent: (ChainDevice<*>) -> Unit
 ) {
@@ -81,6 +82,7 @@ fun HiddenDevicePickerButton(
 
                 ChainDevicePicker(
                     visible = pickerVisible,
+                    sampling = sampling,
                     onDismiss = {
                         pickerVisible = false
                     },

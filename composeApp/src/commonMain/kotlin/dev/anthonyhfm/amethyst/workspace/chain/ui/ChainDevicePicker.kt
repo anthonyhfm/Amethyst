@@ -2,6 +2,8 @@ package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.twotone.AudioFile
+import androidx.compose.material.icons.twotone.Audiotrack
 import androidx.compose.material.icons.twotone.Close
 import androidx.compose.material.icons.twotone.ColorLens
 import androidx.compose.material.icons.twotone.ContentCopy
@@ -32,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
@@ -54,7 +57,7 @@ import io.androidpoet.dropdown.MenuItem
 import io.androidpoet.dropdown.dropDownMenu
 import io.androidpoet.dropdown.dropDownMenuColors
 
-fun getMenu(): MenuItem<String> {
+fun getLightsMenu(): MenuItem<String> {
     return dropDownMenu {
         item("cat_container", "Container") {
             icon(Icons.TwoTone.DataArray)
@@ -129,20 +132,74 @@ fun getMenu(): MenuItem<String> {
     }
 }
 
+fun getSamplingMenu(): MenuItem<String> {
+    return dropDownMenu {
+        item("cat_audio", "Audio") {
+            icon(Icons.TwoTone.Audiotrack)
+
+            item("device_clip", "Clip") {
+                icon(Icons.TwoTone.AudioFile)
+            }
+        }
+
+        item("cat_container", "Container") {
+            icon(Icons.TwoTone.DataArray)
+
+            item("device_group", "Group") {
+                icon(Icons.TwoTone.Group)
+            }
+        }
+        item("cat_filter", "Filter") {
+            icon(Icons.TwoTone.Filter)
+
+            item("device_coordinate_filter", "Coordinate Filter") {
+                icon(Icons.TwoTone.MyLocation)
+            }
+        }
+        item("cat_shape", "Shape") {
+            icon(Icons.TwoTone.ShapeLine)
+
+            item("device_offset", "Offset") {
+                icon(Icons.TwoTone.LineAxis)
+            }
+
+            item("device_copy", "Copy") {
+                icon(Icons.TwoTone.ContentCopy)
+            }
+        }
+        item("cat_timing", "Timing") {
+            icon(Icons.TwoTone.Timer)
+
+            item("device_delay", "Delay") {
+                icon(Icons.TwoTone.Timeline)
+            }
+
+            item("device_hold", "Hold") {
+                icon(Icons.TwoTone.Pause)
+            }
+
+            item("device_loop", "Loop") {
+                icon(Icons.TwoTone.Loop)
+            }
+        }
+    }
+}
+
 @Composable
 fun ChainDevicePicker(
     visible: Boolean,
+    sampling: Boolean,
     onPickComponent: (ChainDevice<*>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val menu = getMenu()
+    val menu = if (!sampling) getLightsMenu() else getSamplingMenu()
 
     val registry = mapOf<String, ChainDevice<*>>(
         "device_color" to ColorChainDevice(),
         "device_coordinate_filter" to CoordinateFilterChainDevice(),
         "device_delay" to DelayChainDevice(),
         "device_gradient" to GradientChainDevice(),
-        "device_group" to GroupChainDevice(),
+        "device_group" to GroupChainDevice(sampling = sampling),
         "device_keyframes" to KeyframesChainDevice(),
         "device_layer" to LayerChainDevice(),
         "device_layer_filter" to LayerFilterChainDevice(),
@@ -152,6 +209,7 @@ fun ChainDevicePicker(
         "device_flip" to FlipChainDevice(),
         "device_rotate" to RotateChainDevice(),
         "device_copy" to CopyChainDevice(),
+        "device_clip" to ClipChainDevice(),
     )
 
     Dropdown(
