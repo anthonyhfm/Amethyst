@@ -56,7 +56,7 @@ fun <T> StepDial(
             .size(52.dp)
             .pointerInput(Unit) {
                 detectVerticalDragGestures { input, offset ->
-                    dialValue = (dialValue + (offset * -1) * 0.01f).coerceIn(0f, 1f)
+                    dialValue = (dialValue + (offset * -1) * 0.005f).coerceIn(0f, 1f)
                 }
             }
             .background(containerColor)

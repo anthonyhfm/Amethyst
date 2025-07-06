@@ -31,7 +31,7 @@ fun WorkspaceWindow() {
             height = 800.dp
         ),
         onKeyEvent = {
-            false
+            WorkspaceRepository.mode.value.onKeyEvent(it)
         }
     ) {
         WorkspaceMenuBar()

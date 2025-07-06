@@ -29,12 +29,13 @@ import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
 import kotlin.collections.forEach
 
 @Serializable
 data class StateChain(
-    val devices: List<DeviceState> = emptyList()
+    val devices: List<@Polymorphic DeviceState> = emptyList()
 ) {
     fun unpack(): Chain {
         val chain = Chain()

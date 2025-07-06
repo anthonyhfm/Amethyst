@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.start
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
+import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
+import dev.anthonyhfm.amethyst.devices.DeviceStateSerializationModule
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
@@ -30,7 +32,7 @@ class StartWindowViewModel() : ViewModel() {
     fun onClickCreateProject() {
         viewModelScope.launch {
             val file = FileKit.saveFile(
-                bytes = ProtoBuf.encodeToByteArray(
+                bytes = AmethystProtoBuf.encodeToByteArray(
                     serializer = SaveableWorkspaceData.serializer(),
                     value = SaveableWorkspaceData("New Project")
                 ),
@@ -39,7 +41,9 @@ class StartWindowViewModel() : ViewModel() {
             )
 
             file?.readBytes()?.let { bytes ->
-                val data = ProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(bytes)
+                val data = AmethystProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(bytes).apply {
+                    this.path = file.path
+                }
 
                 if (file.path != null) {
                     GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
@@ -70,7 +74,9 @@ class StartWindowViewModel() : ViewModel() {
             )
 
             file?.readBytes()?.let { bytes ->
-                val data = ProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(bytes)
+                val data = AmethystProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(bytes).apply {
+                    this.path = file.path
+                }
 
                 if (file.path != null) {
                     GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
@@ -94,7 +100,9 @@ class StartWindowViewModel() : ViewModel() {
             val file = File(path)
 
             file.readBytes().let { bytes ->
-                val data = ProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(bytes)
+                val data = AmethystProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(bytes).apply {
+                    this.path = file.path
+                }
 
                 if (file.path != null) {
                     GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(

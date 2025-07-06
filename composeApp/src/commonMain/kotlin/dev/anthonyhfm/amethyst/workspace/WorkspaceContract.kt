@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.KeyEvent
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.atsushieno.ktmidi.MidiPortDetails
@@ -52,6 +53,9 @@ interface WorkspaceContract {
     interface WorkspaceMode {
         val displayName: String
         val selectable: Boolean
+
+        fun onKeyEvent(event: KeyEvent): Boolean = false
+
         data class Layout(
             override val displayName: String = "Layout Editor",
             override val selectable: Boolean = true

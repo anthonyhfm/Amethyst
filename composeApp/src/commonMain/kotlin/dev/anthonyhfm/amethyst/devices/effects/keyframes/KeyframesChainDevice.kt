@@ -138,6 +138,11 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
             }
 
             is Event.OnSelectFrame -> {
+                if (event.frameIndex == state.value.frames.lastIndex + 1) {
+                    onEvent(Event.OnAddFrame())
+                    return
+                }
+
                 state.update {
                     it.copy(
                         selectedFrameIndex = if (event.frameIndex < 0) {

@@ -71,7 +71,7 @@ fun BoxScope.FrameListPanel(
                 index = index,
                 selected = state.selectedFrameIndex == index,
                 timing = frame.timing,
-                onEvent = onEvent
+                onEvent = onEvent,
             )
         }
 

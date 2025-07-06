@@ -9,6 +9,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.IntSize
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
@@ -72,6 +77,24 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 }
             )
         }
+    }
+
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (event.type == KeyEventType.KeyDown) {
+            when (event.key) {
+                Key.DirectionUp, Key.DirectionLeft -> {
+                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.selectedFrameIndex - 1))
+                    return true
+                }
+
+                Key.DirectionDown, Key.DirectionRight -> {
+                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.selectedFrameIndex + 1))
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 
     fun virtualDevicePress(x: Int, y: Int, offset: Offset) {

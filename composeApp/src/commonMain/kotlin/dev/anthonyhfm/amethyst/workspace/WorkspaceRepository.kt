@@ -73,11 +73,13 @@ object WorkspaceRepository {
 
     fun saveWorkspace(): SaveableWorkspaceData {
         return SaveableWorkspaceData(
+            title = saveableWorkspaceData?.title ?: "Untitled Project",
             lights = StateChain.pack(lightsChain.heavenChain),
             sampling = StateChain.pack(lightsChain.heavenChain),
             settings = WorkspaceSettings(
                 bpm = _bpm.value
-            )
+            ),
+            path = saveableWorkspaceData?.path,
         ).also { saveableWorkspaceData = it }
     }
 }
