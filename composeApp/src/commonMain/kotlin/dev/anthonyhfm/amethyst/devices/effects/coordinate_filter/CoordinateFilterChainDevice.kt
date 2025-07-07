@@ -47,6 +47,7 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
     override fun Content() {
         AmethystDevice(
             title = "Coordinate Filter",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(120.dp)
         ) {

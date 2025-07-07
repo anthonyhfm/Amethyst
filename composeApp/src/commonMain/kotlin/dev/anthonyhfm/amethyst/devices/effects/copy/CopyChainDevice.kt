@@ -19,6 +19,7 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
     override fun Content() {
         AmethystDevice(
             title = "Copy",
+            deviceId = internalUUID,
             modifier = Modifier.width(200.dp)
         ) {
 

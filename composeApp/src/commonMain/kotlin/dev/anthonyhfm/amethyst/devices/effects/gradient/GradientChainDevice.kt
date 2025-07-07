@@ -68,6 +68,7 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
 
         AmethystDevice(
             title = "Gradient",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(
                     width = if (selectedColor != null) {

@@ -38,6 +38,7 @@ class LoopChainDevice : ChainDevice<LoopChainDeviceState>() {
 
         AmethystDevice(
             title = "Loop",
+            deviceId = internalUUID,
             modifier = Modifier.width(200.dp)
         ) {
             Row(

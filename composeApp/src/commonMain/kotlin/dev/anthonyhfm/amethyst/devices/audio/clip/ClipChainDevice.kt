@@ -22,6 +22,7 @@ class ClipChainDevice : ChainDevice<ClipChainDeviceState>() {
 
         AmethystDevice(
             title = "Clip",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(400.dp)
         ) {

@@ -32,6 +32,7 @@ class HoldChainDevice : ChainDevice<HoldChainDeviceState>() {
 
         AmethystDevice(
             title = "Hold",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(100.dp)
         ) {

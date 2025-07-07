@@ -73,6 +73,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
 
         AmethystDevice(
             title = "Keyframes",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(120.dp)
         ) {

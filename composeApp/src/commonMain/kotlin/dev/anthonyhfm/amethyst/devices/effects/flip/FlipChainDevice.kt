@@ -22,6 +22,7 @@ class FlipChainDevice : ChainDevice<FlipChainDeviceState>() {
 
         AmethystDevice(
             title = "Flip",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(100.dp)
         ) {

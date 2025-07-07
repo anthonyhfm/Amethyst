@@ -22,6 +22,7 @@ class RotateChainDevice : ChainDevice<RotateChainDeviceState>() {
 
         AmethystDevice(
             title = "Rotate",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(100.dp)
         ) {

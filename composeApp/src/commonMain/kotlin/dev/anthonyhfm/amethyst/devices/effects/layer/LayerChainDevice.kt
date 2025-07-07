@@ -27,6 +27,7 @@ class LayerChainDevice : ChainDevice<LayerChainDeviceState>() {
 
         AmethystDevice(
             title = "Layer",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(100.dp)
         ) {

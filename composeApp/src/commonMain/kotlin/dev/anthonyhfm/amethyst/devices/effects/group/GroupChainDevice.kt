@@ -79,6 +79,7 @@ class GroupChainDevice(
         ) {
             AmethystDevice(
                 title = "Group",
+                deviceId = internalUUID,
                 modifier = Modifier
                     .width(180.dp),
             ) {
@@ -304,7 +305,7 @@ class GroupChainDevice(
 
     fun createGroup(atIndex: Int? = null) {
         state.update {
-            it.copy(
+            val out = it.copy(
                 groups = it.groups.toMutableList().apply {
                     if (atIndex == null) {
                         add(Group("Chain ${it.groups.size + 1}"))
@@ -313,16 +314,18 @@ class GroupChainDevice(
                     }
                 }
             )
-        }
 
-        if (atIndex != null) {
-            state.value.groups[atIndex].chain.midiExit = {
-                midiExit?.invoke(it)
+            if (atIndex != null) {
+                out.groups[atIndex].chain.midiExit = {
+                    midiExit?.invoke(it)
+                }
+            } else {
+                out.groups.last().chain.midiExit = {
+                    midiExit?.invoke(it)
+                }
             }
-        } else {
-            state.value.groups.last().chain.midiExit = {
-                midiExit?.invoke(it)
-            }
+
+            out
         }
     }
 

@@ -31,6 +31,7 @@ class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
 
         AmethystDevice(
             title = "Delay",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(100.dp)
         ) {

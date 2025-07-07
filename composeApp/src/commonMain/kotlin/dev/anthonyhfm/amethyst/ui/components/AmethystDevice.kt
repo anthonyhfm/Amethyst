@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -11,10 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,30 +26,55 @@ import org.koin.compose.koinInject
 @Composable
 fun AmethystDevice(
     title: String,
+    deviceId: String,
     modifier: Modifier = Modifier,
     titleBarModifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val selectedDeviceId by WorkspaceRepository.selectionUUID.collectAsState()
+    val isSelected = selectedDeviceId == deviceId
+
     val titleModifier = LocalTitleBarModifier.current.then(titleBarModifier)
+
+    // Bestimme Farben basierend auf Auswahlstatus
+    val titleBarColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
+
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
 
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(6.dp))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(28.dp)
-                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .background(titleBarColor)
                 .then(titleModifier)
+                .clickable {
+                    WorkspaceRepository.setSelection(deviceId)
+                }
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
                 lineHeight = MaterialTheme.typography.labelLarge.fontSize,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                },
                 modifier = Modifier
                     .align(Alignment.Center)
             )

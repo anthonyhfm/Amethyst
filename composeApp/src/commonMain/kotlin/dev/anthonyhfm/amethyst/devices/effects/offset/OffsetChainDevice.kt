@@ -45,6 +45,7 @@ class OffsetChainDevice : ChainDevice<OffsetChainDeviceState>() {
     override fun Content() {
         AmethystDevice(
             title = "Offset",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(200.dp)
         ) {

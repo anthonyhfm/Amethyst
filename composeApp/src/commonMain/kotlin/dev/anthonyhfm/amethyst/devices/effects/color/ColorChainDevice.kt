@@ -44,6 +44,7 @@ class ColorChainDevice : ChainDevice<ColorChainDeviceState>() {
 
         AmethystDevice(
             title = "Color",
+            deviceId = internalUUID,
             modifier = Modifier
                 .width(200.dp),
         ) {
