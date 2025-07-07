@@ -36,10 +36,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.devices.ChainDevice
@@ -49,11 +52,14 @@ import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuArea
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuItem
 import dev.anthonyhfm.amethyst.workspace.chain.ui.HiddenDevicePickerButton
+import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.ReorderableRow
+import sh.calvin.reorderable.ReorderableScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 class GroupChainDevice(
@@ -260,6 +266,7 @@ class GroupChainDevice(
     private fun GroupContent() {
         val groupsState by state.collectAsState()
         val effects by groupsState.groups[groupsState.selectionIndex].chain.devices
+        var isDraggingAny by remember { mutableStateOf(false) }
 
         if (effects.isEmpty()) {
             Box(
@@ -281,24 +288,65 @@ class GroupChainDevice(
             Row(
                 modifier = Modifier
                     .fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                groupsState.groups[groupsState.selectionIndex].chain.devices.value.forEachIndexed { index, device ->
-                    HiddenDevicePickerButton(
-                        sampling = sampling,
-                        onAddComponent = {
-                            groupsState.groups[groupsState.selectionIndex].chain.add(it, index)
-                        }
-                    )
-
-                    device.Content()
-                }
-
                 HiddenDevicePickerButton(
                     sampling = sampling,
                     onAddComponent = {
-                        groupsState.groups[groupsState.selectionIndex].chain.add(it)
+                        groupsState.groups[groupsState.selectionIndex].chain.add(it, 0)
                     }
                 )
+
+                ReorderableRow(
+                    list = effects,
+                    onSettle = { fromIndex, toIndex ->
+                        isDraggingAny = false
+                        reorderDeviceInGroup(groupsState.selectionIndex, fromIndex, toIndex)
+                    },
+                    onMove = {
+                        isDraggingAny = true
+                    },
+                    verticalAlignment = Alignment.CenterVertically
+                ) { index, device, isDragging ->
+                    key(device.internalUUID) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ChainDeviceItem(
+                                device = device,
+                                isDragging = isDragging
+                            )
+
+                            HiddenDevicePickerButton(
+                                sampling = sampling,
+                                onAddComponent = {
+                                    groupsState.groups[groupsState.selectionIndex].chain.add(it, index + 1)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun ReorderableScope.ChainDeviceItem(
+        device: ChainDevice<*>,
+        isDragging: Boolean
+    ) {
+        Box(
+            modifier = Modifier
+                .then(
+                    if (isDragging) {
+                        Modifier.shadow(8.dp, RoundedCornerShape(8.dp))
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
+            TitleBarModifierProvider(Modifier.draggableHandle()) {
+                device.Content()
             }
         }
     }
@@ -401,6 +449,28 @@ class GroupChainDevice(
                 }
             )
         }
+    }
+
+    /**
+     * Reorders a device within a group
+     *
+     * @param groupIndex the index of the group containing the devices
+     * @param fromIndex the current index of the device to be moved
+     * @param toIndex the target index to which the device will be moved
+     */
+    fun reorderDeviceInGroup(groupIndex: Int, fromIndex: Int, toIndex: Int) {
+        if (fromIndex == toIndex) return
+
+        val chain = state.value.groups[groupIndex].chain
+        val devices = chain.devices.value.toMutableList()
+
+        if (fromIndex < 0 || fromIndex >= devices.size || toIndex < 0 || toIndex >= devices.size) return
+
+        val device = devices.removeAt(fromIndex)
+        devices.add(toIndex, device)
+
+        // Update the devices list in the chain
+        chain.devices.value = devices
     }
 }
 
