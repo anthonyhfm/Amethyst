@@ -3,7 +3,10 @@ package dev.anthonyhfm.amethyst.core.heaven.elements
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import kotlinx.coroutines.flow.update
 
 class Chain : SignalReceiver() {
     val devices: MutableState<List<ChainDevice<*>>> = mutableStateOf(emptyList())
@@ -45,6 +48,26 @@ class Chain : SignalReceiver() {
     fun remove(index: Int) {
         devices.value = devices.value.toMutableList().apply {
             removeAt(index)
+        }
+
+        reroute()
+    }
+
+    fun remove(uuid: String) {
+        devices.value = devices.value.toMutableList().apply {
+            removeAll { it.internalUUID == uuid }
+        }.map {
+            when (it) {
+                is GroupChainDevice -> {
+                    it.apply {
+                        state.value.groups.forEach { group ->
+                            group.chain.remove(uuid)
+                        }
+                    }
+                }
+
+                else -> it
+            }
         }
 
         reroute()

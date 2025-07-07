@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.workspace
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.KeyEvent
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.workspace.modes.chain.ChainModeKeyHandler
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.atsushieno.ktmidi.MidiPortDetails
 
@@ -69,11 +70,19 @@ interface WorkspaceContract {
         data class LightsChain(
             override val displayName: String = "Lights (Chain Editor)",
             override val selectable: Boolean = true
-        ) : WorkspaceMode
+        ) : WorkspaceMode {
+            override fun onKeyEvent(event: KeyEvent): Boolean {
+                return ChainModeKeyHandler.handleKeyInput(event)
+            }
+        }
 
         data class SamplingChain(
             override val displayName: String = "Sampling (Chain Editor)",
             override val selectable: Boolean = true
-        ) : WorkspaceMode
+        ) : WorkspaceMode {
+            override fun onKeyEvent(event: KeyEvent): Boolean {
+                return ChainModeKeyHandler.handleKeyInput(event)
+            }
+        }
     }
 }

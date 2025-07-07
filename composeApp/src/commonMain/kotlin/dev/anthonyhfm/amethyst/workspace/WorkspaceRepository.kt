@@ -33,12 +33,16 @@ object WorkspaceRepository {
     fun switchMode(mode: WorkspaceContract.WorkspaceMode) {
         previousMode = _mode.value
 
+        _selectionUUID.update { null }
+
         _mode.update {
             mode
         }
     }
 
     fun switchToPreviousMode() {
+        _selectionUUID.update { null }
+
         _mode.update {
             previousMode
         }
