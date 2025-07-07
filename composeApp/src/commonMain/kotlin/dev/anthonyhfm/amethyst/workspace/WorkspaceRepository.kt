@@ -1,5 +1,13 @@
 package dev.anthonyhfm.amethyst.workspace
 
+import androidx.compose.ui.geometry.Offset
+import dev.anthonyhfm.amethyst.core.heaven.Heaven
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.workspace.chain.WorkspaceChain
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
@@ -66,6 +74,21 @@ object WorkspaceRepository {
         lightsChain.heavenChain = workspaceData.lights.unpack()
         samplingChain.heavenChain = workspaceData.sampling.unpack()
 
+        println("Devices: ${workspaceData.launchpadDevices}")
+
+        Heaven.devices = workspaceData.launchpadDevices.map { savedDevice ->
+            val device = when (savedDevice.type) {
+                SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO -> ViewportLaunchpadPro()
+                SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO_MK3 -> ViewportLaunchpadProMk3()
+                SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_X -> ViewportLaunchpadX()
+                SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_MK2 -> ViewportLaunchpadMk2()
+                SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MYSTRIX -> ViewportMystrix()
+                SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MIDIFIGHTER64 -> ViewportMidiFighter64()
+            }
+
+            device.apply { position.value = Offset(savedDevice.positionX, savedDevice.positionY) }
+        }
+
         _bpm.update {
             workspaceData.settings.bpm
         }
@@ -84,6 +107,21 @@ object WorkspaceRepository {
                 bpm = _bpm.value
             ),
             path = saveableWorkspaceData?.path,
+            launchpadDevices = Heaven.devices.map { device ->
+                SaveableWorkspaceData.SavableViewportLaunchpad(
+                    type = when (device) {
+                        is ViewportLaunchpadPro -> SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                        is ViewportLaunchpadProMk3 -> SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO_MK3
+                        is ViewportLaunchpadX -> SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_X
+                        is ViewportLaunchpadMk2 -> SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_MK2
+                        is ViewportMystrix -> SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MYSTRIX
+                        is ViewportMidiFighter64 -> SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MIDIFIGHTER64
+                        else -> { TODO("Could not serialize virtual launchpad element for the workspace") }
+                    },
+                    positionX = device.position.value.x,
+                    positionY = device.position.value.y
+                )
+            }
         ).also { saveableWorkspaceData = it }
     }
 }

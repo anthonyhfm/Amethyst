@@ -41,6 +41,16 @@ class WorkspaceViewModel(
     )
 
     init {
+        Heaven.devices.forEach { device ->
+            device.onEvent = { onEvent(it) }
+
+            state.update {
+                it.copy(
+                    viewportElements = it.viewportElements.plus(device)
+                )
+            }
+        }
+
         viewModelScope.launch {
             state.collect { state ->
                 Heaven.devices = state.viewportElements

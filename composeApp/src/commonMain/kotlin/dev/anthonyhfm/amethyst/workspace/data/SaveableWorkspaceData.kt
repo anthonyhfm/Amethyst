@@ -10,9 +10,26 @@ data class SaveableWorkspaceData(
     val settings: WorkspaceSettings = WorkspaceSettings(),
     val lights: StateChain = StateChain(),
     val sampling: StateChain = StateChain(),
+    val launchpadDevices: List<SavableViewportLaunchpad> = emptyList(),
     @Transient
     var path: String? = null, // This is not serialized, used for file operations
-)
+) {
+    @Serializable
+    data class SavableViewportLaunchpad(
+        val positionX: Float,
+        val positionY: Float,
+        val type: ViewportDeviceType
+    ) {
+        enum class ViewportDeviceType {
+            LAUNCHPAD_PRO,
+            LAUNCHPAD_PRO_MK3,
+            LAUNCHPAD_X,
+            LAUNCHPAD_MK2,
+            MYSTRIX,
+            MIDIFIGHTER64
+        }
+    }
+}
 
 @Serializable
 data class RecentWorkspace(
