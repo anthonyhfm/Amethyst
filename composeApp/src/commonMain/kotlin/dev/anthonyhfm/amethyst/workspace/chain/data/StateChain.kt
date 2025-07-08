@@ -2,6 +2,8 @@ package dev.anthonyhfm.amethyst.workspace.chain.data
 
 import dev.anthonyhfm.amethyst.core.heaven.elements.Chain
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
@@ -135,6 +137,13 @@ data class StateChain(
 
                 is RotateChainDeviceState -> {
                     RotateChainDevice().let {
+                        it.state.update { device }
+                        chain.add(it)
+                    }
+                }
+
+                is ClipChainDeviceState -> {
+                    ClipChainDevice().let {
                         it.state.update { device }
                         chain.add(it)
                     }
