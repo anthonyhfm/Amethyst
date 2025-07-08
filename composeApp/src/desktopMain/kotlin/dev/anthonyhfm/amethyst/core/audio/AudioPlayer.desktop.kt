@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.core.audio
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import io.github.vinceglb.filekit.core.PlatformInputStream
 import org.lwjgl.openal.AL
 import org.lwjgl.openal.AL10
 import org.lwjgl.openal.ALC
@@ -12,7 +11,6 @@ import org.lwjgl.stb.STBVorbis.stb_vorbis_decode_memory
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
 import java.nio.ByteBuffer
-import java.nio.IntBuffer
 import java.nio.ShortBuffer
 
 actual object AudioPlayer {
@@ -21,7 +19,6 @@ actual object AudioPlayer {
     private val availableSources = mutableListOf<Int>()
     private var isInitialized = false
 
-    // Separate Map für OpenAL-spezifische Buffer IDs
     private val audioBuffers = mutableMapOf<String, Int>()
 
     private fun ensureInitialized() {
@@ -37,11 +34,10 @@ actual object AudioPlayer {
                 throw RuntimeException("Failed to open OpenAL device")
             }
 
-            // WICHTIG: Context mit optimalen Einstellungen für Low-Latency
             val contextAttribs = intArrayOf(
-                ALC10.ALC_FREQUENCY, 44100,    // Feste Sample Rate
-                ALC10.ALC_REFRESH, 60,          // 60Hz Refresh Rate
-                ALC10.ALC_SYNC, ALC10.ALC_FALSE, // Async für bessere Performance
+                ALC10.ALC_FREQUENCY, 44100,
+                ALC10.ALC_REFRESH, 120,
+                ALC10.ALC_SYNC, ALC10.ALC_FALSE,
                 0
             )
 
@@ -54,8 +50,7 @@ actual object AudioPlayer {
             ALC10.alcMakeContextCurrent(context)
             AL.createCapabilities(ALC.createCapabilities(device))
 
-            // Mehr Sources für weniger Conflicts
-            repeat(32) { // Erhöht von 16 auf 32
+            repeat(64) {
                 val source = AL10.alGenSources()
                 if (AL10.alGetError() == AL10.AL_NO_ERROR) {
                     availableSources.add(source)
@@ -77,10 +72,8 @@ actual object AudioPlayer {
         val audioId = uuid ?: UUID.randomUUID()
 
         try {
-            // Audio dekodieren
             val audioInfo = decodeAudioData(data)
 
-            // OpenAL Buffer erstellen
             val bufferId = AL10.alGenBuffers()
             val format = when (audioInfo.channels) {
                 1 -> AL10.AL_FORMAT_MONO16
@@ -91,18 +84,15 @@ actual object AudioPlayer {
             AL10.alBufferData(bufferId, format, audioInfo.pcmData, audioInfo.sampleRate)
             checkALError("Buffer data")
 
-            // Buffer ID für später speichern
             audioBuffers[audioId] = bufferId
 
-            // AudioClip mit rohen Daten erstellen
             val audioClip = AudioClip(
                 name = "Audio_${audioId.take(8)}",
                 length = audioInfo.duration,
-                data = data, // Ursprüngliche rohe Daten behalten
+                data = data,
                 key = audioId
             )
 
-            // Im Repository speichern
             WorkspaceRepository.audioRegistry[audioId] = audioClip
 
             println("Audio loaded: $audioId (${audioInfo.duration}ms, ${audioInfo.sampleRate}Hz)")
@@ -126,7 +116,6 @@ actual object AudioPlayer {
         try {
             val source = getAvailableSource()
 
-            // Source konfigurieren
             AL10.alSourcei(source, AL10.AL_BUFFER, bufferId)
             AL10.alSourcef(source, AL10.AL_PITCH, 1.0f)
             AL10.alSourcef(source, AL10.AL_GAIN, 1.0f)
@@ -142,7 +131,6 @@ actual object AudioPlayer {
         }
     }
 
-    // Zusätzliche Methoden für deine AudioClip-Struktur
     fun removeAudio(audioKey: String) {
         audioBuffers[audioKey]?.let { bufferId ->
             AL10.alDeleteBuffers(bufferId)
@@ -152,7 +140,6 @@ actual object AudioPlayer {
     }
 
     actual fun preloadFromAudioClip(audioClip: AudioClip) {
-        // Für den Fall, dass du bereits gespeicherte AudioClips laden willst
         ensureInitialized()
 
         try {
@@ -216,7 +203,6 @@ actual object AudioPlayer {
         buffer.position(34)
         val bitsPerSample = buffer.short.toInt()
 
-        // Erweiterte Format-Unterstützung
         if (bitsPerSample != 16 && bitsPerSample != 8 && bitsPerSample != 24) {
             throw RuntimeException("Unsupported bit depth: $bitsPerSample. Supported: 8, 16, 24 bit")
         }
@@ -238,7 +224,6 @@ actual object AudioPlayer {
                 val duration = (samples * 1000L) / sampleRate
                 val pcmBuffer = MemoryUtil.memAllocShort(samples * channels)
 
-                // Bessere Sample-Konvertierung
                 when (bitsPerSample) {
                     8 -> {
                         repeat(samples * channels) {
@@ -257,7 +242,7 @@ actual object AudioPlayer {
                             val byte2 = buffer.get().toInt() and 0xFF
                             val byte3 = buffer.get().toInt() and 0xFF
                             val sample = (byte3 shl 16) or (byte2 shl 8) or byte1
-                            pcmBuffer.put((sample shr 8).toShort()) // 24->16 bit conversion
+                            pcmBuffer.put((sample shr 8).toShort())
                         }
                     }
                 }
@@ -326,7 +311,6 @@ actual object AudioPlayer {
     }
 }
 
-// Hilfsklasse für Audio-Metadaten
 private data class AudioInfo(
     val pcmData: ShortBuffer,
     val duration: Long,
