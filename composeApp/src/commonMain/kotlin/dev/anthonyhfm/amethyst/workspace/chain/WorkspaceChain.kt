@@ -70,5 +70,7 @@ class WorkspaceChain(
 
         // Update the devices list in the chain
         heavenChain.devices.value = devices
+
+        heavenChain.reroute()
     }
 }
