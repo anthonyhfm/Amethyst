@@ -9,5 +9,5 @@ data class AudioClip(
     val name: String,
     val length: Long, // Length in milliseconds
     val data: ByteArray,
-    val key: String = UUID.randomUUID(),
+    val key: String,
 )

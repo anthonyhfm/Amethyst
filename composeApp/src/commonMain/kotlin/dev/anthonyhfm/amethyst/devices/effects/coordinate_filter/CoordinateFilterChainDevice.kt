@@ -49,7 +49,7 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
             title = "Coordinate Filter",
             deviceId = internalUUID,
             modifier = Modifier
-                .width(120.dp)
+                .width(140.dp)
         ) {
             FilledIconButton(
                 onClick = {

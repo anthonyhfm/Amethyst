@@ -121,6 +121,10 @@ fun getLightsMenu(): MenuItem<String> {
         item("cat_transform", "Transform") {
             icon(Icons.TwoTone.Transform)
 
+            item("device_layer", "Layer") {
+                icon(Icons.TwoTone.Layers)
+            }
+
             item("device_flip", "Flip") {
                 icon(Icons.TwoTone.Flip)
             }
@@ -216,6 +220,8 @@ fun ChainDevicePicker(
         isOpen = visible,
         menu = menu,
         onItemSelected = {
+            onDismiss()
+
             registry[it]?.let { device ->
                 onPickComponent(device)
             }

@@ -3,11 +3,15 @@ package dev.anthonyhfm.amethyst.workspace.chain.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +29,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import kotlinx.coroutines.delay
@@ -46,77 +51,85 @@ fun WorkspaceChainEditor(
         }
     }
 
-    Box(
+    Column(
         modifier = Modifier
-            .padding(12.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .height(280.dp)
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer.compositeOver(MaterialTheme.colorScheme.surfaceColorAtElevation(24.dp)))
-            .border(1.dp, MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
-            .padding(vertical = 12.dp)
-            .horizontalScroll(scrollState)
+            .padding(12.dp),
+
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (devices.isNotEmpty()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // First HiddenDevicePickerButton at the beginning of the chain
+        MacroControls()
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .height(280.dp)
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainer.compositeOver(MaterialTheme.colorScheme.surfaceColorAtElevation(24.dp)))
+                .border(1.dp, MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                .padding(vertical = 12.dp)
+                .horizontalScroll(scrollState)
+        ) {
+            if (devices.isNotEmpty()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // First HiddenDevicePickerButton at the beginning of the chain
+                    HiddenDevicePickerButton(
+                        sampling = sampling,
+                        expanded = false && !isDraggingAny, // Collapse during dragging
+                        onAddComponent = {
+                            onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
+                        }
+                    )
+
+                    ReorderableRow(
+                        list = devices,
+                        onSettle = { fromIndex, toIndex ->
+                            isDraggingAny = false
+
+                            onEvent(
+                                WorkspaceContract.Event.ReorderChainDevice(
+                                    fromIndex = fromIndex,
+                                    toIndex = toIndex
+                                )
+                            )
+                        },
+                        onMove = {
+                            isDraggingAny = true
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) { index, device, isDragging ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // The actual device
+                            ChainDeviceItem(
+                                device = device,
+                                isDragging = isDragging
+                            )
+
+                            // Use the new forceOff parameter instead of animation
+                            HiddenDevicePickerButton(
+                                sampling = sampling,
+                                expanded = index == devices.lastIndex,
+                                forceOff = isDraggingAny, // Hide immediately during dragging
+                                onAddComponent = {
+                                    onEvent(WorkspaceContract.Event.AddChainDevice(it, index + 1))
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                // If no devices exist, show only the expanded picker
                 HiddenDevicePickerButton(
                     sampling = sampling,
-                    expanded = false && !isDraggingAny, // Collapse during dragging
+                    expanded = true,
                     onAddComponent = {
-                        onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
+                        onEvent(WorkspaceContract.Event.AddChainDevice(it))
                     }
                 )
-
-                ReorderableRow(
-                    list = devices,
-                    onSettle = { fromIndex, toIndex ->
-                        isDraggingAny = false
-
-                        onEvent(
-                            WorkspaceContract.Event.ReorderChainDevice(
-                                fromIndex = fromIndex,
-                                toIndex = toIndex
-                            )
-                        )
-                    },
-                    onMove = {
-                        isDraggingAny = true
-                    },
-                    verticalAlignment = Alignment.CenterVertically
-                ) { index, device, isDragging ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // The actual device
-                        ChainDeviceItem(
-                            device = device,
-                            isDragging = isDragging
-                        )
-
-                        // Use the new forceOff parameter instead of animation
-                        HiddenDevicePickerButton(
-                            sampling = sampling,
-                            expanded = index == devices.lastIndex,
-                            forceOff = isDraggingAny, // Hide immediately during dragging
-                            onAddComponent = {
-                                onEvent(WorkspaceContract.Event.AddChainDevice(it, index + 1))
-                            }
-                        )
-                    }
-                }
             }
-        } else {
-            // If no devices exist, show only the expanded picker
-            HiddenDevicePickerButton(
-                sampling = sampling,
-                expanded = true,
-                onAddComponent = {
-                    onEvent(WorkspaceContract.Event.AddChainDevice(it))
-                }
-            )
         }
     }
 }

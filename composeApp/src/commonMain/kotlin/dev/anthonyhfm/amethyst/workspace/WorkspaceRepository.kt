@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.ui.geometry.Offset
+import dev.anthonyhfm.amethyst.core.audio.AudioClip
+import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
@@ -23,6 +25,8 @@ object WorkspaceRepository {
 
     var samplingChain: WorkspaceChain = WorkspaceChain(isSampling = true)
         private set
+
+    val audioRegistry: MutableMap<String, AudioClip> = mutableMapOf()
 
     private var saveableWorkspaceData: SaveableWorkspaceData? = null
 
@@ -71,10 +75,12 @@ object WorkspaceRepository {
     fun loadWorkspace(workspaceData: SaveableWorkspaceData) {
         saveableWorkspaceData = workspaceData
 
+        workspaceData.audioClips.forEach {
+            AudioPlayer.preloadFromAudioClip(it)
+        }
+
         lightsChain.heavenChain = workspaceData.lights.unpack()
         samplingChain.heavenChain = workspaceData.sampling.unpack()
-
-        println("Devices: ${workspaceData.launchpadDevices}")
 
         Heaven.devices = workspaceData.launchpadDevices.map { savedDevice ->
             val device = when (savedDevice.type) {
@@ -102,7 +108,7 @@ object WorkspaceRepository {
         return SaveableWorkspaceData(
             title = saveableWorkspaceData?.title ?: "Untitled Project",
             lights = StateChain.pack(lightsChain.heavenChain),
-            sampling = StateChain.pack(lightsChain.heavenChain),
+            sampling = StateChain.pack(samplingChain.heavenChain),
             settings = WorkspaceSettings(
                 bpm = _bpm.value
             ),
@@ -121,7 +127,8 @@ object WorkspaceRepository {
                     positionX = device.position.value.x,
                     positionY = device.position.value.y
                 )
-            }
+            },
+            audioClips = audioRegistry.values.map { it }
         ).also { saveableWorkspaceData = it }
     }
 }

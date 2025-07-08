@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.workspace.data
 
+import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -11,6 +12,8 @@ data class SaveableWorkspaceData(
     val lights: StateChain = StateChain(),
     val sampling: StateChain = StateChain(),
     val launchpadDevices: List<SavableViewportLaunchpad> = emptyList(),
+    val macros: List<Macro> = listOf(Macro(1)),
+    val audioClips: List<AudioClip> = emptyList(),
     @Transient
     var path: String? = null, // This is not serialized, used for file operations
 ) {

@@ -223,6 +223,15 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
                         delayInMs = stepLength * step
                     )
                 }
+
+                Heaven.schedule(
+                    job = {
+                        midiExit?.invoke(
+                            listOf(signal.copy(color = Color.Black))
+                        )
+                    },
+                    delayInMs = stepLength * (gradientSteps + 1)
+                )
             }
         }
     }
