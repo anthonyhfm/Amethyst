@@ -2,28 +2,22 @@ package dev.anthonyhfm.amethyst.ui.launchpad.viewport
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
+import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadSurfaceDetectionOverlay
 import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadButton
 import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadLayout
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
@@ -49,29 +43,41 @@ class ViewportMidiFighter64(
                 .background(Color(0xFF0d0d0d)),
             contentAlignment = Alignment.Center
         ) {
-            GenericLaunchpadLayout(
-                layoutType = layout,
-                modifier = Modifier
-                    .fillMaxSize(0.94f)
-            ) { x, y ->
-                GridPad(
-                    x = x,
-                    y = y,
-                    effectData = previewGrid[x + y * 10],
-                    onClick = null,
-                    modifier = if (interactive) {
-                        Modifier
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = { offset: Offset ->
-                                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
-                                        tryAwaitRelease()
-                                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
-                                    }
-                                )
-                            }
-                    } else Modifier
-                )
+            if (interactive) {
+                LaunchpadSurfaceDetectionOverlay(
+                    layoutType = layout,
+                    onPadPressed = { x, y ->
+                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
+                    },
+                    onPadReleased = { x, y ->
+                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
+                    },
+                    modifier = Modifier.fillMaxSize(0.94f)
+                ) {
+                    GenericLaunchpadLayout(
+                        layoutType = layout,
+                        modifier = Modifier.fillMaxSize()
+                    ) { x, y ->
+                        GridPad(
+                            x = x,
+                            y = y,
+                            effectData = previewGrid[x + y * 10],
+                            modifier = Modifier
+                        )
+                    }
+                }
+            } else {
+                GenericLaunchpadLayout(
+                    layoutType = layout,
+                    modifier = Modifier.fillMaxSize(0.94f)
+                ) { x, y ->
+                    GridPad(
+                        x = x,
+                        y = y,
+                        effectData = previewGrid[x + y * 10],
+                        modifier = Modifier
+                    )
+                }
             }
         }
     }
@@ -83,48 +89,16 @@ private fun GridPad(
     x: Int,
     y: Int,
     effectData: RawUpdate,
-    onClick: (() -> Unit)?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .then(
-                if (onClick != null) {
-                    Modifier.combinedClickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {
-                            onClick()
-                        }
-                    )
-                } else {
-                    Modifier
-                }
-            ),
-
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize(),
-
-            contentAlignment = Alignment.Center
-        ) {
-            GenericLaunchpadButton(
-                sizeModifier = Modifier
-                    .fillMaxSize(0.8f),
-                effect = effectData,
-                enableLightSpot = false,
-                shape = CircleShape
-            )
-
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .fillMaxSize(0.62f)
-                    .background(Color(0xFF0A0A0A))
-            )
-        }
+        GenericLaunchpadButton(
+            sizeModifier = Modifier.fillMaxSize(0.78f),
+            effect = effectData,
+            shape = CircleShape
+        )
     }
 }
