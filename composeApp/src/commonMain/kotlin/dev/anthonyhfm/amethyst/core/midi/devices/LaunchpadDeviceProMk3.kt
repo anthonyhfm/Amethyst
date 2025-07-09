@@ -22,11 +22,12 @@ class LaunchpadDeviceProMk3(
 
     override fun getEffectSysEx(updates: List<RawUpdate>): ByteArray {
         return mutableListOf<Byte>().apply {
-            addAll(arrayOf(240.toByte(), 0.toByte(), 32.toByte(), 41.toByte(), 2.toByte(), 14.toByte(), 3.toByte(), 3.toByte()))
+            addAll(arrayOf(240.toByte(), 0.toByte(), 32.toByte(), 41.toByte(), 2.toByte(), 14.toByte(), 3.toByte()))
 
             updates.forEach { update ->
                 addAll(
                     arrayOf(
+                        3.toByte(),
                         update.index,
                         (update.color.red * 127).toInt().toByte(),
                         (update.color.green * 127).toInt().toByte(),
