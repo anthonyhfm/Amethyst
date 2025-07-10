@@ -95,7 +95,7 @@ private fun GridPad(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        if (y == 0 && x > 0 && x < 9) {
+        if (y == 9 && x > 0 && x < 9) {
             EdgePad(effectData = effectData)
         } else if (x == 9 && y > 0 && y < 9) {
             EdgePad(effectData = effectData)
