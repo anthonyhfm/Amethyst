@@ -2,12 +2,15 @@ package dev.anthonyhfm.amethyst.ui.launchpad.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntSize
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.floor
 
 @Composable
@@ -20,6 +23,7 @@ fun LaunchpadSurfaceDetectionOverlay(
 ) {
     var layoutSize by remember { mutableStateOf(IntSize.Zero) }
     var activePointers by remember { mutableStateOf(mapOf<PointerId, Pair<Int, Int>>()) }
+    val workspaceMode by WorkspaceRepository.mode.collectAsState()
 
     Box(
         modifier = modifier
@@ -27,58 +31,65 @@ fun LaunchpadSurfaceDetectionOverlay(
             .onGloballyPositioned { coordinates ->
                 layoutSize = coordinates.size
             }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
+            .then(
+                if (workspaceMode is WorkspaceContract.WorkspaceMode.Layout) {
+                    Modifier
+                } else {
+                    Modifier
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
 
-                        when (event.type) {
-                            PointerEventType.Press -> {
-                                event.changes.forEach { change ->
-                                    if (!change.isConsumed) {
-                                        val pad = calculatePadFromOffset(change.position, layoutSize, layoutType)
-                                        pad?.let { (x, y) ->
-                                            activePointers = activePointers + (change.id to Pair(x, y))
-                                            onPadPressed(x, y)
-                                            change.consume()
-                                        }
-                                    }
-                                }
-                            }
-
-                            PointerEventType.Move -> {
-                                event.changes.forEach { change ->
-                                    if (!change.isConsumed && activePointers.containsKey(change.id)) {
-                                        val newPad = calculatePadFromOffset(change.position, layoutSize, layoutType)
-                                        val currentPad = activePointers[change.id]
-
-                                        if (newPad != null && newPad != currentPad) {
-                                            currentPad?.let { (oldX, oldY) ->
-                                                onPadReleased(oldX, oldY)
+                                    when (event.type) {
+                                        PointerEventType.Press -> {
+                                            event.changes.forEach { change ->
+                                                if (!change.isConsumed) {
+                                                    val pad = calculatePadFromOffset(change.position, layoutSize, layoutType)
+                                                    pad?.let { (x, y) ->
+                                                        activePointers = activePointers + (change.id to Pair(x, y))
+                                                        onPadPressed(x, y)
+                                                        change.consume()
+                                                    }
+                                                }
                                             }
-
-                                            val (newX, newY) = newPad
-                                            activePointers = activePointers + (change.id to Pair(newX, newY))
-                                            onPadPressed(newX, newY)
-                                            change.consume()
                                         }
-                                    }
-                                }
-                            }
 
-                            PointerEventType.Release -> {
-                                event.changes.forEach { change ->
-                                    activePointers[change.id]?.let { (x, y) ->
-                                        onPadReleased(x, y)
-                                        activePointers = activePointers - change.id
-                                        change.consume()
+                                        PointerEventType.Move -> {
+                                            event.changes.forEach { change ->
+                                                if (!change.isConsumed && activePointers.containsKey(change.id)) {
+                                                    val newPad = calculatePadFromOffset(change.position, layoutSize, layoutType)
+                                                    val currentPad = activePointers[change.id]
+
+                                                    if (newPad != null && newPad != currentPad) {
+                                                        currentPad?.let { (oldX, oldY) ->
+                                                            onPadReleased(oldX, oldY)
+                                                        }
+
+                                                        val (newX, newY) = newPad
+                                                        activePointers = activePointers + (change.id to Pair(newX, newY))
+                                                        onPadPressed(newX, newY)
+                                                        change.consume()
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        PointerEventType.Release -> {
+                                            event.changes.forEach { change ->
+                                                activePointers[change.id]?.let { (x, y) ->
+                                                    onPadReleased(x, y)
+                                                    activePointers = activePointers - change.id
+                                                    change.consume()
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
                 }
-            }
+            )
     ) {
         content()
     }
