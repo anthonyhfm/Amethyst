@@ -1,61 +1,89 @@
 package dev.anthonyhfm.amethyst.core.heaven.elements
 
 import androidx.compose.ui.graphics.Color
-import androidx.lifecycle.AtomicReference
+import kotlinx.atomicfu.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import dev.anthonyhfm.amethyst.core.heaven.utils.SortedList
 
 class Screen : AutoCloseable {
     private class Pixel(
         private val index: Byte
     ) {
-        private val signals: MutableMap<Int, Signal> = mutableMapOf()
-        private val currentColor = AtomicReference(Color.Black)
+        // Use high-performance SortedList (equivalent to C# SortedList)
+        private val signals = SortedList<Int, Signal>()
+        private val currentColor = atomic(Color.Black)
+
+        // Use Mutex for cross-platform compatibility
         private val locker = Mutex()
 
-        fun clear() {
+        suspend fun clear() = locker.withLock {
             signals.clear()
             signals[10000] = Signal(null, x = index % 10, y = index / 10, color = Color.Black, layer = -100)
-            currentColor.compareAndSet(currentColor.get(), Color.Black)
+            currentColor.value = Color.Black
         }
 
-        fun getColor(): Color = currentColor.get()
+        suspend fun getColor(): Color = locker.withLock {
+            var ret = Color.Black
+
+            // Use direct indexed access for maximum performance (like C#)
+            for (i in 0 until signals.size) {
+                val signal = signals.getValueAt(i)
+
+                // Implement C# blending logic exactly
+                if (signal.blendingMode != BlendingMode.Normal &&
+                    (i == signals.size - 1 ||
+                     signal.layer - signals.getValueAt(i + 1).layer > signal.blendingRange)) {
+                    continue
+                }
+
+                if (signal.blendingMode == BlendingMode.Mask) break
+
+                val multiply = i > 0 &&
+                              signals.getValueAt(i - 1).blendingMode == BlendingMode.Multiply &&
+                              signals.getValueAt(i - 1).layer - signal.layer <= signals.getValueAt(i - 1).blendingRange
+
+                ret = ret.mix(signal.color, multiply)
+
+                if (signal.blendingMode == BlendingMode.Normal) break
+            }
+
+            currentColor.value = ret
+            ret
+        }
 
         suspend fun midiEnter(n: Signal) = locker.withLock {
             if (n.y * 10 + n.x != index.toInt()) return@withLock
 
             val layer = -n.layer
 
-            if (n.color != Color.Black) {
+            if (n.color.isLit()) {
                 signals[layer] = n.copy()
-            } else {
+            } else if (signals.containsKey(layer)) {
                 signals.remove(layer)
             }
-
-            val newColor = signals.entries.minByOrNull { it.key }?.value?.color ?: Color.Black
-            currentColor.compareAndSet(currentColor.get(), newColor)
         }
     }
 
     var screenExit: ((List<RawUpdate>, Array<Color>) -> Unit)? = null
 
-    private val screen = Array(101) { Pixel(index = it.toByte()) }
+    private val screen = Array(101) { Pixel(it.toByte()) }
     private val snapshot = Array(101) { Color.Black }
 
-    fun clear() {
+    suspend fun clear() {
         screen.forEach { it.clear() }
         snapshot()
     }
 
-    private fun snapshot() {
+    private suspend fun snapshot() {
         val updates = mutableListOf<RawUpdate>()
 
         for (i in screen.indices) {
-            val color = screen[i].getColor()
+            val newColor = screen[i].getColor()
 
-            if (snapshot[i] != color) {
-                updates.add(RawUpdate(i, color.copy()))
-                snapshot[i] = color
+            if (snapshot[i] != newColor) {
+                updates.add(RawUpdate(i, newColor.copy()))
+                snapshot[i] = newColor
             }
         }
 
@@ -65,15 +93,34 @@ class Screen : AutoCloseable {
     }
 
     companion object {
-        private val drawingHandlers = mutableListOf<suspend () -> Unit>()
+        // Use atomic list for thread-safe drawing handlers
+        private val drawingHandlers = atomic(listOf<suspend () -> Unit>())
 
         suspend fun draw() {
-            drawingHandlers.forEach { it.invoke() }
+            drawingHandlers.value.forEach { it.invoke() }
+        }
+
+        internal fun addDrawingHandler(handler: suspend () -> Unit) {
+            while (true) {
+                val current = drawingHandlers.value
+                val new = current + handler
+                if (drawingHandlers.compareAndSet(current, new)) break
+            }
+        }
+
+        internal fun removeDrawingHandler(handler: suspend () -> Unit) {
+            while (true) {
+                val current = drawingHandlers.value
+                val new = current - handler
+                if (drawingHandlers.compareAndSet(current, new)) break
+            }
         }
     }
 
+    private val snapshotHandler: suspend () -> Unit = { snapshot() }
+
     init {
-        drawingHandlers.add { snapshot() }
+        addDrawingHandler(snapshotHandler)
     }
 
     fun getColor(index: Int): Color = snapshot[index]
@@ -83,6 +130,36 @@ class Screen : AutoCloseable {
     }
 
     override fun close() {
-        drawingHandlers.remove { snapshot() }
+        removeDrawingHandler(snapshotHandler)
     }
 }
+
+// Extension functions for Color operations (similar to C# Color.Mix)
+fun Color.mix(other: Color, multiply: Boolean = false): Color {
+    return if (multiply) {
+        Color(
+            (red * other.red),
+            (green * other.green),
+            (blue * other.blue),
+            alpha
+        )
+    } else {
+        Color(
+            (red + other.red).coerceIn(0f, 1f),
+            (green + other.green).coerceIn(0f, 1f),
+            (blue + other.blue).coerceIn(0f, 1f),
+            alpha
+        )
+    }
+}
+
+fun Color.isLit(): Boolean = red > 0f || green > 0f || blue > 0f
+
+// Assuming these enums exist
+enum class BlendingType {
+    Normal, Multiply, Mask
+}
+
+// Extension for Signal class to add blending properties
+val Signal.blendingMode: BlendingType get() = BlendingType.Normal // Default implementation
+val Signal.blendingRange: Int get() = 1 // Default implementation

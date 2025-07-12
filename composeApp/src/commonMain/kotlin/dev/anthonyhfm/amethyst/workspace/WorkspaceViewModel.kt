@@ -143,6 +143,8 @@ class WorkspaceViewModel(
                         }
                     )
                 }
+
+                WorkspaceRepository.updateWorkspaceBounds()
             }
 
             is WorkspaceContract.Event.OnPanViewport -> {

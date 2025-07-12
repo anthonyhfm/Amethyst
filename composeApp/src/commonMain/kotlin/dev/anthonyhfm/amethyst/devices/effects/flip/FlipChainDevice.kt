@@ -98,7 +98,7 @@ class FlipChainDevice : ChainDevice<FlipChainDeviceState>() {
     }
 
     override fun midiEnter(n: List<Signal>) {
-        val bounds = WorkspaceRepository.getWorkspaceBounds()
+        val bounds = WorkspaceRepository.bounds
 
         midiExit?.invoke(
             n.map {

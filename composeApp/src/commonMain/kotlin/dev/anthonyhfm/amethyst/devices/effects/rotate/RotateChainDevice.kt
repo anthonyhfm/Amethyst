@@ -120,7 +120,7 @@ class RotateChainDevice : ChainDevice<RotateChainDeviceState>() {
     }
 
     override fun midiEnter(n: List<Signal>) {
-        val bounds = WorkspaceRepository.getWorkspaceBounds()
+        val bounds = WorkspaceRepository.bounds
 
         midiExit?.invoke(n)
     }

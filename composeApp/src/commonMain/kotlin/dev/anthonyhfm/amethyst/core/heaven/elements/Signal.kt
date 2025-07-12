@@ -9,9 +9,9 @@ data class Signal(
     val y: Int,
     val color: Color,
     val layer: Int = 0,
-    val blendingMode: BlendingMode = BlendingMode.NORMAL
+    val blendingMode: BlendingMode = BlendingMode.Normal
 )
 
 enum class BlendingMode {
-    NORMAL, MULTIPLY, ADD, MASK
+    Normal, Multiply, Add, Mask
 }

@@ -28,6 +28,9 @@ object WorkspaceRepository {
     var samplingChain: WorkspaceChain = WorkspaceChain(isSampling = true)
         private set
 
+    var bounds: Pair<IntOffset, IntSize> = Pair(IntOffset(0, 0), IntSize(0, 0))
+        private set
+
     val audioRegistry: MutableMap<String, AudioClip> = mutableMapOf()
 
     private var saveableWorkspaceData: SaveableWorkspaceData? = null
@@ -74,8 +77,8 @@ object WorkspaceRepository {
         }
     }
 
-    fun getWorkspaceBounds(): Pair<IntOffset, IntSize> {
-        return Pair(
+    fun updateWorkspaceBounds() {
+        bounds = Pair(
             first = IntOffset(
                 x = Heaven.devices.minOf { it.position.value.x.toInt() },
                 y = Heaven.devices.minOf { it.position.value.y.toInt() }
