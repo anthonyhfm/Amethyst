@@ -20,6 +20,7 @@ actual object AudioPlayer {
     private var isInitialized = false
 
     private val audioBuffers = mutableMapOf<String, Int>()
+    private val pcmBuffers = mutableMapOf<String, ShortBuffer>() // Speicher-Tracking hinzufügen
 
     private fun ensureInitialized() {
         if (!isInitialized) {
@@ -85,6 +86,7 @@ actual object AudioPlayer {
             checkALError("Buffer data")
 
             audioBuffers[audioId] = bufferId
+            pcmBuffers[audioId] = audioInfo.pcmData // PCM-Buffer für Cleanup speichern
 
             val audioClip = AudioClip(
                 name = "Audio_${audioId.take(8)}",
@@ -100,6 +102,13 @@ actual object AudioPlayer {
 
         } catch (e: Exception) {
             println("Failed to load audio: ${e.message}")
+            // Cleanup bei Fehler
+            pcmBuffers[audioId]?.let { buffer ->
+                if (MemoryUtil.memAddress(buffer) != MemoryUtil.NULL) {
+                    MemoryUtil.memFree(buffer)
+                }
+                pcmBuffers.remove(audioId)
+            }
             throw e
         }
     }
@@ -136,6 +145,13 @@ actual object AudioPlayer {
             AL10.alDeleteBuffers(bufferId)
             audioBuffers.remove(audioKey)
         }
+        // PCM-Buffer freigeben
+        pcmBuffers[audioKey]?.let { buffer ->
+            if (MemoryUtil.memAddress(buffer) != MemoryUtil.NULL) {
+                MemoryUtil.memFree(buffer)
+            }
+            pcmBuffers.remove(audioKey)
+        }
         WorkspaceRepository.audioRegistry.remove(audioKey)
     }
 
@@ -155,10 +171,18 @@ actual object AudioPlayer {
             checkALError("Preload buffer data")
 
             audioBuffers[audioClip.key] = bufferId
+            pcmBuffers[audioClip.key] = audioInfo.pcmData // PCM-Buffer speichern
             WorkspaceRepository.audioRegistry[audioClip.key] = audioClip
 
         } catch (e: Exception) {
             println("Failed to preload audio ${audioClip.key}: ${e.message}")
+            // Cleanup bei Fehler
+            pcmBuffers[audioClip.key]?.let { buffer ->
+                if (MemoryUtil.memAddress(buffer) != MemoryUtil.NULL) {
+                    MemoryUtil.memFree(buffer)
+                }
+                pcmBuffers.remove(audioClip.key)
+            }
         }
     }
 
@@ -326,8 +350,14 @@ actual object AudioPlayer {
                 val samples = rawPcm.remaining() / channels
                 val duration = (samples * 1000L) / sampleRate
 
-                AudioInfo(rawPcm, duration, sampleRate, channels)
+                // Kopiere die Daten in einen neuen Buffer, da rawPcm automatisch freigegeben wird
+                val persistentBuffer = MemoryUtil.memAllocShort(rawPcm.remaining())
+                persistentBuffer.put(rawPcm).flip()
+
+                AudioInfo(persistentBuffer, duration, sampleRate, channels)
             }
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to decode OGG file: ${e.message}")
         } finally {
             MemoryUtil.memFree(buffer)
         }
@@ -343,10 +373,21 @@ actual object AudioPlayer {
     // Stelle sicher, dass in der cleanup()-Methode auch alle PCM-Daten freigegeben werden
     fun cleanup() {
         if (isInitialized) {
-            // Speicher der AudioInfos freigeben
+            // PCM-Buffer explizit freigeben
+            pcmBuffers.values.forEach { buffer ->
+                try {
+                    if (MemoryUtil.memAddress(buffer) != MemoryUtil.NULL) {
+                        MemoryUtil.memFree(buffer)
+                    }
+                } catch (e: Exception) {
+                    println("Warning: Failed to free PCM buffer: ${e.message}")
+                }
+            }
+            pcmBuffers.clear()
+
+            // Audio-Buffer freigeben
             WorkspaceRepository.audioRegistry.values.forEach { audioClip ->
                 audioBuffers[audioClip.key]?.let { bufferId ->
-                    // Audio-Puffer freigeben
                     AL10.alDeleteBuffers(bufferId)
                 }
             }
