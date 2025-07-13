@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import kotlin.math.roundToInt
 
 @Composable
 fun <T> StepDial(
@@ -39,15 +40,23 @@ fun <T> StepDial(
 ) {
     var dialValue by remember { mutableStateOf(0f) }
     var displayValue by remember { mutableStateOf(0f) }
+    var dragLock: Boolean by remember { mutableStateOf(false) }
 
     LaunchedEffect(value) {
-        dialValue = steps.indexOf(value).toFloat() / (steps.size - 1)
+        if (dragLock) return@LaunchedEffect
 
-        displayValue = (dialValue * (steps.size)) / (steps.size)
+        dialValue = steps.indexOf(value).toFloat() / (steps.size - 1)
     }
 
     LaunchedEffect(dialValue) {
-        onValueChange(steps[(dialValue * (steps.size - 1)).toInt()])
+        val newValue = (dialValue * (steps.size - 1)).roundToInt()
+        val newDisplayValue = newValue / (steps.size - 1).toFloat()
+
+        if (displayValue != newDisplayValue) {
+            displayValue = newDisplayValue
+        }
+
+        onValueChange(steps[newValue])
     }
 
     Box(
@@ -55,7 +64,14 @@ fun <T> StepDial(
             .clip(CircleShape)
             .size(52.dp)
             .pointerInput(Unit) {
-                detectVerticalDragGestures { input, offset ->
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        dragLock = true
+                    },
+                    onDragEnd = {
+                        dragLock = false
+                    }
+                ) { input, offset ->
                     dialValue = (dialValue + (offset * -1) * 0.005f).coerceIn(0f, 1f)
                 }
             }
