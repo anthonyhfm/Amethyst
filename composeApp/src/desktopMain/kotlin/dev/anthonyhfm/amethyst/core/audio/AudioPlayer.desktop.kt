@@ -8,38 +8,55 @@ import org.lwjgl.openal.AL10
 import org.lwjgl.openal.ALC
 import org.lwjgl.openal.ALC10
 import org.lwjgl.stb.STBVorbis.stb_vorbis_decode_memory
-import org.lwjgl.system.MemoryStack.stackPush
+import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
+import java.io.ByteArrayInputStream
 import java.nio.ByteBuffer
+import java.nio.IntBuffer
 import java.nio.ShortBuffer
+import java.util.concurrent.atomic.AtomicBoolean
+import javax.sound.sampled.AudioSystem
 
 actual object AudioPlayer {
     private var device: Long = 0
     private var context: Long = 0
     private val availableSources = mutableListOf<Int>()
-    private var isInitialized = false
+    private val initialized = AtomicBoolean(false)
+    private val initializationLock = Object()
 
     private val audioBuffers = mutableMapOf<String, Int>()
 
     private fun ensureInitialized() {
-        if (!isInitialized) {
-            initializeOpenAL()
+        if (!initialized.get()) {
+            synchronized(initializationLock) {
+                if (!initialized.get()) {
+                    try {
+                        initializeOpenAL()
+                        initialized.set(true)
+                    } catch (e: Exception) {
+                        println("Failed to initialize OpenAL: ${e.message}")
+                        e.printStackTrace()
+                        throw e
+                    }
+                }
+            }
         }
     }
 
     private fun initializeOpenAL() {
         try {
-            device = ALC10.alcOpenDevice(null as ByteBuffer?)
+            // Verwende null anstatt null as ByteBuffer? für mehr Klarheit
+            device = ALC10.alcOpenDevice(null as String?)
             if (device == MemoryUtil.NULL) {
                 throw RuntimeException("Failed to open OpenAL device")
             }
 
-            val contextAttribs = intArrayOf(
-                ALC10.ALC_FREQUENCY, 44100,
-                ALC10.ALC_REFRESH, 120,
-                ALC10.ALC_SYNC, ALC10.ALC_FALSE,
-                0
-            )
+            val contextAttribs = IntBuffer.allocate(7)
+            contextAttribs.put(ALC10.ALC_FREQUENCY).put(44100)
+            contextAttribs.put(ALC10.ALC_REFRESH).put(120)
+            contextAttribs.put(ALC10.ALC_SYNC).put(ALC10.ALC_FALSE)
+            contextAttribs.put(0)
+            contextAttribs.flip()
 
             context = ALC10.alcCreateContext(device, contextAttribs)
             if (context == MemoryUtil.NULL) {
@@ -47,22 +64,34 @@ actual object AudioPlayer {
                 throw RuntimeException("Failed to create OpenAL context")
             }
 
-            ALC10.alcMakeContextCurrent(context)
+            if (!ALC10.alcMakeContextCurrent(context)) {
+                ALC10.alcDestroyContext(context)
+                ALC10.alcCloseDevice(device)
+                throw RuntimeException("Failed to make OpenAL context current")
+            }
+
+            // Capabilities erstellen
             AL.createCapabilities(ALC.createCapabilities(device))
 
-            repeat(64) {
+            // Quellen generieren
+            repeat(32) {
                 val source = AL10.alGenSources()
                 if (AL10.alGetError() == AL10.AL_NO_ERROR) {
                     availableSources.add(source)
+                } else {
+                    return
                 }
             }
 
-            isInitialized = true
-            println("OpenAL initialized with ${availableSources.size} sources (anti-crackling mode)")
+            if (availableSources.isEmpty()) {
+                throw RuntimeException("Failed to generate any OpenAL sources")
+            }
+
+            println("OpenAL initialized successfully with ${availableSources.size} sources")
 
         } catch (e: Exception) {
-            println("Failed to initialize OpenAL: ${e.message}")
-            throw e
+            cleanup() // Aufräumen bei Fehlern
+            throw RuntimeException("OpenAL initialization failed: ${e.message}", e)
         }
     }
 
@@ -100,6 +129,7 @@ actual object AudioPlayer {
 
         } catch (e: Exception) {
             println("Failed to load audio: ${e.message}")
+            e.printStackTrace()
             throw e
         }
     }
@@ -175,7 +205,7 @@ actual object AudioPlayer {
 
     private fun decodeAudioData(audioData: ByteArray): AudioInfo {
         return when {
-            isWavFile(audioData) -> decodeWav(audioData)
+            isWavFile(audioData) -> decodeWavSafely(audioData)
             isOggFile(audioData) -> decodeOgg(audioData)
             else -> throw RuntimeException("Unsupported audio format")
         }
@@ -193,128 +223,59 @@ actual object AudioPlayer {
                 data[2] == 'g'.code.toByte() && data[3] == 'S'.code.toByte()
     }
 
-    private fun decodeWav(audioData: ByteArray): AudioInfo {
+    private fun decodeWavSafely(audioData: ByteArray): AudioInfo {
+        // Verwende Java's AudioSystem für sicherere WAV-Dekodierung
         try {
-            val buffer = ByteBuffer.wrap(audioData).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            val inputStream = ByteArrayInputStream(audioData)
+            val audioInputStream = AudioSystem.getAudioInputStream(inputStream)
 
-            // Prüfen der RIFF-Header
-            if (buffer.limit() < 44) { // Minimale WAV-Header-Größe
-                throw RuntimeException("Invalid WAV file: too short")
+            val format = audioInputStream.format
+            val channels = format.channels
+            val sampleRate = format.sampleRate.toInt()
+            val frameSize = format.frameSize
+
+            // Berechne Samples und Dauer
+            val frameCount = audioInputStream.frameLength
+            val samples = frameCount.toInt()
+            val duration = (frameCount * 1000 / sampleRate).toLong()
+
+            // PCM-Daten lesen
+            val byteData = ByteArray(samples * frameSize)
+            val bytesRead = audioInputStream.read(byteData)
+
+            if (bytesRead <= 0) {
+                throw RuntimeException("Failed to read audio data from WAV")
             }
 
-            // Format-Informationen auslesen
-            buffer.position(22)
-            val channels = if (buffer.remaining() >= 2) buffer.short.toInt() else throw RuntimeException("Invalid WAV header")
-
-            buffer.position(24)
-            val sampleRate = if (buffer.remaining() >= 4) buffer.int else throw RuntimeException("Invalid WAV header")
-
-            buffer.position(34)
-            val bitsPerSample = if (buffer.remaining() >= 2) buffer.short.toInt() else throw RuntimeException("Invalid WAV header")
-
-            if (bitsPerSample != 16 && bitsPerSample != 8 && bitsPerSample != 24) {
-                throw RuntimeException("Unsupported bit depth: $bitsPerSample. Supported: 8, 16, 24 bit")
-            }
-
-            // Data-Chunk suchen
-            buffer.position(36)
-            var dataFound = false
-            var chunkSize = 0
-            var samples = 0
-
-            while (buffer.remaining() >= 8 && !dataFound) {
-                val chunkId = ByteArray(4)
-                buffer.get(chunkId, 0, 4)
-                val chunkType = String(chunkId)
-
-                chunkSize = if (buffer.remaining() >= 4) buffer.int else break
-
-                if (chunkType == "data") {
-                    dataFound = true
-                    samples = when (bitsPerSample) {
-                        8 -> chunkSize / channels
-                        16 -> chunkSize / (channels * 2)
-                        24 -> chunkSize / (channels * 3)
-                        else -> chunkSize / (channels * 2)
-                    }
-                    break
-                } else {
-                    if (buffer.remaining() >= chunkSize) {
-                        buffer.position(buffer.position() + chunkSize)
-                    } else {
-                        break
-                    }
-                }
-            }
-
-            if (!dataFound) {
-                throw RuntimeException("No data chunk found in WAV file")
-            }
-
-            val duration = (samples * 1000L) / sampleRate
-
-            // Sicherstellen, dass genug Daten vorhanden sind
-            if (buffer.remaining() < chunkSize) {
-                throw RuntimeException("Incomplete data chunk in WAV file")
-            }
-
-            // PCM-Daten in ShortBuffer konvertieren
+            // Konvertiere zu ShortBuffer für OpenAL
             val pcmBuffer = MemoryUtil.memAllocShort(samples * channels)
+            val byteBuffer = ByteBuffer.wrap(byteData).order(java.nio.ByteOrder.LITTLE_ENDIAN)
 
-            try {
-                when (bitsPerSample) {
-                    8 -> {
-                        for (i in 0 until samples * channels) {
-                            if (buffer.remaining() > 0) {
-                                val sample = (buffer.get().toInt() and 0xFF) - 128
-                                pcmBuffer.put((sample shl 8).toShort())
-                            } else {
-                                break
-                            }
-                        }
-                    }
-                    16 -> {
-                        for (i in 0 until samples * channels) {
-                            if (buffer.remaining() >= 2) {
-                                pcmBuffer.put(buffer.short)
-                            } else {
-                                break
-                            }
-                        }
-                    }
-                    24 -> {
-                        for (i in 0 until samples * channels) {
-                            if (buffer.remaining() >= 3) {
-                                val byte1 = buffer.get().toInt() and 0xFF
-                                val byte2 = buffer.get().toInt() and 0xFF
-                                val byte3 = buffer.get().toInt() and 0xFF
-                                val sample = (byte3 shl 16) or (byte2 shl 8) or byte1
-                                pcmBuffer.put((sample shr 8).toShort())
-                            } else {
-                                break
-                            }
-                        }
-                    }
+            for (i in 0 until samples * channels) {
+                if (byteBuffer.remaining() >= 2) {
+                    pcmBuffer.put(byteBuffer.short)
+                } else {
+                    break
                 }
-
-                pcmBuffer.flip()
-                return AudioInfo(pcmBuffer, duration, sampleRate, channels)
-            } catch (e: Exception) {
-                MemoryUtil.memFree(pcmBuffer)
-                throw e
             }
+
+            pcmBuffer.flip()
+            audioInputStream.close()
+
+            return AudioInfo(pcmBuffer, duration, sampleRate, channels)
         } catch (e: Exception) {
-            throw RuntimeException("Failed to decode WAV file: ${e.message}")
+            throw RuntimeException("Failed to decode WAV file: ${e.message}", e)
         }
     }
 
     private fun decodeOgg(audioData: ByteArray): AudioInfo {
-        val buffer = MemoryUtil.memAlloc(audioData.size)
+        var buffer: ByteBuffer? = null
 
         try {
+            buffer = MemoryUtil.memAlloc(audioData.size)
             buffer.put(audioData).flip()
 
-            return stackPush().use { stack ->
+            return MemoryStack.stackPush().use { stack ->
                 val channelsBuffer = stack.mallocInt(1)
                 val sampleRateBuffer = stack.mallocInt(1)
 
@@ -328,8 +289,10 @@ actual object AudioPlayer {
 
                 AudioInfo(rawPcm, duration, sampleRate, channels)
             }
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to decode OGG file: ${e.message}", e)
         } finally {
-            MemoryUtil.memFree(buffer)
+            buffer?.let { MemoryUtil.memFree(it) }
         }
     }
 
@@ -342,29 +305,38 @@ actual object AudioPlayer {
 
     // Stelle sicher, dass in der cleanup()-Methode auch alle PCM-Daten freigegeben werden
     fun cleanup() {
-        if (isInitialized) {
-            // Speicher der AudioInfos freigeben
-            WorkspaceRepository.audioRegistry.values.forEach { audioClip ->
-                audioBuffers[audioClip.key]?.let { bufferId ->
-                    // Audio-Puffer freigeben
+        if (initialized.get()) {
+            try {
+                // Audio-Puffer freigeben
+                audioBuffers.values.forEach { bufferId ->
                     AL10.alDeleteBuffers(bufferId)
                 }
+                audioBuffers.clear()
+
+                // Sources löschen
+                availableSources.forEach { source ->
+                    AL10.alDeleteSources(source)
+                }
+                availableSources.clear()
+
+                // OpenAL cleanup
+                ALC10.alcMakeContextCurrent(MemoryUtil.NULL)
+                if (context != MemoryUtil.NULL) {
+                    ALC10.alcDestroyContext(context)
+                    context = MemoryUtil.NULL
+                }
+
+                if (device != MemoryUtil.NULL) {
+                    ALC10.alcCloseDevice(device)
+                    device = MemoryUtil.NULL
+                }
+
+                initialized.set(false)
+                println("OpenAL cleaned up successfully")
+            } catch (e: Exception) {
+                println("Error during OpenAL cleanup: ${e.message}")
+                e.printStackTrace()
             }
-            audioBuffers.clear()
-
-            // Sources löschen
-            availableSources.forEach { source ->
-                AL10.alDeleteSources(source)
-            }
-            availableSources.clear()
-
-            // OpenAL cleanup
-            ALC10.alcMakeContextCurrent(MemoryUtil.NULL)
-            ALC10.alcDestroyContext(context)
-            ALC10.alcCloseDevice(device)
-
-            isInitialized = false
-            println("OpenAL cleaned up")
         }
     }
 }
