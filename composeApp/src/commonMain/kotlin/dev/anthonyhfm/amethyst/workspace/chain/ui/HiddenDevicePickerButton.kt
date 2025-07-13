@@ -27,11 +27,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
 fun HiddenDevicePickerButton(
     expanded: Boolean = false,
-    sampling: Boolean = false,
     forceOff: Boolean = false,
     onAddComponent: (ChainDevice<*>) -> Unit
 ) {
@@ -43,8 +44,6 @@ fun HiddenDevicePickerButton(
         modifier = Modifier
             .fillMaxHeight()
             .width(
-                // If forceOff is true, set the width to 12.dp immediately,
-                // without animation and regardless of other states
                 if (forceOff) {
                     12.dp
                 } else {
@@ -82,7 +81,7 @@ fun HiddenDevicePickerButton(
 
                 ChainDevicePicker(
                     visible = pickerVisible,
-                    sampling = sampling,
+                    sampling = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain,
                     onDismiss = {
                         pickerVisible = false
                     },

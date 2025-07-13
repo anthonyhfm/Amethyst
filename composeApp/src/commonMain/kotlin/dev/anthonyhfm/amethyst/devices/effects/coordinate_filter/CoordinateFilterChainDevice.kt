@@ -75,7 +75,7 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
             state.value.filters.forEach { (x, y) ->
                 if (x >= device.position.value.x.toInt() &&
                     x < device.position.value.x.toInt() + 10 &&
-                    y >= device.position.value.y.toInt() && 
+                    y >= device.position.value.y .toInt() &&
                     y < device.position.value.y.toInt() + 10) {
 
                     val localX = x - device.position.value.x.toInt()

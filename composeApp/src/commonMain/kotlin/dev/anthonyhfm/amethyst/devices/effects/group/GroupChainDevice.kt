@@ -63,9 +63,7 @@ import sh.calvin.reorderable.ReorderableRow
 import sh.calvin.reorderable.ReorderableScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-class GroupChainDevice(
-    private val sampling: Boolean = false
-) : ChainDevice<GroupChainDeviceState>() {
+class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
     override val state = MutableStateFlow(GroupChainDeviceState())
 
     init {
@@ -278,7 +276,6 @@ class GroupChainDevice(
                 contentAlignment = Alignment.Center
             ) {
                 HiddenDevicePickerButton(
-                    sampling = sampling,
                     expanded = true,
                     onAddComponent = {
                         groupsState.groups[groupsState.selectionIndex].chain.add(it)
@@ -292,7 +289,6 @@ class GroupChainDevice(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HiddenDevicePickerButton(
-                    sampling = sampling,
                     onAddComponent = {
                         groupsState.groups[groupsState.selectionIndex].chain.add(it, 0)
                     }
@@ -319,7 +315,6 @@ class GroupChainDevice(
                             )
 
                             HiddenDevicePickerButton(
-                                sampling = sampling,
                                 onAddComponent = {
                                     groupsState.groups[groupsState.selectionIndex].chain.add(it, index + 1)
                                 }
@@ -386,7 +381,6 @@ class GroupChainDevice(
 
     fun removeGroup(index: Int) {
         if (state.value.groups.size <= 1) {
-            // Don't remove the last group
             return
         }
 
@@ -395,7 +389,6 @@ class GroupChainDevice(
                 removeAt(index)
             }
 
-            // Adjust selection index if needed
             val newSelectionIndex = when {
                 it.selectionIndex >= newGroups.size -> newGroups.size - 1
                 it.selectionIndex > index -> it.selectionIndex - 1
@@ -417,7 +410,6 @@ class GroupChainDevice(
         copiedGroupName?.let { name ->
             createGroup(index)
 
-            // Rename the newly created group
             state.update {
                 it.copy(
                     groups = it.groups.toMutableList().apply {
@@ -482,14 +474,12 @@ class GroupChainDevice(
                 midiExit?.invoke(it)
             }
 
-            // Erstelle die Gruppe mit der entpackten Chain
             Group(
                 name = group.name,
                 chain = unpackedChain
             )
         }
 
-        // Aktualisiere den Zustand mit den entpackten Gruppen
         this.state.update {
             state.copy(
                 groups = unpackedGroups
