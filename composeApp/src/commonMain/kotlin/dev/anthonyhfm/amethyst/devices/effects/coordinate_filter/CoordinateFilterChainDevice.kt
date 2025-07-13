@@ -28,10 +28,6 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
     private val customMode: CoordinateFilterWorkspaceMode = CoordinateFilterWorkspaceMode()
 
     init {
-        customMode.modeWakeup = {
-            refreshVirtualDevices()
-        }
-
         customMode.modeClose = {
             Heaven.devices.forEach { device ->
                 device.previewState.clear()
@@ -40,6 +36,10 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
 
         customMode.onVirtualDevicePress = { x, y, offset ->
             onSetKeyFilter(x, y, offset)
+        }
+
+        customMode.modeWakeup = {
+            refreshVirtualDevices()
         }
     }
 

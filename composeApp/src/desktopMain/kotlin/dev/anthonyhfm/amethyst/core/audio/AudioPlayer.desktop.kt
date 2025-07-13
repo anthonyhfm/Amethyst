@@ -194,87 +194,141 @@ actual object AudioPlayer {
     }
 
     private fun decodeWav(audioData: ByteArray): AudioInfo {
-        val buffer = ByteBuffer.wrap(audioData).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        try {
+            val buffer = ByteBuffer.wrap(audioData).order(java.nio.ByteOrder.LITTLE_ENDIAN)
 
-        buffer.position(22)
-        val channels = buffer.short.toInt()
-        buffer.position(24)
-        val sampleRate = buffer.int
-        buffer.position(34)
-        val bitsPerSample = buffer.short.toInt()
+            // Prüfen der RIFF-Header
+            if (buffer.limit() < 44) { // Minimale WAV-Header-Größe
+                throw RuntimeException("Invalid WAV file: too short")
+            }
 
-        if (bitsPerSample != 16 && bitsPerSample != 8 && bitsPerSample != 24) {
-            throw RuntimeException("Unsupported bit depth: $bitsPerSample. Supported: 8, 16, 24 bit")
-        }
+            // Format-Informationen auslesen
+            buffer.position(22)
+            val channels = if (buffer.remaining() >= 2) buffer.short.toInt() else throw RuntimeException("Invalid WAV header")
 
-        buffer.position(36)
-        while (buffer.remaining() >= 8) {
-            val chunkType = String(buffer.array(), buffer.position(), 4)
-            buffer.position(buffer.position() + 4)
-            val chunkSize = buffer.int
+            buffer.position(24)
+            val sampleRate = if (buffer.remaining() >= 4) buffer.int else throw RuntimeException("Invalid WAV header")
 
-            if (chunkType == "data") {
-                val samples = when (bitsPerSample) {
-                    8 -> chunkSize / channels
-                    16 -> chunkSize / (channels * 2)
-                    24 -> chunkSize / (channels * 3)
-                    else -> chunkSize / (channels * 2)
+            buffer.position(34)
+            val bitsPerSample = if (buffer.remaining() >= 2) buffer.short.toInt() else throw RuntimeException("Invalid WAV header")
+
+            if (bitsPerSample != 16 && bitsPerSample != 8 && bitsPerSample != 24) {
+                throw RuntimeException("Unsupported bit depth: $bitsPerSample. Supported: 8, 16, 24 bit")
+            }
+
+            // Data-Chunk suchen
+            buffer.position(36)
+            var dataFound = false
+            var chunkSize = 0
+            var samples = 0
+
+            while (buffer.remaining() >= 8 && !dataFound) {
+                val chunkId = ByteArray(4)
+                buffer.get(chunkId, 0, 4)
+                val chunkType = String(chunkId)
+
+                chunkSize = if (buffer.remaining() >= 4) buffer.int else break
+
+                if (chunkType == "data") {
+                    dataFound = true
+                    samples = when (bitsPerSample) {
+                        8 -> chunkSize / channels
+                        16 -> chunkSize / (channels * 2)
+                        24 -> chunkSize / (channels * 3)
+                        else -> chunkSize / (channels * 2)
+                    }
+                    break
+                } else {
+                    if (buffer.remaining() >= chunkSize) {
+                        buffer.position(buffer.position() + chunkSize)
+                    } else {
+                        break
+                    }
                 }
+            }
 
-                val duration = (samples * 1000L) / sampleRate
-                val pcmBuffer = MemoryUtil.memAllocShort(samples * channels)
+            if (!dataFound) {
+                throw RuntimeException("No data chunk found in WAV file")
+            }
 
+            val duration = (samples * 1000L) / sampleRate
+
+            // Sicherstellen, dass genug Daten vorhanden sind
+            if (buffer.remaining() < chunkSize) {
+                throw RuntimeException("Incomplete data chunk in WAV file")
+            }
+
+            // PCM-Daten in ShortBuffer konvertieren
+            val pcmBuffer = MemoryUtil.memAllocShort(samples * channels)
+
+            try {
                 when (bitsPerSample) {
                     8 -> {
-                        repeat(samples * channels) {
-                            val sample = (buffer.get().toInt() and 0xFF) - 128
-                            pcmBuffer.put((sample shl 8).toShort())
+                        for (i in 0 until samples * channels) {
+                            if (buffer.remaining() > 0) {
+                                val sample = (buffer.get().toInt() and 0xFF) - 128
+                                pcmBuffer.put((sample shl 8).toShort())
+                            } else {
+                                break
+                            }
                         }
                     }
                     16 -> {
-                        repeat(samples * channels) {
-                            pcmBuffer.put(buffer.short)
+                        for (i in 0 until samples * channels) {
+                            if (buffer.remaining() >= 2) {
+                                pcmBuffer.put(buffer.short)
+                            } else {
+                                break
+                            }
                         }
                     }
                     24 -> {
-                        repeat(samples * channels) {
-                            val byte1 = buffer.get().toInt() and 0xFF
-                            val byte2 = buffer.get().toInt() and 0xFF
-                            val byte3 = buffer.get().toInt() and 0xFF
-                            val sample = (byte3 shl 16) or (byte2 shl 8) or byte1
-                            pcmBuffer.put((sample shr 8).toShort())
+                        for (i in 0 until samples * channels) {
+                            if (buffer.remaining() >= 3) {
+                                val byte1 = buffer.get().toInt() and 0xFF
+                                val byte2 = buffer.get().toInt() and 0xFF
+                                val byte3 = buffer.get().toInt() and 0xFF
+                                val sample = (byte3 shl 16) or (byte2 shl 8) or byte1
+                                pcmBuffer.put((sample shr 8).toShort())
+                            } else {
+                                break
+                            }
                         }
                     }
                 }
 
                 pcmBuffer.flip()
                 return AudioInfo(pcmBuffer, duration, sampleRate, channels)
-            } else {
-                buffer.position(buffer.position() + chunkSize)
+            } catch (e: Exception) {
+                MemoryUtil.memFree(pcmBuffer)
+                throw e
             }
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to decode WAV file: ${e.message}")
         }
-
-        throw RuntimeException("No data chunk found in WAV file")
     }
 
     private fun decodeOgg(audioData: ByteArray): AudioInfo {
         val buffer = MemoryUtil.memAlloc(audioData.size)
-        buffer.put(audioData).flip()
 
-        return stackPush().use { stack ->
-            val channelsBuffer = stack.mallocInt(1)
-            val sampleRateBuffer = stack.mallocInt(1)
+        try {
+            buffer.put(audioData).flip()
 
-            val rawPcm = stb_vorbis_decode_memory(buffer, channelsBuffer, sampleRateBuffer)
-                ?: throw RuntimeException("Failed to decode OGG file")
+            return stackPush().use { stack ->
+                val channelsBuffer = stack.mallocInt(1)
+                val sampleRateBuffer = stack.mallocInt(1)
 
-            val channels = channelsBuffer.get(0)
-            val sampleRate = sampleRateBuffer.get(0)
-            val samples = rawPcm.remaining() / channels
-            val duration = (samples * 1000L) / sampleRate
+                val rawPcm = stb_vorbis_decode_memory(buffer, channelsBuffer, sampleRateBuffer)
+                    ?: throw RuntimeException("Failed to decode OGG file")
 
-            AudioInfo(rawPcm, duration, sampleRate, channels)
-        }.also {
+                val channels = channelsBuffer.get(0)
+                val sampleRate = sampleRateBuffer.get(0)
+                val samples = rawPcm.remaining() / channels
+                val duration = (samples * 1000L) / sampleRate
+
+                AudioInfo(rawPcm, duration, sampleRate, channels)
+            }
+        } finally {
             MemoryUtil.memFree(buffer)
         }
     }
@@ -286,11 +340,15 @@ actual object AudioPlayer {
         }
     }
 
+    // Stelle sicher, dass in der cleanup()-Methode auch alle PCM-Daten freigegeben werden
     fun cleanup() {
         if (isInitialized) {
-            // Alle OpenAL Buffer löschen
-            audioBuffers.values.forEach { bufferId ->
-                AL10.alDeleteBuffers(bufferId)
+            // Speicher der AudioInfos freigeben
+            WorkspaceRepository.audioRegistry.values.forEach { audioClip ->
+                audioBuffers[audioClip.key]?.let { bufferId ->
+                    // Audio-Puffer freigeben
+                    AL10.alDeleteBuffers(bufferId)
+                }
             }
             audioBuffers.clear()
 
