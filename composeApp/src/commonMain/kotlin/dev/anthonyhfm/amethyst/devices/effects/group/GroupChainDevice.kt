@@ -472,8 +472,39 @@ class GroupChainDevice(
         val device = devices.removeAt(fromIndex)
         devices.add(toIndex, device)
 
-        // Update the devices list in the chain
         chain.devices.value = devices
+    }
+
+    fun loadFromState(state: GroupChainDeviceState) {
+        val unpackedGroups = state.groups.map { group ->
+            val unpackedChain = group.stateChain.unpack()
+            unpackedChain.midiExit = {
+                midiExit?.invoke(it)
+            }
+
+            // Erstelle die Gruppe mit der entpackten Chain
+            Group(
+                name = group.name,
+                chain = unpackedChain
+            )
+        }
+
+        // Aktualisiere den Zustand mit den entpackten Gruppen
+        this.state.update {
+            state.copy(
+                groups = unpackedGroups
+            )
+        }
+
+        if (this.state.value.groups.isEmpty()) {
+            createGroup()
+        }
+
+        if (this.state.value.selectionIndex >= this.state.value.groups.size || this.state.value.selectionIndex < 0) {
+            this.state.update {
+                it.copy(selectionIndex = 0)
+            }
+        }
     }
 }
 

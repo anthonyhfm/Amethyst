@@ -99,13 +99,9 @@ data class StateChain(
 
                 is GroupChainDeviceState -> {
                     GroupChainDevice().let {
-                        it.state.update {
-                            device.copy(
-                                groups = device.groups.map { group ->
-                                    group.copy(chain = group.stateChain.unpack())
-                                }
-                            )
-                        }
+                        it.state.update { device }
+                        it.loadFromState(device)
+
                         chain.add(it)
                     }
                 }
@@ -176,11 +172,23 @@ data class StateChain(
 
     companion object {
         fun pack(chain: Chain): StateChain {
-            return StateChain(
+            val stateChain = StateChain(
                 devices = chain.devices.value.map {
-                    it.state.value
+                    if (it is GroupChainDevice) {
+                        it.state.value.copy(
+                            groups = it.state.value.groups.map { group ->
+                                group.copy(
+                                    stateChain = pack(group.chain)
+                                )
+                            }
+                        )
+                    } else {
+                        it.state.value
+                    }
                 }
             )
+
+            return stateChain
         }
     }
 }

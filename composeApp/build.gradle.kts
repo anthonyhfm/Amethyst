@@ -134,7 +134,7 @@ compose.desktop {
             packageName = "Amethyst"
             packageVersion = "1.0.0"
 
-            targetFormats(TargetFormat.Pkg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Pkg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.AppImage)
 
             macOS {
                 iconFile.set(project.file("../icons/amethyst_macos.icns"))

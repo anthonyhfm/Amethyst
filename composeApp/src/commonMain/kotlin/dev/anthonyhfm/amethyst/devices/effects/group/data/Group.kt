@@ -10,7 +10,7 @@ data class Group(
     val name: String,
     @Transient
     val chain: Chain = Chain(),
+    val stateChain: StateChain = StateChain.pack(chain)
 ) {
-    val stateChain: StateChain
-        get() = StateChain.pack(chain)
+
 }
