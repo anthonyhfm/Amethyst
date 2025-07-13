@@ -79,18 +79,7 @@ fun WorkspaceViewport(
                 }
             }
         }
-
-        // Sortiere die Elemente, sodass das ausgewählte Element als letztes (oberhalb) gerendert wird
-        val indexedElements = elements.mapIndexed { index, element -> index to element }
-        val sortedElements = if (viewportState.selectedElement != null) {
-            indexedElements.sortedWith(compareBy { (index, _) ->
-                if (index == viewportState.selectedElement) 1 else 0
-            })
-        } else {
-            indexedElements
-        }
-
-        sortedElements.forEach { (index, element) ->
+        elements.forEachIndexed { index, element ->
             var draggingOffset by remember { mutableStateOf(Offset.Zero) }
 
             BoxWithConstraints(
