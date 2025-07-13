@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,9 +42,10 @@ import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 fun RowScope.ProjectsView(
     onClickCreateProject: () -> Unit,
     onClickOpenProject: () -> Unit,
+    onRemoveProjectFromRecents: (RecentWorkspace) -> Unit,
     onOpenRecentWorkspace: (RecentWorkspace) -> Unit
 ) {
-    val projects: List<RecentWorkspace> = GlobalSettings.recentWorkspaces
+    var projects: List<RecentWorkspace> = GlobalSettings.recentWorkspaces
     var showSettings by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -159,10 +161,10 @@ fun RowScope.ProjectsView(
 
                     IconButton(
                         onClick = {
-
+                            onRemoveProjectFromRecents(it)
                         }
                     ) {
-                        Icon(Icons.Default.MoreVert, null)
+                        Icon(Icons.Default.Remove, null)
                     }
                 }
             }
