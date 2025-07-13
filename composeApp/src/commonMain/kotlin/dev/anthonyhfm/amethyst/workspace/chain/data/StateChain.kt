@@ -99,7 +99,6 @@ data class StateChain(
 
                 is GroupChainDeviceState -> {
                     GroupChainDevice().let {
-                        it.state.update { device }
                         it.loadFromState(device)
 
                         chain.add(it)
