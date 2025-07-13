@@ -26,11 +26,26 @@ import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun AmethystWelcome(onClickGitHub: () -> Unit) {
+    val version = System.getProperty("app.version")
+
     Box(
         modifier = Modifier
             .width(280.dp)
             .fillMaxHeight()
     ) {
+        Text(
+            text = if (version == null) {
+                "Development"
+            } else {
+                "Version: $version"
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, bottom = 8.dp),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
         Image(
             painter = painterResource(Res.drawable.amethyst_studio_logo),
             contentDescription = "Amethyst Studio Logo",

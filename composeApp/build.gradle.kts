@@ -131,14 +131,20 @@ compose.desktop {
         mainClass = "dev.anthonyhfm.amethyst.MainKt"
 
         nativeDistributions {
+            packageName = "Amethyst"
+            packageVersion = "1.0.0"
+
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
 
             macOS {
                 iconFile.set(project.file("../icons/amethyst_macos.icns"))
+                dockName = "Amethyst"
             }
 
             windows {
                 iconFile.set(project.file("../icons/amethyst_windows.ico"))
+                menu = true
+                shortcut = true
             }
 
             linux {
@@ -146,9 +152,6 @@ compose.desktop {
 
                 iconFile.set(project.file("../icons/amethyst_linux.png"))
             }
-
-            packageName = "Amethyst"
-            packageVersion = "1.0.0"
         }
     }
 }
