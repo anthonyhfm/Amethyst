@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.twotone.Adjust
 import androidx.compose.material.icons.twotone.AudioFile
 import androidx.compose.material.icons.twotone.Audiotrack
 import androidx.compose.material.icons.twotone.Close
@@ -11,6 +12,8 @@ import androidx.compose.material.icons.twotone.DataArray
 import androidx.compose.material.icons.twotone.DeleteSweep
 import androidx.compose.material.icons.twotone.FileCopy
 import androidx.compose.material.icons.twotone.Filter
+import androidx.compose.material.icons.twotone.FilterCenterFocus
+import androidx.compose.material.icons.twotone.FilterTiltShift
 import androidx.compose.material.icons.twotone.Flip
 import androidx.compose.material.icons.twotone.Gradient
 import androidx.compose.material.icons.twotone.Grid3x3
@@ -21,6 +24,7 @@ import androidx.compose.material.icons.twotone.Loop
 import androidx.compose.material.icons.twotone.MyLocation
 import androidx.compose.material.icons.twotone.Pause
 import androidx.compose.material.icons.twotone.RotateLeft
+import androidx.compose.material.icons.twotone.Science
 import androidx.compose.material.icons.twotone.ShapeLine
 import androidx.compose.material.icons.twotone.Timeline
 import androidx.compose.material.icons.twotone.Timer
@@ -47,8 +51,10 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDevice
 import io.androidpoet.dropdown.Dropdown
 import io.androidpoet.dropdown.Easing
 import io.androidpoet.dropdown.EnterAnimation
@@ -76,6 +82,10 @@ fun getLightsMenu(): MenuItem<String> {
             item("device_layer_filter", "Layer Filter") {
                 icon(Icons.TwoTone.Layers)
             }
+
+            item("device_macro_filter", "Macro Filter") {
+                icon(Icons.TwoTone.FilterTiltShift)
+            }
         }
         item("cat_color", "Color") {
             icon(Icons.TwoTone.ColorLens)
@@ -90,10 +100,6 @@ fun getLightsMenu(): MenuItem<String> {
         }
         item("cat_shape", "Shape") {
             icon(Icons.TwoTone.ShapeLine)
-
-            item("device_offset", "Offset") {
-                icon(Icons.TwoTone.LineAxis)
-            }
 
             item("device_copy", "Copy") {
                 icon(Icons.TwoTone.ContentCopy)
@@ -121,6 +127,10 @@ fun getLightsMenu(): MenuItem<String> {
         item("cat_transform", "Transform") {
             icon(Icons.TwoTone.Transform)
 
+            item("device_offset", "Offset") {
+                icon(Icons.TwoTone.LineAxis)
+            }
+
             item("device_layer", "Layer") {
                 icon(Icons.TwoTone.Layers)
             }
@@ -131,6 +141,13 @@ fun getLightsMenu(): MenuItem<String> {
 
             item("device_rotate", "Rotate") {
                 icon(Icons.TwoTone.RotateLeft)
+            }
+        }
+        item("cat_misc", "Misc") {
+            icon(Icons.TwoTone.Science)
+
+            item("device_switch", "Switch") {
+                icon(Icons.TwoTone.Adjust)
             }
         }
     }
@@ -159,16 +176,9 @@ fun getSamplingMenu(): MenuItem<String> {
             item("device_coordinate_filter", "Coordinate Filter") {
                 icon(Icons.TwoTone.MyLocation)
             }
-        }
-        item("cat_shape", "Shape") {
-            icon(Icons.TwoTone.ShapeLine)
 
-            item("device_offset", "Offset") {
-                icon(Icons.TwoTone.LineAxis)
-            }
-
-            item("device_copy", "Copy") {
-                icon(Icons.TwoTone.ContentCopy)
+            item("device_macro_filter", "Macro Filter") {
+                icon(Icons.TwoTone.FilterTiltShift)
             }
         }
         item("cat_timing", "Timing") {
@@ -184,6 +194,13 @@ fun getSamplingMenu(): MenuItem<String> {
 
             item("device_loop", "Loop") {
                 icon(Icons.TwoTone.Loop)
+            }
+        }
+        item("cat_misc", "Misc") {
+            icon(Icons.TwoTone.Science)
+
+            item("device_switch", "Switch") {
+                icon(Icons.TwoTone.Adjust)
             }
         }
     }
@@ -213,7 +230,9 @@ fun ChainDevicePicker(
         "device_flip" to FlipChainDevice(),
         "device_rotate" to RotateChainDevice(),
         "device_copy" to CopyChainDevice(),
+        "device_macro_filter" to MacroFilterChainDevice(),
         "device_clip" to ClipChainDevice(),
+        "device_switch" to SwitchChainDevice()
     )
 
     Dropdown(

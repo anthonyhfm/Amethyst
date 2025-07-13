@@ -13,8 +13,10 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceCon
 import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
@@ -36,5 +38,7 @@ val DeviceStateSerializationModule = SerializersModule {
         subclass(OffsetChainDeviceState::class)
         subclass(RotateChainDeviceState::class)
         subclass(ClipChainDeviceState::class)
+        subclass(MacroFilterChainDeviceState::class)
+        subclass(SwitchChainDeviceState::class)
     }
 }

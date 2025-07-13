@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.workspace.chain.WorkspaceChain
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +35,9 @@ object WorkspaceRepository {
     val audioRegistry: MutableMap<String, AudioClip> = mutableMapOf()
 
     private var saveableWorkspaceData: SaveableWorkspaceData? = null
+
+    private val _macros: MutableStateFlow<List<Macro>> = MutableStateFlow(listOf(Macro(1)))
+    val macros: StateFlow<List<Macro>> = _macros.asStateFlow()
 
     private val _mode: MutableStateFlow<WorkspaceContract.WorkspaceMode> = MutableStateFlow(WorkspaceContract.WorkspaceMode.Layout())
     val mode: StateFlow<WorkspaceContract.WorkspaceMode> = _mode.asStateFlow()
@@ -71,9 +75,29 @@ object WorkspaceRepository {
         }
     }
 
-    fun setSelection(uuid: String) {
+    fun setSelection(uuid: String?) {
         _selectionUUID.update {
             uuid
+        }
+    }
+
+    fun setMacroValue(index: Int, macro: Macro) {
+        if (index < 0 || index >= _macros.value.size) {
+            println("Macro index out of bounds: $index")
+        }
+
+        _macros.update { currentMacros ->
+            currentMacros.toMutableList().apply {
+                this[index] = macro
+            }
+        }
+    }
+
+    fun addMacro(macro: Macro) {
+        _macros.update { currentMacros ->
+            currentMacros.toMutableList().apply {
+                add(macro)
+            }
         }
     }
 
@@ -99,6 +123,8 @@ object WorkspaceRepository {
 
         lightsChain.heavenChain = workspaceData.lights.unpack()
         samplingChain.heavenChain = workspaceData.sampling.unpack()
+
+        _macros.update { workspaceData.macros }
 
         Heaven.devices = workspaceData.launchpadDevices.map { savedDevice ->
             val device = when (savedDevice.type) {
@@ -127,6 +153,7 @@ object WorkspaceRepository {
             title = saveableWorkspaceData?.title ?: "Untitled Project",
             lights = StateChain.pack(lightsChain.heavenChain),
             sampling = StateChain.pack(samplingChain.heavenChain),
+            macros = _macros.value,
             settings = WorkspaceSettings(
                 bpm = _bpm.value
             ),

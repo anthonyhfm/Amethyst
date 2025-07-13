@@ -26,10 +26,14 @@ import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevi
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
@@ -144,6 +148,20 @@ data class StateChain(
 
                 is ClipChainDeviceState -> {
                     ClipChainDevice().let {
+                        it.state.update { device }
+                        chain.add(it)
+                    }
+                }
+
+                is MacroFilterChainDeviceState -> {
+                    MacroFilterChainDevice().let {
+                        it.state.update { device }
+                        chain.add(it)
+                    }
+                }
+
+                is SwitchChainDeviceState -> {
+                    SwitchChainDevice().let {
                         it.state.update { device }
                         chain.add(it)
                     }
