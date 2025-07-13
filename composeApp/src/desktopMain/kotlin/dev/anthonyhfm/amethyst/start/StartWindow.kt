@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.start
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.amethyst_linux
+import amethyst.composeapp.generated.resources.amethyst_macos
+import amethyst.composeapp.generated.resources.amethyst_windows
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +23,7 @@ import dev.anthonyhfm.amethyst.desktop.FlatUtilityLaf
 import dev.anthonyhfm.amethyst.start.ui.AmethystWelcome
 import dev.anthonyhfm.amethyst.start.ui.ProjectsView
 import dev.anthonyhfm.amethyst.ui.modifier.platformPaddingTop
+import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import javax.swing.UIManager
 import kotlin.system.exitProcess
@@ -41,7 +46,15 @@ fun StartWindow(
             height = 450.dp,
             position = WindowPosition.Aligned(Alignment.Center)
         ),
-        resizable = false
+        resizable = false,
+        icon = painterResource(
+            resource = when (DesktopPlatform.get()) {
+                DesktopPlatform.MacOS -> Res.drawable.amethyst_macos
+                DesktopPlatform.Windows -> Res.drawable.amethyst_windows
+                DesktopPlatform.Linux -> Res.drawable.amethyst_linux
+                DesktopPlatform.Unknown -> throw IllegalStateException("Unknown platform")
+            }
+        )
     ) {
         val viewModel = viewModel { StartWindowViewModel() }
 

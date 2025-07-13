@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.amethyst_linux
+import amethyst.composeapp.generated.resources.amethyst_macos
+import amethyst.composeapp.generated.resources.amethyst_windows
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -12,6 +16,7 @@ import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
+import org.jetbrains.compose.resources.painterResource
 import javax.swing.UIManager
 import kotlin.system.exitProcess
 
@@ -32,7 +37,15 @@ fun WorkspaceWindow() {
         ),
         onKeyEvent = {
             WorkspaceRepository.mode.value.onKeyEvent(it)
-        }
+        },
+        icon = painterResource(
+            resource = when (DesktopPlatform.get()) {
+                DesktopPlatform.MacOS -> Res.drawable.amethyst_macos
+                DesktopPlatform.Windows -> Res.drawable.amethyst_windows
+                DesktopPlatform.Linux -> Res.drawable.amethyst_linux
+                DesktopPlatform.Unknown -> throw IllegalStateException("Unknown platform")
+            }
+        )
     ) {
         WorkspaceMenuBar()
 

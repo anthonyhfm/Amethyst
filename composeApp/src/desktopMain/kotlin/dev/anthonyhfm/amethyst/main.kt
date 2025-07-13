@@ -32,6 +32,8 @@ fun main() {
         setupAboutHandler()
     }
 
+    println(System.getProperty("app.version"))
+
     application {
         KoinApplication(
             application = {
