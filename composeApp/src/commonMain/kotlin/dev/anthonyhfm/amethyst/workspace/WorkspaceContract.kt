@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.KeyEvent
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.workspace.modes.chain.ChainModeKeyHandler
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.atsushieno.ktmidi.MidiPortDetails
@@ -34,8 +35,8 @@ interface WorkspaceContract {
         data class AddChainDevice(val device: ChainDevice<*>, val atIndex: Int? = null) : Event
         data class ReorderChainDevice(val fromIndex: Int, val toIndex: Int) : Event
 
-        data class OnPressVirtualDevice(val x: Int, val y: Int, val offset: Offset) : Event
-        data class OnReleaseVirtualDevice(val x: Int, val y: Int, val offset: Offset) : Event
+        data class OnPressVirtualDevice(val x: Int, val y: Int, val offset: Offset, val layout: LaunchpadLayout) : Event
+        data class OnReleaseVirtualDevice(val x: Int, val y: Int, val offset: Offset, val layout: LaunchpadLayout) : Event
     }
 
     data class State(

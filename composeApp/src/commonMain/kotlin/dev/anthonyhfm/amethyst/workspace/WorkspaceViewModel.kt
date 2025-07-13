@@ -212,23 +212,23 @@ class WorkspaceViewModel(
             is WorkspaceContract.Event.OnPressVirtualDevice -> {
                 when (state.value.mode) {
                     is KeyframesWorkspaceMode -> {
-                        (state.value.mode as KeyframesWorkspaceMode).virtualDevicePress(event.x, event.y, event.offset)
+                        (state.value.mode as KeyframesWorkspaceMode).virtualDevicePress(event.x, event.y - event.layout.offsetY, event.offset)
                     }
 
                     is CoordinateFilterWorkspaceMode -> {
-                        (state.value.mode as CoordinateFilterWorkspaceMode).virtualDevicePress(event.x, event.y, event.offset)
+                        (state.value.mode as CoordinateFilterWorkspaceMode).virtualDevicePress(event.x, event.y - event.layout.offsetY, event.offset)
                     }
 
                     is WorkspaceContract.WorkspaceMode.Layout -> { }
 
                     else -> {
                         WorkspaceRepository.lightsChain.onMidiInput(
-                            inputData = MidiInputData(event.y * 10 + event.x, 127),
+                            inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 127),
                             offset = event.offset
                         )
 
                         WorkspaceRepository.samplingChain.onMidiInput(
-                            inputData = MidiInputData(event.y * 10 + event.x, 127),
+                            inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 127),
                             offset = event.offset
                         )
                     }
@@ -238,12 +238,12 @@ class WorkspaceViewModel(
             is WorkspaceContract.Event.OnReleaseVirtualDevice -> {
                 if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) {
                     WorkspaceRepository.lightsChain.onMidiInput(
-                        inputData = MidiInputData(event.y * 10 + event.x, 0),
+                        inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 0),
                         offset = event.offset
                     )
 
                     WorkspaceRepository.samplingChain.onMidiInput(
-                        inputData = MidiInputData(event.y * 10 + event.x, 0),
+                        inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 0),
                         offset = event.offset
                     )
                 }

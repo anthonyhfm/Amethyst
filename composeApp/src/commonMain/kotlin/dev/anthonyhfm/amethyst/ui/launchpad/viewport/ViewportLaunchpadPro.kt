@@ -54,10 +54,10 @@ class ViewportLaunchpadPro(
                 LaunchpadSurfaceDetectionOverlay(
                     layoutType = layout,
                     onPadPressed = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value, layout))
                     },
                     onPadReleased = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value, layout))
                     },
                     modifier = Modifier.fillMaxSize(0.94f)
                 ) {

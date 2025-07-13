@@ -47,10 +47,10 @@ class ViewportMidiFighter64(
                 LaunchpadSurfaceDetectionOverlay(
                     layoutType = layout,
                     onPadPressed = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value, layout))
                     },
                     onPadReleased = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value, layout))
                     },
                     modifier = Modifier.fillMaxSize(0.94f)
                 ) {
@@ -96,9 +96,18 @@ private fun GridPad(
         contentAlignment = Alignment.Center
     ) {
         GenericLaunchpadButton(
-            sizeModifier = Modifier.fillMaxSize(0.78f),
+            sizeModifier = Modifier
+                .fillMaxSize(0.8f),
             effect = effectData,
+            enableLightSpot = false,
             shape = CircleShape
+        )
+
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .fillMaxSize(0.62f)
+                .background(Color(0xFF0A0A0A))
         )
     }
 }

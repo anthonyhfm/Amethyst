@@ -47,10 +47,10 @@ class ViewportMystrix(
                 LaunchpadSurfaceDetectionOverlay(
                     layoutType = layout,
                     onPadPressed = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value, layout))
                     },
                     onPadReleased = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value, layout))
                     },
                     modifier = Modifier.fillMaxSize(0.92f)
                 ) {
@@ -97,10 +97,10 @@ private fun GridPad(
     ) {
         if (x in 2..5 && y in 2..5) {
             ClippedPad(
-                topLeft = x == 2 && y == 5,
+                topLeft = x == 4 && y == 5,
                 topRight = x == 5 && y == 5,
-                bottomLeft = x == 2 && y == 2,
-                bottomRight = x == 5 && y == 2,
+                bottomLeft = x == 4 && y == 4,
+                bottomRight = x == 5 && y == 4,
                 effectData = effectData
             )
         } else {

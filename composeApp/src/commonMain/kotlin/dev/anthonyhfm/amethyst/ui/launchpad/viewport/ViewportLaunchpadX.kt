@@ -47,10 +47,10 @@ class ViewportLaunchpadX(
                 LaunchpadSurfaceDetectionOverlay(
                     layoutType = layout,
                     onPadPressed = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value, layout))
                     },
                     onPadReleased = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value))
+                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value, layout))
                     },
                     modifier = Modifier.fillMaxSize(0.92f)
                 ) {
@@ -110,7 +110,8 @@ private fun GridPad(
         } else if (x in 1..8 && y in 1..8) {
             GenericLaunchpadButton(
                 sizeModifier = Modifier.fillMaxSize(0.82f),
-                effect = effectData
+                effect = effectData,
+                shape = RoundedCornerShape(4)
             )
         }
     }
@@ -156,6 +157,7 @@ private fun ClippedPad(
                 )
             )
             .fillMaxSize(0.82f),
-        effect = effectData
+        effect = effectData,
+        shape = RoundedCornerShape(4)
     )
 }
