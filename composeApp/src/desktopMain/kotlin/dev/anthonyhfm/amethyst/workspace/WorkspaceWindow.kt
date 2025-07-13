@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
+import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
@@ -28,6 +29,8 @@ fun WorkspaceWindow() {
 
     Window(
         onCloseRequest = {
+            AudioPlayer.cleanup()
+
             exitProcess(0)
         },
         title = "Amethyst",
