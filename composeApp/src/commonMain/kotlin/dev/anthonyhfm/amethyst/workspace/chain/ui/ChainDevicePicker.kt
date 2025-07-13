@@ -220,7 +220,7 @@ fun ChainDevicePicker(
         "device_coordinate_filter" to CoordinateFilterChainDevice(),
         "device_delay" to DelayChainDevice(),
         "device_gradient" to GradientChainDevice(),
-        "device_group" to GroupChainDevice(sampling = sampling),
+        "device_group" to GroupChainDevice(),
         "device_keyframes" to KeyframesChainDevice(),
         "device_layer" to LayerChainDevice(),
         "device_layer_filter" to LayerFilterChainDevice(),
