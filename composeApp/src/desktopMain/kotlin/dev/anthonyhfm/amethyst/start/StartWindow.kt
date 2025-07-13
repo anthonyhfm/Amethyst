@@ -30,7 +30,7 @@ import kotlin.system.exitProcess
 
 @Composable
 fun StartWindow(
-    onOpenEditor: () -> Unit
+    onOpenEditor: () -> Unit,
 ) {
     if (DesktopPlatform.get() == DesktopPlatform.Windows) {
         UIManager.setLookAndFeel(FlatUtilityLaf())
@@ -47,14 +47,12 @@ fun StartWindow(
             position = WindowPosition.Aligned(Alignment.Center)
         ),
         resizable = false,
-        icon = painterResource(
-            resource = when (DesktopPlatform.get()) {
-                DesktopPlatform.MacOS -> Res.drawable.amethyst_macos
-                DesktopPlatform.Windows -> Res.drawable.amethyst_windows
-                DesktopPlatform.Linux -> Res.drawable.amethyst_linux
-                DesktopPlatform.Unknown -> throw IllegalStateException("Unknown platform")
-            }
-        )
+        icon = when (DesktopPlatform.get()) {
+            DesktopPlatform.Windows -> painterResource(Res.drawable.amethyst_windows)
+            DesktopPlatform.Linux -> painterResource(Res.drawable.amethyst_linux)
+
+            else -> null
+        }
     ) {
         val viewModel = viewModel { StartWindowViewModel() }
 
@@ -62,7 +60,7 @@ fun StartWindow(
             onOpenEditor()
         }
 
-        if(DesktopPlatform.get() == DesktopPlatform.MacOS) {
+        if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
             window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
             window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
         }
@@ -93,6 +91,9 @@ fun StartWindow(
                         },
                         onOpenRecentWorkspace = {
                             viewModel.openProjectFile(it.path)
+                        },
+                        onRemoveProjectFromRecents = {
+                            viewModel.onRemoveProjectFromRecents(it)
                         }
                     )
                 }

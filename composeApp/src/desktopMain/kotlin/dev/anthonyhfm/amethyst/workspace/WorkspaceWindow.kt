@@ -38,14 +38,12 @@ fun WorkspaceWindow() {
         onKeyEvent = {
             WorkspaceRepository.mode.value.onKeyEvent(it)
         },
-        icon = painterResource(
-            resource = when (DesktopPlatform.get()) {
-                DesktopPlatform.MacOS -> Res.drawable.amethyst_macos
-                DesktopPlatform.Windows -> Res.drawable.amethyst_windows
-                DesktopPlatform.Linux -> Res.drawable.amethyst_linux
-                DesktopPlatform.Unknown -> throw IllegalStateException("Unknown platform")
-            }
-        )
+        icon = when (DesktopPlatform.get()) {
+            DesktopPlatform.Windows -> painterResource(Res.drawable.amethyst_windows)
+            DesktopPlatform.Linux -> painterResource(Res.drawable.amethyst_linux)
+
+            else -> null
+        }
     ) {
         WorkspaceMenuBar()
 

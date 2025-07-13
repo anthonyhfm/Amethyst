@@ -119,4 +119,10 @@ class StartWindowViewModel() : ViewModel() {
             }
         }
     }
+
+    fun onRemoveProjectFromRecents(recentWorkspace: RecentWorkspace) {
+        GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.filterNot {
+            it.path == recentWorkspace.path
+        }
+    }
 }
