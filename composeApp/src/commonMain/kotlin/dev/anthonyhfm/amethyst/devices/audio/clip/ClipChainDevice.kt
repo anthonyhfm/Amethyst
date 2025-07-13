@@ -91,7 +91,9 @@ class ClipChainDevice : ChainDevice<ClipChainDeviceState>() {
     override fun midiEnter(n: List<Signal>) {
         n.forEach {
             if (it.color != Color.Black) {
-                AudioPlayer.playAudio(state.value.audioKey)
+                if (WorkspaceRepository.audioRegistry[state.value.audioKey] != null) {
+                    AudioPlayer.playAudio(state.value.audioKey)
+                }
             }
         }
 
