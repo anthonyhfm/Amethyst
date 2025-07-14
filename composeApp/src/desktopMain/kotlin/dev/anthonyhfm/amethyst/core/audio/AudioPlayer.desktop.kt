@@ -22,7 +22,15 @@ actual object AudioPlayer {
     private val pcmBuffers = mutableMapOf<String, ByteBuffer>()
 
     private fun ensureInitialized() {
-        if (!isInitialized) initializeOpenAL()
+        if (!isInitialized) {
+            try {
+                initializeOpenAL()
+            } catch (e: Exception) {
+                println("Failed to initialize OpenAL: ${e.message}")
+                println("This might be a JVM module access issue. Please ensure proper JVM arguments are set.")
+                throw RuntimeException("Audio system initialization failed. Check JVM arguments for LWJGL compatibility.", e)
+            }
+        }
     }
 
     private fun initializeOpenAL() {
@@ -214,7 +222,12 @@ actual object AudioPlayer {
             val duration = (samples * 1000L) / rate
 
             val byteCount = raw.remaining() * 2
-            val pcmBuf = MemoryUtil.memAlloc(byteCount).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            val pcmBuf = try {
+                MemoryUtil.memAlloc(byteCount).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            } catch (e: OutOfMemoryError) {
+                MemoryUtil.memFree(input)
+                throw RuntimeException("Failed to allocate memory for OGG decoding. This may be due to missing JVM arguments for LWJGL.", e)
+            }
             pcmBuf.asShortBuffer().put(raw).flip(); pcmBuf.position(0)
             MemoryUtil.memFree(input)
             AudioInfo(pcmBuf, duration, rate, channels)
