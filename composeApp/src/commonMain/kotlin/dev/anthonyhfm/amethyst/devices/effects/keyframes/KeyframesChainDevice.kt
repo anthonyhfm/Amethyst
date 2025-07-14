@@ -215,7 +215,11 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                         frames = it.frames.toMutableList().apply {
                             removeAt(event.frameIndex)
                         },
-                        selectedFrameIndex = event.frameIndex.coerceAtMost(it.frames.lastIndex)
+                        selectedFrameIndex = if (event.frameIndex == it.frames.lastIndex) {
+                            it.frames.lastIndex - 1
+                        } else {
+                            event.frameIndex
+                        }
                     )
                 }
 
