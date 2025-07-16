@@ -39,10 +39,8 @@ actual object AudioPlayer {
     }
 
     private fun initializeAudioSystem() {
-        // Verwende das beste verfügbare Audio-Device mit niedriger Latenz
         val mixerInfos = AudioSystem.getMixerInfo()
 
-        // Bevorzuge DirectSound auf Windows oder CoreAudio auf macOS für niedrige Latenz
         mixer = mixerInfos.find { info ->
             info.name.contains("DirectSound", ignoreCase = true) ||
             info.name.contains("CoreAudio", ignoreCase = true) ||
@@ -51,7 +49,6 @@ actual object AudioPlayer {
 
         isInitialized = true
 
-        // Starte Cleanup-Task für beendete Clips
         executor.scheduleAtFixedRate({
             cleanupFinishedClips()
         }, 1, 1, TimeUnit.SECONDS)
@@ -92,7 +89,6 @@ actual object AudioPlayer {
         val loadedClip = audioClips[audioKey] ?: return
 
         try {
-            // Erstelle einen neuen Clip für jede Wiedergabe (ermöglicht mehrfache gleichzeitige Wiedergabe)
             val clip = AudioSystem.getClip(mixer?.mixerInfo)
             val audioInputStream = AudioInputStream(
                 ByteArrayInputStream(loadedClip.audioData),
@@ -102,21 +98,18 @@ actual object AudioPlayer {
 
             clip.open(audioInputStream)
 
-            // Optimiere für niedrige Latenz
             if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                 val gainControl = clip.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
-                gainControl.value = 0.0f // 0 dB = normale Lautstärke
+                gainControl.value = 0.0f
             }
 
-            // Tracking für Cleanup
             val playId = "${audioKey}_${System.currentTimeMillis()}"
             playingClips[playId] = clip
 
-            // Cleanup nach Wiedergabe
             clip.addLineListener { event ->
                 if (event.type == LineEvent.Type.STOP) {
                     cleanupScope.launch {
-                        delay(100) // Kurze Verzögerung für sauberes Cleanup
+                        delay(100)
                         playingClips.remove(playId)?.close()
                     }
                 }
@@ -148,7 +141,6 @@ actual object AudioPlayer {
         audioClips.remove(audioKey)
         WorkspaceRepository.audioRegistry.remove(audioKey)
 
-        // Stoppe alle laufenden Instanzen dieses Clips
         playingClips.entries.removeAll { (playId, clip) ->
             if (playId.startsWith(audioKey)) {
                 clip.stop()
@@ -163,9 +155,8 @@ actual object AudioPlayer {
             if (!clip.isRunning) {
                 try {
                     clip.close()
-                } catch (e: Exception) {
-                    // Ignoriere Cleanup-Fehler
-                }
+                } catch (e: Exception) { }
+
                 true
             } else false
         }
@@ -173,13 +164,22 @@ actual object AudioPlayer {
 
     private fun decodeAudioData(data: ByteArray): AudioInfo = when {
         isWav(data) -> decodeWav(data)
-        isOgg(data) -> throw RuntimeException("OGG format not supported in Java Sound implementation. Please use WAV files.")
-        else -> throw RuntimeException("Unsupported audio format. Only WAV files are supported.")
+        isMp3(data) -> decodeMp3(data)
+        isOgg(data) -> throw RuntimeException("OGG format not supported in Java Sound implementation. Please use WAV or MP3 files.")
+        else -> throw RuntimeException("Unsupported audio format. Only WAV and MP3 files are supported.")
     }
 
     private fun isWav(d: ByteArray) = d.size >= 12 &&
         d[0] == 'R'.code.toByte() && d[1] == 'I'.code.toByte() &&
         d[2] == 'F'.code.toByte() && d[3] == 'F'.code.toByte()
+
+    private fun isMp3(d: ByteArray) = d.size >= 3 && (
+        (d[0] == 'I'.code.toByte() && d[1] == 'D'.code.toByte() && d[2] == '3'.code.toByte()) ||
+        (d[0] == 0xFF.toByte() && (d[1].toInt() and 0xE0) == 0xE0) ||
+        d.indices.take(100).any { i ->
+            i < d.size - 1 && d[i] == 0xFF.toByte() && (d[i + 1].toInt() and 0xE0) == 0xE0
+        }
+    )
 
     private fun isOgg(d: ByteArray) = d.size >= 4 &&
         d[0] == 'O'.code.toByte() && d[1] == 'g'.code.toByte() &&
@@ -189,7 +189,6 @@ actual object AudioPlayer {
         val buf = ByteBuffer.wrap(audioData).order(ByteOrder.LITTLE_ENDIAN)
         require(buf.limit() >= 44) { "Invalid WAV: too short" }
 
-        // WAV Header parsing
         buf.position(22); val channels = buf.short.toInt()
         buf.position(24); val sampleRate = buf.int
         buf.position(34); val bitsPerSample = buf.short.toInt()
@@ -197,7 +196,6 @@ actual object AudioPlayer {
         require(bitsPerSample in listOf(8, 16, 24)) { "Unsupported bit depth: $bitsPerSample" }
         require(channels in 1..2) { "Unsupported channel count: $channels" }
 
-        // Find data chunk
         buf.position(36)
         var dataSize = 0
         var dataStartPos = 0
@@ -216,7 +214,6 @@ actual object AudioPlayer {
 
         require(dataSize > 0) { "No data chunk found in WAV file" }
 
-        // Create AudioFormat
         val encoding = if (bitsPerSample == 8) AudioFormat.Encoding.PCM_UNSIGNED else AudioFormat.Encoding.PCM_SIGNED
         val frameSize = channels * (bitsPerSample / 8)
         val frameRate = sampleRate.toFloat()
@@ -224,7 +221,6 @@ actual object AudioPlayer {
 
         val audioFormat = AudioFormat(encoding, frameRate, bitsPerSample, channels, frameSize, frameRate, bigEndian)
 
-        // Extract audio data
         buf.position(dataStartPos)
         val audioBytes = ByteArray(dataSize)
         buf.get(audioBytes, 0, minOf(dataSize, buf.remaining()))
@@ -235,25 +231,55 @@ actual object AudioPlayer {
         return AudioInfo(audioFormat, audioBytes, duration)
     }
 
+    private fun decodeMp3(audioData: ByteArray): AudioInfo {
+        try {
+            val inputStream = ByteArrayInputStream(audioData)
+            val audioInputStream = AudioSystem.getAudioInputStream(inputStream)
+
+            val sourceFormat = audioInputStream.format
+            println("MP3 Source format: $sourceFormat")
+
+            val targetFormat = AudioFormat(
+                AudioFormat.Encoding.PCM_SIGNED,
+                sourceFormat.sampleRate,
+                16,
+                sourceFormat.channels,
+                sourceFormat.channels * 2,
+                sourceFormat.sampleRate,
+                false
+            )
+
+            val pcmStream = AudioSystem.getAudioInputStream(targetFormat, audioInputStream)
+
+            val pcmData = pcmStream.readAllBytes()
+
+            val frameLength = pcmData.size / targetFormat.frameSize
+            val duration = (frameLength * 1000L / targetFormat.sampleRate).toLong()
+
+            pcmStream.close()
+            audioInputStream.close()
+
+            return AudioInfo(targetFormat, pcmData, duration)
+
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to decode MP3: ${e.message}", e)
+        }
+    }
+
     fun cleanup() {
         if (!isInitialized) return
 
-        // Stoppe alle laufenden Clips
         playingClips.values.forEach { clip ->
             try {
                 clip.stop()
                 clip.close()
-            } catch (e: Exception) {
-                // Ignoriere Cleanup-Fehler
-            }
+            } catch (e: Exception) { }
         }
         playingClips.clear()
         audioClips.clear()
 
-        // Cleanup Coroutine Scope
         cleanupScope.cancel()
 
-        // Shutdown Executor
         executor.shutdown()
         try {
             if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {

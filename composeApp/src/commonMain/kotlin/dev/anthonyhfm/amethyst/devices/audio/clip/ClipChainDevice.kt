@@ -51,7 +51,7 @@ class ClipChainDevice : ChainDevice<ClipChainDeviceState>() {
                             mode = PickerMode.Single,
                             title = "Select Audio File",
                             type = PickerType.File(
-                                extensions = listOf("wav", "ogg")
+                                extensions = listOf("wav", "ogg", "mp3")
                             )
                         )
 

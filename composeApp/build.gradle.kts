@@ -78,6 +78,10 @@ kotlin {
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)
             implementation(libs.flatlaf)
+
+            // MP3 support
+            implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
+            implementation("com.googlecode.soundlibs:jlayer:1.0.1.4")
         }
     }
 }
