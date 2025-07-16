@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
@@ -33,10 +34,11 @@ class SwitchChainDevice : ChainDevice<SwitchChainDeviceState>() {
     override fun Content() {
         val deviceState by state.collectAsState()
         val macros by WorkspaceRepository.macros.collectAsState()
+        val selections by SelectionManager.selections.collectAsState()
 
         AmethystDevice(
             title = "Switch",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(100.dp)
         ) {

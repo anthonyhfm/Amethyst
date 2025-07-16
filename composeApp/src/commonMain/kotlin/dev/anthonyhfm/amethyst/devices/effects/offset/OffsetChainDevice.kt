@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
@@ -43,9 +44,11 @@ class OffsetChainDevice : ChainDevice<OffsetChainDeviceState>() {
 
     @Composable
     override fun Content() {
+        val selections by SelectionManager.selections.collectAsState()
+
         AmethystDevice(
             title = "Offset",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(200.dp)
         ) {

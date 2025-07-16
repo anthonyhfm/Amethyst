@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -76,6 +77,8 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
 
     @Composable
     override fun Content() {
+        val selections by SelectionManager.selections.collectAsState()
+
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
@@ -84,7 +87,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         ) {
             AmethystDevice(
                 title = "Group",
-                deviceId = internalUUID,
+                isSelected = selections.contains(this@GroupChainDevice),
                 modifier = Modifier
                     .width(180.dp),
             ) {
@@ -305,7 +308,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                     },
                     verticalAlignment = Alignment.CenterVertically
                 ) { index, device, isDragging ->
-                    key(device.internalUUID) {
+                    key(device.selectionUUID) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {

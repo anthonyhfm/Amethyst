@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import kotlinx.coroutines.delay
@@ -146,7 +148,13 @@ private fun ReorderableScope.ChainDeviceItem(
                 }
             )
     ) {
-        TitleBarModifierProvider(Modifier.draggableHandle()) {
+        TitleBarModifierProvider(
+            Modifier
+                .clickable {
+                    SelectionManager.select(device)
+                }
+                .draggableHandle()
+        ) {
             device.Content()
         }
     }

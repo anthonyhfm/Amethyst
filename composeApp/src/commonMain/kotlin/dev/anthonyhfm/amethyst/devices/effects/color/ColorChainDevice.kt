@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,6 +19,7 @@ import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
@@ -29,6 +32,7 @@ class ColorChainDevice : ChainDevice<ColorChainDeviceState>() {
 
     @Composable
     override fun Content() {
+        val selections by SelectionManager.selections.collectAsState()
         val controller = rememberColorPickerController()
 
         LaunchedEffect(Unit) {
@@ -44,7 +48,7 @@ class ColorChainDevice : ChainDevice<ColorChainDeviceState>() {
 
         AmethystDevice(
             title = "Color",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(200.dp),
         ) {

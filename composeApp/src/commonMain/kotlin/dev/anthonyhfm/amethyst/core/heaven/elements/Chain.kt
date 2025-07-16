@@ -55,7 +55,7 @@ class Chain : SignalReceiver() {
 
     fun remove(uuid: String) {
         devices.value = devices.value.toMutableList().apply {
-            removeAll { it.internalUUID == uuid }
+            removeAll { it.selectionUUID == uuid }
         }.map {
             when (it) {
                 is GroupChainDevice -> {

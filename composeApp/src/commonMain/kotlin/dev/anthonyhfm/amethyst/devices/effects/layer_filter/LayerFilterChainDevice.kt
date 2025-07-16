@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
@@ -24,10 +25,11 @@ class LayerFilterChainDevice : ChainDevice<LayerFilterChainDeviceState>() {
     @Composable
     override fun Content() {
         val deviceState by state.collectAsState()
+        val selections by SelectionManager.selections.collectAsState()
 
         AmethystDevice(
             title = "Layer Filter",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(120.dp)
         ) {

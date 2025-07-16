@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
@@ -68,6 +69,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     override fun Content() {
         val bpm = WorkspaceRepository.bpm.collectAsState()
         val state by state.collectAsState()
+        val selections by SelectionManager.selections.collectAsState()
 
         LaunchedEffect(bpm, state.frames) {
             renderAnimation()
@@ -75,7 +77,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
 
         AmethystDevice(
             title = "Keyframes",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(120.dp)
         ) {

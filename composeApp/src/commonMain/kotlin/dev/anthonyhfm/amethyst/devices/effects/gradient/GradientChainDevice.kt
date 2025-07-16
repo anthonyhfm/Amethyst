@@ -29,6 +29,7 @@ import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -49,6 +50,7 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
     override fun Content() {
         val controller = rememberColorPickerController()
         val deviceState by state.collectAsState()
+        val selections by SelectionManager.selections.collectAsState()
 
         var selectedColor: Int? by remember { mutableStateOf(null) }
 
@@ -67,7 +69,7 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
 
         AmethystDevice(
             title = "Gradient",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(
                     width = if (selectedColor != null) {

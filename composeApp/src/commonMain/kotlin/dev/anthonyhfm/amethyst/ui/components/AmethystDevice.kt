@@ -26,14 +26,11 @@ import org.koin.compose.koinInject
 @Composable
 fun AmethystDevice(
     title: String,
-    deviceId: String,
+    isSelected: Boolean,
     modifier: Modifier = Modifier,
     titleBarModifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val selectedDeviceId by WorkspaceRepository.selectionUUID.collectAsState()
-    val isSelected = selectedDeviceId == deviceId
-
     val titleModifier = LocalTitleBarModifier.current.then(titleBarModifier)
 
     // Bestimme Farben basierend auf Auswahlstatus
@@ -62,9 +59,6 @@ fun AmethystDevice(
                 .height(28.dp)
                 .background(titleBarColor)
                 .then(titleModifier)
-                .clickable {
-                    WorkspaceRepository.setSelection(deviceId)
-                }
         ) {
             Text(
                 text = title,

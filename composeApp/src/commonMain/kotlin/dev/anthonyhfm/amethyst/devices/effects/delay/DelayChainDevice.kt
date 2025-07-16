@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -28,10 +29,11 @@ class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
     @Composable
     override fun Content() {
         val deviceState by state.collectAsState()
+        val selections by SelectionManager.selections.collectAsState()
 
         AmethystDevice(
             title = "Delay",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(100.dp)
         ) {

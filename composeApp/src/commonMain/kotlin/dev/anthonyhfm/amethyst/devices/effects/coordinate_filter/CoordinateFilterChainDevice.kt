@@ -7,6 +7,8 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -14,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
@@ -45,9 +48,11 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
 
     @Composable
     override fun Content() {
+        val selections by SelectionManager.selections.collectAsState()
+
         AmethystDevice(
             title = "Coordinate Filter",
-            deviceId = internalUUID,
+            isSelected = selections.contains(this),
             modifier = Modifier
                 .width(140.dp)
         ) {
