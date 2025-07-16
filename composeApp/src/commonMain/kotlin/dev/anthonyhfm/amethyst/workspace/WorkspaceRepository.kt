@@ -139,7 +139,9 @@ object WorkspaceRepository {
             device.apply { position.value = Offset(savedDevice.positionX, savedDevice.positionY) }
         }
 
-        updateWorkspaceBounds()
+        if (Heaven.devices.isNotEmpty()) {
+            updateWorkspaceBounds()
+        }
 
         _bpm.update {
             workspaceData.settings.bpm

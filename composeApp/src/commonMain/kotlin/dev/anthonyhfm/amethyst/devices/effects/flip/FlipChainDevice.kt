@@ -104,7 +104,9 @@ class FlipChainDevice : ChainDevice<FlipChainDeviceState>() {
             n.map {
                 when (state.value.mode) {
                     FlipChainDeviceState.FlipMode.HORIZONTAL -> {
-                        it.copy(y = bounds.first.y - it.y + bounds.second.height - 1)
+                        it.copy(
+                            y = bounds.first.y + bounds.second.height - 1 - it.y
+                        )
                     }
 
                     FlipChainDeviceState.FlipMode.VERTICAL -> {
