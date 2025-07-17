@@ -67,6 +67,7 @@ kotlin {
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.filekit.core)
             implementation(libs.dropdown)
+            implementation("com.mohamedrejeb.dnd:compose-dnd:0.4.0")
             kotlin("stdlib")
         }
         desktopMain.dependencies {

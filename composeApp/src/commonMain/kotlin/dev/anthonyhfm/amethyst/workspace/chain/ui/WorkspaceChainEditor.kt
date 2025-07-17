@@ -20,6 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
+import com.mohamedrejeb.compose.dnd.DragAndDropContainer
+import com.mohamedrejeb.compose.dnd.drag.DraggableItem
+import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
@@ -28,6 +31,7 @@ fun WorkspaceChainEditor(
     devices: List<ChainDevice<*>>,
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
+    val dragAndDropState = rememberDragAndDropState<ChainDevice<*>>()
     val scrollState = rememberScrollState()
 
     Column(
@@ -49,31 +53,44 @@ fun WorkspaceChainEditor(
                 .horizontalScroll(scrollState)
         ) {
             if (devices.isNotEmpty()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                DragAndDropContainer(
+                    state = dragAndDropState,
                 ) {
-                    HiddenDevicePickerButton(
-                        expanded = false,
-                        onAddComponent = {
-                            onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
-                        }
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HiddenDevicePickerButton(
+                            dragAndDropState = dragAndDropState,
+                            expanded = false,
+                            onAddComponent = {
+                                onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
+                            }
+                        )
 
-                    Row {
-                        devices.forEachIndexed { index, device ->
-                            device.Content()
-
-                            HiddenDevicePickerButton(
-                                expanded = index == devices.lastIndex,
-                                onAddComponent = {
-                                    onEvent(WorkspaceContract.Event.AddChainDevice(it, index + 1))
+                        Row {
+                            devices.forEachIndexed { index, device ->
+                                DraggableItem(
+                                    state = dragAndDropState,
+                                    key = device.selectionUUID,
+                                    data = device,
+                                ) {
+                                    device.Content()
                                 }
-                            )
+
+                                HiddenDevicePickerButton(
+                                    dragAndDropState = dragAndDropState,
+                                    expanded = index == devices.lastIndex,
+                                    onAddComponent = {
+                                        onEvent(WorkspaceContract.Event.AddChainDevice(it, index + 1))
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             } else {
                 HiddenDevicePickerButton(
+                    dragAndDropState = dragAndDropState,
                     expanded = true,
                     onAddComponent = {
                         onEvent(WorkspaceContract.Event.AddChainDevice(it))

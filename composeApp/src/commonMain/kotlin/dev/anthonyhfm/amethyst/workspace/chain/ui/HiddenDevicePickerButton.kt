@@ -26,12 +26,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.mohamedrejeb.compose.dnd.DragAndDropState
+import com.mohamedrejeb.compose.dnd.drop.dropTarget
+import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
 fun HiddenDevicePickerButton(
+    dragAndDropState: DragAndDropState<ChainDevice<*>> = rememberDragAndDropState(),
     expanded: Boolean = false,
     forceOff: Boolean = false,
     onAddComponent: (ChainDevice<*>) -> Unit
@@ -56,7 +62,14 @@ fun HiddenDevicePickerButton(
                     ).value
                 }
             )
-            .hoverable(interaction),
+            .hoverable(interaction)
+            .dropTarget(
+                state = dragAndDropState,
+                key = remember { UUID.randomUUID() },
+                onDrop = { state ->
+                    onAddComponent(state.data)
+                }
+            ),
 
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
