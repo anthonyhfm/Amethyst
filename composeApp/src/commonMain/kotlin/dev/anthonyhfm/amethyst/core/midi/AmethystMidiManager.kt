@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMK2
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMystrix
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePro
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
+import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePush2
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
 import dev.atsushieno.ktmidi.MidiInput
@@ -24,7 +25,8 @@ class AmethystMidiManager {
         LaunchpadDeviceType.LAUNCHPAD_PRO_CFW to { LaunchpadDevicePro.identifyCFW(it) },
         LaunchpadDeviceType.LAUNCHPAD_PRO to { LaunchpadDevicePro.identify(it) },
         LaunchpadDeviceType.LAUNCHPAD_MK2 to { LaunchpadDeviceMK2.identify(it) },
-        LaunchpadDeviceType.MYSTRIX to { LaunchpadDeviceMystrix.identify(it) }
+        LaunchpadDeviceType.MYSTRIX to { LaunchpadDeviceMystrix.identify(it) },
+        LaunchpadDeviceType.ABLETON_PUSH_2 to { LaunchpadDevicePush2.identify(it) },
     )
 
     @OptIn(ExperimentalUnsignedTypes::class)
@@ -76,6 +78,8 @@ class AmethystMidiManager {
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun getDeviceTypeByInquiry(data: ByteArray): LaunchpadDeviceType? {
+        println(data.toUByteArray().contentToString())
+
         val convertedData = data.toUByteArray()
         val messageStart = data.toUByteArray().indexOf(240u)
         val messageEnd = data.toUByteArray().indexOf(247u)

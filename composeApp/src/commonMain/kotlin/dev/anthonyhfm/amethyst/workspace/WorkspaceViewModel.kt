@@ -12,6 +12,7 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMK2
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMystrix
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePro
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
+import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePush2
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
@@ -310,5 +311,6 @@ private fun LaunchpadDeviceType.mapLaunchpadDevice(output: MidiOutput): Launchpa
         LaunchpadDeviceType.LAUNCHPAD_PRO_CFW -> LaunchpadDevicePro(output, true)
         LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(output)
         LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(output)
+        LaunchpadDeviceType.ABLETON_PUSH_2 -> LaunchpadDevicePush2(output)
     }
 }

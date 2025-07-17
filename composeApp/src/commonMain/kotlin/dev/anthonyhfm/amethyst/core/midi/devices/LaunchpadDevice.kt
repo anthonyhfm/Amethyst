@@ -45,4 +45,7 @@ enum class LaunchpadDeviceType(val label: String) {
     MYSTRIX(
         label = "Mystrix"
     ),
+    ABLETON_PUSH_2(
+        label = "Ableton Push 2"
+    ),
 }
