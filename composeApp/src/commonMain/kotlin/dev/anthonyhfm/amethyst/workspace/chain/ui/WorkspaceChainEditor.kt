@@ -24,6 +24,7 @@ import com.mohamedrejeb.compose.dnd.DragAndDropContainer
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
 @Composable
@@ -74,7 +75,13 @@ fun WorkspaceChainEditor(
                                     key = device.selectionUUID,
                                     data = device,
                                 ) {
-                                    device.Content()
+                                    if (device is GroupChainDevice) {
+                                        device.Content(
+                                            dragAndDropState = dragAndDropState
+                                        )
+                                    } else {
+                                        device.Content()
+                                    }
                                 }
 
                                 HiddenDevicePickerButton(

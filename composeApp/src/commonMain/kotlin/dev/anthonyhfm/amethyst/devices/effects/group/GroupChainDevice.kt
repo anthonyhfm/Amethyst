@@ -44,6 +44,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
+import com.mohamedrejeb.compose.dnd.DragAndDropContainer
+import com.mohamedrejeb.compose.dnd.DragAndDropState
+import com.mohamedrejeb.compose.dnd.drag.DraggableItem
+import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
@@ -76,7 +80,9 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
     }
 
     @Composable
-    override fun Content() {
+    fun Content(
+        dragAndDropState: DragAndDropState<ChainDevice<*>> = rememberDragAndDropState()
+    ) {
         val selections by SelectionManager.selections.collectAsState()
 
         Row(
@@ -106,7 +112,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
             key( // Trigger recomposition on selected group change
                 state.collectAsState().value
             ) {
-                GroupContent()
+                GroupContent(dragAndDropState)
             }
 
             Box(
@@ -118,6 +124,11 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                     .border(1.dp, MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
             )
         }
+    }
+
+    @Composable
+    override fun Content() {
+        Content(rememberDragAndDropState())
     }
 
     @Composable
@@ -265,12 +276,17 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
     }
 
     @Composable
-    private fun GroupContent() {
+    private fun GroupContent(dragAndDropState: DragAndDropState<ChainDevice<*>>) {
         val groupsState by state.collectAsState()
-        val effects by groupsState.groups[groupsState.selectionIndex].chain.devices
-        var isDraggingAny by remember { mutableStateOf(false) }
+        val devices by groupsState.groups[groupsState.selectionIndex].chain.devices
 
-        if (effects.isEmpty()) {
+        if (devices.isEmpty()) {
+            DragAndDropContainer(
+                state = dragAndDropState,
+            ) {
+
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -297,10 +313,23 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                     }
                 )
 
-                effects.forEachIndexed { index, device ->
-                    device.Content()
+                devices.forEachIndexed { index, device ->
+                    DraggableItem(
+                        state = dragAndDropState,
+                        key = device.selectionUUID,
+                        data = device,
+                    ) {
+                        if (device is GroupChainDevice) {
+                            device.Content(
+                                dragAndDropState = dragAndDropState
+                            )
+                        } else {
+                            device.Content()
+                        }
+                    }
 
                     HiddenDevicePickerButton(
+                        dragAndDropState = dragAndDropState,
                         onAddComponent = {
                             groupsState.groups[groupsState.selectionIndex].chain.add(it, index + 1)
                         }
