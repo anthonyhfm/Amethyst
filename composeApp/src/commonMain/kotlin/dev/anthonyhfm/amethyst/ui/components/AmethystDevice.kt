@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import org.koin.compose.koinInject
@@ -33,7 +34,6 @@ fun AmethystDevice(
 ) {
     val titleModifier = LocalTitleBarModifier.current.then(titleBarModifier)
 
-    // Bestimme Farben basierend auf Auswahlstatus
     val titleBarColor = if (isSelected) {
         MaterialTheme.colorScheme.primary
     } else {

@@ -208,14 +208,6 @@ class WorkspaceViewModel(
                 }
             }
 
-            is WorkspaceContract.Event.ReorderChainDevice -> {
-                if (state.value.mode is WorkspaceContract.WorkspaceMode.LightsChain) {
-                    WorkspaceRepository.lightsChain.reorderDevice(event.fromIndex, event.toIndex)
-                } else if (state.value.mode is WorkspaceContract.WorkspaceMode.SamplingChain) {
-                    WorkspaceRepository.samplingChain.reorderDevice(event.fromIndex, event.toIndex)
-                }
-            }
-
             is WorkspaceContract.Event.OnPressVirtualDevice -> {
                 when (state.value.mode) {
                     is KeyframesWorkspaceMode -> {

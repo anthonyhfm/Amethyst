@@ -35,9 +35,10 @@ import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
 @Composable
-fun HiddenDevicePickerButton(
+fun ExpandingChainDevicePicker(
     dragAndDropState: DragAndDropState<ChainDevice<*>> = rememberDragAndDropState(),
     expanded: Boolean = false,
     forceOff: Boolean = false,
@@ -69,7 +70,15 @@ fun HiddenDevicePickerButton(
                 state = dragAndDropState,
                 key = remember { UUID.randomUUID() },
                 onDrop = { state ->
-                    onAddComponent(state.data)
+                    onAddComponent(StateChain.unpackDevice(state.data.state.value))
+
+                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                        println("Removing from sampling heaven chain: ${state.data.selectionUUID}")
+                        WorkspaceRepository.samplingChain.heavenChain.remove(state.data.selectionUUID)
+                    } else {
+                        println("Removing from lights heaven chain: ${state.data.selectionUUID}")
+                        WorkspaceRepository.lightsChain.heavenChain.remove(state.data.selectionUUID)
+                    }
                 }
             ),
 

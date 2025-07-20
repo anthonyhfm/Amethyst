@@ -52,25 +52,4 @@ class WorkspaceChain(
     fun addDevice(device: ChainDevice<*>, atIndex: Int?) {
         heavenChain.add(device, atIndex)
     }
-
-    /**
-     * Reorders a device in the chain
-     *
-     * @param fromIndex the current index of the device to be moved
-     * @param toIndex the target index to which the device will be moved
-     */
-    fun reorderDevice(fromIndex: Int, toIndex: Int) {
-        if (fromIndex == toIndex) return
-
-        val devices = heavenChain.devices.value.toMutableList()
-        if (fromIndex < 0 || fromIndex >= devices.size || toIndex < 0 || toIndex >= devices.size) return
-
-        val device = devices.removeAt(fromIndex)
-        devices.add(toIndex, device)
-
-        // Update the devices list in the chain
-        heavenChain.devices.value = devices
-
-        heavenChain.reroute()
-    }
 }

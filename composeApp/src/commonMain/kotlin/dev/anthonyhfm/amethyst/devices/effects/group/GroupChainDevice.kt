@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -31,20 +30,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
-import com.mohamedrejeb.compose.dnd.DragAndDropContainer
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
@@ -56,16 +50,15 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuArea
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import dev.anthonyhfm.amethyst.workspace.chain.ui.HiddenDevicePickerButton
+import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
 import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.ReorderableRow
-import sh.calvin.reorderable.ReorderableScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
@@ -281,7 +274,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         val devices by groupsState.groups[groupsState.selectionIndex].chain.devices
 
         if (devices.isEmpty()) {
-            HiddenDevicePickerButton(
+            ExpandingChainDevicePicker(
                 expanded = true,
                 expandedWidth = 100.dp,
                 onAddComponent = {
@@ -294,7 +287,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                     .fillMaxHeight(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HiddenDevicePickerButton(
+                ExpandingChainDevicePicker(
                     onAddComponent = {
                         groupsState.groups[groupsState.selectionIndex].chain.add(it, 0)
                     }
@@ -306,16 +299,23 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                         key = device.selectionUUID,
                         data = device,
                     ) {
-                        if (device is GroupChainDevice) {
-                            device.Content(
-                                dragAndDropState = dragAndDropState
-                            )
-                        } else {
-                            device.Content()
+                        TitleBarModifierProvider(
+                            Modifier
+                                .rightClickable {
+                                    println(device.selectionUUID)
+                                }
+                        ) {
+                            if (device is GroupChainDevice) {
+                                device.Content(
+                                    dragAndDropState = dragAndDropState
+                                )
+                            } else {
+                                device.Content()
+                            }
                         }
                     }
 
-                    HiddenDevicePickerButton(
+                    ExpandingChainDevicePicker(
                         dragAndDropState = dragAndDropState,
                         onAddComponent = {
                             groupsState.groups[groupsState.selectionIndex].chain.add(it, index + 1)

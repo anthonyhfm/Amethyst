@@ -25,6 +25,7 @@ import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
 @Composable
@@ -60,7 +61,7 @@ fun WorkspaceChainEditor(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        HiddenDevicePickerButton(
+                        ExpandingChainDevicePicker(
                             dragAndDropState = dragAndDropState,
                             expanded = false,
                             onAddComponent = {
@@ -75,16 +76,23 @@ fun WorkspaceChainEditor(
                                     key = device.selectionUUID,
                                     data = device,
                                 ) {
-                                    if (device is GroupChainDevice) {
-                                        device.Content(
-                                            dragAndDropState = dragAndDropState
-                                        )
-                                    } else {
-                                        device.Content()
+                                    TitleBarModifierProvider(
+                                        Modifier
+                                            .rightClickable {
+                                                println(device.selectionUUID)
+                                            }
+                                    ) {
+                                        if (device is GroupChainDevice) {
+                                            device.Content(
+                                                dragAndDropState = dragAndDropState
+                                            )
+                                        } else {
+                                            device.Content()
+                                        }
                                     }
                                 }
 
-                                HiddenDevicePickerButton(
+                                ExpandingChainDevicePicker(
                                     dragAndDropState = dragAndDropState,
                                     expanded = index == devices.lastIndex,
                                     onAddComponent = {
@@ -96,7 +104,7 @@ fun WorkspaceChainEditor(
                     }
                 }
             } else {
-                HiddenDevicePickerButton(
+                ExpandingChainDevicePicker(
                     dragAndDropState = dragAndDropState,
                     expanded = true,
                     onAddComponent = {

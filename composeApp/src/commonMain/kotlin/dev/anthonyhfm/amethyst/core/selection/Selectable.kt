@@ -6,11 +6,13 @@ import dev.anthonyhfm.amethyst.core.util.randomUUID
 
 interface Selectable {
     val selectionUUID: String
-        get() = UUID.randomUUID()
 
-    data object VirtualViewportDevice : Selectable
+    data class VirtualViewportDevice(
+        override val selectionUUID: String = UUID.randomUUID()
+    ) : Selectable
 
     data class ChainDevice(
-        val parent: Chain
+        val parent: Chain,
+        override val selectionUUID: String = UUID.randomUUID()
     ) : Selectable
 }

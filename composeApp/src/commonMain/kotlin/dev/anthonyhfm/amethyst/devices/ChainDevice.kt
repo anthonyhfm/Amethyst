@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
 abstract class ChainDevice <State : @Serializable DeviceState> : SignalReceiver(), Selectable {
+    override val selectionUUID: String = UUID.randomUUID()
+
     abstract val state: MutableStateFlow<State>
 
     @Composable

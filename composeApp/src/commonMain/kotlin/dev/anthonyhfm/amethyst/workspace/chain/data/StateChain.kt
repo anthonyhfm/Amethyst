@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace.chain.data
 
 import dev.anthonyhfm.amethyst.core.heaven.elements.Chain
+import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
@@ -47,121 +48,7 @@ data class StateChain(
         val chain = Chain()
 
         devices.forEach { device ->
-            when (device) {
-                is CoordinateFilterChainDeviceState -> {
-                    CoordinateFilterChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is LayerFilterChainDeviceState -> {
-                    LayerFilterChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is DelayChainDeviceState -> {
-                    DelayChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is HoldChainDeviceState -> {
-                    HoldChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is LoopChainDeviceState -> {
-                    LoopChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is ColorChainDeviceState -> {
-                    ColorChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is GradientChainDeviceState -> {
-                    GradientChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is GroupChainDeviceState -> {
-                    GroupChainDevice().let {
-                        it.loadFromState(device)
-
-                        chain.add(it)
-                    }
-                }
-
-                is KeyframesChainDeviceContract.KeyframesChainDeviceState -> {
-                    KeyframesChainDevice().let {
-                        it.state.update { device }
-
-                        chain.add(it)
-                    }
-                }
-
-                is LayerChainDeviceState -> {
-                    LayerChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is OffsetChainDeviceState -> {
-                    OffsetChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is FlipChainDeviceState -> {
-                    FlipChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is RotateChainDeviceState -> {
-                    RotateChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is ClipChainDeviceState -> {
-                    ClipChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is MacroFilterChainDeviceState -> {
-                    MacroFilterChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-
-                is SwitchChainDeviceState -> {
-                    SwitchChainDevice().let {
-                        it.state.update { device }
-                        chain.add(it)
-                    }
-                }
-            }
+            chain.add(unpackDevice(device))
         }
 
         chain.reroute()
@@ -188,6 +75,108 @@ data class StateChain(
             )
 
             return stateChain
+        }
+
+        fun unpackDevice(device: DeviceState): ChainDevice<*> {
+            return when (device) {
+                is CoordinateFilterChainDeviceState -> {
+                    CoordinateFilterChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is LayerFilterChainDeviceState -> {
+                    LayerFilterChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is DelayChainDeviceState -> {
+                    DelayChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is HoldChainDeviceState -> {
+                    HoldChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is LoopChainDeviceState -> {
+                    LoopChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is ColorChainDeviceState -> {
+                    ColorChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is GradientChainDeviceState -> {
+                    GradientChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is GroupChainDeviceState -> {
+                    GroupChainDevice().apply {
+                        loadFromState(device)
+                    }
+                }
+
+                is KeyframesChainDeviceContract.KeyframesChainDeviceState -> {
+                    KeyframesChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is LayerChainDeviceState -> {
+                    LayerChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is OffsetChainDeviceState -> {
+                    OffsetChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is FlipChainDeviceState -> {
+                    FlipChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is RotateChainDeviceState -> {
+                    RotateChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is ClipChainDeviceState -> {
+                    ClipChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is MacroFilterChainDeviceState -> {
+                    MacroFilterChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is SwitchChainDeviceState -> {
+                    SwitchChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                else -> { throw IllegalArgumentException("Unknown device state: $device") }
+            }
         }
     }
 }
