@@ -411,17 +411,25 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
 
     fun duplicateGroup(index: Int) {
         val group = state.value.groups[index]
-        createGroup(index + 1)
 
         state.update {
-            it.copy(
+            val out = it.copy(
                 groups = it.groups.toMutableList().apply {
-                    this[index + 1] = Group(
-                        name = "Chain ${it.groups.size + 1}",
-                        chain = StateChain.pack(group.chain).unpack()
+                    add(
+                        index = index,
+                        element = Group(
+                            name = "Chain ${it.groups.size + 1}",
+                            chain = StateChain.pack(group.chain).unpack()
+                        )
                     )
                 }
             )
+
+            out.groups[index].chain.midiExit = {
+                midiExit?.invoke(it)
+            }
+
+            out
         }
     }
 
