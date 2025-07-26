@@ -14,6 +14,8 @@ data class SaveableWorkspaceData(
     val launchpadDevices: List<SavableViewportLaunchpad> = emptyList(),
     val macros: List<Macro> = listOf(Macro(1)),
     val audioClips: List<AudioClip> = emptyList(),
+    val author: String = "Unknown",
+    val version: String = "1.0.0",
     @Transient
     var path: String? = null, // This is not serialized, used for file operations
 ) {

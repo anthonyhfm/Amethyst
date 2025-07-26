@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.start
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.devices.DeviceStateSerializationModule
@@ -11,6 +12,7 @@ import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import io.github.vinceglb.filekit.core.FileKit
 import io.github.vinceglb.filekit.core.PickerMode
 import io.github.vinceglb.filekit.core.PickerType
+import io.github.vinceglb.filekit.core.extension
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -68,28 +70,28 @@ class StartWindowViewModel() : ViewModel() {
                 type = PickerType.File(
                     extensions = listOf(
                         "amproj",
+                        "zip",
+                        "als",
+                        "approj"
                     )
                 ),
                 mode = PickerMode.Single,
             )
 
-            file?.readBytes()?.let { bytes ->
-                val data = AmethystProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(bytes).apply {
-                    this.path = file.path
+            when (file?.extension?.lowercase()) {
+                "amproj" -> {
+                    openProjectFile(file.path!!)
                 }
 
-                if (file.path != null) {
-                    GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
-                        RecentWorkspace(
-                            title = data.title,
-                            path = file.path!!
-                        )
-                    ).toSet().toList()
+                "zip" -> {
+                    WorkspaceRepository.loadWorkspace(
+                        workspaceData = UnipadConverter.convertToWorkspace(file.path!!)
+                    )
+
+                    onOpenEditor?.invoke()
                 }
 
-                WorkspaceRepository.loadWorkspace(data)
-
-                onOpenEditor?.invoke()
+                else -> TODO("File format not yet supported: ${file?.extension}")
             }
         }
     }

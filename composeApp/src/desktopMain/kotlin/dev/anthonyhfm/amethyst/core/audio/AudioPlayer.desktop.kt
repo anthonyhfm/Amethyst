@@ -84,6 +84,28 @@ actual object AudioPlayer {
         }
     }
 
+    actual fun getAudioClip(data: ByteArray): AudioClip? {
+        ensureInitialized()
+        val audioId = UUID.randomUUID()
+
+        try {
+            val audioInfo = decodeAudioData(data)
+
+            val clip = AudioClip(
+                name = "Audio_${audioId.take(8)}",
+                length = audioInfo.duration,
+                data = data,
+                key = audioId
+            )
+
+            println("Audio loaded: $audioId (${audioInfo.duration}ms, ${audioInfo.format.sampleRate.toInt()}Hz)")
+
+            return clip
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
     actual fun playAudio(audioKey: String) {
         ensureInitialized()
         val loadedClip = audioClips[audioKey] ?: return
@@ -118,6 +140,15 @@ actual object AudioPlayer {
             clip.start()
         } catch (e: Exception) {
             println("Failed to play audio $audioKey: ${e.message}")
+        }
+    }
+
+    actual fun stopAudio(audioKey: String) {
+        ensureInitialized()
+
+        cleanupScope.launch {
+            delay(100)
+            playingClips.remove(audioKey)?.close()
         }
     }
 

@@ -11,4 +11,8 @@ expect object AudioPlayer {
     fun loadAudio(data: ByteArray, uuid: String? = null): String
     fun playAudio(audioKey: String)
     fun preloadFromAudioClip(audioClip: AudioClip)
+
+    fun stopAudio(audioKey: String)
+
+    fun getAudioClip(data: ByteArray): AudioClip?
 }
