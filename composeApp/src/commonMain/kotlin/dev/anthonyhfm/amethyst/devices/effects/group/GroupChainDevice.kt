@@ -88,7 +88,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         ) {
             AmethystDevice(
                 title = "Group",
-                isSelected = selections.contains(this@GroupChainDevice),
+                isSelected = selections.any { it.selectionUUID == this@GroupChainDevice.selectionUUID },
                 modifier = Modifier
                     .width(180.dp),
             ) {

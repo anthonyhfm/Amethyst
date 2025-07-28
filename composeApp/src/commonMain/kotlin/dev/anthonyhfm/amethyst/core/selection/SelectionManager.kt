@@ -15,5 +15,7 @@ object SelectionManager {
         if (selections.value.find { it.selectionUUID == element.selectionUUID } == null) {
             selections.value = selections.value + element
         }
+
+        println(selections.value)
     }
 }

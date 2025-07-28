@@ -38,7 +38,7 @@ class RotateChainDevice : ChainDevice<RotateChainDeviceState>() {
 
         AmethystDevice(
             title = "Rotate",
-            isSelected = selections.contains(this),
+            isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
                 .width(140.dp)

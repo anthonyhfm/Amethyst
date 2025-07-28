@@ -40,7 +40,7 @@ class LoopChainDevice : ChainDevice<LoopChainDeviceState>() {
 
         AmethystDevice(
             title = "Loop",
-            isSelected = selections.contains(this),
+            isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier.width(200.dp)
         ) {
