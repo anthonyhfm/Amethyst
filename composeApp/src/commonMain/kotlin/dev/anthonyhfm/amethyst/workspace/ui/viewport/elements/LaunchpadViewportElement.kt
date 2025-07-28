@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shape
 import dev.anthonyhfm.amethyst.core.midi.data.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.heaven.elements.Screen
+import dev.anthonyhfm.amethyst.core.selection.Selectable
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
@@ -26,13 +27,13 @@ import kotlinx.coroutines.launch
 
 abstract class LaunchpadViewportElement(
     override var position: MutableState<Offset> = mutableStateOf(Offset(0f, 0f)),
-) : ViewportElement {
+) : ViewportElement, Selectable {
     abstract val name: String
     abstract override var shape: Shape
     abstract override var size: Size
     abstract val layout: LaunchpadLayout
 
-    internal val internalUUID = UUID.randomUUID()
+    override val selectionUUID: String = UUID.randomUUID()
 
     val renderScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 

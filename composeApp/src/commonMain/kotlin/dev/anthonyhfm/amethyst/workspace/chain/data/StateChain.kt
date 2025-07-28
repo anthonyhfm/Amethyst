@@ -29,6 +29,8 @@ import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
@@ -61,13 +63,9 @@ data class StateChain(
             val stateChain = StateChain(
                 devices = chain.devices.value.map {
                     if (it is GroupChainDevice) {
-                        it.state.value.copy(
-                            groups = it.state.value.groups.map { group ->
-                                group.copy(
-                                    stateChain = pack(group.chain)
-                                )
-                            }
-                        )
+                        it.packState()
+                    } else if (it is MultiGroupChainDevice) {
+                        it.packState()
                     } else {
                         it.state.value
                     }
@@ -123,6 +121,12 @@ data class StateChain(
 
                 is GroupChainDeviceState -> {
                     GroupChainDevice().apply {
+                        loadFromState(device)
+                    }
+                }
+
+                is MultiGroupChainDeviceState -> {
+                    MultiGroupChainDevice().apply {
                         loadFromState(device)
                     }
                 }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,7 +29,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import dev.anthonyhfm.amethyst.core.selection.Selectable
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -44,6 +48,7 @@ fun WorkspaceViewport(
     val gridSize = (40 * density).toInt()
     val color = MaterialTheme.colorScheme.onSurface.copy(0.2f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
+    val selections by SelectionManager.selections.collectAsState()
 
     Box(
         modifier = modifier
@@ -66,7 +71,12 @@ fun WorkspaceViewport(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
                 ) {
-                    onEvent(WorkspaceContract.Event.OnSelectDevice(null))
+                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Layout) {
+                        if (SelectionManager.selections.value.any { it is Selectable.VirtualViewportDevice }) {
+                            SelectionManager.clear()
+                        }
+                    }
+
                 }
         ) {
             for (x in ((viewportState.offset.x % gridSize).toInt() - gridSize) until size.width.toInt() step gridSize) {
@@ -81,6 +91,7 @@ fun WorkspaceViewport(
         }
         elements.forEachIndexed { index, element ->
             var draggingOffset by remember { mutableStateOf(Offset.Zero) }
+            val selected = selections.any { it.selectionUUID == element.selectionUUID }
 
             BoxWithConstraints(
                 modifier = Modifier
@@ -91,7 +102,7 @@ fun WorkspaceViewport(
                     }
                     .scale(1f)
                     .then(
-                        other = if (viewportState.selectedElement == index) {
+                        other = if (selected) {
                             Modifier
                                 .border(2.dp, MaterialTheme.colorScheme.primary, element.shape)
                         } else Modifier
@@ -99,7 +110,13 @@ fun WorkspaceViewport(
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = {
-                                onEvent(WorkspaceContract.Event.OnSelectDevice(index))
+                                if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Layout) {
+                                    SelectionManager.select(
+                                        Selectable.VirtualViewportDevice(
+                                            element = element as LaunchpadViewportElement
+                                        )
+                                    )
+                                }
                             },
                             onDrag = { input, offset ->
                                 input.consume()
@@ -146,7 +163,13 @@ fun WorkspaceViewport(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
                     ) {
-                        onEvent(WorkspaceContract.Event.OnSelectDevice(index))
+                        if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Layout) {
+                            SelectionManager.select(
+                                Selectable.VirtualViewportDevice(
+                                    element = element as LaunchpadViewportElement
+                                )
+                            )
+                        }
                     }
             ) {
                 if (element is LaunchpadViewportElement) {
@@ -154,7 +177,7 @@ fun WorkspaceViewport(
                         element.indexInViewport = index
                     }
 
-                    if (viewportState.selectedElement == index) {
+                    if (selected) {
                         Row(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)

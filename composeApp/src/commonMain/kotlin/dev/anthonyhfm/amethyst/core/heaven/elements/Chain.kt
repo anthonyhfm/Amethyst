@@ -56,18 +56,6 @@ class Chain : SignalReceiver() {
     fun remove(uuid: String) {
         devices.value = devices.value.toMutableList().apply {
             removeAll { it.selectionUUID == uuid }
-        }.map {
-            when (it) {
-                is GroupChainDevice -> {
-                    it.apply {
-                        state.value.groups.forEach { group ->
-                            group.chain.remove(uuid)
-                        }
-                    }
-                }
-
-                else -> it
-            }
         }
 
         reroute()

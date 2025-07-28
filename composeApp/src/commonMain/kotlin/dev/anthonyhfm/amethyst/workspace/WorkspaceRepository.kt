@@ -45,16 +45,11 @@ object WorkspaceRepository {
     private val _bpm = MutableStateFlow(120.00)
     val bpm: StateFlow<Double> = _bpm.asStateFlow()
 
-    private val _selectionUUID: MutableStateFlow<String?> = MutableStateFlow(null)
-    val selectionUUID: StateFlow<String?> = _selectionUUID.asStateFlow()
-
     // Keep track of the previous mode
     private var previousMode: WorkspaceContract.WorkspaceMode = WorkspaceContract.WorkspaceMode.Layout()
 
     fun switchMode(mode: WorkspaceContract.WorkspaceMode) {
         previousMode = _mode.value
-
-        _selectionUUID.update { null }
 
         _mode.update {
             mode
@@ -62,8 +57,6 @@ object WorkspaceRepository {
     }
 
     fun switchToPreviousMode() {
-        _selectionUUID.update { null }
-
         _mode.update {
             previousMode
         }
@@ -72,12 +65,6 @@ object WorkspaceRepository {
     fun setBpm(bpm: Double) {
         _bpm.update {
             bpm
-        }
-    }
-
-    fun setSelection(uuid: String?) {
-        _selectionUUID.update {
-            uuid
         }
     }
 

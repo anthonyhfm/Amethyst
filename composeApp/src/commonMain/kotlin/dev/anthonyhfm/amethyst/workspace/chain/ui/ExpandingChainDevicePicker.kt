@@ -35,6 +35,8 @@ import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -77,6 +79,8 @@ fun ExpandingChainDevicePicker(
                         StateChain.unpackDevice(
                             if (state.data.state.value is GroupChainDeviceState) {
                                 (state.data as GroupChainDevice).packState()
+                            } else if (state.data.state.value is MultiGroupChainDeviceState) {
+                                (state.data as MultiGroupChainDevice).packState()
                             } else {
                                 state.data.state.value
                             }

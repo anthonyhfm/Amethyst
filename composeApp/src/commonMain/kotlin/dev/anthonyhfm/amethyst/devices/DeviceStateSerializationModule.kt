@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
@@ -30,6 +31,7 @@ val DeviceStateSerializationModule = SerializersModule {
         subclass(FlipChainDeviceState::class)
         subclass(GradientChainDeviceState::class)
         subclass(GroupChainDeviceState::class)
+        subclass(MultiGroupChainDeviceState::class)
         subclass(HoldChainDeviceState::class)
         subclass(KeyframesChainDeviceContract.KeyframesChainDeviceState::class)
         subclass(LayerChainDeviceState::class)

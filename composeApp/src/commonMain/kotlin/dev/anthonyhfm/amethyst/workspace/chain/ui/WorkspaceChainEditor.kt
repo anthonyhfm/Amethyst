@@ -30,6 +30,7 @@ import dev.anthonyhfm.amethyst.core.selection.Selectable
 import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.DeviceDraggingPreview
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
@@ -107,12 +108,22 @@ fun WorkspaceChainEditor(
                                             device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
                                         }
 
-                                        if (device is GroupChainDevice) {
-                                            device.Content(
-                                                dragAndDropState = dragAndDropState
-                                            )
-                                        } else {
-                                            device.Content()
+                                        when (device) {
+                                            is GroupChainDevice -> {
+                                                device.Content(
+                                                    dragAndDropState = dragAndDropState
+                                                )
+                                            }
+
+                                            is MultiGroupChainDevice -> {
+                                                device.Content(
+                                                    dragAndDropState = dragAndDropState
+                                                )
+                                            }
+
+                                            else -> {
+                                                device.Content()
+                                            }
                                         }
                                     }
                                 }

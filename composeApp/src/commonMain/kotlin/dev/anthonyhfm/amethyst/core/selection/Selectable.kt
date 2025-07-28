@@ -3,12 +3,14 @@ package dev.anthonyhfm.amethyst.core.selection
 import dev.anthonyhfm.amethyst.core.heaven.elements.Chain
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
 interface Selectable {
     val selectionUUID: String
 
     data class VirtualViewportDevice(
-        override val selectionUUID: String = UUID.randomUUID()
+        val element: LaunchpadViewportElement,
+        override val selectionUUID: String = element.selectionUUID
     ) : Selectable
 
     data class ChainDevice(

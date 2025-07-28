@@ -16,7 +16,6 @@ interface WorkspaceContract {
         data object OnDismissDeviceConfigure : Event
 
         data class ChangeWorkspaceMode(val mode: WorkspaceMode) : Event
-        data class OnSelectDevice(val index: Int?) : Event
         data class ChangeViewportElementPosition(
             val index: Int,
             val offset: Offset
@@ -48,8 +47,7 @@ interface WorkspaceContract {
 
     data class ViewportState(
         val offset: Offset = Offset.Zero,
-        val zoom: Float = 1f,
-        val selectedElement: Int? = null,
+        val zoom: Float = 1f
     )
 
     interface WorkspaceMode {

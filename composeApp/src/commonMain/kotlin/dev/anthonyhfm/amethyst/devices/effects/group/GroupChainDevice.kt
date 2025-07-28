@@ -49,6 +49,7 @@ import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuArea
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuItem
@@ -79,6 +80,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         dragAndDropState: DragAndDropState<ChainDevice<*>> = rememberDragAndDropState()
     ) {
         val selections by SelectionManager.selections.collectAsState()
+        val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
         Row(
             modifier = Modifier
@@ -88,7 +90,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         ) {
             AmethystDevice(
                 title = "Group",
-                isSelected = selections.any { it.selectionUUID == this@GroupChainDevice.selectionUUID },
+                isSelected = isSelected,
                 modifier = Modifier
                     .width(180.dp),
             ) {
@@ -97,7 +99,15 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                         modifier = Modifier
                             .fillMaxHeight()
                             .width(28.dp)
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .then(
+                                if (isSelected) {
+                                    Modifier
+                                        .background(MaterialTheme.colorScheme.primary)
+                                } else {
+                                    Modifier
+                                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                                }
+                            )
                     )
 
                     GroupList()
@@ -115,8 +125,17 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                     .clip(RoundedCornerShape(6.dp))
                     .fillMaxHeight()
                     .width(28.dp)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .border(1.dp, MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
+                    .then(
+                        if (isSelected) {
+                            Modifier
+                                .background(MaterialTheme.colorScheme.primary)
+                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
+                        } else {
+                            Modifier
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .border(1.dp, MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
+                        }
+                    )
             )
         }
     }
@@ -318,12 +337,22 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                                 device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
                             }
 
-                            if (device is GroupChainDevice) {
-                                device.Content(
-                                    dragAndDropState = dragAndDropState
-                                )
-                            } else {
-                                device.Content()
+                            when (device) {
+                                is GroupChainDevice -> {
+                                    device.Content(
+                                        dragAndDropState = dragAndDropState
+                                    )
+                                }
+
+                                is MultiGroupChainDevice -> {
+                                    device.Content(
+                                        dragAndDropState = dragAndDropState
+                                    )
+                                }
+
+                                else -> {
+                                    device.Content()
+                                }
                             }
                         }
                     }
@@ -444,27 +473,6 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
 
             out
         }
-    }
-
-    /**
-     * Reorders a device within a group
-     *
-     * @param groupIndex the index of the group containing the devices
-     * @param fromIndex the current index of the device to be moved
-     * @param toIndex the target index to which the device will be moved
-     */
-    fun reorderDeviceInGroup(groupIndex: Int, fromIndex: Int, toIndex: Int) {
-        if (fromIndex == toIndex) return
-
-        val chain = state.value.groups[groupIndex].chain
-        val devices = chain.devices.value.toMutableList()
-
-        if (fromIndex < 0 || fromIndex >= devices.size || toIndex < 0 || toIndex >= devices.size) return
-
-        val device = devices.removeAt(fromIndex)
-        devices.add(toIndex, device)
-
-        chain.devices.value = devices
     }
 
     fun loadFromState(state: GroupChainDeviceState) {

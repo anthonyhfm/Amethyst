@@ -5,31 +5,25 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.core.selection.Selectable
+import dev.anthonyhfm.amethyst.core.selection.SelectionManager
 
 object ChainModeKeyHandler {
     fun handleKeyInput(keyEvent: KeyEvent): Boolean {
-
         if (keyEvent.type == KeyEventType.KeyUp) {
             when (keyEvent.key) {
                 Key.Backspace, Key.Delete -> {
-                    val selection = WorkspaceRepository.selectionUUID.value
-                    val mode = WorkspaceRepository.mode.value
+                    val selections = SelectionManager.selections.value.filter { it is Selectable.ChainDevice }
 
-                    selection?.let { selection ->
-                        if (mode is WorkspaceContract.WorkspaceMode.LightsChain) {
-                            WorkspaceRepository.lightsChain.heavenChain.remove(selection)
-                        } else if (mode is WorkspaceContract.WorkspaceMode.SamplingChain) {
-                            WorkspaceRepository.samplingChain.heavenChain.remove(selection)
-                        }
+                    selections.forEach { selection ->
+                        (selection as Selectable.ChainDevice).parent.remove(selection.device.selectionUUID)
 
-                        return true
+                        SelectionManager.clear()
                     }
                 }
 
                 Key.Escape -> {
-                    WorkspaceRepository.setSelection(null)
+                    SelectionManager.clear()
                 }
             }
         }

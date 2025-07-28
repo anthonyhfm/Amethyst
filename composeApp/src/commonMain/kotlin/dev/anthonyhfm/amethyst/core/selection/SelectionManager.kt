@@ -15,7 +15,9 @@ object SelectionManager {
         if (selections.value.find { it.selectionUUID == element.selectionUUID } == null) {
             selections.value = selections.value + element
         }
+    }
 
-        println(selections.value)
+    fun clear() {
+        selections.value = emptyList()
     }
 }

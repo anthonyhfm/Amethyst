@@ -89,12 +89,7 @@ class WorkspaceViewModel(
                 }
 
                 state.update {
-                    it.copy(
-                        mode = newMode,
-                        viewportState = it.viewportState.copy(
-                            selectedElement = null
-                        )
-                    )
+                    it.copy(mode = newMode,)
                 }
             }
         }
@@ -179,18 +174,6 @@ class WorkspaceViewModel(
                     it.copy(
                         showDeviceConfigurator = null
                     )
-                }
-            }
-
-            is WorkspaceContract.Event.OnSelectDevice -> {
-                if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
-                    state.update {
-                        it.copy(
-                            viewportState = it.viewportState.copy(
-                                selectedElement = event.index
-                            )
-                        )
-                    }
                 }
             }
 

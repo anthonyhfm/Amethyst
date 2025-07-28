@@ -29,6 +29,7 @@ import androidx.compose.material.icons.twotone.ShapeLine
 import androidx.compose.material.icons.twotone.Timeline
 import androidx.compose.material.icons.twotone.Timer
 import androidx.compose.material.icons.twotone.Transform
+import androidx.compose.material.icons.twotone._123
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -52,6 +53,7 @@ import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDevice
@@ -70,6 +72,10 @@ fun getLightsMenu(): MenuItem<String> {
 
             item("device_group", "Group") {
                 icon(Icons.TwoTone.Group)
+            }
+
+            item("device_multi", "Multi") {
+                icon(Icons.TwoTone._123)
             }
         }
         item("cat_filter", "Filter") {
@@ -155,6 +161,18 @@ fun getLightsMenu(): MenuItem<String> {
 
 fun getSamplingMenu(): MenuItem<String> {
     return dropDownMenu {
+        item("cat_container", "Container") {
+            icon(Icons.TwoTone.DataArray)
+
+            item("device_group", "Group") {
+                icon(Icons.TwoTone.Group)
+            }
+
+            item("device_multi", "Multi") {
+                icon(Icons.TwoTone._123)
+            }
+        }
+
         item("cat_audio", "Audio") {
             icon(Icons.TwoTone.Audiotrack)
 
@@ -163,13 +181,6 @@ fun getSamplingMenu(): MenuItem<String> {
             }
         }
 
-        item("cat_container", "Container") {
-            icon(Icons.TwoTone.DataArray)
-
-            item("device_group", "Group") {
-                icon(Icons.TwoTone.Group)
-            }
-        }
         item("cat_filter", "Filter") {
             icon(Icons.TwoTone.Filter)
 
@@ -221,6 +232,7 @@ fun ChainDevicePicker(
         "device_delay" to DelayChainDevice(),
         "device_gradient" to GradientChainDevice(),
         "device_group" to GroupChainDevice(),
+        "device_multi" to MultiGroupChainDevice(),
         "device_keyframes" to KeyframesChainDevice(),
         "device_layer" to LayerChainDevice(),
         "device_layer_filter" to LayerFilterChainDevice(),
