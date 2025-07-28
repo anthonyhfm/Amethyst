@@ -301,7 +301,10 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                     if (previousFrame != null) {
                         val cleared = previousFrame.entries.filter { prev ->
                             frame.entries.none { it.x == prev.x && it.y == prev.y }
-                        }.map { it.toOffSignal() }
+                        }.map {
+                            it.toOffSignal()
+                        }
+
                         addAll(cleared)
                     }
                 }

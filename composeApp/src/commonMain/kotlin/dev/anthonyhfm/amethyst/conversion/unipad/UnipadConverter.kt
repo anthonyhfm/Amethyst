@@ -41,7 +41,7 @@ object UnipadConverter : AmethystConverter {
                     type = SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
                 )
             ),
-            audioClips = clipMap.values.filter { it != null }.map { it!! },
+            audioClips = clipMap.values.map { it!! },
         )
     }
 
