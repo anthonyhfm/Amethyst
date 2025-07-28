@@ -3,45 +3,52 @@ package dev.anthonyhfm.amethyst.core.heaven
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.heaven.elements.Screen
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevice
-import dev.anthonyhfm.amethyst.core.util.StopWatch
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.core.util.StopWatch
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.collections.ArrayList
-import kotlin.collections.MutableList
-import kotlin.collections.mutableMapOf
+import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.max
 
 object Heaven {
     var devices: List<LaunchpadViewportElement> = emptyList()
+        set(value) {
+            field = value
+            wake()
+        }
 
-    private val signalQueue: MutableList<List<Signal>> = mutableListOf()
-    private val jobs: MutableMap<Long, MutableList<() -> Unit>> = mutableMapOf()
-    private val jobQueue: MutableList<Pair<Long, () -> Unit>> = mutableListOf()
+    private val signalQueue = Channel<List<Signal>>(UNLIMITED)
+    private val jobQueue = Channel<Pair<Long, () -> Unit>>(UNLIMITED)
+
+    private val jobsMutex = Mutex()
+    private val jobsList = mutableListOf<Pair<Long, MutableList<() -> Unit>>>()
+
+    @Volatile
+    private var prev: Long = 0L
+
+    @Volatile
+    private var lastRender: Long = -1L
+
+    @Volatile
+    private var renderAt: Long = -1L
 
     private val deviceMutex = Mutex()
-    private val signalMutex = Mutex()
-    private val jobMutex = Mutex()
 
-    private var prev: Long = 0L
-    private var lastRender: Long = -1L
-    private var renderAt: Long = -1L
     var fps: Int = GlobalSettings.perforanceFPS
 
     private val stopWatch = StopWatch()
-    private val renderScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val renderScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private fun msToTicks(ms: Double): Long = (ms / 1000 * stopWatch.frequency).toLong()
 
     fun midiEnter(signals: List<Signal>) {
         renderScope.launch {
-            signalMutex.withLock {
-                signalQueue.add(signals)
-            }
+            signalQueue.send(signals)
         }
         wake()
     }
@@ -49,14 +56,12 @@ object Heaven {
     fun schedule(delayInMs: Double, job: () -> Unit) {
         val targetTime = prev + msToTicks(delayInMs)
         renderScope.launch {
-            jobMutex.withLock {
-                jobQueue.add(targetTime to job)
-            }
+            jobQueue.send(targetTime to job)
         }
         wake()
     }
 
-    private var renderJob: Job? = null
+    @Volatile private var renderJob: Job? = null
     private val isAwake: Boolean get() = renderJob?.isActive == true
 
     val time: Double
@@ -65,7 +70,6 @@ object Heaven {
             return prev * 1000.0 / stopWatch.frequency
         }
 
-    @OptIn(DelicateCoroutinesApi::class)
     private fun wake() {
         if (isAwake) return
 
@@ -74,72 +78,24 @@ object Heaven {
         renderJob = renderScope.launch {
             try {
                 while (true) {
-                    prev = max(0, stopWatch.elapsedTicks())
+                    val hasNewJobs = processJobQueue()
 
-                    if (renderAt < 0 && jobQueue.isEmpty() && jobs.isEmpty() && signalQueue.isEmpty()) {
-                        delay(1)
-                        continue
-                    }
+                    val hasWork = renderAt >= 0 || hasNewJobs ||
+                            jobsList.isNotEmpty() || !signalQueue.isEmpty
 
-                    jobMutex.withLock {
-                        while (jobQueue.isNotEmpty()) {
-                            val (targetTime, job) = jobQueue.removeFirstOrNull() ?: continue
-                            jobs.getOrPut(targetTime) { ArrayList() }.add(job)
+                    if (!hasWork) {
+                        delay(10)
+                        if (renderAt < 0 && jobsList.isEmpty() &&
+                            jobQueue.isEmpty && signalQueue.isEmpty) {
+                            break
                         }
                     }
 
-                    prev = max(0, stopWatch.elapsedTicks())
+                    prev = stopWatch.elapsedTicks()
 
-                    jobMutex.withLock {
-                        val keysToProcess = jobs.keys.filter { it <= prev }.toList()
-                        keysToProcess.forEach { key ->
-                            val jobList = jobs[key]
-                            if (jobList != null) {
-                                jobList.forEach {
-                                    try {
-                                        it.invoke()
-                                    } catch (e: Exception) {
-                                        println("Error executing job: ${e.message}")
-                                    }
-                                }
-                                jobs.remove(key)
-                            }
-                        }
-                    }
+                    executeReadyJobs(prev)
 
-                    var changed = false
-
-                    signalMutex.withLock {
-                        while (signalQueue.isNotEmpty()) {
-                            val signals = signalQueue.removeFirstOrNull() ?: continue
-
-                            signals.forEach { signal ->
-                                deviceMutex.withLock {
-                                    devices.forEach { device ->
-                                        if (signal.x in device.position.value.x.toInt() until device.position.value.x.toInt() + device.layout.x &&
-                                            signal.y in device.position.value.y.toInt() until device.position.value.y.toInt() + device.layout.y) {
-
-                                            val posX = signal.x - device.position.value.x.toInt() + device.layout.offsetX
-                                            val posY = abs(signal.y - 9 - device.position.value.y.toInt())
-
-                                            renderScope.launch {
-                                                try {
-                                                    device.screen.midiEnter(signal.copy(
-                                                        x = posX,
-                                                        y = posY
-                                                    ))
-                                                } catch (e: Exception) {
-                                                    println("Error in midiEnter: ${e.message}")
-                                                }
-                                            }
-
-                                            changed = true
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    val changed = processSignals()
 
                     if (changed && renderAt < 0) {
                         renderAt = max(
@@ -148,17 +104,15 @@ object Heaven {
                         )
                     } else if (renderAt >= 0 && prev > renderAt) {
                         Screen.draw()
-
                         lastRender = prev
                         renderAt = -1L
                     }
 
-                    delay(1)
+                    yield()
+                }
 
-                    if (renderAt < 0 && jobQueue.isEmpty() && jobs.isEmpty() && signalQueue.isEmpty()) {
-                        Screen.draw()
-                        lastRender = prev
-                    }
+                if (lastRender < prev) {
+                    Screen.draw()
                 }
             } catch (e: Exception) {
                 println("RenderJob Exception: ${e.message}")
@@ -167,21 +121,142 @@ object Heaven {
         }
     }
 
+    private suspend fun processJobQueue(): Boolean {
+        var processed = false
+
+        while (!jobQueue.isEmpty) {
+            val (targetTime, job) = jobQueue.tryReceive().getOrNull() ?: break
+
+            jobsMutex.withLock {
+                val insertIndex = findInsertPosition(targetTime)
+
+                if (insertIndex < jobsList.size && jobsList[insertIndex].first == targetTime) {
+                    jobsList[insertIndex].second.add(job)
+                } else {
+                    jobsList.add(insertIndex, targetTime to mutableListOf(job))
+                }
+            }
+
+            processed = true
+        }
+
+        return processed
+    }
+
+    private fun findInsertPosition(targetTime: Long): Int {
+        var low = 0
+        var high = jobsList.size
+
+        while (low < high) {
+            val mid = (low + high) / 2
+            if (jobsList[mid].first < targetTime) {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+
+        return low
+    }
+
+    private suspend fun executeReadyJobs(currentTime: Long) {
+        val jobsToExecute = jobsMutex.withLock {
+            val result = mutableListOf<() -> Unit>()
+            var splitIndex = 0
+
+            for (i in jobsList.indices) {
+                if (jobsList[i].first <= currentTime) {
+                    result.addAll(jobsList[i].second)
+                    splitIndex++
+                } else {
+                    break
+                }
+            }
+
+            if (splitIndex > 0) {
+                jobsList.subList(0, splitIndex).clear()
+            }
+
+            result
+        }
+
+        jobsToExecute.forEach { job ->
+            try {
+                job.invoke()
+            } catch (e: Exception) {
+                println("Error executing job: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun processSignals(): Boolean {
+        var changed = false
+
+        while (!signalQueue.isEmpty) {
+            val signals = signalQueue.tryReceive().getOrNull() ?: break
+
+            data class MidiCall(val device: LaunchpadViewportElement, val signal: Signal)
+            val midiCalls = mutableListOf<MidiCall>()
+
+            deviceMutex.withLock {
+                val currentDevices = devices
+
+                signals.forEach { signal ->
+                    currentDevices.forEach { device ->
+                        if (isSignalInDevice(signal, device)) {
+                            val posX = signal.x - device.position.value.x.toInt() + device.layout.offsetX
+                            val posY = abs(signal.y - 9 - device.position.value.y.toInt())
+
+                            midiCalls.add(MidiCall(
+                                device,
+                                signal.copy(x = posX, y = posY)
+                            ))
+
+                            changed = true
+                        }
+                    }
+                }
+            }
+
+            midiCalls.forEach { (device, signal) ->
+                device.screen.midiEnter(signal)
+            }
+        }
+
+        return changed
+    }
+
+    private fun isSignalInDevice(signal: Signal, device: LaunchpadViewportElement): Boolean {
+        val deviceX = device.position.value.x.toInt()
+        val deviceY = device.position.value.y.toInt()
+        return signal.x in deviceX until deviceX + device.layout.x &&
+                signal.y in deviceY until deviceY + device.layout.y
+    }
+
     fun clear() {
         renderScope.launch {
             deviceMutex.withLock {
                 devices.forEach { it.screen.clear() }
             }
-            signalMutex.withLock {
-                signalQueue.clear()
+
+            while (!signalQueue.isEmpty) {
+                signalQueue.tryReceive()
             }
-            jobMutex.withLock {
-                jobs.clear()
-                jobQueue.clear()
+            while (!jobQueue.isEmpty) {
+                jobQueue.tryReceive()
             }
+
+            jobsMutex.withLock {
+                jobsList.clear()
+            }
+
             prev = 0L
             lastRender = -1L
             renderAt = -1L
         }
+    }
+
+    fun shutdown() {
+        renderScope.cancel()
     }
 }

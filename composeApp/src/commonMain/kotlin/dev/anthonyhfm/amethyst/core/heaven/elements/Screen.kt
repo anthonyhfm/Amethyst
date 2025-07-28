@@ -1,20 +1,18 @@
 package dev.anthonyhfm.amethyst.core.heaven.elements
 
 import androidx.compose.ui.graphics.Color
+import dev.anthonyhfm.amethyst.core.heaven.utils.SortedList
 import kotlinx.atomicfu.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import dev.anthonyhfm.amethyst.core.heaven.utils.SortedList
 
 class Screen : AutoCloseable {
     private class Pixel(
         private val index: Byte
     ) {
-        // Use high-performance SortedList (equivalent to C# SortedList)
         private val signals = SortedList<Int, Signal>()
         private val currentColor = atomic(Color.Black)
 
-        // Use Mutex for cross-platform compatibility
         private val locker = Mutex()
 
         suspend fun clear() = locker.withLock {
@@ -26,11 +24,9 @@ class Screen : AutoCloseable {
         suspend fun getColor(): Color = locker.withLock {
             var ret = Color.Black
 
-            // Use direct indexed access for maximum performance (like C#)
             for (i in 0 until signals.size) {
                 val signal = signals.getValueAt(i)
 
-                // Implement C# blending logic exactly
                 if (signal.blendingMode != BlendingMode.Normal &&
                     (i == signals.size - 1 ||
                      signal.layer - signals.getValueAt(i + 1).layer > signal.blendingRange)) {
