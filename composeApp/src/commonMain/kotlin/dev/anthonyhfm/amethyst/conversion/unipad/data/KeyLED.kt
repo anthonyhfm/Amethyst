@@ -81,7 +81,7 @@ object KeyLED {
                     if (inst[1] == "mc") { // Side buttons
                         currentFrame = currentFrame.copy(
                             entries = currentFrame.entries.filter {
-                                it.x != mcCoordinates[inst[2].toInt()].first || it.y != mcCoordinates[inst[2].toInt()].second
+                                (it.x != mcCoordinates[inst[2].toInt()].first || it.y != mcCoordinates[inst[2].toInt()].second)
                             }.plus(
                                 KeyframesChainDeviceContract.KeyframesEntry(
                                     x = mcCoordinates[inst[2].toInt()].first,
@@ -98,7 +98,7 @@ object KeyLED {
 
                         currentFrame = currentFrame.copy(
                             entries = currentFrame.entries.filter {
-                                it.x != x || it.y != y
+                                (it.x != x || it.y != y)
                             }.plus(
                                 KeyframesChainDeviceContract.KeyframesEntry(
                                     x = x,

@@ -296,7 +296,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                 animationMs += deltaMs
 
                 val signals = buildList {
-                    addAll(frame.entries.map { it.toSignal() })
+                    addAll(frame.entries.filter { !(previousFrame?.entries?.contains(it) ?: false) }.map { it.toSignal() })
 
                     if (previousFrame != null) {
                         val cleared = previousFrame.entries.filter { prev ->
