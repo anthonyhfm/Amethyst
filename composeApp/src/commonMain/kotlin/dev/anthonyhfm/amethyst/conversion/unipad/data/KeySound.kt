@@ -24,12 +24,12 @@ import kotlinx.coroutines.runBlocking
 object KeySound {
     @OptIn(DelicateCoroutinesApi::class)
     fun loadAllAudioClips(zipFile: String): MutableMap<String, AudioClip?> {
-        val entries = Zip.getEntries(zipFile).filter { it.path.startsWith("Sounds/") && !it.isDirectory }
+        val entries = Zip.getEntries(zipFile).filter { (it.path.startsWith("Sounds/") || it.path.startsWith("sounds/")) && !it.isDirectory }
         val clipMap: MutableMap<String, AudioClip?> = mutableMapOf()
         val scope = CoroutineScope(Dispatchers.IO.limitedParallelism(4))
 
         entries.forEach { entry ->
-            val clipName = entry.path.removePrefix("Sounds/").trim()
+            val clipName = entry.path.removePrefix("Sounds/").removePrefix("sounds/").trim()
             clipMap[clipName] = null
 
             scope.launch {

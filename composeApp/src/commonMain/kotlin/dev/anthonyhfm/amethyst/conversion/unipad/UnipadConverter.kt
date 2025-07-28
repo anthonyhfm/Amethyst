@@ -19,11 +19,11 @@ object UnipadConverter : AmethystConverter {
     override fun convertToWorkspace(path: String): SaveableWorkspaceData {
         val entries = Zip.getEntries(path)
 
-        if (!entries.contains(ZipEntry("Info"))) {
+        if (!entries.contains(ZipEntry("Info")) && !entries.contains(ZipEntry("info"))) {
             throw IllegalArgumentException("Invalid Unipad file: Missing 'Info' entry")
         }
 
-        val infomap: Map<String, String> = Zip.getInputStream(path, "Info")
+        val infomap: Map<String, String> = Zip.getInputStream(path, if (entries.contains(ZipEntry("Info"))) "Info" else "info")
             .decodeToString()
             .trim()
             .split("\n")
@@ -51,7 +51,7 @@ object UnipadConverter : AmethystConverter {
     }
 
     fun createAudioChain(path: String, pages: Int, clipMap: Map<String, String>): StateChain {
-        val keySound = Zip.getInputStream(path, "KeySound")
+        val keySound = Zip.getInputStream(path, if (Zip.getEntries(path).contains(ZipEntry("KeySound"))) "KeySound" else "keySound")
 
         return StateChain(
             devices = listOf(
