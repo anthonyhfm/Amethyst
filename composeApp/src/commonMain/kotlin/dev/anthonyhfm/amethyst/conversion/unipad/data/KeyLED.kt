@@ -5,12 +5,14 @@ import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.core.util.Zip
+import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.coroutines.flow.update
 import kotlin.time.Duration.Companion.milliseconds
@@ -150,7 +152,7 @@ object KeyLED {
     fun createChain(zipFile: String, page: Int, entries: List<String>): StateChain {
         val groups = mutableListOf<Group>()
 
-        entries.filter {
+        entries.filter { // Single Animation
             it.split(" ").size == 4
         }.forEachIndexed { index, entry ->
             val x = entry.split(" ")[2].toInt()
@@ -173,8 +175,45 @@ object KeyLED {
             )
         }
 
-        // TODO: Add support for multi device
-        println("Page ${page + 1} not fully implemented yet.")
+        entries.filter {
+            it.split(" ").size == 5
+        }.map {
+            it.removePrefix("keyLED/").trim().split(" ").let { inst ->
+                "${inst[0]} ${inst[1]} ${inst[2]} ${inst[3]}"
+            }
+        }.distinct().forEachIndexed { index, entry ->
+            val multiEntries = entries.filter {
+                it.removePrefix("keyLED/").startsWith(entry)
+            }.sortedBy { it.split(" ")[4].trim() }
+
+            val x = entry.split(" ")[2].toInt()
+            val y = entry.split(" ")[1].toInt()
+
+            groups.add(
+                Group(
+                    name = "Multi ${index + 1}",
+                    stateChain = StateChain(
+                        devices = listOf(
+                            CoordinateFilterChainDeviceState(
+                                filters = listOf(Pair(x, y))
+                            ),
+                            MultiGroupChainDeviceState(
+                                groups = multiEntries.map {
+                                    Group(
+                                        name = it.split(" ")[4].trim(),
+                                        stateChain = StateChain(
+                                            devices = listOf(
+                                                convertToKeyframes(Zip.getInputStream(zipFile, it))
+                                            )
+                                        )
+                                    )
+                                }
+                            )
+                        )
+                    )
+                )
+            )
+        }
 
         return StateChain(
             devices = listOf(

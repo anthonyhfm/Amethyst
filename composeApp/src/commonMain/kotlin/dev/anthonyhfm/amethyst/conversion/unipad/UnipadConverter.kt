@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.conversion.unipad
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.unipad.data.KeyLED
 import dev.anthonyhfm.amethyst.conversion.unipad.data.KeySound
+import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
