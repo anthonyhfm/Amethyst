@@ -42,13 +42,14 @@ object Heaven {
     var fps: Int = GlobalSettings.perforanceFPS
 
     private val stopWatch = StopWatch()
-    private val renderScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val renderScope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     private fun msToTicks(ms: Double): Long = (ms / 1000 * stopWatch.frequency).toLong()
 
     fun midiEnter(signals: List<Signal>) {
         renderScope.launch {
             signalQueue.send(signals)
+            cancel()
         }
         wake()
     }
@@ -57,6 +58,7 @@ object Heaven {
         val targetTime = prev + msToTicks(delayInMs)
         renderScope.launch {
             jobQueue.send(targetTime to job)
+            cancel()
         }
         wake()
     }
@@ -118,6 +120,8 @@ object Heaven {
                 println("RenderJob Exception: ${e.message}")
                 e.printStackTrace()
             }
+
+            cancel()
         }
     }
 
@@ -253,6 +257,8 @@ object Heaven {
             prev = 0L
             lastRender = -1L
             renderAt = -1L
+
+            cancel()
         }
     }
 
