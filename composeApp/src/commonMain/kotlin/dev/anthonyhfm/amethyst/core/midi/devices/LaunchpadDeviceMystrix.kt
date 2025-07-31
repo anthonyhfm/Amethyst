@@ -44,7 +44,15 @@ class LaunchpadDeviceMystrix(
     companion object {
         @OptIn(ExperimentalUnsignedTypes::class)
         fun identify(inquiry: UByteArray): Boolean {
-            return false
+            if (inquiry.size > 18) return false
+
+            try {
+                val cutdown = inquiry.copyOfRange(2, inquiry.lastIndex - 4)
+
+                return cutdown.contentEquals(ubyteArrayOf(127u, 6u, 2u, 0u, 2u, 3u, 77u,88u, 17u, 1u))
+            } catch (e: Exception) {
+                return false
+            }
         }
     }
 }
