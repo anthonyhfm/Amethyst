@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGroupAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
 
@@ -11,6 +12,7 @@ abstract class AbletonAdapter {
         fun resolveAdapter(xml: XmlElement): AbletonAdapter? {
             return when (xml.name) {
                 "MidiEffectGroupDevice" -> MidiEffectGroupAdapter(xml)
+                "MxDeviceMidiEffect" -> MxDeviceMidiEffectAdapter(xml) // Will resolve max plugins
 
                 else -> {
                     println("Unsupported Ableton XML element: ${xml.name}")
