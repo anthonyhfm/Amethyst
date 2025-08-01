@@ -2,7 +2,9 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
+import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
@@ -39,6 +41,23 @@ class MidiEffectGroupAdapter(
                                         MacroFilterChainDeviceState(
                                             macro = 0,
                                             value = minMacro!!,
+                                        )
+                                    )
+                                }
+
+                                if (maxKey - minKey != 127 && minKey == maxKey) {
+                                    add(
+                                        CoordinateFilterChainDeviceState(
+                                            filters = IntArray(maxKey + 1 - minKey) {
+                                                minKey + it
+                                            }.map {
+                                                val xy = DRUM_RACK_TO_XY[it]
+
+                                                val x: Int = xy % 10
+                                                val y: Int = xy / 10
+
+                                                Pair(x,  9 - y)
+                                            }
                                         )
                                     )
                                 }

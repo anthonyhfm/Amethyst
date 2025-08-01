@@ -4,8 +4,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import io.github.vinceglb.filekit.core.FileKit
-import io.github.vinceglb.filekit.core.PlatformFile
 
 class MxDeviceMidiEffectAdapter(
     private val xml: XmlElement
@@ -27,16 +25,13 @@ class MxDeviceMidiEffectAdapter(
         val fileSize: Int = searchHint.localQuerySelector("FileSize")[0].attributes["Value"]?.toInt() ?: 0
         val crc: Int = searchHint.localQuerySelector("Crc")[0].attributes["Value"]?.toInt() ?: 0
 
-        println("Resolving MxDeviceMidiEffect: $name")
-        println("File Size: $fileSize, CRC: $crc")
-
         when (MaxDeviceMatcher(fileSize, crc)) {
             MaxDeviceMatcher(55316, 55855) -> { // Depths Selector
                 return DepthsSelectorAdapter(readDataBlob(blob.text!!)).toDeviceStates()
             }
 
             else -> {
-                println("Max device could not be resolved.")
+                println("Max device not supported: $name. File size: $fileSize, CRC: $crc")
                 return emptyList()
             }
         }

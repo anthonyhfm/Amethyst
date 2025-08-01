@@ -7,10 +7,16 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
+import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.serialization.decodeFromString
 
 object AbletonConverter : AmethystConverter {
+    var file: PlatformFile? = null
+        private set
+
     override fun convertToWorkspace(path: String): SaveableWorkspaceData {
+        file = PlatformFile(path)
+
         val file = Zip.decode(path) // Decompresses the .als GZIP format
         val abletonXml = SimpleXmlParser.parse(file.decodeToString())
         val config = AbletonImporterConfig()
@@ -38,7 +44,14 @@ object AbletonConverter : AmethystConverter {
         }
 
         return SaveableWorkspaceData(
-            lights = MidiChainReader().readMidiChain(lightsTrackXML!!)
+            lights = MidiChainReader().readMidiChain(lightsTrackXML!!),
+            launchpadDevices = listOf(
+                SaveableWorkspaceData.SavableViewportLaunchpad(
+                    positionX = 0f,
+                    positionY = 0f,
+                    type = SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                )
+            )
         )
     }
 }

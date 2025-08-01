@@ -22,10 +22,11 @@ import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import io.github.vinceglb.filekit.core.FileKit
-import io.github.vinceglb.filekit.core.PickerMode
-import io.github.vinceglb.filekit.core.PickerType
-import io.github.vinceglb.filekit.core.pickFile
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -50,10 +51,10 @@ class ClipChainDevice : ChainDevice<ClipChainDeviceState>() {
             IconButton(
                 onClick = {
                     scope.launch {
-                        val file = FileKit.pickFile(
-                            mode = PickerMode.Single,
+                        val file = FileKit.openFilePicker(
+                            mode = FileKitMode.Single,
                             title = "Select Audio File",
-                            type = PickerType.File(
+                            type = FileKitType.File(
                                 extensions = listOf("wav", "ogg", "mp3")
                             )
                         )

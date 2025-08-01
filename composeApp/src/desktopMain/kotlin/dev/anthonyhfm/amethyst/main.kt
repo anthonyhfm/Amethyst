@@ -15,6 +15,7 @@ import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.about.setupAboutHandler
 import dev.anthonyhfm.amethyst.start.StartWindow
 import dev.anthonyhfm.amethyst.workspace.WorkspaceWindow
+import io.github.vinceglb.filekit.FileKit
 import org.koin.compose.KoinApplication
 import java.awt.Color
 import javax.swing.BorderFactory
@@ -35,6 +36,8 @@ fun main() {
     println(System.getProperty("app.version"))
 
     application {
+        FileKit.init(appId = "Amethyst")
+
         KoinApplication(
             application = {
                 modules(amethystKoinModule)

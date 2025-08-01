@@ -8,9 +8,11 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
-import io.github.vinceglb.filekit.core.FileKit
-import io.github.vinceglb.filekit.core.PickerMode
-import io.github.vinceglb.filekit.core.PickerType
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.openFileSaver
+import io.github.vinceglb.filekit.path
+import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.write
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -39,13 +41,16 @@ class WorkspaceMenuBarViewModel : ViewModel() {
     @OptIn(ExperimentalSerializationApi::class)
     fun saveProjectAs() {
         viewModelScope.launch {
-            val file = FileKit.saveFile(
-                bytes = AmethystProtoBuf.encodeToByteArray(
+            val file = FileKit.openFileSaver(
+                extension = "amproj",
+                suggestedName = "project",
+            )
+
+            file?.write(
+                AmethystProtoBuf.encodeToByteArray(
                     serializer = SaveableWorkspaceData.serializer(),
                     value = WorkspaceRepository.saveWorkspace()
-                ),
-                extension = "amproj",
-                baseName = "project",
+                )
             )
 
             file?.readBytes()?.let { bytes ->
@@ -53,14 +58,12 @@ class WorkspaceMenuBarViewModel : ViewModel() {
                     this.path = file.path
                 }
 
-                if (file.path != null) {
-                    GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
-                        RecentWorkspace(
-                            title = data.title,
-                            path = file.path!!
-                        )
-                    ).toSet().toList()
-                }
+                GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
+                    RecentWorkspace(
+                        title = data.title,
+                        path = file.path
+                    )
+                ).toSet().toList()
             }
         }
     }

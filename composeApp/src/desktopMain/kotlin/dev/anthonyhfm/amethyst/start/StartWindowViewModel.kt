@@ -6,18 +6,21 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
-import dev.anthonyhfm.amethyst.devices.DeviceStateSerializationModule
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
-import io.github.vinceglb.filekit.core.FileKit
-import io.github.vinceglb.filekit.core.PickerMode
-import io.github.vinceglb.filekit.core.PickerType
-import io.github.vinceglb.filekit.core.extension
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.dialogs.openFileSaver
+import io.github.vinceglb.filekit.extension
+import io.github.vinceglb.filekit.path
+import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.write
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.protobuf.ProtoBuf
 import java.awt.Desktop
 import java.io.File
 import java.net.URI
@@ -34,13 +37,16 @@ class StartWindowViewModel() : ViewModel() {
     @OptIn(ExperimentalSerializationApi::class)
     fun onClickCreateProject() {
         viewModelScope.launch {
-            val file = FileKit.saveFile(
-                bytes = AmethystProtoBuf.encodeToByteArray(
+            val file = FileKit.openFileSaver(
+                extension = "amproj",
+                suggestedName = "project",
+            )
+
+            file?.write(
+                AmethystProtoBuf.encodeToByteArray(
                     serializer = SaveableWorkspaceData.serializer(),
                     value = SaveableWorkspaceData("New Project")
-                ),
-                extension = "amproj",
-                baseName = "project",
+                )
             )
 
             file?.readBytes()?.let { bytes ->
@@ -48,14 +54,12 @@ class StartWindowViewModel() : ViewModel() {
                     this.path = file.path
                 }
 
-                if (file.path != null) {
-                    GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
-                        RecentWorkspace(
-                            title = data.title,
-                            path = file.path!!
-                        )
-                    ).toSet().toList()
-                }
+                GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
+                    RecentWorkspace(
+                        title = data.title,
+                        path = file.path
+                    )
+                ).toSet().toList()
 
                 WorkspaceRepository.loadWorkspace(data)
 
@@ -67,8 +71,8 @@ class StartWindowViewModel() : ViewModel() {
     @OptIn(ExperimentalSerializationApi::class)
     fun onClickOpenProject() {
         viewModelScope.launch {
-            val file = FileKit.pickFile(
-                type = PickerType.File(
+            val file = FileKit.openFilePicker(
+                type = FileKitType.File(
                     extensions = listOf(
                         "amproj",
                         "zip",
@@ -76,17 +80,17 @@ class StartWindowViewModel() : ViewModel() {
                         "approj"
                     )
                 ),
-                mode = PickerMode.Single,
+                mode = FileKitMode.Single,
             )
 
             when (file?.extension?.lowercase()) {
                 "amproj" -> {
-                    openProjectFile(file.path!!)
+                    openProjectFile(file.path)
                 }
 
                 "als" -> {
                     WorkspaceRepository.loadWorkspace(
-                        workspaceData = AbletonConverter.convertToWorkspace(file.path!!)
+                        workspaceData = AbletonConverter.convertToWorkspace(file.path)
                     )
 
                     onOpenEditor?.invoke()
@@ -94,7 +98,7 @@ class StartWindowViewModel() : ViewModel() {
 
                 "zip" -> {
                     WorkspaceRepository.loadWorkspace(
-                        workspaceData = UnipadConverter.convertToWorkspace(file.path!!)
+                        workspaceData = UnipadConverter.convertToWorkspace(file.path)
                     )
 
                     onOpenEditor?.invoke()
