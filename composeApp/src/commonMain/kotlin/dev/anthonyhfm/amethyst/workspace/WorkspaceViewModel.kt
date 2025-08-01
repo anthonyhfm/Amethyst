@@ -257,7 +257,13 @@ class WorkspaceViewModel(
                 }
 
                 inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
-                    getMidiInputData(bytes)?.let {
+                    val data = if (deviceType == LaunchpadDeviceType.ABLETON_PUSH_2) {
+                        LaunchpadDevicePush2.getMidiInputData(bytes)
+                    } else {
+                        getMidiInputData(bytes)
+                    }
+
+                    data?.let {
                         if (WorkspaceRepository.mode.value.claimInputs) {
                             WorkspaceRepository.mode.value.onMidiInput(it)
                         } else {

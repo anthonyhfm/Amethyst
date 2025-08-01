@@ -32,7 +32,7 @@ class MidiEffectGroupAdapter(
                                 val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127
 
                                 if ((branch.querySelector("UserName")[0].attributes["Value"]).toString().lowercase().contains("page")) {
-                                    println("Branch ${index + 1} is a page, addomg macro filter device state.")
+                                    println("Branch ${index + 1} is a page, adding macro filter device state.")
                                     println("TODO: Handle page branches properly.")
 
                                     add(
