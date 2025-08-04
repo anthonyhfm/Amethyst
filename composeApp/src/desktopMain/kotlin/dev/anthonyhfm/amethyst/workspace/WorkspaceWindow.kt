@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
+import dev.anthonyhfm.amethyst.core.controls.shortcuts.ShortcutManager
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
@@ -39,7 +40,14 @@ fun WorkspaceWindow() {
             height = 800.dp
         ),
         onKeyEvent = {
-            WorkspaceRepository.mode.value.onKeyEvent(it)
+            // Prioritize mode events over shortcuts
+            val modeEvent = WorkspaceRepository.mode.value.onKeyEvent(it)
+
+            if (!modeEvent) {
+                ShortcutManager.handleShortcut(it)
+            }
+
+            modeEvent
         },
         icon = when (DesktopPlatform.get()) {
             DesktopPlatform.Windows -> painterResource(Res.drawable.amethyst_windows)

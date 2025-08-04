@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
-import dev.anthonyhfm.amethyst.core.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -21,7 +21,6 @@ import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
-import kotlin.time.Duration.Companion.milliseconds
 
 class DelayChainDevice : ChainDevice<DelayChainDeviceState>() {
     override val state = MutableStateFlow(DelayChainDeviceState())

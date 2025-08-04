@@ -5,8 +5,8 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import dev.anthonyhfm.amethyst.core.selection.Selectable
-import dev.anthonyhfm.amethyst.core.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 
 object ChainModeKeyHandler {
     fun handleKeyInput(keyEvent: KeyEvent): Boolean {

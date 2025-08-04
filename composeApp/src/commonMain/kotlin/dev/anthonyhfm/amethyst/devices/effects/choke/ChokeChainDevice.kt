@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.devices.effects.copy
+package dev.anthonyhfm.amethyst.devices.effects.choke
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -15,15 +15,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
-class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
-    override val state = MutableStateFlow(CopyChainDeviceState())
+class ChokeChainDevice : ChainDevice<ChokeChainDeviceState>() {
+    override val state = MutableStateFlow(ChokeChainDeviceState())
 
     @Composable
     override fun Content() {
         val selections by SelectionManager.selections.collectAsState()
 
         AmethystDevice(
-            title = "Copy",
+            title = "Choke",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier.width(200.dp)
@@ -38,7 +38,7 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
 }
 
 @Serializable
-data class CopyChainDeviceState(
+data class ChokeChainDeviceState(
     @Transient
     val data: Any = Any()
 ) : DeviceState()

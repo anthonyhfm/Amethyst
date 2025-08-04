@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.core.selection
+package dev.anthonyhfm.amethyst.core.controls.selection
 
 import dev.anthonyhfm.amethyst.core.heaven.elements.Chain
 import dev.anthonyhfm.amethyst.core.util.UUID

@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.core.selection
+package dev.anthonyhfm.amethyst.core.controls.selection
 
 import kotlinx.coroutines.flow.MutableStateFlow
 

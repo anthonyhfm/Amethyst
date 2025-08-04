@@ -6,7 +6,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shape
-import dev.anthonyhfm.amethyst.core.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 
 interface ViewportElement : Selectable {
     var position: MutableState<Offset>

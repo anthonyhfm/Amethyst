@@ -13,7 +13,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shape
 import dev.anthonyhfm.amethyst.core.midi.data.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.heaven.elements.Screen
-import dev.anthonyhfm.amethyst.core.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
