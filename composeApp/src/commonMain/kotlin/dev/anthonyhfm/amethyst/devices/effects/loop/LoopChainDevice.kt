@@ -52,6 +52,17 @@ class LoopChainDevice : ChainDevice<LoopChainDeviceState>() {
                     text = "${deviceState.repeat}",
                     steps = IntArray(128) { it + 1 }.toList(),
                     value = deviceState.repeat,
+                    onResolveTextValue = {
+                        val repeatText = it.trim().toIntOrNull()
+
+                        repeatText?.let { repeat ->
+                            if (repeat in 1..128) {
+                                state.update {
+                                    it.copy(repeat = repeat)
+                                }
+                            }
+                        }
+                    },
                     onValueChange = { value ->
                         state.update {
                             it.copy(repeat = value)
@@ -86,6 +97,17 @@ class LoopChainDevice : ChainDevice<LoopChainDeviceState>() {
                         onValueChange = { value ->
                             state.update {
                                 it.copy(gate = value)
+                            }
+                        },
+                        onResolveTextValue = {
+                            val gateText = it.removeSuffix("%").trim().toIntOrNull()
+
+                            gateText?.let { gate ->
+                                if (gate in 0..200) {
+                                    state.update {
+                                        it.copy(gate = gate / 200f) // Convert to float between 0.0 and 1.0
+                                    }
+                                }
                             }
                         },
                         modifier = Modifier

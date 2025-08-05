@@ -41,6 +41,18 @@ fun TimeDial(
             headline = headline,
             dialColor = MaterialTheme.colorScheme.secondary,
             text = "${timing.toMsValue(bpm)} ms",
+            onResolveTextValue = {
+                val timing = it.asTiming()
+
+                timing?.let { timing ->
+                    if (timing.toMsValue(bpm) <= 1000) {
+                        onSelectTiming(
+                            timing,
+                            timing.toMsValue(bpm)
+                        )
+                    }
+                }
+            },
             modifier = Modifier
                 .rightClickable {
                     millisecondMode = !millisecondMode
@@ -62,10 +74,19 @@ fun TimeDial(
                     Timing.Rythm(it).toMsValue(bpm)
                 )
             },
+            onResolveTextValue = {
+                val timing = it.asTiming()
+
+                timing?.let { timing ->
+                    onSelectTiming(
+                        timing,
+                        timing.toMsValue(bpm)
+                    )
+                }
+            },
             modifier = Modifier
                 .rightClickable {
                     millisecondMode = !millisecondMode
-                    println("Rightclick")
                 },
         )
     }
@@ -79,5 +100,43 @@ fun Timing.toMsValue(bpm: Double): Int = when (this) {
         val secondsPerQuarter = 60.0 / bpm
 
         (secondsPerQuarter * fraction * 1000).toInt()
+    }
+}
+
+fun String.asTiming(): Timing? {
+    val trimmed = this.trim().lowercase()
+
+    return when {
+        trimmed.endsWith("ms") -> {
+            val value = trimmed.removeSuffix("ms").trim().toIntOrNull()
+
+            if (value != null) {
+                Timing.Duration(value.milliseconds)
+            } else {
+                null
+            }
+        }
+
+        "/" in this -> {
+            val parts = trimmed.split("/").map { it.trim() }
+            if (parts.size == 2) {
+                val numerator = parts[0]
+                val denominator = parts[1]
+
+                Timing.Rythm.RythmTiming.entries.find {
+                    val textParts = it.text.split("/").map { it.trim() }
+
+                    textParts[0] == numerator && textParts[1] == denominator
+                }?.let {
+                    Timing.Rythm(it)
+                }
+            } else {
+                null
+            }
+        }
+
+        else -> {
+            null
+        }
     }
 }

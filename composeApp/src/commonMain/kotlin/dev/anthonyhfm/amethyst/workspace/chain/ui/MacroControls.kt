@@ -140,6 +140,20 @@ fun MacroList() {
                 text = macro.value.toString(),
                 steps = IntArray(128) { it }.toList(),
                 value = 0,
+                onResolveTextValue = {
+                    val valueText = it.trim().toIntOrNull()
+
+                    valueText?.let { value ->
+                        if (value in 0..127) {
+                            WorkspaceRepository.setMacroValue(
+                                index = index,
+                                macro = macro.copy(
+                                    value = value
+                                )
+                            )
+                        }
+                    }
+                },
                 onValueChange = {
                     WorkspaceRepository.setMacroValue(
                         index = index,

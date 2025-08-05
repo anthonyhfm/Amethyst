@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import kotlinx.coroutines.flow.update
 
 @Composable
 fun TimingControls(
@@ -37,6 +38,15 @@ fun TimingControls(
             value = gate,
             onValueChange = { value ->
                 onGateChanged(value)
+            },
+            onResolveTextValue = {
+                val gateText = it.removeSuffix("%").trim().toIntOrNull()
+
+                gateText?.let { gate ->
+                    if (gate in 0..200) {
+                        onGateChanged(gate / 200f)
+                    }
+                }
             },
             modifier = Modifier
                 .rightClickable {

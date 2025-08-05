@@ -57,6 +57,17 @@ class SwitchChainDevice : ChainDevice<SwitchChainDeviceState>() {
                             value = deviceState.macro,
                             steps = IntArray(macros.size) { it }.toList(),
                             text = "${deviceState.macro + 1}",
+                            onResolveTextValue = {
+                                val macroText = it.trim().toIntOrNull()
+
+                                macroText?.let { macro ->
+                                    if (macro in 1..macros.size) {
+                                        state.update {
+                                            it.copy(macro = macro - 1)
+                                        }
+                                    }
+                                }
+                            },
                             onValueChange = { value ->
                                 state.update {
                                     it.copy(macro = value)
@@ -81,6 +92,17 @@ class SwitchChainDevice : ChainDevice<SwitchChainDeviceState>() {
                         value = deviceState.value,
                         steps = IntArray(128) { it }.toList(),
                         text = deviceState.value.toString(),
+                        onResolveTextValue = {
+                            val valueText = it.trim().toIntOrNull()
+
+                            valueText?.let { value ->
+                                if (value in 0..127) {
+                                    state.update {
+                                        it.copy(value = value)
+                                    }
+                                }
+                            }
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(value = value)

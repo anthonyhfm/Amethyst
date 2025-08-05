@@ -149,6 +149,17 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
                                     it.copy(gate = value)
                                 }
                             },
+                            onResolveTextValue = {
+                                val gateText = it.removeSuffix("%").trim().toIntOrNull()
+
+                                gateText?.let { gate ->
+                                    if (gate in 0..200) {
+                                        state.update {
+                                            it.copy(gate = gate / 200f) // Convert to float between 0.0 and 1.0
+                                        }
+                                    }
+                                }
+                            },
                             modifier = Modifier
                                 .rightClickable {
                                     state.update {

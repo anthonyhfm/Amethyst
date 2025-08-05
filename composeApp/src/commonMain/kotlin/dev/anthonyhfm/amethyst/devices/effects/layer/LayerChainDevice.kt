@@ -45,6 +45,17 @@ class LayerChainDevice : ChainDevice<LayerChainDeviceState>() {
                     value = deviceState.layer,
                     steps = IntArray(41) { -20 + it }.toList(),
                     text = "${deviceState.layer}",
+                    onResolveTextValue = {
+                        val layerText = it.trim().toIntOrNull()
+
+                        layerText?.let { layer ->
+                            if (layer in -20..20) {
+                                state.update {
+                                    it.copy(layer = layer)
+                                }
+                            }
+                        }
+                    },
                     onValueChange = { value ->
                         state.update {
                             it.copy(layer = value)

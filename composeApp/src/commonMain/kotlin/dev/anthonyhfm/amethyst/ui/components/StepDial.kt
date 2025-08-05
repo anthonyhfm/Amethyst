@@ -3,14 +3,19 @@ package dev.anthonyhfm.amethyst.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
@@ -23,8 +28,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import kotlin.math.roundToInt
@@ -116,10 +131,24 @@ fun <T> StepTextDial(
     steps: List<T>,
     value: T,
     onValueChange: (T) -> Unit,
+    onResolveTextValue: (String) -> Unit,
     containerColor: Color = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp),
     dialColor: Color = MaterialTheme.colorScheme.tertiary,
     modifier: Modifier = Modifier
 ) {
+    var editing by remember { mutableStateOf(false) }
+    var textValue by remember { mutableStateOf(text) }
+
+    val focusRequester = FocusRequester()
+
+    LaunchedEffect(editing) {
+        if (editing) {
+            focusRequester.requestFocus()
+        } else {
+            focusRequester.freeFocus()
+        }
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -132,7 +161,14 @@ fun <T> StepTextDial(
         }
 
         StepDial(
-            modifier = modifier,
+            modifier = modifier
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            editing = !editing
+                        }
+                    )
+                },
             steps = steps,
             value = value,
             containerColor = containerColor,
@@ -142,9 +178,44 @@ fun <T> StepTextDial(
             }
         )
 
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall
-        )
+        if (!editing) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier
+                    .width(52.dp)
+                    .height(16.dp),
+                textAlign = TextAlign.Center,
+            )
+        } else {
+            BasicTextField(
+                value = textValue,
+                onValueChange = {
+                    textValue = it
+                },
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .width(52.dp)
+                    .height(16.dp)
+                    .background(MaterialTheme.colorScheme.background)
+                    .onKeyEvent {
+                        if (it.key == Key.Enter) {
+                            onResolveTextValue(textValue)
+                            editing = false
+                            true
+                        }
+
+                        false
+                    },
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None,
+                    autoCorrectEnabled = false,
+                    keyboardType = KeyboardType.Unspecified,
+                    imeAction = ImeAction.Done
+                ),
+                textStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurface)
+            )
+        }
     }
 }
