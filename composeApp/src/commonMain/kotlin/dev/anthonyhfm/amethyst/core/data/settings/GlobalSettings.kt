@@ -31,4 +31,10 @@ object GlobalSettings {
         set(value) {
             settings.putFloat("framesPerSecond", value)
         }
+
+    var enableDiscordRPC: Boolean
+        get() = settings.getBoolean("enableDiscordRPC", true)
+        set(value) {
+            settings.putBoolean("enableDiscordRPC", value)
+        }
 }
