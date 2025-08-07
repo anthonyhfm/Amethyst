@@ -1,3 +1,4 @@
+
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -33,6 +34,8 @@ import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
@@ -81,6 +84,10 @@ fun ExpandingChainDevicePicker(
                                 (state.data as GroupChainDevice).packState()
                             } else if (state.data.state.value is MultiGroupChainDeviceState) {
                                 (state.data as MultiGroupChainDevice).packState()
+                            } else if (state.data.state.value is ChokeChainDeviceState) {
+                                (state.data as ChokeChainDevice).state.value.copy(
+                                    stateChain = pack((state.data as ChokeChainDevice).state.value.chain)
+                                )
                             } else {
                                 state.data.state.value
                             }

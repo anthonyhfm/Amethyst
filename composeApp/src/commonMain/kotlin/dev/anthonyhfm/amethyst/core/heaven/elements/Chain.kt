@@ -3,8 +3,10 @@ package dev.anthonyhfm.amethyst.core.heaven.elements
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import dev.anthonyhfm.amethyst.devices.ChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.coroutines.flow.update
 
@@ -54,8 +56,40 @@ class Chain : SignalReceiver() {
     }
 
     fun remove(uuid: String) {
-        devices.value = devices.value.toMutableList().apply {
-            removeAll { it.selectionUUID == uuid }
+        if (devices.value.any { it.selectionUUID == uuid }) {
+            devices.value = devices.value.toMutableList().apply {
+                removeAll { it.selectionUUID == uuid }
+            }
+
+            return
+        } else {
+            devices.value.map {
+                when (it) {
+                    is GroupChainDevice -> {
+                        it.apply {
+                            state.value.groups.forEach { group ->
+                                group.chain.remove(uuid)
+                            }
+                        }
+                    }
+
+                    is MultiGroupChainDevice -> {
+                        it.apply {
+                            state.value.groups.forEach { group ->
+                                group.chain.remove(uuid)
+                            }
+                        }
+                    }
+
+                    is ChokeChainDevice -> {
+                        it.apply {
+                            state.value.chain.remove(uuid)
+                        }
+                    }
+
+                    else -> it
+                }
+            }
         }
 
         reroute()

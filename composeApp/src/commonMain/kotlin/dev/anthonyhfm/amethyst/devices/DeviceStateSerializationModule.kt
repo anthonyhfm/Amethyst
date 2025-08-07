@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices
 
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDeviceState
@@ -32,6 +33,7 @@ val DeviceStateSerializationModule = SerializersModule {
         subclass(GradientChainDeviceState::class)
         subclass(GroupChainDeviceState::class)
         subclass(MultiGroupChainDeviceState::class)
+        subclass(ChokeChainDeviceState::class)
         subclass(HoldChainDeviceState::class)
         subclass(KeyframesChainDeviceContract.KeyframesChainDeviceState::class)
         subclass(LayerChainDeviceState::class)

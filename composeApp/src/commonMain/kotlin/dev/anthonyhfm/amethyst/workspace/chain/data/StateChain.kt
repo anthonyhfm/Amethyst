@@ -5,6 +5,8 @@ import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
@@ -66,6 +68,10 @@ data class StateChain(
                         it.packState()
                     } else if (it is MultiGroupChainDevice) {
                         it.packState()
+                    } else if (it is ChokeChainDevice) {
+                        it.state.value.copy(
+                            stateChain = pack(it.state.value.chain)
+                        )
                     } else {
                         it.state.value
                     }
@@ -128,6 +134,16 @@ data class StateChain(
                 is MultiGroupChainDeviceState -> {
                     MultiGroupChainDevice().apply {
                         loadFromState(device)
+                    }
+                }
+
+                is ChokeChainDeviceState -> {
+                    ChokeChainDevice().apply {
+                        state.update {
+                            device.copy(
+                                chain = device.stateChain.unpack()
+                            )
+                        }
                     }
                 }
 

@@ -9,9 +9,19 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import io.github.vinceglb.filekit.PlatformFile
+import kotlinx.coroutines.flow.any
 
 object ShortcutManager {
     fun handleShortcut(keyEvent: KeyEvent): Boolean {
+        if (keyEvent.isCtrlPressed && keyEvent.key == Key.D) {
+            if (SelectionManager.selections.value.any { it is Selectable.ChainDevice }) {
+                SelectionManager.selections.value.forEach {
+                    
+                }
+                return true
+            }
+        }
+
         if (keyEvent.isCtrlPressed && keyEvent.key == Key.C) {
             if (SelectionManager.selections.value.isNotEmpty()) {
                 ClipboardManager.copy(SelectionManager.selections.value)
