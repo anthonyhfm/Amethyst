@@ -16,6 +16,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
@@ -28,7 +29,7 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     lateinit var state: StateFlow<KeyframesChainDeviceContract.KeyframesChainDeviceState>
 
-    var onVirtualDevicePress: ((x: Int, y: Int, offset: Offset) -> Unit)? = null
+    var onVirtualDevicePress: ((x: Int, y: Int) -> Unit)? = null
     var onEvent: ((KeyframesChainDeviceContract.Event) -> Unit)? = null
     var modeWakeup: (() -> Unit)? = null
     var modeClose: (() -> Unit)? = null
@@ -88,8 +89,8 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
         return false
     }
 
-    fun virtualDevicePress(x: Int, y: Int, offset: Offset) {
-        onVirtualDevicePress?.invoke(x, y, offset)
+    fun virtualDevicePress(x: Int, y: Int) {
+        onVirtualDevicePress?.invoke(x, y)
     }
 
     fun wake() {

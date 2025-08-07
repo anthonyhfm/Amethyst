@@ -37,8 +37,8 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
             }
         }
 
-        customMode.onVirtualDevicePress = { x, y, offset ->
-            onSetKeyFilter(x, y, offset)
+        customMode.onVirtualDevicePress = { x, y ->
+            onSetKeyFilter(x, y)
         }
 
         customMode.modeWakeup = {
@@ -75,31 +75,23 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
     }
 
     fun refreshVirtualDevices() {
-        Heaven.devices.forEach { device ->
-            device.previewState.clear()
+        Heaven.clear()
 
-            state.value.filters.forEach { (x, y) ->
-                if (x >= device.position.value.x.toInt() &&
-                    x < device.position.value.x.toInt() + 10 &&
-                    y >= device.position.value.y .toInt() &&
-                    y < device.position.value.y.toInt() + 10) {
-
-                    val localX = x - device.position.value.x.toInt()
-                    val localY = 9 - (y - device.position.value.y.toInt())
-
-                    device.previewState.sendToPreview(listOf(
-                        RawUpdate(localX + localY * 10, Color.Green)
-                    ))
-                }
+        Heaven.midiEnter(
+            state.value.filters.map {
+                Signal(
+                    origin = this,
+                    x = it.first,
+                    y = it.second,
+                    color = Color.Green,
+                    layer = 0
+                )
             }
-        }
+        )
     }
 
-    fun onSetKeyFilter(x: Int, y: Int, offset: Offset) {
-        val globalX = offset.x.toInt() + x
-        val globalY = offset.y.toInt() + (9 - y)
-
-        val coordinatePair = Pair(globalX, globalY)
+    fun onSetKeyFilter(x: Int, y: Int) {
+        val coordinatePair = Pair(x, y)
 
         val isAlreadyFiltered = state.value.filters.contains(coordinatePair)
 
@@ -115,7 +107,17 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
             }
         }
 
-        refreshVirtualDevices()
+        Heaven.midiEnter(
+            listOf(
+                Signal(
+                    origin = this,
+                    x = x,
+                    y = y,
+                    color = Color.Green,
+                    layer = 0
+                )
+            )
+        )
     }
 
     override fun midiEnter(n: List<Signal>) {

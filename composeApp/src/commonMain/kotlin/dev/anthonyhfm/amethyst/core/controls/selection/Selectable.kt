@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.controls.selection
 import dev.anthonyhfm.amethyst.core.heaven.elements.Chain
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
 interface Selectable {

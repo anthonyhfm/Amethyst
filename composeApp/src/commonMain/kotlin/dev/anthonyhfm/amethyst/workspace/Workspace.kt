@@ -70,7 +70,7 @@ fun Workspace() {
     ) { paddingValues ->
         if (state.showDeviceConfigurator != null) {
             DeviceSettingsDialog(
-                index = state.showDeviceConfigurator!!,
+                uuid = state.showDeviceConfigurator!!,
                 onEvent = { viewModel.onEvent(it) }
             )
         }

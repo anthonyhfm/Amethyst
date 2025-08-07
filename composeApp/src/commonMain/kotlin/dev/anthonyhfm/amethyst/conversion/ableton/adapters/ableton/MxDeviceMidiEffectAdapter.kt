@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MidiExt3Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -28,6 +29,10 @@ class MxDeviceMidiEffectAdapter(
         when (MaxDeviceMatcher(fileSize, crc)) {
             MaxDeviceMatcher(55316, 55855) -> { // Depths Selector
                 return DepthsSelectorAdapter(readDataBlob(blob.text!!)).toDeviceStates()
+            }
+
+            MaxDeviceMatcher(134927, 42016) -> { // MidiExt v3.0
+                return MidiExt3Adapter(xml).toDeviceStates()
             }
 
             else -> {

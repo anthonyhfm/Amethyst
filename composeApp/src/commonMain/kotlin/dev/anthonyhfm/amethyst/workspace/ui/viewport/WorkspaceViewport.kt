@@ -76,7 +76,6 @@ fun WorkspaceViewport(
                             SelectionManager.clear()
                         }
                     }
-
                 }
         ) {
             for (x in ((viewportState.offset.x % gridSize).toInt() - gridSize) until size.width.toInt() step gridSize) {
@@ -89,6 +88,7 @@ fun WorkspaceViewport(
                 }
             }
         }
+
         elements.forEachIndexed { index, element ->
             var draggingOffset by remember { mutableStateOf(Offset.Zero) }
             val selected = selections.any { it.selectionUUID == element.selectionUUID }
@@ -172,23 +172,18 @@ fun WorkspaceViewport(
                         }
                     }
             ) {
-                if (element is LaunchpadViewportElement) {
-                    LaunchedEffect(index) {
-                        element.indexInViewport = index
-                    }
-
-                    if (selected) {
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .offset(y = -56.dp)
-                                .zIndex(1000f),
-                        ) {
-                            element.actions(this)
-                        }
+                if (selected) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = -56.dp)
+                            .zIndex(1000f),
+                    ) {
+                        element.Actions(this)
                     }
                 }
-                element.content()
+
+                element.Content()
             }
         }
     }

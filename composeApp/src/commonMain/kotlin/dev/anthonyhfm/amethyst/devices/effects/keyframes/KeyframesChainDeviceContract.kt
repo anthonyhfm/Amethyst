@@ -12,7 +12,7 @@ import kotlinx.serialization.Transient
 
 sealed interface KeyframesChainDeviceContract {
     sealed interface Event {
-        data class OnPaintButton(val x: Int, val y: Int, val offset: Offset) : Event
+        data class OnPaintButton(val x: Int, val y: Int) : Event
         data class OnColorUpdate(val color: Color) : Event
         data class OnSelectFrame(val frameIndex: Int) : Event
         data class OnDeleteFrame(val frameIndex: Int) : Event

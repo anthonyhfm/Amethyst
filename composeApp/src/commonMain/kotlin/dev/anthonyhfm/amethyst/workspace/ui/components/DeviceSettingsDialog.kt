@@ -22,8 +22,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.atsushieno.ktmidi.MidiAccess
 import dev.atsushieno.ktmidi.MidiPortDetails
 import org.koin.compose.koinInject
@@ -31,16 +33,18 @@ import org.koin.compose.koinInject
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeviceSettingsDialog(
-    index: Int,
+    uuid: String,
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
-    var midiAccess = koinInject<MidiAccess>()
+    val midiAccess = koinInject<MidiAccess>()
+
+    val device = Heaven.devices.find { it.selectionUUID == uuid }
 
     var expandedInput: Boolean by remember { mutableStateOf(false) }
     var expandedOutput: Boolean by remember { mutableStateOf(false) }
 
-    var midiInputPort: MidiPortDetails? by remember { mutableStateOf(null) }
-    var midiOutputPort: MidiPortDetails? by remember { mutableStateOf(null) }
+    var midiInputPort: MidiPortDetails? by remember { mutableStateOf(device?.deviceConfig?.input?.details) }
+    var midiOutputPort: MidiPortDetails? by remember { mutableStateOf(device?.deviceConfig?.launchpadDevice?.midiOutput?.details) }
 
     AlertDialog(
         onDismissRequest = {
@@ -147,7 +151,7 @@ fun DeviceSettingsDialog(
                 onClick = {
                     onEvent(
                         WorkspaceContract.Event.OnChangeDeviceConfig(
-                            index = index,
+                            uuid = uuid,
                             inputPort = midiInputPort,
                             outputPort = midiOutputPort,
                         )

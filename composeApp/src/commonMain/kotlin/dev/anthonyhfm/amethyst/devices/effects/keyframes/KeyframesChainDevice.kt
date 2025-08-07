@@ -51,8 +51,8 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
             }
         }
 
-        customMode.onVirtualDevicePress = { x, y, offset ->
-            onEvent(Event.OnPaintButton(x, y, offset))
+        customMode.onVirtualDevicePress = { x, y ->
+            onEvent(Event.OnPaintButton(x, y))
         }
     }
 
@@ -93,9 +93,6 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     fun onEvent(event: Event) {
         when (event) {
             is Event.OnPaintButton -> {
-                val globalX = event.offset.x.toInt() + event.x
-                val globalY = event.offset.y.toInt() + (9 - event.y)
-
                 state.update { state ->
                     state.copy(
                         frames = state.frames.toMutableList().apply {
@@ -103,7 +100,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                                 index = state.selectedFrameIndex,
                                 element = state.frames[state.selectedFrameIndex].copy(
                                     entries = state.frames[state.selectedFrameIndex].entries.toMutableList().apply {
-                                        val index: Int = indexOfFirst { it.x == globalX && it.y == globalY }
+                                        val index: Int = indexOfFirst { it.x == event.x && it.y == event.y }
 
                                         if (index != -1) {
                                             removeAt(index)
@@ -111,11 +108,27 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
 
                                         add(
                                             element = KeyframesEntry(
-                                                x = globalX,
-                                                y = globalY,
+                                                x = event.x,
+                                                y = event.y,
                                                 r = state.selectedColor.first,
                                                 g = state.selectedColor.second,
                                                 b = state.selectedColor.third
+                                            )
+                                        )
+
+                                        Heaven.midiEnter(
+                                            listOf(
+                                                Signal(
+                                                    origin = this,
+                                                    x = event.x,
+                                                    y = event.y,
+                                                    color = Color(
+                                                        red = state.selectedColor.first,
+                                                        green = state.selectedColor.second,
+                                                        blue = state.selectedColor.third
+                                                    ),
+                                                    layer = 0
+                                                )
                                             )
                                         )
                                     }
@@ -124,8 +137,6 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                         }
                     )
                 }
-
-                refreshVirtualDevices()
             }
 
             is Event.OnColorUpdate -> {
@@ -248,32 +259,21 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     }
 
     fun refreshVirtualDevices() {
-        Heaven.devices.forEach { device ->
-            device.previewState.clear()
+        Heaven.clear()
 
-            state.value.frames[state.value.selectedFrameIndex].entries.forEach { (x, y, r, g, b) ->
-                if (x >= device.position.value.x.toInt() &&
-                    x < device.position.value.x.toInt() + 10 &&
-                    y >= device.position.value.y.toInt() &&
-                    y < device.position.value.y.toInt() + 10) {
-
-                    val localX = x - device.position.value.x.toInt()
-                    val localY = 9 - (y - device.position.value.y.toInt())
-
-                    device.previewState.sendToPreview(listOf(
-                        RawUpdate(localX + localY * 10, Color(r, g, b))
-                    ))
-                }
+        Heaven.midiEnter(
+            state.value.frames[state.value.selectedFrameIndex].entries.map {
+                Signal(
+                    origin = this,
+                    x = it.x,
+                    y = it.y,
+                    color = Color(it.r, it.g, it.b),
+                    layer = 0
+                )
             }
-        }
+        )
     }
 
-    /**
-     * Weird and complex rendering logic to create an animation based on the frames and their timings.
-     * This prerenders the animation so that it can be played back smoothly later.
-     *
-     * Supposed to run better than rendering on the fly during playback.
-     */
     fun renderAnimation() {
         val bpm = WorkspaceRepository.bpm.value
         var animationMs = 0

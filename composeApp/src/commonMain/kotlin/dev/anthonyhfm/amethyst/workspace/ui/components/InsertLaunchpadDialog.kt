@@ -133,7 +133,7 @@ fun InsertLaunchpadDialog(
                                             onEvent(WorkspaceContract.Event.AddDeviceToViewport(device))
                                         }
                                 ) {
-                                    device.content()
+                                    device.Content()
                                 }
                             }
 

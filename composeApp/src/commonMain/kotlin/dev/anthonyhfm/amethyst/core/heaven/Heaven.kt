@@ -209,7 +209,7 @@ object Heaven {
                     currentDevices.forEach { device ->
                         if (isSignalInDevice(signal, device)) {
                             val posX = signal.x - device.position.value.x.toInt() + device.layout.offsetX
-                            val posY = abs(signal.y - 9 - device.position.value.y.toInt())
+                            val posY = abs(signal.y - 9 - device.position.value.y.toInt()) - device.layout.offsetY
 
                             midiCalls.add(MidiCall(
                                 device,

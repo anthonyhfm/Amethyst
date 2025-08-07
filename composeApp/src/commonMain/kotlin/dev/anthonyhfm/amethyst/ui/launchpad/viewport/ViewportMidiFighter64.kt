@@ -33,7 +33,8 @@ class ViewportMidiFighter64(
 
     override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_8X8
 
-    override val content: @Composable (() -> Unit) = {
+    @Composable
+    override fun Content() {
         val previewGrid by previewState.grid
 
         Box(
@@ -47,10 +48,10 @@ class ViewportMidiFighter64(
                 LaunchpadSurfaceDetectionOverlay(
                     layoutType = layout,
                     onPadPressed = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnPressVirtualDevice(x, y, position.value, layout))
+                        handleButtonEvent(true, x, y)
                     },
                     onPadReleased = { x, y ->
-                        onEvent?.invoke(WorkspaceContract.Event.OnReleaseVirtualDevice(x, y, position.value, layout))
+                        handleButtonEvent(false, x, y)
                     },
                     modifier = Modifier.fillMaxSize(0.94f)
                 ) {

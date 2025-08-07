@@ -2,6 +2,8 @@ package dev.anthonyhfm.amethyst.workspace
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiManager
 import dev.anthonyhfm.amethyst.core.midi.IO_COROUTINE
@@ -85,11 +87,19 @@ class WorkspaceViewModel(
 
                             (state.value.mode as KeyframesWorkspaceMode).close()
                         }
+
+                        if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
+                            WorkspaceRepository.updateWorkspaceBounds()
+
+                            if (SelectionManager.selections.value.any { it is Selectable.VirtualViewportDevice }) {
+                                SelectionManager.clear()
+                            }
+                        }
                     }
                 }
 
                 state.update {
-                    it.copy(mode = newMode,)
+                    it.copy(mode = newMode)
                 }
             }
         }
@@ -163,7 +173,7 @@ class WorkspaceViewModel(
                 if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
                     state.update {
                         it.copy(
-                            showDeviceConfigurator = event.index
+                            showDeviceConfigurator = event.uuid
                         )
                     }
                 }
@@ -190,51 +200,11 @@ class WorkspaceViewModel(
                     WorkspaceRepository.samplingChain.addDevice(event.device, event.atIndex)
                 }
             }
-
-            is WorkspaceContract.Event.OnPressVirtualDevice -> {
-                when (state.value.mode) {
-                    is KeyframesWorkspaceMode -> {
-                        (state.value.mode as KeyframesWorkspaceMode).virtualDevicePress(event.x + event.layout.offsetX, event.y + event.layout.offsetY, event.offset)
-                    }
-
-                    is CoordinateFilterWorkspaceMode -> {
-                        (state.value.mode as CoordinateFilterWorkspaceMode).virtualDevicePress(event.x + event.layout.offsetX, event.y + event.layout.offsetY, event.offset)
-                    }
-
-                    is WorkspaceContract.WorkspaceMode.Layout -> { }
-
-                    else -> {
-                        WorkspaceRepository.lightsChain.onMidiInput(
-                            inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 127),
-                            offset = event.offset
-                        )
-
-                        WorkspaceRepository.samplingChain.onMidiInput(
-                            inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 127),
-                            offset = event.offset
-                        )
-                    }
-                }
-            }
-
-            is WorkspaceContract.Event.OnReleaseVirtualDevice -> {
-                if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) {
-                    WorkspaceRepository.lightsChain.onMidiInput(
-                        inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 0),
-                        offset = event.offset
-                    )
-
-                    WorkspaceRepository.samplingChain.onMidiInput(
-                        inputData = MidiInputData((event.y + event.layout.offsetY) * 10 + event.x, 0),
-                        offset = event.offset
-                    )
-                }
-            }
         }
     }
 
     fun changeDeviceConfig(event: WorkspaceContract.Event.OnChangeDeviceConfig) {
-        state.value.viewportElements[event.index].apply {
+        state.value.viewportElements.find { it.selectionUUID == event.uuid }?.apply {
             deviceConfig.input?.close()
             deviceConfig.launchpadDevice?.midiOutput?.close()
 

@@ -12,6 +12,10 @@ interface ViewportElement : Selectable {
     var position: MutableState<Offset>
     val size: Size
     val shape: Shape
-    val actions: @Composable RowScope.() -> Unit
-    val content: @Composable () -> Unit
+
+    @Composable
+    fun Content()
+
+    @Composable
+    fun Actions(scope: RowScope)
 }

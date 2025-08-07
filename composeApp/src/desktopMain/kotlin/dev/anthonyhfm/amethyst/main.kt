@@ -36,8 +36,6 @@ fun main() {
         setupAboutHandler()
     }
 
-    println(System.getProperty("app.version"))
-
     application {
         if (GlobalSettings.enableDiscordRPC) {
             rpc.start()

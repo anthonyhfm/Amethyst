@@ -21,10 +21,10 @@ interface WorkspaceContract {
             val offset: Offset
         ) : Event
         data class OnPanViewport(val offset: Offset) : Event
-        data class OnClickDeviceConfigure(val index: Int) : Event
+        data class OnClickDeviceConfigure(val uuid: String) : Event
 
         data class OnChangeDeviceConfig(
-            val index: Int,
+            val uuid: String,
             var inputPort: MidiPortDetails?,
             var outputPort: MidiPortDetails?,
         ) : Event
@@ -32,14 +32,11 @@ interface WorkspaceContract {
         data class AddDeviceToViewport(val device: LaunchpadViewportElement) : Event
 
         data class AddChainDevice(val device: ChainDevice<*>, val atIndex: Int? = null) : Event
-
-        data class OnPressVirtualDevice(val x: Int, val y: Int, val offset: Offset, val layout: LaunchpadLayout) : Event
-        data class OnReleaseVirtualDevice(val x: Int, val y: Int, val offset: Offset, val layout: LaunchpadLayout) : Event
     }
 
     data class State(
         val mode: WorkspaceMode,
-        val showDeviceConfigurator: Int? = null,
+        val showDeviceConfigurator: String? = null,
         val showDevicePicker: Boolean = false,
         val viewportState: ViewportState = ViewportState(),
         val viewportElements: List<LaunchpadViewportElement> = emptyList()
