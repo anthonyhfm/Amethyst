@@ -16,8 +16,6 @@ sealed interface DesktopPlatform {
                 return Windows
             }
 
-            println(system)
-
             return Unknown
         }
     }

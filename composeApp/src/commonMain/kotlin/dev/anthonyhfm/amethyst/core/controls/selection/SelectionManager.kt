@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 object SelectionManager {
     val selections: MutableStateFlow<List<Selectable>> = MutableStateFlow(emptyList())
 
-    fun select(element: Selectable, single: Boolean = false) {
+    fun select(element: Selectable, single: Boolean = true) {
         if (single) {
             selections.value = emptyList()
         } else if (selections.value.find { it::class.simpleName == element::class.simpleName } != null) {
@@ -13,7 +13,7 @@ object SelectionManager {
         }
 
         if (selections.value.find { it.selectionUUID == element.selectionUUID } == null) {
-            selections.value = selections.value + element
+            selections.value += element
         }
     }
 

@@ -17,6 +17,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.formdev.flatlaf.util.SystemInfo
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.FlatUtilityLaf
@@ -25,6 +26,8 @@ import dev.anthonyhfm.amethyst.start.ui.ProjectsView
 import dev.anthonyhfm.amethyst.ui.modifier.platformPaddingTop
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
+import javax.swing.JDialog
+import javax.swing.JFrame
 import javax.swing.UIManager
 import kotlin.system.exitProcess
 

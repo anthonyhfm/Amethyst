@@ -64,21 +64,31 @@ data class StateChain(
         fun pack(chain: Chain): StateChain {
             val stateChain = StateChain(
                 devices = chain.devices.value.map {
-                    if (it is GroupChainDevice) {
-                        it.packState()
-                    } else if (it is MultiGroupChainDevice) {
-                        it.packState()
-                    } else if (it is ChokeChainDevice) {
-                        it.state.value.copy(
-                            stateChain = pack(it.state.value.chain)
-                        )
-                    } else {
-                        it.state.value
-                    }
+                    packDevice(it)
                 }
             )
 
             return stateChain
+        }
+
+        fun packDevice(device: ChainDevice<*>): DeviceState {
+            return when (device) {
+                is GroupChainDevice -> {
+                    device.packState()
+                }
+
+                is MultiGroupChainDevice -> {
+                    device.packState()
+                }
+
+                is ChokeChainDevice -> {
+                    device.state.value.copy(
+                        stateChain = pack(device.state.value.chain)
+                    )
+                }
+
+                else -> device.state.value
+            }
         }
 
         fun unpackDevice(device: DeviceState): ChainDevice<*> {
