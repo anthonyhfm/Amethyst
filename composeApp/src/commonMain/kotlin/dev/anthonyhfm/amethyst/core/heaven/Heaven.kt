@@ -42,7 +42,7 @@ object Heaven {
     var fps: Int = GlobalSettings.perforanceFPS
 
     private val stopWatch = StopWatch()
-    private val renderScope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
+    private val renderScope = CoroutineScope(Dispatchers.Main.limitedParallelism(1) + SupervisorJob())
 
     private fun msToTicks(ms: Double): Long = (ms / 1000 * stopWatch.frequency).toLong()
 
