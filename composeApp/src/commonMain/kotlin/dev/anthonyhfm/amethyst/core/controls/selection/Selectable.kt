@@ -19,4 +19,10 @@ interface Selectable {
         val device: dev.anthonyhfm.amethyst.devices.ChainDevice<*>,
         override val selectionUUID: String = device.selectionUUID
     ) : Selectable
+
+    data class GradientStep(
+        val parent: GradientChainDevice,
+        val stepIndex: Int,
+        override val selectionUUID: String = parent.state.value.gradientData[stepIndex].selectionUUID
+    ) : Selectable
 }

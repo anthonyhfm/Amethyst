@@ -25,11 +25,14 @@ import androidx.compose.ui.unit.dp
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.gradient.ui.GradientEditorBar
@@ -50,15 +53,17 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        var selectedColor: Int? by remember { mutableStateOf(null) }
+        val selectedColor: Int? = selections.filterIsInstance<Selectable.GradientStep>()
+            .find { it.parent == this }
+            ?.stepIndex
 
         LaunchedEffect(selectedColor) {
             if (selectedColor != null) {
                 controller.selectByColor(
                     color = Color(
-                        deviceState.gradientData[selectedColor!!].r,
-                        deviceState.gradientData[selectedColor!!].g,
-                        deviceState.gradientData[selectedColor!!].b,
+                        deviceState.gradientData[selectedColor].r,
+                        deviceState.gradientData[selectedColor].g,
+                        deviceState.gradientData[selectedColor].b,
                     ),
                     fromUser = false
                 )
@@ -93,7 +98,11 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
                     GradientEditorBar(
                         selectedColor = selectedColor,
                         onSelectionChange = {
-                            selectedColor = it
+                            if (it != null) {
+                                SelectionManager.select(Selectable.GradientStep(this@GradientChainDevice, it))
+                            } else {
+                                SelectionManager.clear()
+                            }
                         },
                         colors = deviceState.gradientData,
                         onGradientDataEmit = { data ->
@@ -281,5 +290,7 @@ data class GradientChainDeviceState(
         val r: Float,
         val g: Float,
         val b: Float,
-    )
+
+        override val selectionUUID: String = UUID.randomUUID(),
+    ) : Selectable
 }

@@ -31,6 +31,10 @@ object ShortcutManager {
         }
 
         if (keyEvent.isCtrlPressed && keyEvent.key == Key.V) {
+            if (SelectionManager.selections.value.isNotEmpty()) {
+                ClipboardManager.paste()
+                return true
+            }
             return true
         }
 
