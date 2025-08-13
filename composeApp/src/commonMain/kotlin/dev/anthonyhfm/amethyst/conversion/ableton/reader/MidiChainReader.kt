@@ -20,4 +20,12 @@ class MidiChainReader {
             }.flatten()
         )
     }
+
+    fun getChainWeight(xmlElement: XmlElement): Int {
+        val chainDevices = xmlElement.querySelector("DeviceChain")[0]
+            .querySelector("DeviceChain")[0]
+            .querySelector("Devices")[0]
+
+        return chainDevices.getRecursiveChildrenCount()
+    }
 }

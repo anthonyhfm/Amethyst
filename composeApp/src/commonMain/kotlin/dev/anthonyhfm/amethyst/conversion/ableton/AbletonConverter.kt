@@ -27,20 +27,18 @@ object AbletonConverter : AmethystConverter {
 
         val xmlTracks: List<XmlElement> = abletonXml.querySelector("MidiTrack")
 
-        val lightsTrackXML = xmlTracks.find { track ->
-            val name = track.querySelector("Name")[0]
-                .querySelector("UserName")[0]
-                .attributes["Value"]
+        // Get the two tracks (audio, lights)
+        val sortedTracks = xmlTracks.sortedByDescending {
+            MidiChainReader()
+                .getChainWeight(it)
+        }.chunked(2).first()
 
-            name == config.launchpads[0].lightsTrack // TODO: Expand for multiple launchpads
+        val lightsTrackXML = sortedTracks.find {
+            it.querySelector("InstrumentGroupDevice").isEmpty()
         }
 
-        val audioTrackXML = xmlTracks.find { track ->
-            val name = track.querySelector("Name")[0]
-                .querySelector("UserName")[0]
-                .attributes["Value"]
-
-            name == config.launchpads[0].audioTrack // TODO: Expand for multiple launchpads
+        val audioTrackXML = sortedTracks.find {
+            it.querySelector("InstrumentGroupDevice").isNotEmpty()
         }
 
         return SaveableWorkspaceData(

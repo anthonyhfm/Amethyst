@@ -33,6 +33,18 @@ data class XmlElement(
 
         return results
     }
+
+    fun getRecursiveChildrenCount(): Int {
+        var count = 0
+
+        count += children.size
+
+        for (child in children) {
+            count += child.getRecursiveChildrenCount()
+        }
+
+        return count
+    }
 }
 
 object SimpleXmlParser {
