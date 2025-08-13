@@ -319,6 +319,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                     DraggableItem(
                         state = dragAndDropState,
                         key = device.selectionUUID,
+                        dragAfterLongPress = true,
                         data = device,
                     ) {
                         TitleBarModifierProvider(

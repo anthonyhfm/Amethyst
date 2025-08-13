@@ -80,10 +80,8 @@ fun WorkspaceChainEditor(
                                 DraggableItem(
                                     state = dragAndDropState,
                                     key = device.selectionUUID,
+                                    dragAfterLongPress = true,
                                     data = device,
-                                    draggableContent = {
-                                        DeviceDraggingPreview(device)
-                                    }
                                 ) {
                                     TitleBarModifierProvider(
                                         Modifier
