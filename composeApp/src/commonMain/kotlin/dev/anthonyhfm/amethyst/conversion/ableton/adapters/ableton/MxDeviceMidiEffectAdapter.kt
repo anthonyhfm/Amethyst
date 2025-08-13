@@ -31,7 +31,9 @@ class MxDeviceMidiEffectAdapter(
                 return DepthsSelectorAdapter(readDataBlob(blob.text!!)).toDeviceStates()
             }
 
-            MaxDeviceMatcher(134927, 42016) -> { // MidiExt v3.0
+            MaxDeviceMatcher(134927, 42016),
+            MaxDeviceMatcher(23292, 61071),
+            MaxDeviceMatcher(159503, 62613),-> { // MidiExt v3.0
                 return MidiExt3Adapter(xml).toDeviceStates()
             }
 
