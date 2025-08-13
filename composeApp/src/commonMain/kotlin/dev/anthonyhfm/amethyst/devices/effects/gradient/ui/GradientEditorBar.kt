@@ -34,7 +34,7 @@ import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 
 @Composable
 fun GradientEditorBar(
-    selectedColor: Int?,
+    selectedColor: String?,
     onSelectionChange: (Int?) -> Unit,
     colors: List<GradientChainDeviceState.GradientColor>,
     onGradientDataEmit: (List<GradientChainDeviceState.GradientColor>) -> Unit,
@@ -90,9 +90,9 @@ fun GradientEditorBar(
                         .offset(
                             x = maxWidth * pos
                         )
-                        .scale(if (selectedColor == index) 1.1f else 1f)
+                        .scale(if (selectedColor == colors.filterIndexed { i, _ -> i == index }.firstOrNull()?.selectionUUID) 1.1f else 1f)
                         .shadow(
-                            elevation = if (selectedColor == index) 16.dp else 6.dp,
+                            elevation = if (selectedColor == colors.filterIndexed { i, _ -> i == index }.firstOrNull()?.selectionUUID) 16.dp else 6.dp,
                             shape = CircleShape
                         )
                         .clip(CircleShape)
@@ -105,7 +105,7 @@ fun GradientEditorBar(
                             shape = CircleShape
                         )
                         .clickable {
-                            if (selectedColor == index) {
+                            if (selectedColor == colors.filterIndexed { i, _ -> i == index }.firstOrNull()?.selectionUUID) {
                                 onSelectionChange(null)
                             } else {
                                 onSelectionChange(index)

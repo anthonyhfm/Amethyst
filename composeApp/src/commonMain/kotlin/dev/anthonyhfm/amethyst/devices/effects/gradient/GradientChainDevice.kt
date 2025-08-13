@@ -53,22 +53,9 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        val selectedColor: Int? = selections.filterIsInstance<Selectable.GradientStep>()
+        val selectedColor: String? = selections.filterIsInstance<Selectable.GradientStep>()
             .find { it.parent == this }
-            ?.stepIndex
-
-        LaunchedEffect(selectedColor) {
-            if (selectedColor != null) {
-                controller.selectByColor(
-                    color = Color(
-                        deviceState.gradientData[selectedColor].r,
-                        deviceState.gradientData[selectedColor].g,
-                        deviceState.gradientData[selectedColor].b,
-                    ),
-                    fromUser = false
-                )
-            }
-        }
+            ?.selectionUUID
 
         AmethystDevice(
             title = "Gradient",
@@ -196,7 +183,11 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
                                 state.update {
                                     val list = it.gradientData.toMutableList()
 
-                                    list[selectedColor!!] = list[selectedColor!!].copy(
+                                    val index = list.indexOfFirst { selectionUUID == selectedColor }
+
+                                    if (index == -1) return@update it
+
+                                    list[index] = list[index].copy(
                                         r = color.color.red,
                                         g = color.color.green,
                                         b = color.color.blue
