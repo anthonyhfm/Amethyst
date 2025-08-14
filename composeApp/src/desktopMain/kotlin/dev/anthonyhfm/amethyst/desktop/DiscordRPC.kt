@@ -8,17 +8,19 @@ class DiscordRPC {
     val client: RichClient = RichClient(appId)
 
     fun start() {
-        client.connect()
+        try {
+            client.connect()
 
-        client.update {
-            type = ActivityType.GAME
-            details = "Version 1.0.0"
-            state = "Development Mode"
+            client.update {
+                type = ActivityType.GAME
+                details = "Version 1.0.0"
+                state = "Development Mode"
 
-            assets {
-                largeImage = "amethyst_studio_logo"
-                largeText = "Amethyst"
+                assets {
+                    largeImage = "amethyst_studio_logo"
+                    largeText = "Amethyst"
+                }
             }
-        }
+        } catch (e: Exception) { /* Do nothing */ }
     }
 }
