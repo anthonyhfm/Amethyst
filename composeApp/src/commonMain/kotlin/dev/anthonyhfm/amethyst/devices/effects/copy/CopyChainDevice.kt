@@ -426,8 +426,27 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
     }
 
     override fun midiEnter(n: List<Signal>) {
-        n.forEach {
-            midiExit?.invoke(listOf(it))
+        when (state.value.type) {
+            CopyChainDeviceState.CopyType.STATIC -> {
+                state.value.offsets.forEachIndexed { index, offset ->
+                    midiExit?.invoke(
+                        n.map { signal ->
+                            signal.copy(
+                                x = signal.x + offset.first,
+                                y = signal.y - offset.second
+                            )
+                        }
+                    )
+                }
+            }
+
+            CopyChainDeviceState.CopyType.INTERPOLATE -> {
+                // Handle interpolate copy logic
+            }
+
+            CopyChainDeviceState.CopyType.RANDOM -> {
+
+            }
         }
 
         midiExit?.invoke(n)
