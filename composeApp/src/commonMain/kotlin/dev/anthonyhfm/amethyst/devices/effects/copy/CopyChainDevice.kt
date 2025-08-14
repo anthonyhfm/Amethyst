@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
@@ -85,7 +86,7 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(160.dp + 52.dp + (deviceState.offsets.size * 126.dp) +  DividerDefaults.Thickness)
+                .width(160.dp + 52.dp + (deviceState.offsets.size * 130.dp) +  DividerDefaults.Thickness)
         ) {
             Row {
                 Column(
@@ -116,6 +117,7 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                     DropdownMenu(
                         expanded = openTypePicker,
                         onDismissRequest = { openTypePicker = false },
+                        offset = DpOffset(x = 0.dp, y = 2.dp)
                     ) {
                         CopyChainDeviceState.CopyType.entries.forEach { type ->
                             MenuItem(
@@ -136,12 +138,15 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                         }
                     }
 
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                    ) {
                         Text(
                             text = "Isolation",
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 4.dp)
                         )
+
                         AssistChip(
                             onClick = {
                                 openIsolationPicker = true
@@ -160,10 +165,10 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                                 )
                             }
                         )
-
                         DropdownMenu(
                             expanded = openIsolationPicker,
                             onDismissRequest = { openIsolationPicker = false },
+                            offset = DpOffset(x = 0.dp, y = 24.dp)
                         ) {
                             CopyChainDeviceState.IsolationType.entries.forEach { type ->
                                 MenuItem(
@@ -241,7 +246,23 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
 
                 Row {
                     deviceState.offsets.forEachIndexed { index, offset ->
-                        Offset()
+                        Offset(
+                            index = index,
+                            offset = offset,
+                            onChangeOffset = { newOffset ->
+                                state.update {
+                                    it.copy(
+                                        offsets = it.offsets.mapIndexed { i, pair ->
+                                            if (i == index) {
+                                                newOffset
+                                            } else {
+                                                pair
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        )
                     }
 
                     AddOffsetButton(
@@ -281,10 +302,14 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
     }
 
     @Composable
-    fun Offset() {
+    fun Offset(
+        index: Int,
+        offset: Pair<Int, Int>,
+        onChangeOffset: (Pair<Int, Int>) -> Unit
+    ) {
         Column(
             modifier = Modifier
-                .width(126.dp)
+                .width(130.dp)
                 .fillMaxHeight()
                 .padding(start = 6.dp)
                 .padding(vertical = 6.dp)
@@ -300,6 +325,26 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                 style = MaterialTheme.typography.bodyMedium,
             )
 
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceAround,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Text(
+                    text = "X: ${offset.first}",
+                    style = MaterialTheme.typography.labelMedium,
+                    lineHeight = MaterialTheme.typography.labelMedium.fontSize
+                )
+
+                Text(
+                    text = "Y: ${offset.second}",
+                    style = MaterialTheme.typography.labelMedium,
+                    lineHeight = MaterialTheme.typography.labelMedium.fontSize
+                )
+            }
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -307,7 +352,9 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                     modifier = Modifier
                         .clip(CircleShape)
                         .size(42.dp)
-                        .clickable { },
+                        .clickable {
+                            onChangeOffset(offset.copy(second = offset.second + 1))
+                        },
 
                     contentAlignment = Alignment.Center
                 ) {
@@ -324,23 +371,27 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .size(42.dp)
-                            .clickable { },
+                            .size(38.dp)
+                            .clickable {
+                                onChangeOffset(offset.copy(first = offset.first - 1))
+                            },
 
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "up")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "left")
                     }
 
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .size(42.dp)
-                            .clickable { },
+                            .size(38.dp)
+                            .clickable {
+                                onChangeOffset(offset.copy(first = offset.first + 1))
+                            },
 
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.ArrowForward, contentDescription = "up")
+                        Icon(Icons.Default.ArrowForward, contentDescription = "right")
                     }
                 }
 
@@ -348,12 +399,14 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                     modifier = Modifier
                         .offset(y = -12.dp)
                         .clip(CircleShape)
-                        .size(42.dp)
-                        .clickable { },
+                        .size(38.dp)
+                        .clickable {
+                            onChangeOffset(offset.copy(second = offset.second - 1))
+                        },
 
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.ArrowDownward, contentDescription = "up")
+                    Icon(Icons.Default.ArrowDownward, contentDescription = "down")
                 }
             }
 
@@ -365,7 +418,7 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                 },
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .padding(4.dp)
+                    .padding(bottom = 4.dp)
             ) {
                 Icon(Icons.Default.Remove, contentDescription = "Remove Offset")
             }

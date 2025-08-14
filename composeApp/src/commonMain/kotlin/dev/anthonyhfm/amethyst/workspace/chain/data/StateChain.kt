@@ -11,6 +11,8 @@ import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.flip.FlipChainDevice
@@ -159,6 +161,12 @@ data class StateChain(
 
                 is KeyframesChainDeviceContract.KeyframesChainDeviceState -> {
                     KeyframesChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is CopyChainDeviceState -> {
+                    CopyChainDevice().apply {
                         state.update { device }
                     }
                 }
