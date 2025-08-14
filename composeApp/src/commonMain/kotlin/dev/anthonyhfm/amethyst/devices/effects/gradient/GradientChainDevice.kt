@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,6 +58,15 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
             .find { it.parent == this }
             ?.selectionUUID
 
+        LaunchedEffect(selectedColor) {
+            if (selectedColor != null) {
+                val color = deviceState.gradientData.find { it.selectionUUID == selectedColor }
+                if (color != null) {
+                    controller.selectByColor(Color(color.r, color.g, color.b), false)
+                }
+            }
+        }
+
         AmethystDevice(
             title = "Gradient",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
@@ -82,40 +92,42 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
 
                     verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 ) {
-                    GradientEditorBar(
-                        selectedColor = selectedColor,
-                        onSelectionChange = {
-                            if (it != null) {
-                                SelectionManager.select(Selectable.GradientStep(this@GradientChainDevice, it))
-                            } else {
-                                SelectionManager.clear()
-                            }
-                        },
-                        colors = deviceState.gradientData,
-                        onGradientDataEmit = { data ->
-                            state.update {
-                                it.copy(
-                                    gradientData = data
+                    key(deviceState.gradientData.size) {
+                        GradientEditorBar(
+                            selectedColor = selectedColor,
+                            onSelectionChange = {
+                                if (it != null) {
+                                    SelectionManager.select(Selectable.GradientStep(this@GradientChainDevice, it))
+                                } else {
+                                    SelectionManager.clear()
+                                }
+                            },
+                            colors = deviceState.gradientData,
+                            onGradientDataEmit = { data ->
+                                state.update {
+                                    it.copy(
+                                        gradientData = data
+                                    )
+                                }
+                            },
+                            onAddGradientPoint = { position ->
+                                val newColor = GradientChainDeviceState.GradientColor(
+                                    r = 1.0f,
+                                    g = 1.0f,
+                                    b = 1.0f,
+                                    position = position
                                 )
+                                val updatedColors = deviceState.gradientData.toMutableList().apply {
+                                    add(newColor)
+                                }
+                                state.update {
+                                    it.copy(
+                                        gradientData = updatedColors
+                                    )
+                                }
                             }
-                        },
-                        onAddGradientPoint = { position ->
-                            val newColor = GradientChainDeviceState.GradientColor(
-                                r = 1.0f,
-                                g = 1.0f,
-                                b = 1.0f,
-                                position = position
-                            )
-                            val updatedColors = deviceState.gradientData.toMutableList().apply {
-                                add(newColor)
-                            }
-                            state.update {
-                                it.copy(
-                                    gradientData = updatedColors
-                                )
-                            }
-                        }
-                    )
+                        )
+                    }
 
                     Row(
                         modifier = Modifier
@@ -180,22 +192,23 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
                         HsvColorPicker(
                             controller = controller,
                             onColorChanged = { color ->
-                                state.update {
-                                    val list = it.gradientData.toMutableList()
+                                if (color.fromUser) {
+                                    state.update {
+                                        val list = it.gradientData.toMutableList()
+                                        val index = list.indexOfFirst { it.selectionUUID == selectedColor }
 
-                                    val index = list.indexOfFirst { selectionUUID == selectedColor }
+                                        if (index == -1) return@update it
 
-                                    if (index == -1) return@update it
+                                        list[index] = list[index].copy(
+                                            r = color.color.red,
+                                            g = color.color.green,
+                                            b = color.color.blue
+                                        )
 
-                                    list[index] = list[index].copy(
-                                        r = color.color.red,
-                                        g = color.color.green,
-                                        b = color.color.blue
-                                    )
-
-                                    return@update it.copy(
-                                        gradientData = list
-                                    )
+                                        return@update it.copy(
+                                            gradientData = list
+                                        )
+                                    }
                                 }
                             },
                             modifier = Modifier
