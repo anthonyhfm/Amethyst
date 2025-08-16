@@ -121,27 +121,54 @@ class RotateChainDevice : ChainDevice<RotateChainDeviceState>() {
 
     override fun midiEnter(n: List<Signal>) {
         val bounds = WorkspaceRepository.bounds
+        val rightEdgeX = bounds.first.x + bounds.second.width - 1
+        val bottomEdgeY = bounds.first.y + bounds.second.height - 1
 
-        when (state.value.mode) {
-            RotateChainDeviceState.RotateMode.DEGREES_270 -> {
-                midiExit?.invoke(
-                    n.map {
-                        it.copy(
-                            x = it.y,
-                            y = it.x,
-                        )
-                    }
-                )
-            }
+        val rotatedSignals = n.map {
+            when (state.value.mode) {
+                RotateChainDeviceState.RotateMode.DEGREES_90 -> {
+                    val relativeX = it.x - bounds.first.x
+                    val relativeY = it.y - bounds.first.y
 
-            else -> {
-                midiExit?.invoke(n)
+                    val rotatedRelativeX = relativeY
+                    val rotatedRelativeY = bounds.second.width - 1 - relativeX
+
+                    val rotatedX = bounds.first.x + rotatedRelativeX
+                    val rotatedY = bounds.first.y + rotatedRelativeY
+
+                    it.copy(x = rotatedX, y = rotatedY)
+                }
+
+                RotateChainDeviceState.RotateMode.DEGREES_180 -> {
+                    val distanceFromRight = rightEdgeX - it.x
+                    val distanceFromBottom = bottomEdgeY - it.y
+
+                    val rotatedX = bounds.first.x + distanceFromRight
+                    val rotatedY = bounds.first.y + distanceFromBottom
+
+                    it.copy(x = rotatedX, y = rotatedY)
+                }
+
+                RotateChainDeviceState.RotateMode.DEGREES_270 -> {
+                    val relativeX = it.x - bounds.first.x
+                    val relativeY = it.y - bounds.first.y
+
+                    val rotatedRelativeX = bounds.second.height - 1 - relativeY
+                    val rotatedRelativeY = relativeX
+
+                    val rotatedX = bounds.first.x + rotatedRelativeX
+                    val rotatedY = bounds.first.y + rotatedRelativeY
+
+                    it.copy(x = rotatedX, y = rotatedY)
+                }
             }
         }
 
-        if (state.value.bypass) {
-            midiExit?.invoke(n)
-        }
+        midiExit?.invoke(rotatedSignals.toMutableList().apply {
+            if (state.value.bypass) {
+                addAll(n)
+            }
+        })
     }
 }
 
