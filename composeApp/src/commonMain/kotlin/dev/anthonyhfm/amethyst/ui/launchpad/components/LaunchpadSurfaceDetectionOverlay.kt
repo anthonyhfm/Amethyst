@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.ui.launchpad.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -102,15 +101,15 @@ private fun calculatePadFromOffset(
 ): Pair<Int, Int>? {
     if (layoutSize.width == 0 || layoutSize.height == 0) return null
 
-    val padWidth = layoutSize.width.toFloat() / layoutType.x
-    val padHeight = layoutSize.height.toFloat() / layoutType.y
+    val padWidth = layoutSize.width.toFloat() / layoutType.cols
+    val padHeight = layoutSize.height.toFloat() / layoutType.rows
 
     val col = floor(offset.x / padWidth).toInt()
     val row = floor(offset.y / padHeight).toInt()
 
-    val actualRow = (layoutType.y - 1) - row
+    val actualRow = (layoutType.rows - 1) - row
 
-    if (col in 0 until layoutType.x && actualRow in 0 until layoutType.y) {
+    if (col in 0 until layoutType.cols && actualRow in 0 until layoutType.rows) {
         return Pair(
             col,
             actualRow

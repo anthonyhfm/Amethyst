@@ -21,12 +21,12 @@ fun GenericLaunchpadLayout(
             modifier = Modifier
                 .fillMaxSize(),
         ) {
-            for (row in (layoutType.y - 1) downTo 0) {
+            for (row in (layoutType.rows - 1) downTo 0) {
                 Row(
                     modifier = Modifier
                         .weight(1f)
                 ) {
-                    for (col in 0 until layoutType.x) {
+                    for (col in 0 until layoutType.cols) {
                         Box(
                             modifier = Modifier
                                 .weight(1f)

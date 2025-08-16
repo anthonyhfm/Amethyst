@@ -16,7 +16,6 @@ import dev.anthonyhfm.amethyst.core.midi.data.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.heaven.elements.Screen
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
-import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
@@ -28,7 +27,6 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 abstract class LaunchpadViewportElement(
@@ -88,18 +86,18 @@ abstract class LaunchpadViewportElement(
         val signal = Signal(
             origin = this,
             x = x + position.value.x.toInt(),
-            y = (layout.y - 1) - y + position.value.y.toInt(),
+            y = (layout.rows - 1) - y + position.value.y.toInt(),
             color = if (down) Color.White else Color.Black,
             layer = 0
         )
 
         when (mode) {
             is KeyframesWorkspaceMode -> {
-                mode.virtualDevicePress(x + position.value.x.toInt(), (layout.y - 1) - y + position.value.y.toInt())
+                mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
             }
 
             is CoordinateFilterWorkspaceMode -> {
-                mode.virtualDevicePress(x + position.value.x.toInt(), (layout.y - 1) - y + position.value.y.toInt())
+                mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
             }
 
             else -> {

@@ -233,8 +233,8 @@ object Heaven {
     private fun isSignalInDevice(signal: Signal, device: LaunchpadViewportElement): Boolean {
         val deviceX = device.position.value.x.toInt()
         val deviceY = device.position.value.y.toInt()
-        return signal.x in deviceX until deviceX + device.layout.x &&
-                signal.y in deviceY until deviceY + device.layout.y
+        return signal.x in deviceX until deviceX + device.layout.cols &&
+                signal.y in deviceY until deviceY + device.layout.rows
     }
 
     fun clear() {

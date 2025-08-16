@@ -1,20 +1,14 @@
 package dev.anthonyhfm.amethyst.devices.effects.copy
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,11 +22,8 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilledIconButton
@@ -50,14 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -65,11 +55,12 @@ import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import io.androidpoet.dropdown.MenuItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
+import kotlin.math.abs
 
 class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
     override val state = MutableStateFlow(CopyChainDeviceState())
@@ -108,7 +99,6 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                                 text = when (state.value.type) {
                                     CopyChainDeviceState.CopyType.STATIC -> "Static"
                                     CopyChainDeviceState.CopyType.INTERPOLATE -> "Interpolate"
-                                    CopyChainDeviceState.CopyType.RANDOM -> "Random"
                                 }
                             )
                         }
@@ -130,7 +120,6 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                                         text = when (type) {
                                             CopyChainDeviceState.CopyType.STATIC -> "Static"
                                             CopyChainDeviceState.CopyType.INTERPOLATE -> "Interpolate"
-                                            CopyChainDeviceState.CopyType.RANDOM -> "Random"
                                         }
                                     )
                                 }
@@ -159,8 +148,8 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                                 Text(
                                     text = when (state.value.isolate) {
                                         CopyChainDeviceState.IsolationType.NONE -> "None"
-                                        CopyChainDeviceState.IsolationType.ISOLATE_8x8 -> "8x8 Isolation"
-                                        CopyChainDeviceState.IsolationType.ISOLATE_10x10 -> "Full-Device"
+                                        CopyChainDeviceState.IsolationType.EDGELESS -> "Edgeless"
+                                        CopyChainDeviceState.IsolationType.FULL -> "Full"
                                     }
                                 )
                             }
@@ -180,8 +169,8 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
                                         Text(
                                             text = when (type) {
                                                 CopyChainDeviceState.IsolationType.NONE -> "None"
-                                                CopyChainDeviceState.IsolationType.ISOLATE_8x8 -> "8x8 Isolation"
-                                                CopyChainDeviceState.IsolationType.ISOLATE_10x10 -> "Full-Device"
+                                                CopyChainDeviceState.IsolationType.EDGELESS -> "Edgeless"
+                                                CopyChainDeviceState.IsolationType.FULL -> "Full"
                                             }
                                         )
                                     }
@@ -414,7 +403,11 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
 
             FilledIconButton(
                 onClick = {
-
+                    state.update {
+                        it.copy(
+                            offsets = it.offsets.filterIndexed { i, _ -> i != index }
+                        )
+                    }
                 },
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
@@ -425,32 +418,148 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
         }
     }
 
+    private fun bresenhamLine(x0: Int, y0: Int, x1: Int, y1: Int): List<Pair<Int, Int>> {
+        val points = mutableListOf<Pair<Int, Int>>()
+
+        var x = x0
+        var y = y0
+
+        val dx = abs(x1 - x0)
+        val dy = abs(y1 - y0)
+
+        val sx = if (x0 < x1) 1 else -1
+        val sy = if (y0 < y1) 1 else -1
+
+        var err = dx - dy
+
+        while (true) {
+            points.add(Pair(x, y))
+
+            if (x == x1 && y == y1) break
+
+            val e2 = 2 * err
+
+            if (e2 > -dy) {
+                err -= dy
+                x += sx
+            }
+
+            if (e2 < dx) {
+                err += dx
+                y += sy
+            }
+        }
+
+        return points
+    }
+
+    private fun animateSignalThroughOffsetsWithIsolation(originalSignal: Signal, offsets: List<Pair<Int, Int>>) {
+        val animationDuration = state.value.delayMs * (state.value.gate * 2).toInt()
+
+        val targets = mutableListOf<Pair<Int, Int>>()
+        targets.add(Pair(0, 0))
+        targets.addAll(offsets)
+
+        for (i in 0 until targets.size - 1) {
+            val startOffset = targets[i]
+            val endOffset = targets[i + 1]
+
+            val interpolationPoints = bresenhamLine(
+                startOffset.first, startOffset.second,
+                endOffset.first, endOffset.second
+            )
+
+            interpolationPoints.forEachIndexed { stepIndex, offset ->
+                val copiedSignal = originalSignal.copy(
+                    x = originalSignal.x + offset.first,
+                    y = originalSignal.y - offset.second
+                )
+
+                if (isSignalWithinDeviceBounds(copiedSignal, state.value.isolate)) {
+                    Heaven.schedule(
+                        job = {
+                            midiExit?.invoke(listOf(copiedSignal))
+                        },
+                        delayInMs = (state.value.delayMs * stepIndex).toDouble()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun isSignalWithinDeviceBounds(signal: Signal, isolationType: CopyChainDeviceState.IsolationType): Boolean {
+        if (isolationType == CopyChainDeviceState.IsolationType.NONE) {
+            return true
+        }
+
+        val originDevice = signal.origin as? LaunchpadViewportElement ?: return true
+
+        val absoluteX = signal.x
+        val absoluteY = signal.y
+
+        val layout = originDevice.layout
+        val deviceStartX = originDevice.position.value.x.toInt()
+        val deviceStartY = originDevice.position.value.y.toInt()
+        val deviceEndX = deviceStartX + originDevice.layout.cols
+        val deviceEndY = deviceStartY + originDevice.layout.rows
+
+        return when (isolationType) {
+            CopyChainDeviceState.IsolationType.EDGELESS -> {
+                val mainGridStartX = deviceStartX + layout.mainOffsetX + layout.offsetX
+                val mainGridStartY = deviceStartY + layout.mainOffsetY + layout.offsetY
+                val mainGridEndX = mainGridStartX + layout.mainGridMaxX
+                val mainGridEndY = mainGridStartY + layout.mainGridMaxY
+
+                absoluteX in mainGridStartX until mainGridEndX &&
+                absoluteY in mainGridStartY until mainGridEndY
+            }
+
+            CopyChainDeviceState.IsolationType.FULL -> {
+                absoluteX in deviceStartX until deviceEndX &&
+                absoluteY in deviceStartY until deviceEndY
+            }
+            else -> true
+        }
+    }
+
+    private fun filterSignalsForIsolation(signals: List<Signal>): List<Signal> {
+        return signals.filter { signal ->
+            isSignalWithinDeviceBounds(signal, state.value.isolate)
+        }
+    }
+
     override fun midiEnter(n: List<Signal>) {
         when (state.value.type) {
             CopyChainDeviceState.CopyType.STATIC -> {
-                state.value.offsets.forEachIndexed { index, offset ->
-                    midiExit?.invoke(
-                        n.map { signal ->
-                            signal.copy(
-                                x = signal.x + offset.first,
-                                y = signal.y - offset.second
-                            )
-                        }
-                    )
+                state.value.offsets.forEach { offset ->
+                    val copiedSignals = n.map { signal ->
+                        signal.copy(
+                            x = signal.x + offset.first,
+                            y = signal.y - offset.second
+                        )
+                    }
+
+                    val filteredSignals = filterSignalsForIsolation(copiedSignals)
+
+                    if (filteredSignals.isNotEmpty()) {
+                        midiExit?.invoke(filteredSignals)
+                    }
                 }
             }
 
             CopyChainDeviceState.CopyType.INTERPOLATE -> {
-                // Handle interpolate copy logic
-            }
-
-            CopyChainDeviceState.CopyType.RANDOM -> {
-
+                if (state.value.offsets.isNotEmpty()) {
+                    n.forEach { signal ->
+                        animateSignalThroughOffsetsWithIsolation(signal, state.value.offsets)
+                    }
+                }
             }
         }
 
         midiExit?.invoke(n)
     }
+
+
 }
 
 @Serializable
@@ -460,17 +569,16 @@ data class CopyChainDeviceState(
     val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
     val offsets: List<Pair<Int, Int>> = emptyList(),
     val delayMs: Int = 0,
-    val gate: Float = 0.5f, // 100% = 0.5f, 200% = 1.0f
+    val gate: Float = 0.5f // 100% = 0.5f, 200% = 1.0f
 ) : DeviceState() {
     enum class CopyType {
         STATIC,
         INTERPOLATE,
-        RANDOM
     }
 
     enum class IsolationType {
         NONE,
-        ISOLATE_8x8,
-        ISOLATE_10x10,
+        EDGELESS,
+        FULL,
     }
 }
