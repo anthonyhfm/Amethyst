@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.workspace
 
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -174,6 +175,26 @@ class WorkspaceViewModel(
                     it.copy(
                         viewportState = it.viewportState.copy(
                             offset = it.viewportState.offset + event.offset
+                        )
+                    )
+                }
+            }
+
+            is WorkspaceContract.Event.OnZoomViewport -> {
+                state.update {
+                    val currentZoom = it.viewportState.zoom
+                    val newZoom = (currentZoom + event.zoomDelta).coerceIn(0.5f, 2.0f)
+
+                    val zoomChange = newZoom / currentZoom
+                    val newOffset = Offset(
+                        x = event.zoomCenter.x + (it.viewportState.offset.x - event.zoomCenter.x) * zoomChange,
+                        y = event.zoomCenter.y + (it.viewportState.offset.y - event.zoomCenter.y) * zoomChange
+                    )
+
+                    it.copy(
+                        viewportState = it.viewportState.copy(
+                            offset = newOffset,
+                            zoom = newZoom
                         )
                     )
                 }

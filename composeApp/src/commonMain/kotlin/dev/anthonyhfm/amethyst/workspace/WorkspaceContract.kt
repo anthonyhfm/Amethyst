@@ -22,6 +22,7 @@ interface WorkspaceContract {
             val offset: Offset
         ) : Event
         data class OnPanViewport(val offset: Offset) : Event
+        data class OnZoomViewport(val zoomDelta: Float, val zoomCenter: Offset) : Event
         data class OnClickDeviceConfigure(val uuid: String) : Event
 
         data class OnChangeDeviceConfig(

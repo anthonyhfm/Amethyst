@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,9 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -56,11 +56,32 @@ fun WorkspaceViewport(
             .onSizeChanged { size ->
                 viewportSize.value = Size(size.width.toFloat(), size.height.toFloat())
             }
+            .pointerInput(Unit) {
+                detectTransformGestures(
+                    onGesture = { centroid, _, zoom, _ ->
+                        val zoomDelta = (zoom - 1f) * 0.1f
+                        onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, centroid))
+                    }
+                )
+            }
+            .pointerInput("scroll") {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val scrollDelta = event.changes.firstOrNull()?.scrollDelta
+                        if (scrollDelta != null && scrollDelta.y != 0f) {
+                            val zoomDelta = -scrollDelta.y * 0.05f
+                            val mousePosition = event.changes.first().position
+                            onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, mousePosition))
+                        }
+                    }
+                }
+            }
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
+                .pointerInput("pan") {
                     detectDragGestures(
                         onDrag = { input, offset ->
                             onEvent(WorkspaceContract.Event.OnPanViewport(offset))
@@ -78,14 +99,22 @@ fun WorkspaceViewport(
                     }
                 }
         ) {
-            for (x in ((viewportState.offset.x % gridSize).toInt() - gridSize) until size.width.toInt() step gridSize) {
-                for (y in ((viewportState.offset.y % gridSize).toInt() - gridSize) until size.height.toInt() step gridSize) {
+            val scaledGridSize = gridSize * viewportState.zoom
+            val startX = (viewportState.offset.x % scaledGridSize) - scaledGridSize
+            val startY = (viewportState.offset.y % scaledGridSize) - scaledGridSize
+
+            var x = startX
+            while (x < size.width) {
+                var y = startY
+                while (y < size.height) {
                     drawCircle(
                         color = color,
-                        radius = 2f * density,
-                        center = Offset(x.toFloat(), y.toFloat())
+                        radius = 2f * density * viewportState.zoom,
+                        center = Offset(x, y)
                     )
+                    y += scaledGridSize
                 }
+                x += scaledGridSize
             }
         }
 
@@ -96,15 +125,20 @@ fun WorkspaceViewport(
             BoxWithConstraints(
                 modifier = Modifier
                     .offset {
-                        val xOffset = (element.position.value.x * gridSize + viewportState.offset.x).roundToInt()
-                        val yOffset = (element.position.value.y * gridSize + viewportState.offset.y).roundToInt()
+                        val scaledGridSize = gridSize * viewportState.zoom
+                        val xOffset = (element.position.value.x * scaledGridSize + viewportState.offset.x).roundToInt()
+                        val yOffset = (element.position.value.y * scaledGridSize + viewportState.offset.y).roundToInt()
                         IntOffset(xOffset, yOffset)
                     }
-                    .scale(1f)
+                    .graphicsLayer {
+                        scaleX = viewportState.zoom
+                        scaleY = viewportState.zoom
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    }
                     .then(
                         other = if (selected) {
                             Modifier
-                                .border(2.dp, MaterialTheme.colorScheme.primary, element.shape)
+                                .border((2 / viewportState.zoom).dp, MaterialTheme.colorScheme.primary, element.shape)
                         } else Modifier
                     )
                     .pointerInput(Unit) {
@@ -123,26 +157,21 @@ fun WorkspaceViewport(
 
                                 draggingOffset += offset
 
-                                // Calculate accumulated movement in grid units
-                                val accumulatedGridX = draggingOffset.x / gridSize
-                                val accumulatedGridY = draggingOffset.y / gridSize
+                                val scaledGridSize = gridSize * viewportState.zoom
+                                val accumulatedGridX = draggingOffset.x / scaledGridSize
+                                val accumulatedGridY = draggingOffset.y / scaledGridSize
 
-                                // Check if we've moved at least one grid unit in any direction
                                 if (abs(accumulatedGridX) >= 1f || abs(accumulatedGridY) >= 1f) {
-                                    // Calculate grid movement (whole grid units only)
                                     val gridMoveX = accumulatedGridX.toInt()
                                     val gridMoveY = accumulatedGridY.toInt()
 
-                                    // Only move if we have at least one whole grid unit of movement
                                     if (gridMoveX != 0 || gridMoveY != 0) {
-                                        // Calculate new position in grid units
                                         val newX = element.position.value.x + gridMoveX
                                         val newY = element.position.value.y + gridMoveY
 
-                                        // Subtract the applied movement from the accumulated offset
                                         draggingOffset = Offset(
-                                            draggingOffset.x - (gridMoveX * gridSize),
-                                            draggingOffset.y - (gridMoveY * gridSize)
+                                            draggingOffset.x - (gridMoveX * scaledGridSize),
+                                            draggingOffset.y - (gridMoveY * scaledGridSize)
                                         )
 
                                         onEvent(
@@ -176,7 +205,7 @@ fun WorkspaceViewport(
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .offset(y = -56.dp)
+                            .offset(y = (-56 / viewportState.zoom).dp)
                             .zIndex(1000f),
                     ) {
                         element.Actions(this)
