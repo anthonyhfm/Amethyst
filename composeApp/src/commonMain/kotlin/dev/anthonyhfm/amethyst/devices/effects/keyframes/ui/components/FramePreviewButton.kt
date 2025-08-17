@@ -4,9 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -44,18 +48,18 @@ fun FramePreviewButton(
             .fillMaxWidth()
             .background(
                 when {
-                    isSelectedInManager -> MaterialTheme.colorScheme.primary
-                    selected -> MaterialTheme.colorScheme.tertiaryContainer
+                    selected && isSelectedInManager -> MaterialTheme.colorScheme.tertiary
+                    isSelectedInManager -> MaterialTheme.colorScheme.tertiary.copy(0.5f)
+                    selected -> MaterialTheme.colorScheme.tertiary
                     else -> MaterialTheme.colorScheme.surfaceContainer
                 }
             )
             .clickable {
-                val modifierKeys = ModifierKeysState.current
                 onEvent(
                     KeyframesChainDeviceContract.Event.OnSelectFrame(
                         frameIndex = index,
-                        rangeSelect = modifierKeys.shift,
-                        multiSelect = modifierKeys.ctrl || modifierKeys.meta
+                        rangeSelect = ModifierKeysState.isShiftPressed,
+                        multiSelect = ModifierKeysState.isCtrlPressed
                     )
                 )
             }
@@ -79,9 +83,10 @@ fun FramePreviewButton(
                 .width(56.dp)
                 .background(
                     when {
-                        isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
-                        selected -> MaterialTheme.colorScheme.tertiary
-                        else -> MaterialTheme.colorScheme.tertiaryContainer
+                        selected && isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
+                        isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
+                        selected -> MaterialTheme.colorScheme.onTertiary
+                        else -> MaterialTheme.colorScheme.onTertiary
                     }
                 )
                 .padding(vertical = 4.dp),
@@ -90,9 +95,10 @@ fun FramePreviewButton(
             lineHeight = MaterialTheme.typography.labelLarge.fontSize,
             fontWeight = FontWeight.Bold,
             color = when {
-                isSelectedInManager -> MaterialTheme.colorScheme.primary
-                selected -> MaterialTheme.colorScheme.onTertiary
-                else -> MaterialTheme.colorScheme.onTertiaryContainer
+                selected && isSelectedInManager -> MaterialTheme.colorScheme.tertiary
+                isSelectedInManager -> MaterialTheme.colorScheme.tertiary
+                selected -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.tertiary
             },
         )
 
@@ -101,8 +107,9 @@ fun FramePreviewButton(
             style = MaterialTheme.typography.labelLarge,
             lineHeight = MaterialTheme.typography.labelLarge.fontSize,
             color = when {
-                isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
-                selected -> MaterialTheme.colorScheme.onTertiaryContainer
+                selected && isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
+                isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
+                selected -> MaterialTheme.colorScheme.onTertiary
                 else -> MaterialTheme.colorScheme.onSurface
             },
         )

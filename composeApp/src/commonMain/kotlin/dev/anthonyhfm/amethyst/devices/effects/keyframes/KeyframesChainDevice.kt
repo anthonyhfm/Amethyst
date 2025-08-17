@@ -13,10 +13,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
-import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
@@ -35,6 +33,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     override val state = MutableStateFlow(KeyframesChainDeviceState())
 
     private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
+    private var lastSelectedFrameIndex: Int? = null
 
     init {
         renderAnimation()
@@ -161,26 +160,43 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
 
                 when {
                     event.rangeSelect -> {
+                        lastSelectedFrameIndex?.let { lastIndex ->
+                            if (lastIndex != event.frameIndex) {
+                                val start = minOf(lastIndex, event.frameIndex)
+                                val end = maxOf(lastIndex, event.frameIndex)
+
+                                for (i in start..end) {
+                                    SelectionManager.select(
+                                        Selectable.KeyframeItem(parent = this, frameIndex = i),
+                                        single = false
+                                    )
+                                }
+                            }
+                        }
+
                         SelectionManager.select(keyframeItem, single = false)
+                        lastSelectedFrameIndex = event.frameIndex
                     }
                     event.multiSelect -> {
                         SelectionManager.select(keyframeItem, single = false)
+                        lastSelectedFrameIndex = event.frameIndex
                     }
                     else -> {
                         SelectionManager.select(keyframeItem, single = true)
-                    }
-                }
+                        lastSelectedFrameIndex = event.frameIndex
 
-                state.update {
-                    it.copy(
-                        currentFrameIndex = if (event.frameIndex < 0) {
-                            0
-                        } else if (event.frameIndex >= it.frames.size) {
-                            it.frames.size - 1
-                        } else {
-                            event.frameIndex
+                        state.update {
+                            it.copy(
+                                currentFrameIndex = if (event.frameIndex < 0) {
+                                    0
+                                } else if (event.frameIndex >= it.frames.size) {
+                                    it.frames.size - 1
+                                } else {
+                                    event.frameIndex
+                                }
+                            )
                         }
-                    )
+                    }
                 }
 
                 refreshVirtualDevices()
