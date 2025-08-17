@@ -13,12 +13,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 
@@ -27,21 +26,38 @@ fun FramePreviewButton(
     index: Int,
     selected: Boolean,
     timing: Timing,
-    onEvent: (KeyframesChainDeviceContract.Event) -> Unit
+    onEvent: (KeyframesChainDeviceContract.Event) -> Unit,
+    parent: dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice? = null
 ) {
+    val selections by SelectionManager.selections.collectAsState()
+    val isSelectedInManager = parent?.let { parentDevice ->
+        selections.any {
+            it is Selectable.KeyframeItem &&
+                    it.parent == parentDevice &&
+                    it.frameIndex == index
+        }
+    } ?: false
+
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .fillMaxWidth()
             .background(
-                if (selected) {
-                    MaterialTheme.colorScheme.tertiaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
+                when {
+                    isSelectedInManager -> MaterialTheme.colorScheme.primary
+                    selected -> MaterialTheme.colorScheme.tertiaryContainer
+                    else -> MaterialTheme.colorScheme.surfaceContainer
                 }
             )
             .clickable {
-                onEvent(KeyframesChainDeviceContract.Event.OnSelectFrame(index))
+                val modifierKeys = ModifierKeysState.current
+                onEvent(
+                    KeyframesChainDeviceContract.Event.OnSelectFrame(
+                        frameIndex = index,
+                        rangeSelect = modifierKeys.shift,
+                        multiSelect = modifierKeys.ctrl || modifierKeys.meta
+                    )
+                )
             }
             .padding(4.dp),
 
@@ -62,10 +78,10 @@ fun FramePreviewButton(
                 .clip(RoundedCornerShape(4.dp))
                 .width(56.dp)
                 .background(
-                    if (selected) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.tertiaryContainer
+                    when {
+                        isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
+                        selected -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.tertiaryContainer
                     }
                 )
                 .padding(vertical = 4.dp),
@@ -73,10 +89,10 @@ fun FramePreviewButton(
             textAlign = TextAlign.Center,
             lineHeight = MaterialTheme.typography.labelLarge.fontSize,
             fontWeight = FontWeight.Bold,
-            color = if (selected) {
-                MaterialTheme.colorScheme.onTertiary
-            } else {
-                MaterialTheme.colorScheme.onTertiaryContainer
+            color = when {
+                isSelectedInManager -> MaterialTheme.colorScheme.primary
+                selected -> MaterialTheme.colorScheme.onTertiary
+                else -> MaterialTheme.colorScheme.onTertiaryContainer
             },
         )
 
@@ -84,10 +100,10 @@ fun FramePreviewButton(
             text = "Frame ${index + 1}",
             style = MaterialTheme.typography.labelLarge,
             lineHeight = MaterialTheme.typography.labelLarge.fontSize,
-            color = if (selected) {
-                MaterialTheme.colorScheme.onTertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurface
+            color = when {
+                isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
+                selected -> MaterialTheme.colorScheme.onTertiaryContainer
+                else -> MaterialTheme.colorScheme.onSurface
             },
         )
     }

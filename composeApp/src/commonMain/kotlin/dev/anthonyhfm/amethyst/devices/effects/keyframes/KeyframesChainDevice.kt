@@ -13,6 +13,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.RawUpdate
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
@@ -38,6 +40,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
         renderAnimation()
 
         customMode.state = state.asStateFlow()
+        customMode.parentDevice = this
 
         customMode.onEvent = { onEvent(it) }
 
@@ -97,9 +100,9 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                     state.copy(
                         frames = state.frames.toMutableList().apply {
                             set(
-                                index = state.selectedFrameIndex,
-                                element = state.frames[state.selectedFrameIndex].copy(
-                                    entries = state.frames[state.selectedFrameIndex].entries.toMutableList().apply {
+                                index = state.currentFrameIndex,
+                                element = state.frames[state.currentFrameIndex].copy(
+                                    entries = state.frames[state.currentFrameIndex].entries.toMutableList().apply {
                                         val index: Int = indexOfFirst { it.x == event.x && it.y == event.y }
 
                                         if (index != -1) {
@@ -151,9 +154,26 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                     return
                 }
 
+                val keyframeItem = Selectable.KeyframeItem(
+                    parent = this,
+                    frameIndex = event.frameIndex
+                )
+
+                when {
+                    event.rangeSelect -> {
+                        SelectionManager.select(keyframeItem, single = false)
+                    }
+                    event.multiSelect -> {
+                        SelectionManager.select(keyframeItem, single = false)
+                    }
+                    else -> {
+                        SelectionManager.select(keyframeItem, single = true)
+                    }
+                }
+
                 state.update {
                     it.copy(
-                        selectedFrameIndex = if (event.frameIndex < 0) {
+                        currentFrameIndex = if (event.frameIndex < 0) {
                             0
                         } else if (event.frameIndex >= it.frames.size) {
                             it.frames.size - 1
@@ -175,11 +195,11 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                                     index = event.atIndex,
                                     element = Frame(
                                         timing = state.value.frames.getOrNull(event.atIndex - 1)?.timing
-                                            ?: state.value.frames[state.value.selectedFrameIndex].timing
+                                            ?: state.value.frames[state.value.currentFrameIndex].timing
                                     )
                                 )
                             } else {
-                                add(Frame(state.value.frames[state.value.selectedFrameIndex].timing))
+                                add(Frame(state.value.frames[state.value.currentFrameIndex].timing))
                             }
                         },
                     )
@@ -191,7 +211,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
             }
 
             is Event.OnDuplicateFrame -> {
-                val frameIndexToDuplicate = event.frameIndex ?: state.value.selectedFrameIndex
+                val frameIndexToDuplicate = event.frameIndex ?: state.value.currentFrameIndex
                 val frameToDuplicate = state.value.frames[frameIndexToDuplicate]
 
                 state.update {
@@ -199,9 +219,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                         frames = it.frames.toMutableList().apply {
                             add(
                                 index = frameIndexToDuplicate + 1,
-                                element = frameToDuplicate.copy(
-                                    _internalUuid = UUID.randomUUID()
-                                )
+                                element = frameToDuplicate.copy(_internalUuid = UUID.randomUUID())
                             )
                         }
                     )
@@ -220,10 +238,10 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                         frames = it.frames.toMutableList().apply {
                             removeAt(event.frameIndex)
                         },
-                        selectedFrameIndex = if (event.frameIndex == it.frames.lastIndex) {
-                            it.frames.lastIndex - 1
+                        currentFrameIndex = if (event.frameIndex == it.frames.lastIndex) {
+                            it.frames.size - 2
                         } else {
-                            event.frameIndex
+                            it.currentFrameIndex
                         }
                     )
                 }
@@ -262,7 +280,7 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
         Heaven.clear()
 
         Heaven.midiEnter(
-            state.value.frames[state.value.selectedFrameIndex].entries.map {
+            state.value.frames[state.value.currentFrameIndex].entries.map {
                 Signal(
                     origin = this,
                     x = it.x,

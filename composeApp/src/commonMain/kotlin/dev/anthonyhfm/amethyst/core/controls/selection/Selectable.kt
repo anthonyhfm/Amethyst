@@ -25,4 +25,16 @@ interface Selectable {
         val stepIndex: Int,
         override val selectionUUID: String = parent.state.value.gradientData[stepIndex].selectionUUID
     ) : Selectable
+
+    data class GroupChainItem(
+        val parent: dev.anthonyhfm.amethyst.devices.ChainDevice<*>,
+        val groupIndex: Int,
+        override val selectionUUID: String = UUID.randomUUID()
+    ) : Selectable
+
+    data class KeyframeItem(
+        val parent: dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice,
+        val frameIndex: Int,
+        override val selectionUUID: String = UUID.randomUUID()
+    ) : Selectable
 }

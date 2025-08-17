@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState.updateFromKeyEvent
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.ShortcutManager
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
@@ -40,6 +41,8 @@ fun WorkspaceWindow() {
             height = 800.dp
         ),
         onKeyEvent = {
+            updateFromKeyEvent(it)
+
             // Prioritize mode events over shortcuts
             val modeEvent = WorkspaceRepository.mode.value.onKeyEvent(it)
 

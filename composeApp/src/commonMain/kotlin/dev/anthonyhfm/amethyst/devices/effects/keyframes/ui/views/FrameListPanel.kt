@@ -29,7 +29,8 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun BoxScope.FrameListPanel(
     state: KeyframesChainDeviceContract.KeyframesChainDeviceState,
-    onEvent: (KeyframesChainDeviceContract.Event) -> Unit
+    onEvent: (KeyframesChainDeviceContract.Event) -> Unit,
+    parent: dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice? = null
 ) {
     val lazyListState = rememberLazyListState()
 
@@ -69,9 +70,10 @@ fun BoxScope.FrameListPanel(
 
             FramePreviewButton(
                 index = index,
-                selected = state.selectedFrameIndex == index,
+                selected = state.currentFrameIndex == index,
                 timing = frame.timing,
                 onEvent = onEvent,
+                parent = parent
             )
         }
 

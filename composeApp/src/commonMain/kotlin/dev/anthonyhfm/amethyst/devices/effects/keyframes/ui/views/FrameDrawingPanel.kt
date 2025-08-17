@@ -50,22 +50,22 @@ fun BoxScope.FrameDrawingPanel(
         Spacer(Modifier.weight(1f))
 
         TimingControls(
-            timing = state.frames[state.selectedFrameIndex].timing,
+            timing = state.frames[state.currentFrameIndex].timing,
             onTimingChanged = { timing ->
                 onEvent(
                     KeyframesChainDeviceContract.Event.OnChangeFrameTiming(
-                        frameIndex = state.selectedFrameIndex,
+                        frameIndex = state.currentFrameIndex,
                         timing = timing,
-                        gate = state.frames[state.selectedFrameIndex].gate
+                        gate = state.frames[state.currentFrameIndex].gate
                     )
                 )
             },
-            gate = state.frames[state.selectedFrameIndex].gate,
+            gate = state.frames[state.currentFrameIndex].gate,
             onGateChanged = {
                 onEvent(
                     KeyframesChainDeviceContract.Event.OnChangeFrameTiming(
-                        frameIndex = state.selectedFrameIndex,
-                        timing = state.frames[state.selectedFrameIndex].timing,
+                        frameIndex = state.currentFrameIndex,
+                        timing = state.frames[state.currentFrameIndex].timing,
                         gate = it
                     )
                 )

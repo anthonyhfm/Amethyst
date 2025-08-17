@@ -34,6 +34,8 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
     var modeWakeup: (() -> Unit)? = null
     var modeClose: (() -> Unit)? = null
 
+    var parentDevice: dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice? = null
+
     @Composable
     fun ModeContent(paddingValues: PaddingValues) {
         val state by state.collectAsState()
@@ -47,7 +49,8 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 state = state,
                 onEvent = {
                     onEvent?.invoke(it)
-                }
+                },
+                parent = parentDevice
             )
 
             FrameDrawingPanel(
@@ -63,12 +66,12 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
         if (event.type == KeyEventType.KeyDown) {
             when (event.key) {
                 Key.DirectionUp, Key.DirectionLeft -> {
-                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.selectedFrameIndex - 1))
+                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.currentFrameIndex - 1))
                     return true
                 }
 
                 Key.DirectionDown, Key.DirectionRight -> {
-                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.selectedFrameIndex + 1))
+                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.currentFrameIndex + 1))
                     return true
                 }
 
@@ -80,7 +83,7 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 }
 
                 Key.Delete, Key.Backspace -> {
-                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnDeleteFrame(state.value.selectedFrameIndex))
+                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnDeleteFrame(state.value.currentFrameIndex))
                     return true
                 }
             }

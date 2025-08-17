@@ -14,7 +14,11 @@ sealed interface KeyframesChainDeviceContract {
     sealed interface Event {
         data class OnPaintButton(val x: Int, val y: Int) : Event
         data class OnColorUpdate(val color: Color) : Event
-        data class OnSelectFrame(val frameIndex: Int) : Event
+        data class OnSelectFrame(
+            val frameIndex: Int,
+            val multiSelect: Boolean = false,
+            val rangeSelect: Boolean = false
+        ) : Event
         data class OnDeleteFrame(val frameIndex: Int) : Event
         data class OnAddFrame(val atIndex: Int? = null) : Event
         data class OnDuplicateFrame(val frameIndex: Int? = null) : Event
@@ -28,7 +32,7 @@ sealed interface KeyframesChainDeviceContract {
     @Serializable
     data class KeyframesChainDeviceState(
         val selectedColor: Triple<Float, Float, Float> = Triple(1f, 1f, 1f),
-        val selectedFrameIndex: Int = 0,
+        val currentFrameIndex: Int = 0,
         val frames: List<Frame> = listOf(
             Frame(
                 timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),

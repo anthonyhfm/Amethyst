@@ -6,9 +6,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -56,6 +58,7 @@ import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.ChainDevice
@@ -207,7 +210,7 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
             }
 
             key( // Trigger recomposition on selected group change
-                deviceState.groups, deviceState.selectionIndex
+                deviceState.groups, deviceState.openedGroupIndex
             ) {
                 GroupContent(dragAndDropState)
             }
@@ -277,11 +280,30 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                         GroupItem(
                             group = group,
                             index = index,
-                            selected = groupsState.selectionIndex == index,
-                            onSelect = {
+                            selected = groupsState.openedGroupIndex == index,
+                            onSelect = { shiftPressed, ctrlPressed ->
+                                val groupChainItem = Selectable.GroupChainItem(
+                                    parent = this@MultiGroupChainDevice,
+                                    groupIndex = index
+                                )
+
+                                when {
+                                    shiftPressed -> {
+                                        performRangeSelection(index)
+                                    }
+                                    ctrlPressed -> {
+                                        SelectionManager.select(groupChainItem, single = false)
+                                        lastSelectedGroupIndex = index
+                                    }
+                                    else -> {
+                                        SelectionManager.select(groupChainItem, single = true)
+                                        lastSelectedGroupIndex = index
+                                    }
+                                }
+
                                 state.update {
                                     it.copy(
-                                        selectionIndex = index
+                                        openedGroupIndex = index
                                     )
                                 }
                             }
@@ -301,13 +323,21 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
         }
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
     @Composable
     private fun ReorderableCollectionItemScope.GroupItem(
         group: Group,
         index: Int,
         selected: Boolean,
-        onSelect: () -> Unit
+        onSelect: (shiftPressed: Boolean, ctrlPressed: Boolean) -> Unit
     ) {
+        val selections by SelectionManager.selections.collectAsState()
+        val isSelectedInManager = selections.any {
+            it is Selectable.GroupChainItem &&
+                    it.parent == this@MultiGroupChainDevice &&
+                    it.groupIndex == index
+        }
+
         Box(
             modifier = Modifier
                 .draggableHandle()
@@ -315,14 +345,17 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                 .fillMaxWidth()
                 .height(28.dp)
                 .background(
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.tertiaryContainer
+                    color = when {
+                        isSelectedInManager -> MaterialTheme.colorScheme.primary
+                        selected -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.tertiaryContainer
                     }
                 )
                 .clickable {
-                    onSelect()
+                    onSelect(
+                        ModifierKeysState.isShiftPressed,
+                        ModifierKeysState.isCtrlPressed
+                    )
                 }
         ) {
             Text(
@@ -333,10 +366,10 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                     .align(Alignment.CenterStart)
                     .padding(start = 6.dp),
 
-                color = if (selected) {
-                    MaterialTheme.colorScheme.onTertiary
-                } else {
-                    MaterialTheme.colorScheme.onTertiaryContainer
+                color = when {
+                    isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
+                    selected -> MaterialTheme.colorScheme.onTertiary
+                    else -> MaterialTheme.colorScheme.onTertiaryContainer
                 }
             )
         }
@@ -386,7 +419,7 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
     @Composable
     private fun GroupContent(dragAndDropState: DragAndDropState<ChainDevice<*>>) {
         val groupsState by state.collectAsState()
-        val devices by groupsState.groups[groupsState.selectionIndex].chain.devices
+        val devices by groupsState.groups[groupsState.openedGroupIndex].chain.devices
 
         if (devices.isEmpty()) {
             ExpandingChainDevicePicker(
@@ -394,7 +427,7 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                 expanded = true,
                 expandedWidth = 100.dp,
                 onAddComponent = {
-                    groupsState.groups[groupsState.selectionIndex].chain.add(it)
+                    groupsState.groups[groupsState.openedGroupIndex].chain.add(it)
                 }
             )
         } else {
@@ -406,7 +439,7 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                 ExpandingChainDevicePicker(
                     dragAndDropState = dragAndDropState,
                     onAddComponent = {
-                        groupsState.groups[groupsState.selectionIndex].chain.add(it, 0)
+                        groupsState.groups[groupsState.openedGroupIndex].chain.add(it, 0)
                     }
                 )
 
@@ -422,7 +455,7 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                                 .clickable {
                                     SelectionManager.select(
                                         Selectable.ChainDevice(
-                                            parent = groupsState.groups[groupsState.selectionIndex].chain,
+                                            parent = groupsState.groups[groupsState.openedGroupIndex].chain,
                                             device = device
                                         )
                                     )
@@ -455,7 +488,7 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                     ExpandingChainDevicePicker(
                         dragAndDropState = dragAndDropState,
                         onAddComponent = {
-                            groupsState.groups[groupsState.selectionIndex].chain.add(it, index + 1)
+                            groupsState.groups[groupsState.openedGroupIndex].chain.add(it, index + 1)
                         }
                     )
                 }
@@ -578,15 +611,15 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                 removeAt(index)
             }
 
-            val newSelectionIndex = when {
-                it.selectionIndex >= newGroups.size -> newGroups.size - 1
-                it.selectionIndex > index -> it.selectionIndex - 1
-                else -> it.selectionIndex
+            val newOpenedGroupIndex = when {
+                it.openedGroupIndex >= newGroups.size -> newGroups.size - 1
+                it.openedGroupIndex > index -> it.openedGroupIndex - 1
+                else -> it.openedGroupIndex
             }
 
             it.copy(
                 groups = newGroups,
-                selectionIndex = newSelectionIndex
+                openedGroupIndex = newOpenedGroupIndex
             )
         }
     }
@@ -666,9 +699,9 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
             createGroup()
         }
 
-        if (this.state.value.selectionIndex >= this.state.value.groups.size || this.state.value.selectionIndex < 0) {
+        if (this.state.value.openedGroupIndex >= this.state.value.groups.size || this.state.value.openedGroupIndex < 0) {
             this.state.update {
-                it.copy(selectionIndex = 0)
+                it.copy(openedGroupIndex = 0)
             }
         }
     }
@@ -683,11 +716,37 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
             }
         )
     }
+
+    private var lastSelectedGroupIndex: Int? = null
+
+    private fun performRangeSelection(endIndex: Int) {
+        val startIndex = lastSelectedGroupIndex ?: endIndex
+        val range = if (startIndex < endIndex) {
+            startIndex..endIndex
+        } else {
+            endIndex..startIndex
+        }
+
+        // Lösche alle aktuellen Auswahlen
+        SelectionManager.clear()
+
+        // Wähle alle Gruppen im Bereich aus
+        range.forEach { index ->
+            val groupChainItem = Selectable.GroupChainItem(
+                parent = this,
+                groupIndex = index
+            )
+            SelectionManager.select(groupChainItem, single = false)
+        }
+
+        // Merke dir den letzten ausgewählten Index
+        lastSelectedGroupIndex = endIndex
+    }
 }
 
 @Serializable
 data class MultiGroupChainDeviceState(
-    val selectionIndex: Int = 0,
+    val openedGroupIndex: Int = 0,
     val type: TYPE = TYPE.FORWARD,
     val currentMultiIndex: Int = 0,
     val groups: List<Group> = emptyList()

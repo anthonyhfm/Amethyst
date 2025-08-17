@@ -8,7 +8,7 @@ object SelectionManager {
     fun select(element: Selectable, single: Boolean = true) {
         if (single) {
             selections.value = emptyList()
-        } else if (selections.value.find { it::class.simpleName == element::class.simpleName } != null) {
+        } else if (selections.value.find { it::class.simpleName == element::class.simpleName } == null) {
             selections.value = emptyList()
         }
 
