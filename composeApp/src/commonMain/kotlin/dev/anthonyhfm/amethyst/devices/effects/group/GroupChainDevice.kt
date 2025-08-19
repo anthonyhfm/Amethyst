@@ -208,13 +208,9 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                                     }
                                     ctrlPressed -> {
                                         SelectionManager.select(groupChainItem, single = false)
-
-                                        lastSelectedGroupIndex = index
                                     }
                                     else -> {
                                         SelectionManager.select(groupChainItem, single = true)
-
-                                        lastSelectedGroupIndex = index
                                     }
                                 }
 
@@ -622,10 +618,8 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         )
     }
 
-    private var lastSelectedGroupIndex: Int? = null
-
     private fun performRangeSelection(endIndex: Int) {
-        val startIndex = lastSelectedGroupIndex ?: endIndex
+        val startIndex = state.value.openedGroupIndex
         val range = if (startIndex < endIndex) {
             startIndex..endIndex
         } else {
@@ -641,8 +635,6 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
             )
             SelectionManager.select(groupChainItem, single = false)
         }
-
-        lastSelectedGroupIndex = endIndex
     }
 }
 

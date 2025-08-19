@@ -295,11 +295,9 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                                     }
                                     ctrlPressed -> {
                                         SelectionManager.select(groupChainItem, single = false)
-                                        lastSelectedGroupIndex = index
                                     }
                                     else -> {
                                         SelectionManager.select(groupChainItem, single = true)
-                                        lastSelectedGroupIndex = index
                                     }
                                 }
 
@@ -780,20 +778,16 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
         )
     }
 
-    private var lastSelectedGroupIndex: Int? = null
-
     private fun performRangeSelection(endIndex: Int) {
-        val startIndex = lastSelectedGroupIndex ?: endIndex
+        val startIndex = state.value.openedGroupIndex
         val range = if (startIndex < endIndex) {
             startIndex..endIndex
         } else {
             endIndex..startIndex
         }
 
-        // Lösche alle aktuellen Auswahlen
         SelectionManager.clear()
 
-        // Wähle alle Gruppen im Bereich aus
         range.forEach { index ->
             val groupChainItem = Selectable.GroupChainItem(
                 parent = this,
@@ -801,9 +795,6 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
             )
             SelectionManager.select(groupChainItem, single = false)
         }
-
-        // Merke dir den letzten ausgewählten Index
-        lastSelectedGroupIndex = endIndex
     }
 }
 
