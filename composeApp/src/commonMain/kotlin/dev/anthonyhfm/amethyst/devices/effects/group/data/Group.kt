@@ -10,5 +10,5 @@ data class Group(
     val name: String,
     @Transient
     val chain: Chain = Chain(),
-    var stateChain: StateChain = StateChain()
+    var stateChain: StateChain = StateChain(),
 )

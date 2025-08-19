@@ -2,6 +2,8 @@ package dev.anthonyhfm.amethyst.core.controls.shortcuts
 
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import kotlinx.coroutines.flow.update
 
 fun handleDeletionShortcut(): Boolean {
@@ -18,6 +20,26 @@ fun handleDeletionShortcut(): Boolean {
                     )
                 }
             }
+
+            return true
+        }
+
+        SelectionManager.selections.value.any { it is Selectable.GroupChainItem } -> {
+            val selected = SelectionManager.selections.value.filterIsInstance<Selectable.GroupChainItem>().sortedByDescending { it.groupIndex }
+
+            selected.forEach {
+                when (it.parent) {
+                    is GroupChainDevice -> {
+                        it.parent.removeGroup(it.groupIndex)
+                    }
+
+                    is MultiGroupChainDevice -> {
+                        it.parent.removeGroup(it.groupIndex)
+                    }
+                }
+            }
+
+            SelectionManager.clear()
 
             return true
         }

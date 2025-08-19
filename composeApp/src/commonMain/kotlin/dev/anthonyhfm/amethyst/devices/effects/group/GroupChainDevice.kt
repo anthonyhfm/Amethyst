@@ -444,7 +444,7 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
     }
 
     fun removeGroup(index: Int) {
-        if (state.value.groups.size <= 1) {
+        if (state.value.groups.size - 1 <= 0) {
             return
         }
 
@@ -494,23 +494,24 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
         }
     }
 
-    fun duplicateGroup(index: Int) {
+    fun duplicateGroup(index: Int, toIndex: Int? = null) {
         val group = state.value.groups[index]
 
         state.update {
             val out = it.copy(
                 groups = it.groups.toMutableList().apply {
                     add(
-                        index = index,
+                        index = toIndex ?: index,
                         element = Group(
                             name = "Chain #",
                             chain = StateChain.pack(group.chain).unpack()
                         )
                     )
-                }
+                },
+                openedGroupIndex = toIndex ?: index
             )
 
-            out.groups[index].chain.midiExit = {
+            out.groups[toIndex ?: index].chain.midiExit = {
                 midiExit?.invoke(it)
             }
 
@@ -569,10 +570,8 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
             endIndex..startIndex
         }
 
-        // Lösche alle aktuellen Auswahlen
         SelectionManager.clear()
 
-        // Wähle alle Gruppen im Bereich aus
         range.forEach { index ->
             val groupChainItem = Selectable.GroupChainItem(
                 parent = this,
@@ -581,7 +580,6 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
             SelectionManager.select(groupChainItem, single = false)
         }
 
-        // Merke dir den letzten ausgewählten Index
         lastSelectedGroupIndex = endIndex
     }
 }

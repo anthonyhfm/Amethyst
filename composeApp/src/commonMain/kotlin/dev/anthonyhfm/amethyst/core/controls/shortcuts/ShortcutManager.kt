@@ -38,6 +38,10 @@ object ShortcutManager {
             return true
         }
 
+        if (keyEvent.key == Key.DirectionDown || keyEvent.key == Key.DirectionUp) {
+            return handleNavigationShortcut(keyEvent)
+        }
+
         return false
     }
 }

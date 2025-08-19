@@ -24,6 +24,7 @@ import java.awt.Color
 import javax.swing.BorderFactory
 import javax.swing.JDialog
 import javax.swing.JFrame
+import javax.swing.SwingUtilities
 import javax.swing.UIManager
 
 
