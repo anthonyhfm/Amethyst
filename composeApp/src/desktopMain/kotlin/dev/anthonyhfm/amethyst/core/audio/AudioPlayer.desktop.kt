@@ -106,6 +106,52 @@ actual object AudioPlayer {
         }
     }
 
+    actual fun getAudioClip(data: ByteArray, sampleStart: Long, sampleEnd: Long): AudioClip? {
+        ensureInitialized()
+        val audioId = UUID.randomUUID()
+
+        try {
+            val audioInfo = decodeAudioData(data)
+
+            // Validiere die Sample-Parameter
+            val totalSamples = audioInfo.pcmData.size / audioInfo.format.frameSize
+            if (sampleStart < 0 || sampleEnd <= sampleStart || sampleEnd > totalSamples) {
+                println("Invalid sample range: start=$sampleStart, end=$sampleEnd, totalSamples=$totalSamples")
+                return null
+            }
+
+            // Berechne Byte-Positionen basierend auf Frame-Grenzen
+            val frameSize = audioInfo.format.frameSize
+            val startByte = (sampleStart * frameSize).toInt()
+            val endByte = (sampleEnd * frameSize).toInt()
+            val extractedLength = endByte - startByte
+
+            // Extrahiere den gewünschten Datenbereich
+            val extractedPcmData = audioInfo.pcmData.copyOfRange(startByte, endByte)
+
+            // Erstelle neue WAV-Datei aus den extrahierten PCM-Daten
+            val extractedWavData = createWavFromPcm(extractedPcmData, audioInfo.format)
+
+            // Berechne die Dauer des extrahierten Samples
+            val extractedSamples = sampleEnd - sampleStart
+            val extractedDuration = (extractedSamples * 1000L) / audioInfo.format.sampleRate.toLong()
+
+            val clip = AudioClip(
+                name = "Sample_${audioId.take(8)}_${sampleStart}-${sampleEnd}",
+                length = extractedDuration,
+                data = extractedWavData,
+                key = audioId
+            )
+
+            println("Audio sample extracted: $audioId (${extractedDuration}ms, samples: $sampleStart-$sampleEnd)")
+
+            return clip
+        } catch (e: Exception) {
+            println("Failed to extract audio sample: ${e.message}")
+            return null
+        }
+    }
+
     actual fun playAudio(audioKey: String) {
         ensureInitialized()
         val loadedClip = audioClips[audioKey] ?: return
@@ -330,3 +376,28 @@ private data class AudioInfo(
     val pcmData: ByteArray,
     val duration: Long
 )
+
+private fun createWavFromPcm(pcmData: ByteArray, audioFormat: AudioFormat): ByteArray {
+    val byteArrayOutputStream = java.io.ByteArrayOutputStream()
+
+    // WAV Header
+    val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+    header.put("RIFF".toByteArray(Charsets.US_ASCII))
+    header.putInt(36 + pcmData.size) // File size - 8 bytes
+    header.put("WAVE".toByteArray(Charsets.US_ASCII))
+    header.put("fmt ".toByteArray(Charsets.US_ASCII))
+    header.putInt(16) // Subchunk1 size (16 for PCM)
+    header.putShort(1) // Audio format (1 for PCM)
+    header.putShort(audioFormat.channels.toShort()) // Number of channels
+    header.putInt(audioFormat.sampleRate.toInt()) // Sample rate
+    header.putInt(audioFormat.sampleRate.toInt() * audioFormat.channels * (audioFormat.sampleSizeInBits / 8)) // Byte rate
+    header.putShort((audioFormat.channels * (audioFormat.sampleSizeInBits / 8)).toShort()) // Block align
+    header.putShort(audioFormat.sampleSizeInBits.toShort()) // Bits per sample
+    header.put("data".toByteArray(Charsets.US_ASCII))
+    header.putInt(pcmData.size) // Subchunk2 size (data size)
+
+    byteArrayOutputStream.write(header.array())
+    byteArrayOutputStream.write(pcmData)
+
+    return byteArrayOutputStream.toByteArray()
+}

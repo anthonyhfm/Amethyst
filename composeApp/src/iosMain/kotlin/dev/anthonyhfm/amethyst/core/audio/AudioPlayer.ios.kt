@@ -1,7 +1,5 @@
 package dev.anthonyhfm.amethyst.core.audio
 
-import io.github.vinceglb.filekit.core.PlatformInputStream
-
 actual object AudioPlayer {
     actual fun loadAudio(data: ByteArray, uuid: String?): String {
         TODO("Not yet implemented")
@@ -11,5 +9,17 @@ actual object AudioPlayer {
     }
 
     actual fun preloadFromAudioClip(audioClip: AudioClip) {
+    }
+
+    actual fun stopAudio(audioKey: String) {
+        TODO("Not yet implemented")
+    }
+
+    actual fun getAudioClip(data: ByteArray): AudioClip? {
+        TODO("Not yet implemented")
+    }
+
+    actual fun getAudioClip(data: ByteArray, sampleStart: Long, sampleEnd: Long): AudioClip? {
+        TODO("Not yet implemented")
     }
 }

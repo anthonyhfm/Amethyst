@@ -1,7 +1,9 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters
 
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.DrumGroupDeviceAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGroupAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimpler
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
 
@@ -11,7 +13,9 @@ abstract class AbletonAdapter {
     companion object {
         fun resolveAdapter(xml: XmlElement): AbletonAdapter? {
             return when (xml.name) {
-                "MidiEffectGroupDevice" -> MidiEffectGroupAdapter(xml)
+                "MidiEffectGroupDevice", "InstrumentGroupDevice" -> MidiEffectGroupAdapter(xml)
+                "DrumGroupDevice" -> DrumGroupDeviceAdapter(xml)
+                "OriginalSimpler" -> OriginalSimpler(xml)
                 "MxDeviceMidiEffect" -> MxDeviceMidiEffectAdapter(xml) // Will resolve max plugins
 
                 else -> {

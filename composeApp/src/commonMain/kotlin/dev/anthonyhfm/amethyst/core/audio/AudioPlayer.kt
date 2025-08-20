@@ -15,4 +15,5 @@ expect object AudioPlayer {
     fun stopAudio(audioKey: String)
 
     fun getAudioClip(data: ByteArray): AudioClip?
+    fun getAudioClip(data: ByteArray, sampleStart: Long, sampleEnd: Long): AudioClip?
 }

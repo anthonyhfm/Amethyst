@@ -26,9 +26,7 @@ class MidiEffectGroupAdapter(
                                 val zoneSettings = branch.localQuerySelector("ZoneSettings")[0]
                                 val branchSelectorRange = branch.localQuerySelector("BranchSelectorRange")[0]
 
-
                                 val minMacro = branchSelectorRange.localQuerySelector("Min")[0].attributes["Value"]?.toInt()
-                                val maxMacro = branchSelectorRange.localQuerySelector("Max")[0].attributes["Value"]?.toInt()
 
                                 val minKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 0
                                 val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127

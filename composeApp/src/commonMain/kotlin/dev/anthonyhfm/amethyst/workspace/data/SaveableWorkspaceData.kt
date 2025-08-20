@@ -12,7 +12,7 @@ data class SaveableWorkspaceData(
     val lights: StateChain = StateChain(),
     val sampling: StateChain = StateChain(),
     val launchpadDevices: List<SavableViewportLaunchpad> = emptyList(),
-    val macros: List<Macro> = listOf(Macro(1)),
+    val macros: List<Macro> = listOf(Macro(0)),
     val audioClips: List<AudioClip> = emptyList(),
     val author: String = "Unknown",
     val version: String = "1.0.0",

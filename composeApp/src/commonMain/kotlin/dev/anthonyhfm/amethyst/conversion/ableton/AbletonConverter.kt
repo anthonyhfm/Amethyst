@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.reader.MidiChainReader
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonImporterConfig
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
+import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import io.github.vinceglb.filekit.PlatformFile
@@ -13,6 +14,8 @@ import kotlinx.serialization.decodeFromString
 object AbletonConverter : AmethystConverter {
     var file: PlatformFile? = null
         private set
+
+    val audioClips: MutableList<AudioClip> = mutableListOf()
 
     override fun convertToWorkspace(path: String): SaveableWorkspaceData {
         file = PlatformFile(path)
@@ -43,6 +46,8 @@ object AbletonConverter : AmethystConverter {
 
         return SaveableWorkspaceData(
             lights = MidiChainReader().readMidiChain(lightsTrackXML!!),
+            sampling = MidiChainReader().readMidiChain(audioTrackXML!!),
+            audioClips = audioClips.toList(),
             launchpadDevices = listOf(
                 SaveableWorkspaceData.SavableViewportLaunchpad(
                     positionX = 0f,
