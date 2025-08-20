@@ -32,9 +32,7 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
 
     init {
         customMode.modeClose = {
-            Heaven.devices.forEach { device ->
-                device.previewState.clear()
-            }
+            Heaven.clear()
         }
 
         customMode.onVirtualDevicePress = { x, y ->
@@ -97,39 +95,27 @@ class CoordinateFilterChainDevice : ChainDevice<CoordinateFilterChainDeviceState
 
         state.update { currentState ->
             if (isAlreadyFiltered) {
-                Heaven.midiEnter(
-                    listOf(
-                        Signal(
-                            origin = this,
-                            x = x,
-                            y = y,
-                            color = Color.Green,
-                            layer = 0
-                        )
-                    )
-                )
-
                 currentState.copy(
                     filters = currentState.filters.filter { it != coordinatePair }
                 )
             } else {
-                Heaven.midiEnter(
-                    listOf(
-                        Signal(
-                            origin = this,
-                            x = x,
-                            y = y,
-                            color = Color.Black,
-                            layer = 0
-                        )
-                    )
-                )
-
                 currentState.copy(
                     filters = currentState.filters + coordinatePair
                 )
             }
         }
+
+        Heaven.midiEnter(
+            listOf(
+                Signal(
+                    origin = this,
+                    x = x,
+                    y = y,
+                    color = if (isAlreadyFiltered) Color.Black else Color.Green,
+                    layer = 0
+                )
+            )
+        )
     }
 
     override fun midiEnter(n: List<Signal>) {

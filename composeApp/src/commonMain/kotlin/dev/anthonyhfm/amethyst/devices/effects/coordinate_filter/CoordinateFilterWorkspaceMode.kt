@@ -1,7 +1,5 @@
 package dev.anthonyhfm.amethyst.devices.effects.coordinate_filter
 
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.IntSize
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
 class CoordinateFilterWorkspaceMode : WorkspaceContract.WorkspaceMode {

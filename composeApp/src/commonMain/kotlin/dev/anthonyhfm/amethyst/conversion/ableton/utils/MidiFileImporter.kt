@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
 
-    fun loadFile(file: PlatformFile): KeyframesChainDeviceContract.KeyframesChainDeviceState {
+    fun loadFile(file: PlatformFile, bpm: Double = 120.0): KeyframesChainDeviceContract.KeyframesChainDeviceState {
         val data = try {
             runBlocking { file.readBytes() }
         } catch (e: Exception) {
@@ -90,7 +90,7 @@ object MidiFileImporter {
         val smpteFps = if (isSmpte) (256 - ((divisionRaw ushr 8) and 0xFF)) else 0 // two's complement
         val smpteTicksPerFrame = if (isSmpte) (divisionRaw and 0xFF) else 0
 
-        var bpm = 120.0 // PPQ mode default; ignored in SMPTE mode
+        var bpm = bpm // PPQ mode default; ignored in SMPTE mode
 
         fun ticksToMs(deltaTicks: Long): Int {
             return if (!isSmpte) {

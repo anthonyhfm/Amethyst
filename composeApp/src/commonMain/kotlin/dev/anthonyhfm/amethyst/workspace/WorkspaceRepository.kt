@@ -156,10 +156,6 @@ object WorkspaceRepository {
                     is ChokeChainDevice -> {
                         recursiveRenderingKeyframes(device.state.value.chain)
                     }
-
-                    is CoordinateFilterChainDevice -> {
-                        device.refreshVirtualDevices()
-                    }
                 }
             }
         }

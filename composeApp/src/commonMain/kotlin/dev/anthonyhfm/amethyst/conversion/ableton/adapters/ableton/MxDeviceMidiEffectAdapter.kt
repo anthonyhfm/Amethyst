@@ -39,7 +39,8 @@ class MxDeviceMidiEffectAdapter(
                 return GenericMidiExtAdapter(xml).toDeviceStates()
             }
 
-            MaxDeviceMatcher(758577, 2479) -> {
+            MaxDeviceMatcher(758577, 2479),
+            MaxDeviceMatcher(123814, 44049) -> {
                 return LPXPagesAdapter().toDeviceStates()
             }
 

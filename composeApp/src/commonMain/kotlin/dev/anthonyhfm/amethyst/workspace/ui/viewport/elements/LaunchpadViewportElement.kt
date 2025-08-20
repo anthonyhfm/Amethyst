@@ -93,11 +93,15 @@ abstract class LaunchpadViewportElement(
 
         when (mode) {
             is KeyframesWorkspaceMode -> {
-                mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
+                if (down) {
+                    mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
+                }
             }
 
             is CoordinateFilterWorkspaceMode -> {
-                mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
+                if (down) {
+                    mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
+                }
             }
 
             else -> {
