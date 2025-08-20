@@ -17,6 +17,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
@@ -113,6 +114,23 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         onEvent?.invoke(KeyframesChainDeviceContract.Event.OnDeleteFrame(state.value.currentFrameIndex))
                     }
                     return true
+                }
+
+                Key.C -> {
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
+                        if (selectedKeyframes.isNotEmpty()) {
+                            ClipboardManager.copy(selectedKeyframes)
+                        }
+                        return true
+                    }
+                }
+
+                Key.V -> {
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        ClipboardManager.paste()
+                        return true
+                    }
                 }
             }
         }

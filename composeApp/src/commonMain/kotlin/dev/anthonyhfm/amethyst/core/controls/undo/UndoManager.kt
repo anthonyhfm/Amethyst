@@ -40,6 +40,43 @@ object UndoManager {
 
                     redoStack.add(action)
                 }
+
+                is UndoableAction.KeyframeCreation -> {
+                    action.device.removeFrameInternal(action.frameIndex)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeDeletion -> {
+                    action.device.addFrameInternal(action.frameIndex, action.frame)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeDuplication -> {
+                    action.device.removeFrameInternal(action.duplicatedIndex)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.MultiKeyframeDuplication -> {
+                    action.duplications.sortedByDescending { it.duplicatedIndex }.forEach { duplication ->
+                        action.device.removeFrameInternal(duplication.duplicatedIndex)
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.MultiKeyframeDeletion -> {
+                    action.deletions.sortedBy { it.frameIndex }.forEach { deletion ->
+                        action.device.addFrameInternal(deletion.frameIndex, deletion.frame)
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.KeyframePaste -> {
+                    // Remove pasted frames in reverse order to maintain correct indices
+                    action.pastedFrames.sortedByDescending { it.frameIndex }.forEach { pasteInfo ->
+                        action.device.removeFrameInternal(pasteInfo.frameIndex)
+                    }
+                    redoStack.add(action)
+                }
             }
         }
     }
@@ -67,6 +104,43 @@ object UndoManager {
                 is UndoableAction.MovedChainDevice -> {
                     action.chainBefore.remove(action.device.selectionUUID, fromUser = false)
                     action.chainAfter.add(action.device, action.toIndex, fromUser = false)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeCreation -> {
+                    action.device.addFrameInternal(action.frameIndex, action.frame)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeDeletion -> {
+                    action.device.removeFrameInternal(action.frameIndex)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeDuplication -> {
+                    action.device.duplicateFrameInternal(action.originalIndex, action.duplicatedIndex)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.MultiKeyframeDuplication -> {
+                    action.duplications.forEach { duplication ->
+                        action.device.addFrameInternal(duplication.duplicatedIndex, duplication.duplicatedFrame)
+                    }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.MultiKeyframeDeletion -> {
+                    action.deletions.sortedByDescending { it.frameIndex }.forEach { deletion ->
+                        action.device.removeFrameInternal(deletion.frameIndex)
+                    }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.KeyframePaste -> {
+                    // Re-paste frames in original order
+                    action.pastedFrames.forEach { pasteInfo ->
+                        action.device.addFrameInternal(pasteInfo.frameIndex, pasteInfo.frame)
+                    }
                     undoStack.add(action)
                 }
             }

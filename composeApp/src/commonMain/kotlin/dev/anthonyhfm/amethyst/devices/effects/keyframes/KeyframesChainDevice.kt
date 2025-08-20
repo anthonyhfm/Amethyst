@@ -528,4 +528,39 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
 
         refreshVirtualDevices()
     }
+
+    fun pasteFrames(frames: List<Frame>, targetStartIndex: Int? = null) {
+        if (frames.isEmpty()) return
+
+        val baseTargetIndex = targetStartIndex ?: state.value.currentFrameIndex + 1
+        val pastedFrameInfos = mutableListOf<UndoableAction.KeyframePasteInfo>()
+
+        // Prepare paste info for all frames
+        frames.forEachIndexed { index, frame ->
+            val targetIndex = baseTargetIndex + index
+            val newFrame = frame.copy(_internalUuid = UUID.randomUUID())
+
+            pastedFrameInfos.add(
+                UndoableAction.KeyframePasteInfo(
+                    frameIndex = targetIndex,
+                    frame = newFrame
+                )
+            )
+        }
+
+        // Add to UndoManager as single action
+        UndoManager.addAction(
+            UndoableAction.KeyframePaste(
+                device = this,
+                pastedFrames = pastedFrameInfos
+            )
+        )
+
+        // Perform the actual paste operations
+        pastedFrameInfos.forEach { pasteInfo ->
+            addFrameInternal(pasteInfo.frameIndex, pasteInfo.frame)
+        }
+
+        refreshVirtualDevices()
+    }
 }

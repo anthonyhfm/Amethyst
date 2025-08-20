@@ -30,6 +30,19 @@ object ClipboardManager {
                 )
             }
 
+            data.any { it is Selectable.KeyframeItem } -> {
+                val keyframeItems = data.filterIsInstance<Selectable.KeyframeItem>()
+                val frames = keyframeItems.map { keyframeItem ->
+                    keyframeItem.parent.state.value.frames[keyframeItem.frameIndex]
+                }
+
+                setClipboardData(
+                    data = ClipboardData.Keyframe(
+                        frames = frames
+                    )
+                )
+            }
+
             data.any { it is Selectable.GradientStep } -> {
                 val step = data.filterIsInstance<Selectable.GradientStep>().first()
 
@@ -67,6 +80,17 @@ object ClipboardManager {
                             atIndex = index
                         )
                     }
+                }
+            }
+
+            is ClipboardData.Keyframe -> {
+                if (mode is dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode) {
+                    val keyframeData = clipboardData.value as ClipboardData.Keyframe
+                    val targetIndex = SelectionManager.selections.value
+                        .filterIsInstance<Selectable.KeyframeItem>()
+                        .maxOfOrNull { it.frameIndex + 1 }
+
+                    mode.parentDevice?.pasteFrames(keyframeData.frames, targetIndex)
                 }
             }
 
