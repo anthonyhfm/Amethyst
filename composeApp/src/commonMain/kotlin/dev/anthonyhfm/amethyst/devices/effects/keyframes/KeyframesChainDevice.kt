@@ -265,6 +265,16 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                 )
 
                 removeFrameInternal(event.frameIndex)
+
+                // Update selection to new last frame if we deleted the last frame
+                if (event.frameIndex == state.value.frames.size) {
+                    val newFrameIndex = maxOf(0, state.value.frames.size - 1)
+                    SelectionManager.select(
+                        Selectable.KeyframeItem(parent = this, frameIndex = newFrameIndex),
+                        single = true
+                    )
+                }
+
                 refreshVirtualDevices()
             }
 
@@ -526,6 +536,15 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
             addFrameInternal(duplication.duplicatedIndex, duplication.duplicatedFrame)
         }
 
+        // Select the newly duplicated frames
+        SelectionManager.clear()
+        duplications.forEach { duplication ->
+            SelectionManager.select(
+                Selectable.KeyframeItem(parent = this, frameIndex = duplication.duplicatedIndex),
+                single = false
+            )
+        }
+
         refreshVirtualDevices()
     }
 
@@ -559,6 +578,15 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
         // Perform the actual paste operations
         pastedFrameInfos.forEach { pasteInfo ->
             addFrameInternal(pasteInfo.frameIndex, pasteInfo.frame)
+        }
+
+        // Select the newly pasted frames
+        SelectionManager.clear()
+        pastedFrameInfos.forEach { pasteInfo ->
+            SelectionManager.select(
+                Selectable.KeyframeItem(parent = this, frameIndex = pasteInfo.frameIndex),
+                single = false
+            )
         }
 
         refreshVirtualDevices()

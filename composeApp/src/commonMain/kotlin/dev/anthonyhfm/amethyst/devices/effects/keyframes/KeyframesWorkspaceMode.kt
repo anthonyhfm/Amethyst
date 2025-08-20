@@ -84,16 +84,12 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                             val frameIndices = selectedKeyframes.map { it.frameIndex }
                             val highest = frameIndices.maxOrNull() ?: 0
 
+                            // Use duplicateFrames which handles selection automatically
                             parentDevice?.duplicateFrames(frameIndices, highest + 1)
 
+                            // Update current frame index to the last duplicated frame
                             parentDevice?.state?.update { currentState ->
                                 currentState.copy(currentFrameIndex = highest + selectedKeyframes.size)
-                            }
-
-                            SelectionManager.selections.update {
-                                selectedKeyframes.mapIndexed { index, keyframe ->
-                                    keyframe.copy(frameIndex = highest + 1 + index)
-                                }
                             }
                         } else {
                             onEvent?.invoke(KeyframesChainDeviceContract.Event.OnDuplicateFrame())
@@ -107,9 +103,19 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     if (selectedKeyframes.isNotEmpty()) {
                         val frameIndices = selectedKeyframes.map { it.frameIndex }
 
+                        // Use the new removeFrames method for multi-deletion
                         parentDevice?.removeFrames(frameIndices)
 
-                        SelectionManager.clear()
+                        // After deletion, select the frame at the position of the lowest deleted index
+                        // or the last frame if we deleted beyond the end
+                        val lowestDeletedIndex = frameIndices.minOrNull() ?: 0
+                        val newFrameCount = (parentDevice?.state?.value?.frames?.size ?: 1)
+                        val newSelectionIndex = minOf(lowestDeletedIndex, newFrameCount - 1)
+
+                        SelectionManager.select(
+                            Selectable.KeyframeItem(parent = parentDevice!!, frameIndex = newSelectionIndex),
+                            single = true
+                        )
                     } else {
                         onEvent?.invoke(KeyframesChainDeviceContract.Event.OnDeleteFrame(state.value.currentFrameIndex))
                     }
