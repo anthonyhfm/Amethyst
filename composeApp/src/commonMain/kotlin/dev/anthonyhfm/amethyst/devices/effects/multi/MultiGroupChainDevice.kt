@@ -298,13 +298,13 @@ class MultiGroupChainDevice : ChainDevice<MultiGroupChainDeviceState>() {
                                     }
                                     else -> {
                                         SelectionManager.select(groupChainItem, single = true)
-                                    }
-                                }
 
-                                state.update {
-                                    it.copy(
-                                        openedGroupIndex = index
-                                    )
+                                        state.update {
+                                            it.copy(
+                                                openedGroupIndex = index
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         )

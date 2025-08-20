@@ -209,15 +209,16 @@ class GroupChainDevice : ChainDevice<GroupChainDeviceState>() {
                                     ctrlPressed -> {
                                         SelectionManager.select(groupChainItem, single = false)
                                     }
+
                                     else -> {
                                         SelectionManager.select(groupChainItem, single = true)
-                                    }
-                                }
 
-                                state.update {
-                                    it.copy(
-                                        openedGroupIndex = index
-                                    )
+                                        state.update {
+                                            it.copy(
+                                                openedGroupIndex = index
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         )
