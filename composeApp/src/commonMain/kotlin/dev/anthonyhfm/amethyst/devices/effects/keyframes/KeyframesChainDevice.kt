@@ -28,6 +28,8 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 
 class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     override val state = MutableStateFlow(KeyframesChainDeviceState())
@@ -205,67 +207,64 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
             }
 
             is Event.OnAddFrame -> {
-                state.update {
-                    it.copy(
-                        frames = it.frames.toMutableList().apply {
-                            if (event.atIndex != null) {
-                                add(
-                                    index = event.atIndex,
-                                    element = Frame(
-                                        timing = state.value.frames.getOrNull(event.atIndex - 1)?.timing
-                                            ?: state.value.frames[state.value.currentFrameIndex].timing,
-                                    )
-                                )
-                            } else {
-                                add(Frame(
-                                    timing = state.value.frames[state.value.currentFrameIndex].timing,
-                                ))
-                            }
-                        },
+                val newFrame = Frame(
+                    timing = if (event.atIndex != null) {
+                        state.value.frames.getOrNull(event.atIndex - 1)?.timing
+                            ?: state.value.frames[state.value.currentFrameIndex].timing
+                    } else {
+                        state.value.frames[state.value.currentFrameIndex].timing
+                    }
+                )
+
+                val frameIndex = event.atIndex ?: state.value.frames.size
+
+                UndoManager.addAction(
+                    UndoableAction.KeyframeCreation(
+                        device = this,
+                        frameIndex = frameIndex,
+                        frame = newFrame
                     )
-                }
+                )
 
-                onEvent(Event.OnSelectFrame(event.atIndex ?: (state.value.frames.size - 1)))
-
+                addFrameInternal(frameIndex, newFrame)
+                onEvent(Event.OnSelectFrame(frameIndex))
                 refreshVirtualDevices()
             }
 
             is Event.OnDuplicateFrame -> {
                 val frameIndexToDuplicate = event.frameIndex ?: state.value.currentFrameIndex
                 val frameToDuplicate = state.value.frames[frameIndexToDuplicate]
+                val newFrame = frameToDuplicate.copy(_internalUuid = UUID.randomUUID())
+                val insertIndex = frameIndexToDuplicate + 1
 
-                state.update {
-                    it.copy(
-                        frames = it.frames.toMutableList().apply {
-                            add(
-                                index = frameIndexToDuplicate + 1,
-                                element = frameToDuplicate.copy(_internalUuid = UUID.randomUUID())
-                            )
-                        }
+                UndoManager.addAction(
+                    UndoableAction.KeyframeDuplication(
+                        device = this,
+                        originalIndex = frameIndexToDuplicate,
+                        duplicatedIndex = insertIndex,
+                        duplicatedFrame = newFrame
                     )
-                }
+                )
 
-                onEvent(Event.OnSelectFrame(frameIndexToDuplicate + 1))
-
+                duplicateFrameInternal(frameIndexToDuplicate, insertIndex)
+                onEvent(Event.OnSelectFrame(insertIndex))
                 refreshVirtualDevices()
             }
 
             is Event.OnDeleteFrame -> {
                 if (state.value.frames.size <= 1) return
 
-                state.update {
-                    it.copy(
-                        frames = it.frames.toMutableList().apply {
-                            removeAt(event.frameIndex)
-                        },
-                        currentFrameIndex = if (event.frameIndex == it.frames.lastIndex) {
-                            it.frames.size - 2
-                        } else {
-                            it.currentFrameIndex
-                        }
-                    )
-                }
+                val frameToDelete = state.value.frames[event.frameIndex]
 
+                UndoManager.addAction(
+                    UndoableAction.KeyframeDeletion(
+                        device = this,
+                        frameIndex = event.frameIndex,
+                        frame = frameToDelete
+                    )
+                )
+
+                removeFrameInternal(event.frameIndex)
                 refreshVirtualDevices()
             }
 
@@ -299,22 +298,81 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     fun duplicateFrame(index: Int, toIndex: Int? = null) {
         val frame = state.value.frames[index]
         val targetIndex = toIndex ?: (index + 1)
+        val newFrame = frame.copy(_internalUuid = UUID.randomUUID())
 
-        state.update {
-            it.copy(
-                frames = it.frames.toMutableList().apply {
-                    add(
-                        index = targetIndex,
-                        element = frame.copy(_internalUuid = UUID.randomUUID())
-                    )
-                }
+        UndoManager.addAction(
+            UndoableAction.KeyframeDuplication(
+                device = this,
+                originalIndex = index,
+                duplicatedIndex = targetIndex,
+                duplicatedFrame = newFrame
             )
+        )
+
+        duplicateFrameInternal(index, targetIndex)
+        refreshVirtualDevices()
+    }
+
+    fun removeFrame(index: Int) {
+        val frameToDelete = state.value.frames[index]
+
+        UndoManager.addAction(
+            UndoableAction.KeyframeDeletion(
+                device = this,
+                frameIndex = index,
+                frame = frameToDelete
+            )
+        )
+
+        removeFrameInternal(index)
+        refreshVirtualDevices()
+    }
+
+    fun removeFrames(frameIndices: List<Int>) {
+        if (frameIndices.isEmpty()) return
+
+        val sortedIndices = frameIndices.sortedDescending()
+        val deletions = mutableListOf<UndoableAction.KeyframeDeletionInfo>()
+
+        sortedIndices.forEach { index ->
+            if (index < state.value.frames.size) {
+                val frame = state.value.frames[index]
+                deletions.add(
+                    UndoableAction.KeyframeDeletionInfo(
+                        frameIndex = index,
+                        frame = frame
+                    )
+                )
+            }
+        }
+
+        UndoManager.addAction(
+            UndoableAction.MultiKeyframeDeletion(
+                device = this,
+                deletions = deletions
+            )
+        )
+
+        sortedIndices.forEach { index ->
+            if (index < state.value.frames.size) {
+                removeFrameInternal(index)
+            }
         }
 
         refreshVirtualDevices()
     }
 
-    fun removeFrame(index: Int) {
+    internal fun addFrameInternal(index: Int, frame: Frame) {
+        state.update {
+            it.copy(
+                frames = it.frames.toMutableList().apply {
+                    add(index, frame)
+                }
+            )
+        }
+    }
+
+    internal fun removeFrameInternal(index: Int) {
         state.update {
             val newFrames = it.frames.toMutableList().apply {
                 removeAt(index)
@@ -339,8 +397,20 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                 currentFrameIndex = newCurrentFrameIndex
             )
         }
+    }
 
-        refreshVirtualDevices()
+    internal fun duplicateFrameInternal(originalIndex: Int, targetIndex: Int) {
+        state.update {
+            val currentFrames = it.frames.toMutableList()
+            val frame = currentFrames[originalIndex]
+            val newFrame = frame.copy(_internalUuid = UUID.randomUUID())
+
+            val safeTargetIndex = targetIndex.coerceIn(0, currentFrames.size)
+
+            currentFrames.add(safeTargetIndex, newFrame)
+
+            it.copy(frames = currentFrames)
+        }
     }
 
     fun refreshVirtualDevices() {
@@ -421,5 +491,41 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                 }
             }
         }
+    }
+
+    fun duplicateFrames(frameIndices: List<Int>, targetStartIndex: Int? = null) {
+        if (frameIndices.isEmpty()) return
+
+        val sortedIndices = frameIndices.sorted()
+        val duplications = mutableListOf<UndoableAction.KeyframeDuplicationInfo>()
+
+        val baseTargetIndex = targetStartIndex ?: (sortedIndices.last() + 1)
+
+        sortedIndices.forEachIndexed { index, originalIndex ->
+            val frame = state.value.frames[originalIndex]
+            val newFrame = frame.copy(_internalUuid = UUID.randomUUID())
+            val targetIndex = baseTargetIndex + index
+
+            duplications.add(
+                UndoableAction.KeyframeDuplicationInfo(
+                    originalIndex = originalIndex,
+                    duplicatedIndex = targetIndex,
+                    duplicatedFrame = newFrame
+                )
+            )
+        }
+
+        UndoManager.addAction(
+            UndoableAction.MultiKeyframeDuplication(
+                device = this,
+                duplications = duplications
+            )
+        )
+
+        duplications.forEach { duplication ->
+            addFrameInternal(duplication.duplicatedIndex, duplication.duplicatedFrame)
+        }
+
+        refreshVirtualDevices()
     }
 }

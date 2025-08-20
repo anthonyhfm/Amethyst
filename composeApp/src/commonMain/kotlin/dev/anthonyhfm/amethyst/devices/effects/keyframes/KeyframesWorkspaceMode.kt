@@ -80,12 +80,10 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     if (event.isCtrlPressed || event.isMetaPressed) {
                         val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
                         if (selectedKeyframes.isNotEmpty()) {
-                            val sortedByIndex = selectedKeyframes.sortedByDescending { it.frameIndex }
-                            val highest = sortedByIndex.maxBy { it.frameIndex }.frameIndex
+                            val frameIndices = selectedKeyframes.map { it.frameIndex }
+                            val highest = frameIndices.maxOrNull() ?: 0
 
-                            sortedByIndex.forEach { keyframe ->
-                                parentDevice?.duplicateFrame(keyframe.frameIndex, highest + 1)
-                            }
+                            parentDevice?.duplicateFrames(frameIndices, highest + 1)
 
                             parentDevice?.state?.update { currentState ->
                                 currentState.copy(currentFrameIndex = highest + selectedKeyframes.size)
@@ -106,11 +104,9 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 Key.Delete, Key.Backspace -> {
                     val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
                     if (selectedKeyframes.isNotEmpty()) {
-                        val sortedByIndexDesc = selectedKeyframes.sortedByDescending { it.frameIndex }
+                        val frameIndices = selectedKeyframes.map { it.frameIndex }
 
-                        sortedByIndexDesc.forEach { keyframe ->
-                            parentDevice?.removeFrame(keyframe.frameIndex)
-                        }
+                        parentDevice?.removeFrames(frameIndices)
 
                         SelectionManager.clear()
                     } else {

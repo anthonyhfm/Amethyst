@@ -71,7 +71,7 @@ object ClipboardManager {
             }
 
             else -> {
-                TODO("You cannot paste this")
+               println("You cannot copy this right now")
             }
         }
     }
