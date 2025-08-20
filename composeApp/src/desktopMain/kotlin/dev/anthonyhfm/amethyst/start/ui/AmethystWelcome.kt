@@ -35,7 +35,7 @@ fun AmethystWelcome(onClickGitHub: () -> Unit) {
     ) {
         Text(
             text = if (version == null) {
-                "Development"
+                "Private Beta 2"
             } else {
                 "Version: $version"
             },
