@@ -28,7 +28,7 @@ class DrumGroupDeviceAdapter(
 
                                 val xy = DRUM_RACK_TO_XY[128 - note] // WHYYYYYY
                                 val x: Int = xy % 10
-                                val y: Int = (xy / 10) - 9
+                                val y: Int = 9 - xy / 10
 
                                 add(
                                     CoordinateFilterChainDeviceState(

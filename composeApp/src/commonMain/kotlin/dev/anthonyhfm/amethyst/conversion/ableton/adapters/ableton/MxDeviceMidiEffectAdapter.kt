@@ -1,7 +1,8 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MidiExt3Adapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.LPXPagesAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -35,7 +36,11 @@ class MxDeviceMidiEffectAdapter(
             MaxDeviceMatcher(23292, 61071),
             MaxDeviceMatcher(134924, 38265),
             MaxDeviceMatcher(159503, 62613),-> { // Generic MidiExt
-                return MidiExt3Adapter(xml).toDeviceStates()
+                return GenericMidiExtAdapter(xml).toDeviceStates()
+            }
+
+            MaxDeviceMatcher(758577, 2479) -> {
+                return LPXPagesAdapter().toDeviceStates()
             }
 
             else -> {

@@ -103,8 +103,6 @@ class StartWindowViewModel() : ViewModel() {
 
                     onOpenEditor?.invoke()
                 }
-
-                else -> TODO("File format not yet supported: ${file?.extension}")
             }
         }
     }

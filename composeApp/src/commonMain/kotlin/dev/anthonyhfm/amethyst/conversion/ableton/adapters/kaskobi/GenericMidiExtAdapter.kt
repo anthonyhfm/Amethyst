@@ -5,12 +5,11 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.parent
 import io.github.vinceglb.filekit.path
 
-class MidiExt3Adapter(
+class GenericMidiExtAdapter(
     private val xml: XmlElement,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {

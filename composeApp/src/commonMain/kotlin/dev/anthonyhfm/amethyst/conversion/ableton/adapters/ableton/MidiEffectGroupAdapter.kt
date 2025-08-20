@@ -26,24 +26,22 @@ class MidiEffectGroupAdapter(
                                 val zoneSettings = branch.localQuerySelector("ZoneSettings")[0]
                                 val branchSelectorRange = branch.localQuerySelector("BranchSelectorRange")[0]
 
-                                val minMacro = branchSelectorRange.localQuerySelector("Min")[0].attributes["Value"]?.toInt()
+                                val minMacro = branchSelectorRange.localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 0
+                                val maxMacro = branchSelectorRange.localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 0
 
                                 val minKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 0
                                 val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127
 
                                 if ((branch.querySelector("UserName")[0].attributes["Value"]).toString().lowercase().contains("page")) {
-                                    println("Branch ${index + 1} is a page, adding macro filter device state.")
-                                    println("TODO: Handle page branches properly.")
-
                                     add(
                                         MacroFilterChainDeviceState(
                                             macro = 0,
-                                            value = minMacro!!,
+                                            value = minMacro,
                                         )
                                     )
                                 }
 
-                                if (maxKey - minKey != 127 && minKey == maxKey) {
+                                if (maxKey - minKey != 127 || minKey == maxKey) {
                                     add(
                                         CoordinateFilterChainDeviceState(
                                             filters = IntArray(maxKey + 1 - minKey) {

@@ -6,6 +6,12 @@ import androidx.compose.ui.unit.IntSize
 import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
+import dev.anthonyhfm.amethyst.core.heaven.elements.Chain
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
@@ -127,6 +133,38 @@ object WorkspaceRepository {
 
         lightsChain.heavenChain = workspaceData.lights.unpack()
         samplingChain.heavenChain = workspaceData.sampling.unpack()
+
+        fun recursiveRenderingKeyframes(chain: Chain) {
+            chain.devices.value.forEach { device ->
+                when (device) {
+                    is KeyframesChainDevice -> {
+                        device.renderAnimation()
+                    }
+
+                    is GroupChainDevice -> {
+                        device.state.value.groups.forEach {
+                            recursiveRenderingKeyframes(it.chain)
+                        }
+                    }
+
+                    is MultiGroupChainDevice -> {
+                        device.state.value.groups.forEach {
+                            recursiveRenderingKeyframes(it.chain)
+                        }
+                    }
+
+                    is ChokeChainDevice -> {
+                        recursiveRenderingKeyframes(device.state.value.chain)
+                    }
+
+                    is CoordinateFilterChainDevice -> {
+                        device.refreshVirtualDevices()
+                    }
+                }
+            }
+        }
+
+        recursiveRenderingKeyframes(lightsChain.heavenChain)
 
         _macros.update { workspaceData.macros }
 
