@@ -16,9 +16,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,7 +49,6 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
 
     @Composable
     override fun Content() {
-        val controller = rememberColorPickerController()
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
@@ -60,10 +56,18 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
             .find { it.parent == this }
             ?.selectionUUID
 
+        // Create a new controller for each selected color to avoid state pollution
+        // Use selectedColor as key to force recreation when selection changes
+        val controller = key(selectedColor) {
+            rememberColorPickerController()
+        }
+
+        // Reset and initialize controller when selection changes
         LaunchedEffect(selectedColor) {
             if (selectedColor != null) {
                 val color = deviceState.gradientData.find { it.selectionUUID == selectedColor }
                 if (color != null) {
+                    // Force a complete reset of the controller
                     controller.selectByColor(Color(color.r, color.g, color.b), false)
                 }
             }
@@ -97,9 +101,14 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
                     key(deviceState.gradientData.size) {
                         GradientEditorBar(
                             selectedColor = selectedColor,
-                            onSelectionChange = {
-                                if (it != null) {
-                                    SelectionManager.select(Selectable.GradientStep(this@GradientChainDevice, it))
+                            onSelectionChange = { selectionUUID ->
+                                if (selectionUUID != null) {
+                                    // Find the gradient color by selectionUUID to ensure we have the correct one
+                                    val gradientColor = deviceState.gradientData.find { it.selectionUUID == selectionUUID }
+                                    if (gradientColor != null) {
+                                        val index = deviceState.gradientData.indexOf(gradientColor)
+                                        SelectionManager.select(Selectable.GradientStep(this@GradientChainDevice, index), single = true)
+                                    }
                                 } else {
                                     SelectionManager.clear()
                                 }
@@ -191,39 +200,43 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
 
                         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
                     ) {
-                        HsvColorPicker(
-                            controller = controller,
-                            onColorChanged = { color ->
-                                if (color.fromUser) {
-                                    state.update {
-                                        val list = it.gradientData.toMutableList()
-                                        val index = list.indexOfFirst { it.selectionUUID == selectedColor }
+                        key(selectedColor) {
+                            HsvColorPicker(
+                                controller = controller,
+                                onColorChanged = { color ->
+                                    if (color.fromUser) {
+                                        // Capture current selectedColor to avoid closure issues
+                                        val currentSelectedColor = selectedColor
+                                        state.update {
+                                            val list = it.gradientData.toMutableList()
+                                            val index = list.indexOfFirst { it.selectionUUID == currentSelectedColor }
 
-                                        if (index == -1) return@update it
+                                            if (index == -1) return@update it
 
-                                        list[index] = list[index].copy(
-                                            r = color.color.red,
-                                            g = color.color.green,
-                                            b = color.color.blue
-                                        )
+                                            list[index] = list[index].copy(
+                                                r = color.color.red,
+                                                g = color.color.green,
+                                                b = color.color.blue
+                                            )
 
-                                        return@update it.copy(
-                                            gradientData = list
-                                        )
+                                            return@update it.copy(
+                                                gradientData = list
+                                            )
+                                        }
                                     }
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1 / 1f)
-                        )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1 / 1f)
+                            )
 
-                        BrightnessSlider(
-                            controller = controller,
-                            modifier = Modifier
-                                .height(24.dp)
-                                .fillMaxWidth()
-                        )
+                            BrightnessSlider(
+                                controller = controller,
+                                modifier = Modifier
+                                    .height(24.dp)
+                                    .fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
@@ -263,8 +276,8 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
                 // Cancel nur die Jobs für diesen spezifischen Button
                 Heaven.cancelJobs { job ->
                     job.owner is Pair<*, *> &&
-                    (job.owner as Pair<*, *>).first == this &&
-                    (job.owner as Pair<*, *>).second == "${signal.x},${signal.y}"
+                    job.owner.first == this &&
+                    job.owner.second == "${signal.x},${signal.y}"
                 }
 
                 for (step in 0..gradientSteps) {
