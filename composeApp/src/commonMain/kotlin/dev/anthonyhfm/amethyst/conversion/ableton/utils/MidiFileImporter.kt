@@ -191,7 +191,6 @@ object MidiFileImporter {
                                     b = triple.third / 63f
                                 )
                             } else {
-                                // Note OFF: Entferne den Eintrag einfach, ohne schwarzen Eintrag hinzuzufügen
                                 filtered
                             }
 

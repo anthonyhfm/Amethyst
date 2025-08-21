@@ -35,6 +35,8 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.heaven.elements.Chain
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.devices.ChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
@@ -205,6 +207,12 @@ fun WorkspaceChainEditor(
                     }
                 )
             }
+        }
+
+        if (platform is Platform.Desktop) {
+            WorkspaceChainScroller(
+                scrollState = scrollState
+            )
         }
     }
 }

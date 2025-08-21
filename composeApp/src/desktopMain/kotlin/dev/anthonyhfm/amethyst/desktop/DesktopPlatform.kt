@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.desktop
 
+import com.formdev.flatlaf.util.SystemInfo
+
 sealed interface DesktopPlatform {
     data object MacOS : DesktopPlatform
     data object Windows : DesktopPlatform
@@ -8,12 +10,12 @@ sealed interface DesktopPlatform {
 
     companion object {
         fun get(): DesktopPlatform {
-            val system = System.getProperty("os.name")
-
-            if (system.contains("Mac OS X")) {
+            if (SystemInfo.isMacOS) {
                 return MacOS
-            } else if (system.contains("Windows")) {
+            } else if (SystemInfo.isWindows_10_orLater) {
                 return Windows
+            } else if (SystemInfo.isLinux) {
+                return Linux
             }
 
             return Unknown

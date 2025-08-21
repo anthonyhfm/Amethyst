@@ -193,7 +193,6 @@ actual object AudioPlayer {
         ensureInitialized()
 
         cleanupScope.launch {
-            delay(100)
             playingClips.remove(audioKey)?.close()
         }
     }
