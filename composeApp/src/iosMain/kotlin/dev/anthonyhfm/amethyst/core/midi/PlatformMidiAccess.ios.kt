@@ -10,6 +10,3 @@ import kotlinx.coroutines.IO
 
 actual val platformMidiAccess: MidiAccess
     get() = TraditionalCoreMidiAccess()
-
-actual val IO_COROUTINE: CoroutineScope
-    get() = CoroutineScope(Dispatchers.IO)

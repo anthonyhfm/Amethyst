@@ -14,6 +14,3 @@ actual val platformMidiAccess: MidiAccess =
         JvmMidiAccess()
     else
         CoreMidi4JAccess()
-
-actual val IO_COROUTINE: CoroutineScope
-    get() = CoroutineScope(Dispatchers.IO)

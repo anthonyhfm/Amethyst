@@ -8,6 +8,3 @@ import kotlinx.coroutines.Dispatchers
 
 actual val platformMidiAccess: MidiAccess
     get() = AndroidMidi2Access(MainActivity.context, true)
-
-actual val IO_COROUTINE: CoroutineScope
-    get() = CoroutineScope(Dispatchers.IO)
