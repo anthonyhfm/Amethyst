@@ -27,9 +27,13 @@ import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.readBytes
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 class ClipChainDevice : ChainDevice<ClipChainDeviceState>() {
@@ -96,7 +100,9 @@ class ClipChainDevice : ChainDevice<ClipChainDeviceState>() {
         n.forEach {
             if (it.color != Color.Black) {
                 if (WorkspaceRepository.audioRegistry[state.value.audioKey] != null) {
-                    AudioPlayer.playAudio(state.value.audioKey)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        AudioPlayer.playAudio(state.value.audioKey)
+                    }
                 }
             }
         }

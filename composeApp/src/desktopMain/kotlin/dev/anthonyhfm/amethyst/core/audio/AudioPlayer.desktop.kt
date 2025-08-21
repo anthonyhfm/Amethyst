@@ -266,30 +266,62 @@ actual object AudioPlayer {
         val buf = ByteBuffer.wrap(audioData).order(ByteOrder.LITTLE_ENDIAN)
         require(buf.limit() >= 44) { "Invalid WAV: too short" }
 
-        buf.position(22); val channels = buf.short.toInt()
-        buf.position(24); val sampleRate = buf.int
-        buf.position(34); val bitsPerSample = buf.short.toInt()
+        // Verify RIFF header
+        val riffHeader = ByteArray(4).also { buf.get(it) }
+        require(String(riffHeader, Charsets.US_ASCII) == "RIFF") { "Not a valid RIFF file" }
 
-        require(bitsPerSample in listOf(8, 16, 24)) { "Unsupported bit depth: $bitsPerSample" }
-        require(channels in 1..2) { "Unsupported channel count: $channels" }
+        val fileSize = buf.int // File size (can be ignored)
 
-        buf.position(36)
+        val waveHeader = ByteArray(4).also { buf.get(it) }
+        require(String(waveHeader, Charsets.US_ASCII) == "WAVE") { "Not a valid WAVE file" }
+
+        var channels = 0
+        var sampleRate = 0
+        var bitsPerSample = 0
         var dataSize = 0
         var dataStartPos = 0
+        var fmtFound = false
 
+        // Parse chunks
         while (buf.remaining() >= 8) {
             val chunkId = ByteArray(4).also { buf.get(it) }
             val chunkSize = buf.int
+            val chunkIdStr = String(chunkId, Charsets.US_ASCII)
 
-            if (String(chunkId, Charsets.US_ASCII) == "data") {
-                dataSize = chunkSize
-                dataStartPos = buf.position()
-                break
+            when (chunkIdStr) {
+                "fmt " -> {
+                    val chunkStart = buf.position()
+                    val audioFormat = buf.short.toInt() // Should be 1 for PCM
+                    require(audioFormat == 1) { "Only PCM format is supported, got format: $audioFormat" }
+
+                    channels = buf.short.toInt()
+                    sampleRate = buf.int
+                    val byteRate = buf.int // Can be ignored
+                    val blockAlign = buf.short.toInt() // Can be ignored
+                    bitsPerSample = buf.short.toInt()
+
+                    fmtFound = true
+
+                    // Skip any remaining bytes in the fmt chunk
+                    buf.position(chunkStart + chunkSize)
+                }
+                "data" -> {
+                    require(fmtFound) { "fmt chunk must come before data chunk" }
+                    dataSize = chunkSize
+                    dataStartPos = buf.position()
+                    break // Stop parsing, we found the data
+                }
+                else -> {
+                    // Skip unknown chunks
+                    buf.position(buf.position() + chunkSize)
+                }
             }
-            buf.position(buf.position() + chunkSize)
         }
 
+        require(fmtFound) { "No fmt chunk found in WAV file" }
         require(dataSize > 0) { "No data chunk found in WAV file" }
+        require(bitsPerSample in listOf(8, 16, 24, 32)) { "Unsupported bit depth: $bitsPerSample" }
+        require(channels in 1..2) { "Unsupported channel count: $channels" }
 
         val encoding = if (bitsPerSample == 8) AudioFormat.Encoding.PCM_UNSIGNED else AudioFormat.Encoding.PCM_SIGNED
         val frameSize = channels * (bitsPerSample / 8)
