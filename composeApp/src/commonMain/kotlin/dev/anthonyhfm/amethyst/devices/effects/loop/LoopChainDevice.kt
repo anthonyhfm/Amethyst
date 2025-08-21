@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.heaven.elements.Signal
@@ -125,11 +126,25 @@ class LoopChainDevice : ChainDevice<LoopChainDeviceState>() {
     override fun midiEnter(n: List<Signal>) {
         val bpm = WorkspaceRepository.bpm.value
 
-        for (i in 0..state.value.repeat - 1) {
-            val delay = i * (state.value.timing.toMsValue(bpm) * (state.value.gate * 2))
+        n.forEach { signal ->
+            if (signal.color != Color.Black) {
+                // Create unique owner for this specific signal/button combination
+                val signalOwner = Pair(this, "${signal.x},${signal.y}")
 
-            Heaven.schedule(delay.toDouble()) {
-                midiExit?.invoke(n)
+                // Cancel nur die Jobs für diesen spezifischen Button
+                Heaven.cancelJobs { job ->
+                    job.owner is Pair<*, *> &&
+                    (job.owner as Pair<*, *>).first == this &&
+                    (job.owner as Pair<*, *>).second == "${signal.x},${signal.y}"
+                }
+
+                for (i in 0..state.value.repeat - 1) {
+                    val delay = i * (state.value.timing.toMsValue(bpm) * (state.value.gate * 2))
+
+                    Heaven.schedule(delay.toDouble(), owner = signalOwner) {
+                        midiExit?.invoke(listOf(signal))
+                    }
+                }
             }
         }
     }

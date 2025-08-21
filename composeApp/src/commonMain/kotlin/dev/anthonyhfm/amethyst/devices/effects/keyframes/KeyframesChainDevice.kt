@@ -521,8 +521,12 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
     override fun midiEnter(n: List<Signal>) {
         n.forEach {
             if (it.color != Color.Black) {
+                // Cancel alle vorherigen Animation-Jobs für dieses Device
+                Heaven.cancelJobsForOwner(this)
+
+                // Starte neue Animation
                 state.value.renderedAnimation.forEach {
-                    Heaven.schedule(it.first.toDouble()) {
+                    Heaven.schedule(it.first.toDouble(), owner = this) {
                         midiExit?.invoke(it.second)
                     }
                 }

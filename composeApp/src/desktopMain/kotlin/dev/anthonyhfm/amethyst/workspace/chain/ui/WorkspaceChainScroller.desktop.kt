@@ -26,7 +26,7 @@ actual fun WorkspaceChainScroller(scrollState: ScrollState) {
             .clip(RoundedCornerShape(12.dp))
             .fillMaxWidth()
             .height(24.dp)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.surface.copy(0.7f))
             .border(1.dp, MaterialTheme.colorScheme.surfaceBright.copy(0.6f), RoundedCornerShape(12.dp))
             .padding(6.dp),
         style = ScrollbarStyle(

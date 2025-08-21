@@ -12,6 +12,7 @@ import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilte
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
@@ -122,6 +123,40 @@ object WorkspaceRepository {
         }
 
         updateWorkspaceBounds()
+    }
+
+    fun resetMulti() {
+        fun recursiveResetMulti(chain: Chain) {
+            chain.devices.value.forEach { device ->
+                when (device) {
+                    is MultiGroupChainDevice -> {
+                        device.state.update {
+                            it.copy(
+                                currentMultiIndex = if (it.type == MultiGroupChainDeviceState.TYPE.BACKWARD) {
+                                    it.groups.lastIndex
+                                } else { 0 }
+                            )
+                        }
+                        device.state.value.groups.forEach { group ->
+                            recursiveResetMulti(group.chain)
+                        }
+                    }
+
+                    is GroupChainDevice -> {
+                        device.state.value.groups.forEach { group ->
+                            recursiveResetMulti(group.chain)
+                        }
+                    }
+
+                    is ChokeChainDevice -> {
+                        recursiveResetMulti(device.state.value.chain)
+                    }
+                }
+            }
+        }
+
+        recursiveResetMulti(lightsChain.heavenChain)
+        recursiveResetMulti(samplingChain.heavenChain)
     }
 
     fun loadWorkspace(workspaceData: SaveableWorkspaceData) {

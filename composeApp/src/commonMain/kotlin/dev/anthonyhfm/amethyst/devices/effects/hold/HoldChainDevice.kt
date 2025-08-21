@@ -86,13 +86,23 @@ class HoldChainDevice : ChainDevice<HoldChainDeviceState>() {
     }
 
     override fun midiEnter(n: List<Signal>) {
-        n.filter {
-            it.color != Color.Black
-        }.apply {
-            midiExit?.invoke(this)
+        n.forEach { signal ->
+            if (signal.color != Color.Black) {
+                // Create unique owner for this specific signal/button combination
+                val signalOwner = Pair(this, "${signal.x},${signal.y}")
 
-            Heaven.schedule(state.value.delayMs.toDouble() * (state.value.gate * 2)) {
-                midiExit?.invoke(this.map { it.copy(color = Color.Black) })
+                // Cancel nur die Jobs für diesen spezifischen Button
+                Heaven.cancelJobs { job ->
+                    job.owner is Pair<*, *> &&
+                    (job.owner as Pair<*, *>).first == this &&
+                    (job.owner as Pair<*, *>).second == "${signal.x},${signal.y}"
+                }
+
+                midiExit?.invoke(listOf(signal))
+
+                Heaven.schedule(state.value.delayMs.toDouble() * (state.value.gate * 2), owner = signalOwner) {
+                    midiExit?.invoke(listOf(signal.copy(color = Color.Black)))
+                }
             }
         }
     }

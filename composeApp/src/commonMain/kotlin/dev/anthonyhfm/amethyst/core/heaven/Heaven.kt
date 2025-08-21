@@ -14,6 +14,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.max
+import java.util.*
+import java.util.concurrent.atomic.AtomicLong
+
+data class ScheduledJob(
+    val id: String,
+    val targetTime: Long,
+    val job: () -> Unit,
+    val owner: Any? = null
+)
 
 object Heaven {
     var devices: List<LaunchpadViewportElement> = emptyList()
@@ -23,10 +32,10 @@ object Heaven {
         }
 
     private val signalQueue = Channel<List<Signal>>(UNLIMITED)
-    private val jobQueue = Channel<Pair<Long, () -> Unit>>(UNLIMITED)
+    private val jobQueue = Channel<ScheduledJob>(UNLIMITED)
 
     private val jobsMutex = Mutex()
-    private val jobsList = mutableListOf<Pair<Long, MutableList<() -> Unit>>>()
+    private val jobsList = mutableListOf<Pair<Long, MutableList<ScheduledJob>>>()
 
     @Volatile
     private var prev: Long = 0L
@@ -54,13 +63,38 @@ object Heaven {
         wake()
     }
 
-    fun schedule(delayInMs: Double, job: () -> Unit) {
+    private val jobIdCounter = AtomicLong(0)
+
+    fun schedule(delayInMs: Double, owner: Any? = null, job: () -> Unit): String {
+        val jobId = "job_${jobIdCounter.incrementAndGet()}_${System.currentTimeMillis()}"
         val targetTime = prev + msToTicks(delayInMs)
+        val scheduledJob = ScheduledJob(jobId, targetTime, job, owner)
+
         renderScope.launch {
-            jobQueue.send(targetTime to job)
+            jobQueue.send(scheduledJob)
             cancel()
         }
         wake()
+        return jobId
+    }
+
+    fun cancelJobs(filter: (ScheduledJob) -> Boolean) {
+        renderScope.launch {
+            jobsMutex.withLock {
+                jobsList.forEach { (_, jobs) ->
+                    jobs.removeAll(filter)
+                }
+                jobsList.removeAll { it.second.isEmpty() }
+            }
+        }
+    }
+
+    fun cancelJobsForOwner(owner: Any) {
+        cancelJobs { it.owner == owner }
+    }
+
+    fun cancelJob(jobId: String) {
+        cancelJobs { it.id == jobId }
     }
 
     @Volatile private var renderJob: Job? = null
@@ -130,15 +164,15 @@ object Heaven {
         var processed = false
 
         while (!jobQueue.isEmpty) {
-            val (targetTime, job) = jobQueue.tryReceive().getOrNull() ?: break
+            val scheduledJob = jobQueue.tryReceive().getOrNull() ?: break
 
             jobsMutex.withLock {
-                val insertIndex = findInsertPosition(targetTime)
+                val insertIndex = findInsertPosition(scheduledJob.targetTime)
 
-                if (insertIndex < jobsList.size && jobsList[insertIndex].first == targetTime) {
-                    jobsList[insertIndex].second.add(job)
+                if (insertIndex < jobsList.size && jobsList[insertIndex].first == scheduledJob.targetTime) {
+                    jobsList[insertIndex].second.add(scheduledJob)
                 } else {
-                    jobsList.add(insertIndex, targetTime to mutableListOf(job))
+                    jobsList.add(insertIndex, scheduledJob.targetTime to mutableListOf(scheduledJob))
                 }
             }
 
@@ -166,7 +200,7 @@ object Heaven {
 
     private suspend fun executeReadyJobs(currentTime: Long) {
         val jobsToExecute = jobsMutex.withLock {
-            val result = mutableListOf<() -> Unit>()
+            val result = mutableListOf<ScheduledJob>()
             var splitIndex = 0
 
             for (i in jobsList.indices) {
@@ -185,11 +219,11 @@ object Heaven {
             result
         }
 
-        jobsToExecute.forEach { job ->
+        jobsToExecute.forEach { scheduledJob ->
             try {
-                job.invoke()
+                scheduledJob.job.invoke()
             } catch (e: Exception) {
-                println("Error executing job: ${e.message}")
+                println("Error executing job ${scheduledJob.id}: ${e.message}")
             }
         }
     }

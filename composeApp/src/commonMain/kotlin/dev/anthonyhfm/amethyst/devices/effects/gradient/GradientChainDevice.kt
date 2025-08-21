@@ -40,7 +40,9 @@ import dev.anthonyhfm.amethyst.devices.effects.gradient.ui.GradientEditorBar
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
+import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -242,36 +244,51 @@ class GradientChainDevice : ChainDevice<GradientChainDeviceState>() {
     }
 
     override fun midiEnter(n: List<Signal>) {
-        // jesus christ, this is a lot of math
+        val bpm = WorkspaceRepository.bpm.value
+        val totalDuration = state.value.timing.toMsValue(bpm) * (state.value.gate * 2)
         val gradientSteps = ((GlobalSettings.perforanceFPS / GlobalSettings.gradientSmoothness) * (state.value.durationMs * (state.value.gate * 2)).toInt() / 1000).toInt()
+        val stepLength = totalDuration / gradientSteps
 
-        val stepLength = (state.value.durationMs * (state.value.gate * 2)) / gradientSteps
-        val colors = state.value.gradientData.sortedBy { it.position }.map { it.position to Color(it.r,  it.g, it.b) }
+        val gradient = state.value.gradientData
+            .sortedBy { it.position }
+            .map { gradientColor ->
+                gradientColor.position to Color(gradientColor.r, gradientColor.g, gradientColor.b)
+            }
 
         n.forEach { signal ->
             if (signal.color != Color.Black) {
+                // Create unique owner for this specific signal/button combination
+                val signalOwner = Pair(this, "${signal.x},${signal.y}")
+
+                // Cancel nur die Jobs für diesen spezifischen Button
+                Heaven.cancelJobs { job ->
+                    job.owner is Pair<*, *> &&
+                    (job.owner as Pair<*, *>).first == this &&
+                    (job.owner as Pair<*, *>).second == "${signal.x},${signal.y}"
+                }
+
                 for (step in 0..gradientSteps) {
                     val progress = step.toFloat() / gradientSteps
-                    val color = interpolateGradient(colors, progress)
+                    val color = interpolateGradient(gradient, progress)
 
                     Heaven.schedule(
-                        job = {
-                            midiExit?.invoke(
-                                listOf(signal.copy(color = color))
-                            )
-                        },
-                        delayInMs = stepLength * step
-                    )
+                        delayInMs = (stepLength * step).toDouble(),
+                        owner = signalOwner
+                    ) {
+                        midiExit?.invoke(
+                            listOf(signal.copy(color = color))
+                        )
+                    }
                 }
 
                 Heaven.schedule(
-                    job = {
-                        midiExit?.invoke(
-                            listOf(signal.copy(color = Color.Black))
-                        )
-                    },
-                    delayInMs = stepLength * (gradientSteps + 1)
-                )
+                    delayInMs = totalDuration.toDouble(),
+                    owner = signalOwner
+                ) {
+                    midiExit?.invoke(
+                        listOf(signal.copy(color = Color.Black))
+                    )
+                }
             }
         }
     }

@@ -456,6 +456,16 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
     private fun animateSignalThroughOffsetsWithIsolation(originalSignal: Signal, offsets: List<Pair<Int, Int>>) {
         val animationDuration = state.value.delayMs * (state.value.gate * 2).toInt()
 
+        // Create unique owner for this specific signal/button combination
+        val signalOwner = Pair(this, "${originalSignal.x},${originalSignal.y}")
+
+        // Cancel nur die Jobs für diesen spezifischen Button
+        Heaven.cancelJobs { job ->
+            job.owner is Pair<*, *> &&
+            (job.owner as Pair<*, *>).first == this &&
+            (job.owner as Pair<*, *>).second == "${originalSignal.x},${originalSignal.y}"
+        }
+
         val targets = mutableListOf<Pair<Int, Int>>()
         targets.add(Pair(0, 0))
         targets.addAll(offsets)
@@ -477,11 +487,11 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
 
                 if (isSignalWithinDeviceBounds(copiedSignal, state.value.isolate)) {
                     Heaven.schedule(
-                        job = {
-                            midiExit?.invoke(listOf(copiedSignal))
-                        },
-                        delayInMs = (state.value.delayMs * stepIndex).toDouble()
-                    )
+                        delayInMs = (state.value.delayMs * stepIndex).toDouble(),
+                        owner = signalOwner
+                    ) {
+                        midiExit?.invoke(listOf(copiedSignal))
+                    }
                 }
             }
         }
