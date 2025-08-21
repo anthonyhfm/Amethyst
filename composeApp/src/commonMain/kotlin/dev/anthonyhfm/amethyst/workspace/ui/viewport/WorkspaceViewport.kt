@@ -129,8 +129,8 @@ fun WorkspaceViewport(
             Box(
                 modifier = Modifier
                     .size(
-                        width = element.size.width.dp * gridSize,
-                        height = element.size.height.dp * gridSize
+                        width = element.size.width.dp * gridSize / density,
+                        height = element.size.height.dp * gridSize / density
                     )
                     .offset {
                         val scaledGridSize = gridSize * viewportState.zoom
