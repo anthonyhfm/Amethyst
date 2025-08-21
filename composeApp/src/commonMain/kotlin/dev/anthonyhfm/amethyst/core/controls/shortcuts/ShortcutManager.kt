@@ -4,6 +4,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
@@ -16,7 +17,7 @@ object ShortcutManager {
         if (keyEvent.type != KeyEventType.KeyDown) return false
 
         // Undo/Redo Shortcuts
-        if (keyEvent.isCtrlPressed && keyEvent.key == Key.Z) {
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.Z) {
             return if (keyEvent.isShiftPressed) {
                 // Ctrl+Shift+Z = Redo
                 UndoManager.redo()
@@ -29,32 +30,32 @@ object ShortcutManager {
         }
 
         // Alternative Redo shortcut (Ctrl+Y)
-        if (keyEvent.isCtrlPressed && keyEvent.key == Key.Y) {
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.Y) {
             UndoManager.redo()
             return true
         }
 
-        if (keyEvent.key == Key.Backspace || keyEvent.key == Key.Delete) {
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) || keyEvent.key == Key.Delete) {
             return handleDeletionShortcut()
         }
 
-        if (keyEvent.isCtrlPressed && keyEvent.key == Key.D) {
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.D) {
             return handleDuplicateShortcut()
         }
 
-        if (keyEvent.isCtrlPressed && keyEvent.key == Key.C) {
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.C) {
             if (SelectionManager.selections.value.isNotEmpty()) {
                 ClipboardManager.copy(SelectionManager.selections.value)
                 return true
             }
         }
 
-        if (keyEvent.isCtrlPressed && keyEvent.key == Key.V) {
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.V) {
             ClipboardManager.paste()
             return true
         }
 
-        if (keyEvent.isCtrlPressed && keyEvent.key == Key.S) {
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.S) {
             println("TODO: Save")
             return true
         }
