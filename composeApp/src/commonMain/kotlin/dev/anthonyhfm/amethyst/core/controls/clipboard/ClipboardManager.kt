@@ -27,7 +27,12 @@ object ClipboardManager {
             data.any { it is Selectable.ChainDevice } -> {
                 setClipboardData(
                     data = ClipboardData.ChainDevice(
-                        states = data.filterIsInstance<Selectable.ChainDevice>().map { it.device.state.value }
+                        states = data.filterIsInstance<Selectable.ChainDevice>().map { it.device.state.value },
+                        type = if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
+                            ClipboardData.ChainDevice.ChainType.Lights
+                        } else {
+                            ClipboardData.ChainDevice.ChainType.Sampling
+                        }
                     )
                 )
             }
@@ -86,6 +91,8 @@ object ClipboardManager {
                 }
 
                 if (mode is WorkspaceContract.WorkspaceMode.LightsChain) {
+                    if ((clipboardData.value as ClipboardData.ChainDevice).type != ClipboardData.ChainDevice.ChainType.Lights) return
+
                     (clipboardData.value as ClipboardData.ChainDevice).states.forEach {
                         WorkspaceRepository.lightsChain.heavenChain.add(
                             device = StateChain.unpackDevice(it),
@@ -93,6 +100,8 @@ object ClipboardManager {
                         )
                     }
                 } else if (mode is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                    if ((clipboardData.value as ClipboardData.ChainDevice).type != ClipboardData.ChainDevice.ChainType.Sampling) return
+
                     (clipboardData.value as ClipboardData.ChainDevice).states.forEach {
                         WorkspaceRepository.samplingChain.heavenChain.add(
                             device = StateChain.unpackDevice(it),

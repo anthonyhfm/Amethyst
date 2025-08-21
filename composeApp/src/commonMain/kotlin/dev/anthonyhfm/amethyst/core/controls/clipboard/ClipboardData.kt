@@ -7,8 +7,14 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 
 sealed interface ClipboardData {
     data class ChainDevice(
-        val states: List<DeviceState>
-    ) : ClipboardData
+        val states: List<DeviceState>,
+        val type: ChainType
+    ) : ClipboardData {
+        enum class ChainType {
+            Lights,
+            Sampling
+        }
+    }
 
     data class GradientStep(
         val step: Selectable.GradientStep
