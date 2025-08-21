@@ -18,7 +18,7 @@ actual object AudioPlayer {
     private val audioClips = ConcurrentHashMap<String, LoadedAudioClip>()
     private val playingClips = ConcurrentHashMap<String, Clip>()
     private var mixer: Mixer? = null
-    private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(4)
+    private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(6)
     private val cleanupScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private data class LoadedAudioClip(
@@ -193,7 +193,13 @@ actual object AudioPlayer {
         ensureInitialized()
 
         cleanupScope.launch {
-            playingClips.remove(audioKey)?.close()
+            playingClips.entries.removeAll { (playId, clip) ->
+                if (playId.startsWith(audioKey)) {
+                    clip.stop()
+                    clip.close()
+                    true
+                } else false
+            }
         }
     }
 

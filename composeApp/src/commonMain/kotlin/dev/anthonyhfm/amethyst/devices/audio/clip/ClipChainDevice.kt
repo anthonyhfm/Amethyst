@@ -101,6 +101,7 @@ class ClipChainDevice : ChainDevice<ClipChainDeviceState>() {
             if (it.color != Color.Black) {
                 if (WorkspaceRepository.audioRegistry[state.value.audioKey] != null) {
                     CoroutineScope(Dispatchers.IO).launch {
+                        AudioPlayer.stopAudio(state.value.audioKey)
                         AudioPlayer.playAudio(state.value.audioKey)
                     }
                 }

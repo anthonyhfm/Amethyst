@@ -26,7 +26,7 @@ object KeySound {
     fun loadAllAudioClips(zipFile: String): MutableMap<String, AudioClip?> {
         val entries = Zip.getEntries(zipFile).filter { (it.path.startsWith("Sounds/") || it.path.startsWith("sounds/")) && !it.isDirectory }
         val clipMap: MutableMap<String, AudioClip?> = mutableMapOf()
-        val scope = CoroutineScope(Dispatchers.IO.limitedParallelism(4))
+        val scope = CoroutineScope(Dispatchers.Default)
 
         entries.forEach { entry ->
             val clipName = entry.path.removePrefix("Sounds/").removePrefix("sounds/").trim()
