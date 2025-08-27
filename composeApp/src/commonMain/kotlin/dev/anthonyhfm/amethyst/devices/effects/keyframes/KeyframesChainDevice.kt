@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
@@ -346,40 +347,15 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                     }
                 }
             }
+
+            is Event.OnChangeInfinity -> {
+                state.update {
+                    it.copy(
+                        infinity = event.checked
+                    )
+                }
+            }
         }
-    }
-
-    fun duplicateFrame(index: Int, toIndex: Int? = null) {
-        val frame = state.value.frames[index]
-        val targetIndex = toIndex ?: (index + 1)
-        val newFrame = frame.copy(_internalUuid = UUID.randomUUID())
-
-        UndoManager.addAction(
-            UndoableAction.KeyframeDuplication(
-                device = this,
-                originalIndex = index,
-                duplicatedIndex = targetIndex,
-                duplicatedFrame = newFrame
-            )
-        )
-
-        duplicateFrameInternal(index, targetIndex)
-        refreshVirtualDevices()
-    }
-
-    fun removeFrame(index: Int) {
-        val frameToDelete = state.value.frames[index]
-
-        UndoManager.addAction(
-            UndoableAction.KeyframeDeletion(
-                device = this,
-                frameIndex = index,
-                frame = frameToDelete
-            )
-        )
-
-        removeFrameInternal(index)
-        refreshVirtualDevices()
     }
 
     fun removeFrames(frameIndices: List<Int>) {
@@ -502,6 +478,8 @@ class KeyframesChainDevice : ChainDevice<KeyframesChainDeviceState>() {
                     addAll(frame.entries.filter { !(previousFrame?.entries?.contains(it) ?: false) }.map { it.toSignal() })
 
                     if (previousFrame != null) {
+                        if (state.value.infinity && index == frames.lastIndex) return@buildList
+
                         val cleared = previousFrame.entries.filter { prev ->
                             frame.entries.none { it.x == prev.x && it.y == prev.y }
                         }.map {

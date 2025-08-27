@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -27,29 +28,18 @@ import kotlinx.coroutines.flow.update
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
-fun BoxScope.FrameListPanel(
+fun ColumnScope.FrameListPanel(
     state: KeyframesChainDeviceContract.KeyframesChainDeviceState,
     onEvent: (KeyframesChainDeviceContract.Event) -> Unit,
     parent: dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice? = null
 ) {
     val lazyListState = rememberLazyListState()
 
-    val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        onEvent(
-            KeyframesChainDeviceContract.Event.OnChangeFramePosition(
-                from = from.index,
-                to = to.index
-            )
-        )
-    }
-
     LazyColumn(
         state = lazyListState,
         modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp)
             .clip(RoundedCornerShape(12.dp))
+            .weight(1f)
             .fillMaxHeight()
             .width(220.dp)
             .background(MaterialTheme.colorScheme.surfaceContainer)

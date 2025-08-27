@@ -23,6 +23,7 @@ sealed interface KeyframesChainDeviceContract {
         data class OnDuplicateFrame(val frameIndex: Int? = null) : Event
         data class OnChangeFrameTiming(val frameIndex: Int, val timing: Timing, val gate: Float) : Event
         data class OnChangeMultiFrameTiming(val frameIndices: List<Int>, val timing: Timing, val gate: Float) : Event
+        data class OnChangeInfinity(val checked: Boolean) : Event
         data class OnChangeFramePosition(
             val from: Int,
             val to: Int
@@ -40,6 +41,7 @@ sealed interface KeyframesChainDeviceContract {
                 timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
             )
         ),
+        val infinity: Boolean = false,
         @Transient
         val renderedAnimation: List<Pair<Int, List<Signal>>> = emptyList(),
     ) : DeviceState()

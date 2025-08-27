@@ -1,12 +1,15 @@
 package dev.anthonyhfm.amethyst.devices.effects.keyframes
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -15,9 +18,11 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.InfinityCheckbox
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
@@ -47,13 +52,29 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            FrameListPanel(
-                state = state,
-                onEvent = {
-                    onEvent?.invoke(it)
-                },
-                parent = parentDevice
-            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 12.dp),
+
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FrameListPanel(
+                    state = state,
+                    onEvent = {
+                        onEvent?.invoke(it)
+                    },
+                    parent = parentDevice
+                )
+
+                InfinityCheckbox(
+                    checked = state.infinity,
+                    onCheckedChange = {
+                        onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeInfinity(it))
+                    }
+                )
+            }
 
             FrameDrawingPanel(
                 state = state,
