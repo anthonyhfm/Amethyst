@@ -39,6 +39,7 @@ object AbletonConverter : AmethystConverter {
             minorVersion.startsWith("9") -> LiveVersion.LIVE_9
             minorVersion.startsWith("10") -> LiveVersion.LIVE_10
             minorVersion.startsWith("11") -> LiveVersion.LIVE_11
+            minorVersion.startsWith("12") -> LiveVersion.LIVE_12
 
             else -> null
         }
