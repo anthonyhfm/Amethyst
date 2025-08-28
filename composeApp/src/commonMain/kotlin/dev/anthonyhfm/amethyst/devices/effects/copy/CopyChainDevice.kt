@@ -470,6 +470,8 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
         targets.add(Pair(0, 0))
         targets.addAll(offsets)
 
+        var globalStepIndex = 0
+
         for (i in 0 until targets.size - 1) {
             val startOffset = targets[i]
             val endOffset = targets[i + 1]
@@ -487,12 +489,17 @@ class CopyChainDevice : ChainDevice<CopyChainDeviceState>() {
 
                 if (isSignalWithinDeviceBounds(copiedSignal, state.value.isolate)) {
                     Heaven.schedule(
-                        delayInMs = (state.value.delayMs * stepIndex).toDouble(),
+                        delayInMs = (state.value.delayMs * globalStepIndex).toDouble(),
                         owner = signalOwner
                     ) {
                         midiExit?.invoke(listOf(copiedSignal))
                     }
                 }
+                globalStepIndex++
+            }
+
+            if (i < targets.size - 2) {
+                globalStepIndex--
             }
         }
     }
