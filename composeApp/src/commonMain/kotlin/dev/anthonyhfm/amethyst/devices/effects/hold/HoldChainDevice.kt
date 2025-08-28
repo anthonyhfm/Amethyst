@@ -165,6 +165,10 @@ class HoldChainDevice : ChainDevice<HoldChainDeviceState>() {
             else {
                 val signalOwner = Pair(this, "${signal.x},${signal.y}")
 
+                if (!state.value.onRelease) {
+                    return@forEach
+                }
+
                 midiExit?.invoke(listOf(signal.copy(color = Color.White)))
 
                 if (state.value.infinite) {
