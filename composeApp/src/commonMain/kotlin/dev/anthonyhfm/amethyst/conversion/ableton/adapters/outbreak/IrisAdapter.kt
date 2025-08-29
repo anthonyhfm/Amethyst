@@ -34,15 +34,15 @@ class IrisAdapter (
         val filteredVelocities = data.fadeVelocities.filter { it != 0 }
 
         val irisRateTiming = mapOf(
-            0 to Timing.Rythm(Timing.Rythm.RythmTiming._1_128),
-            1 to Timing.Rythm(Timing.Rythm.RythmTiming._1_64),
-            2 to Timing.Duration(rythmIndexToDuration("1/48", bpm)), // 1/48 which does not exist in Amethyst (use 1/64 instead)
-            3 to Timing.Rythm(Timing.Rythm.RythmTiming._1_32),
-            4 to Timing.Duration(rythmIndexToDuration("1/24", bpm)), // 1/24 which does not exist in Amethyst (use 1/32 instead)
-            5 to Timing.Rythm(Timing.Rythm.RythmTiming._1_16),
-            6 to Timing.Duration(rythmIndexToDuration("1/12", bpm)), // 1/12 which does not exist in Amethyst (use 500ms instead)
-            7 to Timing.Rythm(Timing.Rythm.RythmTiming._1_8),
-            8 to Timing.Rythm(Timing.Rythm.RythmTiming._1_4)
+            0 to Timing.Duration(rythmIndexToDuration("1/128", bpm, filteredVelocities.size)),
+            1 to Timing.Duration(rythmIndexToDuration("1/64", bpm, filteredVelocities.size)),
+            2 to Timing.Duration(rythmIndexToDuration("1/48", bpm, filteredVelocities.size)), // 1/48 which does not exist in Amethyst (use 1/64 instead)
+            3 to Timing.Duration(rythmIndexToDuration("1/32", bpm, filteredVelocities.size)),
+            4 to Timing.Duration(rythmIndexToDuration("1/24", bpm, filteredVelocities.size)), // 1/24 which does not exist in Amethyst (use 1/32 instead)
+            5 to Timing.Duration(rythmIndexToDuration("1/16", bpm, filteredVelocities.size)),
+            6 to Timing.Duration(rythmIndexToDuration("1/12", bpm, filteredVelocities.size)), // 1/12 which does not exist in Amethyst (use 500ms instead)
+            7 to Timing.Duration(rythmIndexToDuration("1/8", bpm, filteredVelocities.size)),
+            8 to Timing.Duration(rythmIndexToDuration("1/4", bpm, filteredVelocities.size))
         )
 
         val timing = when {
@@ -51,7 +51,7 @@ class IrisAdapter (
                     .getOrElse(data.timingRate.first().toInt()) { Timing.Rythm(Timing.Rythm.RythmTiming._1_8) } // if we cannot resolve, default to 1/8
             }
             data.timingByMsStatus.first().toInt() == 1 -> {
-                Timing.Duration(data.timingMs.first().milliseconds)
+                Timing.Duration(data.timingMs.first().milliseconds * filteredVelocities.size)
             }
             else -> Timing.Rythm(Timing.Rythm.RythmTiming._1_8)
         }
@@ -71,15 +71,15 @@ class IrisAdapter (
                 timing = timing,
                 durationMs = timing.let {
                     when (it) {
-                        is Timing.Duration -> it.duration.inWholeMilliseconds.toInt()
-                        is Timing.Rythm -> rythmIndexToDuration(it.timing.text, bpm).inWholeMilliseconds.toInt()
+                        is Timing.Duration -> it.duration.inWholeMilliseconds.toInt() * filteredVelocities.size
+                        is Timing.Rythm -> rythmIndexToDuration(it.timing.text, bpm, filteredVelocities.size).inWholeMilliseconds.toInt()
                     }
                 }.toDouble(),
             )
         )
     }
 
-    fun rythmIndexToDuration(timing: String, bpm: Double): Duration {
+    fun rythmIndexToDuration(timing: String, bpm: Double, steps: Int): Duration {
         val factor = when (timing) {
             "1/128" -> 1 / 128f
             "1/64" -> 1 / 64f
@@ -100,7 +100,7 @@ class IrisAdapter (
         val fraction = factor * 4
         val secondsPerQuarter = 60.0 / bpm
         println("Converted $timing at $bpm BPM to ${(secondsPerQuarter * fraction * 1000).toInt()} ms")
-        return (secondsPerQuarter * fraction * 1000).toInt().milliseconds
+        return ((secondsPerQuarter * fraction * 1000).toInt() * steps).milliseconds
     }
 
     @Serializable
