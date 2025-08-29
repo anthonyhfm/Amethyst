@@ -89,14 +89,12 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>() {
                             },
                             onValueChange = { value ->
                                 if (!deviceState.onHold) {
-                                state.update {
-                                    it.copy(repeat = value)
-                                }
+                                    state.update {
+                                        it.copy(repeat = value)
+                                    }
                                 }
                             },
-                            modifier = Modifier
-                                .alpha(if (deviceState.onHold) 0.4f else 1f)
-                                .gesturesDisabled(deviceState.onHold),
+                            enabled = !deviceState.onHold
                         )
                     }
 
@@ -253,19 +251,3 @@ data class LoopChainDeviceState(
     val gate: Float = 0.5f,
     val onHold: Boolean = false,
 ) : DeviceState()
-
-fun Modifier.gesturesDisabled(disabled: Boolean = true) =
-    if (disabled) {
-        pointerInput(Unit) {
-            awaitPointerEventScope {
-                // we should wait for all new pointer events
-                while (true) {
-                    awaitPointerEvent(pass = PointerEventPass.Initial)
-                        .changes
-                        .forEach(PointerInputChange::consume)
-                }
-            }
-        }
-    } else {
-        this
-    }

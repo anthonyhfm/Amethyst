@@ -55,6 +55,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                     ) {
                         TimeDial(
                             headline = "Hold",
+                            text = if (deviceState.infinite) "Infinite" else null,
                             timing = deviceState.timing,
                             onSelectTiming = { timing, msValue ->
                                 state.update {
@@ -63,12 +64,13 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                                         delayMs = msValue
                                     )
                                 }
-                            }
+                            },
+                            enabled = !deviceState.infinite
                         )
 
                         TextDial(
                             headline = "Gate",
-                            text = "${(deviceState.gate * 200).toInt()}%",
+                            text = if (!deviceState.infinite) "${(deviceState.gate * 200).toInt()}%" else "Disabled",
                             value = deviceState.gate,
                             onValueChange = { value ->
                                 state.update {
@@ -92,6 +94,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                                         it.copy(gate = 0.5f) // Reset gate to its original state
                                     }
                                 },
+                            enabled = !deviceState.infinite
                         )
                     }
 
