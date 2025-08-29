@@ -6,6 +6,10 @@ import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDeviceState
+import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -38,27 +42,51 @@ class IrisAdapter (
             else -> Timing.Rythm(Timing.Rythm.RythmTiming._1_8)
         }
 
-        return listOf(
-            GradientChainDeviceState(
-                gradientData = List(filteredVelocities.size) { index ->
-                    val color = novationPalette.getOrElse(filteredVelocities[index]) { index -> Triple(0, 0, 0) }
+        val gradientDevice = GradientChainDeviceState(
+            gradientData = List(filteredVelocities.size) { index ->
+                val color = novationPalette.getOrElse(filteredVelocities[index]) { index -> Triple(0, 0, 0) }
 
-                    GradientChainDeviceState.GradientColor(
-                        position = index.toFloat() / (filteredVelocities.size - 1),
-                        r = color.first.toFloat() / 63f,
-                        g = color.second.toFloat() / 63f,
-                        b = color.third.toFloat() / 63f,
-                    )
-                },
-                timing = timing,
-                durationMs = timing.let {
-                    when (it) {
-                        is Timing.Duration -> it.duration.inWholeMilliseconds.toInt() * filteredVelocities.size
-                        is Timing.Rythm -> rythmIndexToDuration(it.timing.text, bpm, filteredVelocities.size).inWholeMilliseconds.toInt()
-                    }
-                }.toDouble(),
-            )
+                GradientChainDeviceState.GradientColor(
+                    position = index.toFloat() / (filteredVelocities.size - 1),
+                    r = color.first.toFloat() / 63f,
+                    g = color.second.toFloat() / 63f,
+                    b = color.third.toFloat() / 63f,
+                )
+            },
+            timing = timing,
+            durationMs = timing.let {
+                when (it) {
+                    is Timing.Duration -> it.duration.inWholeMilliseconds.toInt() * filteredVelocities.size
+                    is Timing.Rythm -> rythmIndexToDuration(it.timing.text, bpm, filteredVelocities.size).inWholeMilliseconds.toInt()
+                }
+            }.toDouble(),
         )
+
+        val loopDevice = LoopChainDeviceState(
+            onHold = true,
+            timing = timing,
+        )
+
+        // TODO: check if we can get rid of group here
+        return if (data.loopMode.first().toInt() == 1) {
+            listOf(
+                GroupChainDeviceState(
+                    groups = listOf(
+                        Group(
+                            name = "Iris Loop",
+                            stateChain = StateChain(
+                                devices = mutableListOf(
+                                    loopDevice,
+                                    gradientDevice
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        } else {
+            listOf(gradientDevice)
+        }
     }
 
     fun irisIndexToTiming(index: Int): String {
@@ -100,7 +128,8 @@ class IrisAdapter (
         @SerialName("Rate[2]")
         val timingMs: List<Double>,
 
-        // TODO: add support for loop mode
+        @SerialName("live.text")
+        val loopMode: List<Double>,
 
         @SerialName("live.text[1]")
         val timingByMsStatus: List<Double>,
