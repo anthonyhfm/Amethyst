@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.core.util.Zip
+import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import io.github.vinceglb.filekit.PlatformFile
@@ -61,8 +62,8 @@ object AbletonConverter : AmethystConverter {
         }
 
         return SaveableWorkspaceData(
-            lights = MidiChainReader().readMidiChain(lightsTrackXML!!),
-            sampling = MidiChainReader().readMidiChain(audioTrackXML!!),
+            lights = lightsTrackXML?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList()),
+            sampling = audioTrackXML?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList()),
             audioClips = audioClips.toList(),
             settings = WorkspaceSettings(
                 bpm = bpm
