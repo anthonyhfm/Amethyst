@@ -1,9 +1,11 @@
 package dev.anthonyhfm.amethyst.ui.components
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,16 +24,17 @@ fun TimeDial(
     timing: Timing,
     onSelectTiming: (timing: Timing, msValue: Int) -> Unit
 ) {
-    var millisecondMode: Boolean by remember { mutableStateOf(false) }
+    val millisecondMode by remember { derivedStateOf { timing is Timing.Duration } }
     val bpm by WorkspaceRepository.bpm.collectAsState()
 
     LaunchedEffect(bpm) {
+        print("TimeDial: BPM changed to $bpm, current timing is $timing which is ${timing.toMsValue(bpm)} ms")
         onSelectTiming(timing, timing.toMsValue(bpm))
     }
 
     if (millisecondMode) {
         TextDial(
-            value = if (timing is Timing.Duration) timing.duration.inMs.toFloat() / 1000 else 0.3f,
+            value = (timing as Timing.Duration).duration.inMs.toFloat() / 1000,
             onValueChange = {
                 onSelectTiming(
                     Timing.Duration((it * 1000).toInt().milliseconds),
@@ -53,10 +56,6 @@ fun TimeDial(
                     }
                 }
             },
-            modifier = Modifier
-                .rightClickable {
-                    millisecondMode = !millisecondMode
-                },
         )
     } else {
         StepTextDial(
@@ -83,12 +82,9 @@ fun TimeDial(
                         timing.toMsValue(bpm)
                     )
                 }
-            },
-            modifier = Modifier
-                .rightClickable {
-                    millisecondMode = !millisecondMode
-                },
+            }
         )
+        // TODO: add back right click to switch to ms mode
     }
 }
 
