@@ -112,7 +112,7 @@ abstract class LaunchpadViewportElement(
                         origin = this,
                         x = x + position.value.x.toInt(),
                         y = (layout.rows - 1) - y + position.value.y.toInt(),
-                        velocity = 127
+                        velocity = if (down) 127 else 0
                     )
                 )
             }
