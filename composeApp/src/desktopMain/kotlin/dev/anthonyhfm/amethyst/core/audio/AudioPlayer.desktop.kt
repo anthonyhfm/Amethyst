@@ -327,14 +327,6 @@ actual object AudioPlayer {
         stopAudio(audioKey)
     }
 
-    // ...existing decode methods...
-    private fun decodeAudioData(data: ByteArray): AudioInfo = when {
-        isWav(data) -> decodeWav(data)
-        isMp3(data) -> decodeMp3(data)
-        isOgg(data) -> throw RuntimeException("OGG format not supported in Java Sound implementation. Please use WAV or MP3 files.")
-        else -> throw RuntimeException("Unsupported audio format. Only WAV and MP3 files are supported.")
-    }
-
     private fun isWav(d: ByteArray) = d.size >= 12 &&
         d[0] == 'R'.code.toByte() && d[1] == 'I'.code.toByte() &&
         d[2] == 'F'.code.toByte() && d[3] == 'F'.code.toByte()
@@ -347,9 +339,13 @@ actual object AudioPlayer {
         }
     )
 
-    private fun isOgg(d: ByteArray) = d.size >= 4 &&
-        d[0] == 'O'.code.toByte() && d[1] == 'g'.code.toByte() &&
-        d[2] == 'g'.code.toByte() && d[3] == 'S'.code.toByte()
+    private fun isFlac(d: ByteArray) = d.size >= 4 &&
+        d[0] == 0x66.toByte() && d[1] == 0x4C.toByte() &&
+        d[2] == 0x61.toByte() && d[3] == 0x43.toByte()
+
+    private fun isM4a(d: ByteArray) = d.size >= 8 &&
+        d[4] == 0x66.toByte() && d[5] == 0x74.toByte() &&
+        d[6] == 0x79.toByte() && d[7] == 0x70.toByte()
 
     private fun decodeWav(audioData: ByteArray): AudioInfo {
         val buf = ByteBuffer.wrap(audioData).order(ByteOrder.LITTLE_ENDIAN)
@@ -511,6 +507,80 @@ actual object AudioPlayer {
         } catch (e: Exception) {
             throw RuntimeException("Failed to decode MP3: ${e.message}", e)
         }
+    }
+
+    private fun decodeFlac(audioData: ByteArray): AudioInfo {
+        try {
+            val inputStream = ByteArrayInputStream(audioData)
+            val audioInputStream = AudioSystem.getAudioInputStream(inputStream)
+
+            val sourceFormat = audioInputStream.format
+
+            val targetFormat = AudioFormat(
+                AudioFormat.Encoding.PCM_SIGNED,
+                sourceFormat.sampleRate,
+                16,
+                sourceFormat.channels,
+                sourceFormat.channels * 2,
+                sourceFormat.sampleRate,
+                false
+            )
+
+            val pcmStream = AudioSystem.getAudioInputStream(targetFormat, audioInputStream)
+            val pcmData = pcmStream.readAllBytes()
+
+            val frameLength = pcmData.size / targetFormat.frameSize
+            val duration = (frameLength * 1000L / targetFormat.sampleRate).toLong()
+
+            pcmStream.close()
+            audioInputStream.close()
+
+            return AudioInfo(targetFormat, pcmData, duration)
+
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to decode FLAC: ${e.message}", e)
+        }
+    }
+
+    private fun decodeM4a(audioData: ByteArray): AudioInfo {
+        try {
+            val inputStream = ByteArrayInputStream(audioData)
+            val audioInputStream = AudioSystem.getAudioInputStream(inputStream)
+
+            val sourceFormat = audioInputStream.format
+
+            val targetFormat = AudioFormat(
+                AudioFormat.Encoding.PCM_SIGNED,
+                sourceFormat.sampleRate,
+                16,
+                sourceFormat.channels,
+                sourceFormat.channels * 2,
+                sourceFormat.sampleRate,
+                false
+            )
+
+            val pcmStream = AudioSystem.getAudioInputStream(targetFormat, audioInputStream)
+            val pcmData = pcmStream.readAllBytes()
+
+            val frameLength = pcmData.size / targetFormat.frameSize
+            val duration = (frameLength * 1000L / targetFormat.sampleRate).toLong()
+
+            pcmStream.close()
+            audioInputStream.close()
+
+            return AudioInfo(targetFormat, pcmData, duration)
+
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to decode M4A: ${e.message}", e)
+        }
+    }
+
+    private fun decodeAudioData(data: ByteArray): AudioInfo = when {
+        isWav(data) -> decodeWav(data)
+        isMp3(data) -> decodeMp3(data)
+        isFlac(data) -> decodeFlac(data)
+        isM4a(data) -> decodeM4a(data)
+        else -> throw RuntimeException("Unsupported audio format. Only WAV, MP3, FLAC, and M4A files are supported.")
     }
 
     fun cleanup() {
