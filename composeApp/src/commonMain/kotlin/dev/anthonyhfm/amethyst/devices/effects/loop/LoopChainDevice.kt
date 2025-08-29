@@ -1,12 +1,10 @@
 package dev.anthonyhfm.amethyst.devices.effects.loop
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -20,7 +18,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -69,25 +71,32 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>() {
                     ){
                         StepTextDial(
                             headline = "Repeat",
-                            text = "${deviceState.repeat}",
+                            text = if (deviceState.onHold) "Unused" else "${deviceState.repeat}",
                             steps = IntArray(128) { it + 1 }.toList(),
                             value = deviceState.repeat,
                             onResolveTextValue = {
-                                val repeatText = it.trim().toIntOrNull()
+                                if (!deviceState.onHold) {
+                                    val repeatText = it.trim().toIntOrNull()
 
-                                repeatText?.let { repeat ->
-                                    if (repeat in 1..128) {
-                                        state.update {
-                                            it.copy(repeat = repeat)
+                                    repeatText?.let { repeat ->
+                                        if (repeat in 1..128) {
+                                            state.update {
+                                                it.copy(repeat = repeat)
+                                            }
                                         }
                                     }
                                 }
                             },
                             onValueChange = { value ->
+                                if (!deviceState.onHold) {
                                 state.update {
                                     it.copy(repeat = value)
                                 }
+                                }
                             },
+                            modifier = Modifier
+                                .alpha(if (deviceState.onHold) 0.4f else 1f)
+                                .gesturesDisabled(deviceState.onHold),
                         )
                     }
 
@@ -244,3 +253,19 @@ data class LoopChainDeviceState(
     val gate: Float = 0.5f,
     val onHold: Boolean = false,
 ) : DeviceState()
+
+fun Modifier.gesturesDisabled(disabled: Boolean = true) =
+    if (disabled) {
+        pointerInput(Unit) {
+            awaitPointerEventScope {
+                // we should wait for all new pointer events
+                while (true) {
+                    awaitPointerEvent(pass = PointerEventPass.Initial)
+                        .changes
+                        .forEach(PointerInputChange::consume)
+                }
+            }
+        }
+    } else {
+        this
+    }
