@@ -1,7 +1,5 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
-import amethyst.composeapp.generated.resources.Res
-import amethyst.composeapp.generated.resources.metronome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Row
@@ -26,9 +24,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.ui.icons.AmethystIcons
+import dev.anthonyhfm.amethyst.ui.icons.outlined.Metronome
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import org.jetbrains.compose.resources.painterResource
-import org.koin.compose.koinInject
 
 @Composable
 fun BPMChanger() {
@@ -46,7 +44,7 @@ fun BPMChanger() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            painter = painterResource(Res.drawable.metronome),
+            imageVector = AmethystIcons.Outlined.Metronome,
             contentDescription = "Beats per minute",
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier

@@ -1,21 +1,13 @@
 package dev.anthonyhfm.amethyst.core.controls.shortcuts
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Draw
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Preview
-import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceModePickerItem
 import kotlinx.coroutines.flow.update
 
 fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {

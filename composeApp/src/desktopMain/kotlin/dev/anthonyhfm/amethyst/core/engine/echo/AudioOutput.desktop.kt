@@ -199,9 +199,9 @@ actual object AudioOutput {
             return
         }
 
-        println("Queueing AudioSignal with ${rawData.size} bytes (audioKey: ${audioSignal.audioKey})")
+        println("Queueing AudioSignal with ${rawData.size} bytes")
 
-        val queuedAudio = QueuedAudio(rawData, audioSignal.audioKey, audioSignal.origin)
+        val queuedAudio = QueuedAudio(rawData, null, audioSignal.origin)
         audioQueue.offer(queuedAudio)
     }
 

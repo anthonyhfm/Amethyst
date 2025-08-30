@@ -222,11 +222,11 @@ actual object AudioOutput {
             return
         }
 
-        println("Queueing Android AudioSignal with ${rawData.size} bytes (audioKey: ${audioSignal.audioKey})")
+        println("Queueing Android AudioSignal with ${rawData.size} bytes")
 
         val queuedAudio = QueuedAudio(
             rawData,
-            audioSignal.audioKey,
+            null,
             audioSignal.origin,
             audioSignal.sampleRate,
             audioSignal.channels
