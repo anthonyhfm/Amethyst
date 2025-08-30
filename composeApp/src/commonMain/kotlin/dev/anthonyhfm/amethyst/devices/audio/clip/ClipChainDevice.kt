@@ -26,9 +26,6 @@ import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.readBytes
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -97,16 +94,24 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
     override fun signalEnter(n: List<Signal>) {
         n.filterIsInstance<Signal.Midi>().forEach {
             if (it.velocity != 0) {
-                if (WorkspaceRepository.audioRegistry[state.value.audioKey] != null) {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        AudioPlayer.stopAudio(state.value.audioKey)
-                        AudioPlayer.playAudio(state.value.audioKey)
-                    }
+                val audioClip = WorkspaceRepository.audioRegistry[state.value.audioKey]
+
+                if (audioClip != null) {
+                    val audioSignal = Signal.AudioSignal(
+                        origin = this,
+                        rawData = audioClip.data,
+                        sampleRate = 44100,
+                        channels = 2,
+                        bitDepth = 16,
+                        audioKey = state.value.audioKey
+                    )
+
+                    signalExit?.invoke(listOf(audioSignal))
+                } else {
+                    signalExit?.invoke(n)
                 }
             }
         }
-
-        signalExit?.invoke(n)
     }
 }
 

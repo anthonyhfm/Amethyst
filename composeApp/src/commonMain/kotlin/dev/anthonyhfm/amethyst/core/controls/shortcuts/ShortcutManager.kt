@@ -35,7 +35,7 @@ object ShortcutManager {
             return true
         }
 
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.Delete) {
+        if (keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace) {
             return handleDeletionShortcut()
         }
 

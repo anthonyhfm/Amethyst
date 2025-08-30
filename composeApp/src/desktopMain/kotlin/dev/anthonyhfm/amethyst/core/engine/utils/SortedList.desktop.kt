@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.core.heaven.utils
+package dev.anthonyhfm.amethyst.core.engine.utils
 
 import java.util.*
 

@@ -87,6 +87,18 @@ kotlin {
             implementation(libs.flatlaf)
             implementation("io.github.vyfor:kpresence:0.6.5")
 
+            // LWJGL OpenAL für Low-Latency Audio
+            implementation("org.lwjgl:lwjgl:3.3.3")
+            implementation("org.lwjgl:lwjgl-openal:3.3.3")
+            runtimeOnly("org.lwjgl:lwjgl:3.3.3:natives-macos")
+            runtimeOnly("org.lwjgl:lwjgl:3.3.3:natives-macos-arm64")
+            runtimeOnly("org.lwjgl:lwjgl-openal:3.3.3:natives-macos")
+            runtimeOnly("org.lwjgl:lwjgl-openal:3.3.3:natives-macos-arm64")
+            runtimeOnly("org.lwjgl:lwjgl:3.3.3:natives-windows")
+            runtimeOnly("org.lwjgl:lwjgl:3.3.3:natives-linux")
+            runtimeOnly("org.lwjgl:lwjgl-openal:3.3.3:natives-windows")
+            runtimeOnly("org.lwjgl:lwjgl-openal:3.3.3:natives-linux")
+
             // MP3 support
             implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
             implementation("com.googlecode.soundlibs:jlayer:1.0.1.4")

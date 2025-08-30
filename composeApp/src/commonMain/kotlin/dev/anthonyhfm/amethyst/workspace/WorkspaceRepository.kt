@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -61,6 +62,10 @@ object WorkspaceRepository {
     init {
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
+        }
+
+        samplingChain.signalExit = {
+            Echo.audioEnter(it.filterIsInstance<Signal.AudioSignal>())
         }
     }
 
@@ -175,6 +180,10 @@ object WorkspaceRepository {
 
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
+        }
+
+        samplingChain.signalExit = {
+            Echo.audioEnter(it.filterIsInstance<Signal.AudioSignal>())
         }
 
         fun recursiveRenderingKeyframes(chain: Chain) {
