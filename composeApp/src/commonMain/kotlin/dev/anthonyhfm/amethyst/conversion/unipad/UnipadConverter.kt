@@ -3,17 +3,17 @@ package dev.anthonyhfm.amethyst.conversion.unipad
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.unipad.data.KeyLED
 import dev.anthonyhfm.amethyst.conversion.unipad.data.KeySound
-import dev.anthonyhfm.amethyst.core.audio.AudioClip
+import dev.anthonyhfm.amethyst.conversion.unipad.data.DecodedAudioClip
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
-import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
+import kotlinx.coroutines.runBlocking
 
 object UnipadConverter : AmethystConverter {
     override fun convertToWorkspace(path: String): SaveableWorkspaceData {
@@ -32,13 +32,16 @@ object UnipadConverter : AmethystConverter {
                     .let { (key, value) -> key to value }
             }
 
-        val clipMap = KeySound.loadAllAudioClips(path)
+        // Load audio clips using the new AudioDecoder system
+        val clipMap = runBlocking {
+            KeySound.loadAllAudioClips(path)
+        }
 
         return SaveableWorkspaceData(
             title = infomap["title"] ?: "Untitled Workspace",
             author = infomap["producerName"] ?: "Unknown",
             lights = createLightsChain(path, infomap["chain"]?.toInt() ?: 1),
-            sampling = createAudioChain(path, infomap["chain"]?.toInt() ?: 1, clipMap.mapValues { it.value?.key ?: "" }),
+            sampling = createAudioChain(path, infomap["chain"]?.toInt() ?: 1, clipMap),
             launchpadDevices = listOf(
                 SaveableWorkspaceData.SavableViewportLaunchpad(
                     positionX = 0f,
@@ -46,11 +49,10 @@ object UnipadConverter : AmethystConverter {
                     type = SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
                 )
             ),
-            audioClips = clipMap.values.map { it!! },
         )
     }
 
-    fun createAudioChain(path: String, pages: Int, clipMap: Map<String, String>): StateChain {
+    private fun createAudioChain(path: String, pages: Int, clipMap: Map<String, DecodedAudioClip>): StateChain {
         val keySound = Zip.getInputStream(path, if (Zip.getEntries(path).contains(ZipEntry("KeySound"))) "KeySound" else "keySound")
 
         return StateChain(
@@ -73,7 +75,7 @@ object UnipadConverter : AmethystConverter {
         )
     }
 
-    fun createLightsChain(path: String, pages: Int): StateChain {
+    private fun createLightsChain(path: String, pages: Int): StateChain {
         val entries = Zip.getEntries(path).filter { it.path.startsWith("keyLED/") }
 
         return StateChain(
@@ -92,7 +94,7 @@ object UnipadConverter : AmethystConverter {
                         Group(
                             name = "Page Switch",
                             stateChain = StateChain(
-                                listOf(
+                                devices = listOf(
                                     GroupChainDeviceState(
                                         groups = List(pages) { index ->
                                             Group(

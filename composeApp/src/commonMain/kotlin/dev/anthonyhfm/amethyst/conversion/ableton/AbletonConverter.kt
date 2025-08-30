@@ -6,7 +6,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.reader.MidiChainReader
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonImporterConfig
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
-import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
@@ -20,8 +19,6 @@ object AbletonConverter : AmethystConverter {
 
     var bpm: Double = 120.0
         private set
-
-    val audioClips: MutableList<AudioClip> = mutableListOf()
 
     var liveVersion: LiveVersion? = null
         private set
@@ -47,7 +44,6 @@ object AbletonConverter : AmethystConverter {
 
         val xmlTracks: List<XmlElement> = abletonXml.querySelector("MidiTrack")
 
-        // Get the two tracks (audio, lights)
         val sortedTracks = xmlTracks.sortedByDescending {
             MidiChainReader()
                 .getChainWeight(it)
@@ -64,7 +60,6 @@ object AbletonConverter : AmethystConverter {
         return SaveableWorkspaceData(
             lights = lightsTrackXML?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList()),
             sampling = audioTrackXML?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList()),
-            audioClips = audioClips.toList(),
             settings = WorkspaceSettings(
                 bpm = bpm
             ),

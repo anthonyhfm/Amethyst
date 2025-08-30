@@ -12,9 +12,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
-import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState.updateFromKeyEvent
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.ShortcutManager
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
@@ -31,7 +31,7 @@ fun WorkspaceWindow() {
 
     Window(
         onCloseRequest = {
-            AudioPlayer.cleanup()
+            AudioOutput.cleanup()
 
             exitProcess(0)
         },

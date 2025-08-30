@@ -99,9 +99,12 @@ kotlin {
             runtimeOnly("org.lwjgl:lwjgl-openal:3.3.3:natives-windows")
             runtimeOnly("org.lwjgl:lwjgl-openal:3.3.3:natives-linux")
 
-            // MP3 support
+            // Audio Decoding Libraries
             implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
             implementation("com.googlecode.soundlibs:jlayer:1.0.1.4")
+            implementation("com.googlecode.soundlibs:vorbisspi:1.0.3.3")
+            implementation("org.jflac:jflac-codec:1.5.2")
+            implementation("com.github.stephenc.java-iso-tools:java-iso-tools-parent:2.0.1")
         }
     }
 }

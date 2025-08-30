@@ -3,8 +3,6 @@ package dev.anthonyhfm.amethyst.workspace
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import dev.anthonyhfm.amethyst.core.audio.AudioClip
-import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
@@ -42,8 +40,6 @@ object WorkspaceRepository {
 
     var bounds: Pair<IntOffset, IntSize> = Pair(IntOffset(0, 0), IntSize(0, 0))
         private set
-
-    val audioRegistry: MutableMap<String, AudioClip> = mutableMapOf()
 
     private var saveableWorkspaceData: SaveableWorkspaceData? = null
 
@@ -173,10 +169,6 @@ object WorkspaceRepository {
     fun loadWorkspace(workspaceData: SaveableWorkspaceData) {
         saveableWorkspaceData = workspaceData
 
-        workspaceData.audioClips.forEach {
-            AudioPlayer.preloadFromAudioClip(it)
-        }
-
         lightsChain = workspaceData.lights.unpack()
         samplingChain = workspaceData.sampling.unpack()
 
@@ -269,7 +261,6 @@ object WorkspaceRepository {
                     positionY = device.position.value.y
                 )
             },
-            audioClips = audioRegistry.values.map { it }
         ).also { saveableWorkspaceData = it }
     }
 }

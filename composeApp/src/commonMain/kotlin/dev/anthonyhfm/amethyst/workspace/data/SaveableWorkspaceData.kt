@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.workspace.data
 
-import dev.anthonyhfm.amethyst.core.audio.AudioClip
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -13,7 +12,6 @@ data class SaveableWorkspaceData(
     val sampling: StateChain = StateChain(),
     val launchpadDevices: List<SavableViewportLaunchpad> = emptyList(),
     val macros: List<Macro> = listOf(Macro(0)),
-    val audioClips: List<AudioClip> = emptyList(),
     val author: String = "Unknown",
     val version: String = "1.0.0",
     @Transient

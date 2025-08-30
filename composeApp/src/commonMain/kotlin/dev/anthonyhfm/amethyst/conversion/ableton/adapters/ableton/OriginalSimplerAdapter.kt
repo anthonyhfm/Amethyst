@@ -1,15 +1,13 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
-import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
-import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.parent
-import io.github.vinceglb.filekit.path
+import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.runBlocking
 
@@ -28,18 +26,44 @@ class OriginalSimplerAdapter(
 
         val audioFile = PlatformFile(filePath)
 
-        var clipKey = ""
-        runBlocking {
-            val clip = AudioPlayer.getAudioClip(audioFile.readBytes(), sampleStart, sampleEnd)
-            clipKey = clip!!.key
+        return runBlocking {
+            try {
+                val audioSignal = AudioDecoder.decodeAudioData(
+                    audioData = audioFile.readBytes(),
+                    fileName = audioFile.name,
+                    sampleStart = if (sampleStart > 0) sampleStart else null,
+                    sampleEnd = if (sampleEnd > 0) sampleEnd else null
+                )
 
-            AbletonConverter.audioClips.add(clip)
+                if (audioSignal != null) {
+                    listOf(
+                        ClipChainDeviceState(
+                            fileName = audioFile.name,
+                            rawData = audioSignal.rawData,
+                            sampleRate = audioSignal.sampleRate,
+                            channels = audioSignal.channels,
+                            bitDepth = audioSignal.bitDepth,
+                            isLoaded = true
+                        )
+                    )
+                } else {
+                    println("Failed to decode audio file: ${audioFile.name}")
+                    listOf(
+                        ClipChainDeviceState(
+                            fileName = "Failed to load: ${audioFile.name}",
+                            isLoaded = false
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                println("Error loading audio file '${audioFile.name}': ${e.message}")
+                listOf(
+                    ClipChainDeviceState(
+                        fileName = "Error: ${audioFile.name}",
+                        isLoaded = false
+                    )
+                )
+            }
         }
-
-        return listOf(
-            ClipChainDeviceState(
-                audioKey = clipKey
-            )
-        )
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.application
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.core.koin.amethystKoinModule
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.DiscordRPC
@@ -25,6 +26,8 @@ fun main() {
 
         setupAboutHandler()
     }
+
+    AudioOutput // <- Initialize AudioOutput, no constructor call, just reference
 
     application {
         if (GlobalSettings.enableDiscordRPC) {

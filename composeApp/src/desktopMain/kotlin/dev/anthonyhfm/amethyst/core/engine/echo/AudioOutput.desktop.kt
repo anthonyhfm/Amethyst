@@ -159,8 +159,6 @@ actual object AudioOutput {
                 println("Failed to start audio playback")
                 audioSource.cleanup()
                 activeSources.remove(key)
-            } else {
-                println("Started playing audio: $key (${validData.size} bytes)")
             }
 
         } catch (e: Exception) {
@@ -185,7 +183,6 @@ actual object AudioOutput {
             if (state == AL10.AL_STOPPED) {
                 audioSource.cleanup()
                 iterator.remove()
-                println("Cleaned up finished audio source: $key")
             }
         }
     }

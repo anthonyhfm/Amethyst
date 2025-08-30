@@ -1,7 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.unipad.data
 
-import dev.anthonyhfm.amethyst.core.audio.AudioClip
-import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
@@ -10,50 +9,98 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 
-object KeySound {
-    @OptIn(DelicateCoroutinesApi::class)
-    fun loadAllAudioClips(zipFile: String): MutableMap<String, AudioClip?> {
-        val entries = Zip.getEntries(zipFile).filter { (it.path.startsWith("Sounds/") || it.path.startsWith("sounds/")) && !it.isDirectory }
-        val clipMap: MutableMap<String, AudioClip?> = mutableMapOf()
-        val scope = CoroutineScope(Dispatchers.Default)
-
-        entries.forEach { entry ->
-            val clipName = entry.path.removePrefix("Sounds/").removePrefix("sounds/").trim()
-            clipMap[clipName] = null
-
-            scope.launch {
-                clipMap[clipName] = AudioPlayer.getAudioClip(Zip.getInputStream(zipFile, entry.path))
-
-                cancel()
-            }
-        }
-
-        while (clipMap.any { it.value == null }) {
-            runBlocking {
-                delay(100)
-            }
-        }
-
-        println("Finished loading ${clipMap.size} audio clips.")
-
-        return clipMap
+data class DecodedAudioClip(
+    val name: String,
+    val rawData: ByteArray?,
+    val sampleRate: Int = 44100,
+    val channels: Int = 2,
+    val bitDepth: Int = 16,
+    val isLoaded: Boolean = false
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is DecodedAudioClip) return false
+        if (name != other.name) return false
+        if (rawData != null) {
+            if (other.rawData == null) return false
+            if (!rawData.contentEquals(other.rawData)) return false
+        } else if (other.rawData != null) return false
+        if (sampleRate != other.sampleRate) return false
+        if (channels != other.channels) return false
+        if (bitDepth != other.bitDepth) return false
+        if (isLoaded != other.isLoaded) return false
+        return true
     }
 
-    fun createChain(page: Int, clipMap: Map<String, String>, entries: List<String>): StateChain {
-        val groups = mutableListOf<Group>()
+    override fun hashCode(): Int {
+        var result = name.hashCode()
+        result = 31 * result + (rawData?.contentHashCode() ?: 0)
+        result = 31 * result + sampleRate
+        result = 31 * result + channels
+        result = 31 * result + bitDepth
+        result = 31 * result + isLoaded.hashCode()
+        return result
+    }
+}
 
-        println(clipMap)
+object KeySound {
+    suspend fun loadAllAudioClips(zipFile: String): Map<String, DecodedAudioClip> = withContext(Dispatchers.IO) {
+        val entries = Zip.getEntries(zipFile).filter {
+            (it.path.startsWith("Sounds/") || it.path.startsWith("sounds/")) && !it.isDirectory
+        }
+
+        val clipMap = mutableMapOf<String, DecodedAudioClip>()
+
+        // Process audio files in parallel
+        val jobs = entries.map { entry ->
+            async(Dispatchers.Default) {
+                val clipName = entry.path.removePrefix("Sounds/").removePrefix("sounds/").trim()
+
+                try {
+                    val audioData = Zip.getInputStream(zipFile, entry.path)
+                    val audioSignal = AudioDecoder.decodeAudioData(audioData, clipName)
+
+                    if (audioSignal != null) {
+                        clipName to DecodedAudioClip(
+                            name = clipName,
+                            rawData = audioSignal.rawData,
+                            sampleRate = audioSignal.sampleRate,
+                            channels = audioSignal.channels,
+                            bitDepth = audioSignal.bitDepth,
+                            isLoaded = true
+                        )
+                    } else {
+                        println("Failed to decode audio clip: $clipName")
+                        clipName to DecodedAudioClip(
+                            name = clipName,
+                            rawData = null,
+                            isLoaded = false
+                        )
+                    }
+                } catch (e: Exception) {
+                    println("Error loading audio clip '$clipName': ${e.message}")
+                    clipName to DecodedAudioClip(
+                        name = clipName,
+                        rawData = null,
+                        isLoaded = false
+                    )
+                }
+            }
+        }
+
+        // Wait for all audio clips to be processed
+        val results = jobs.awaitAll()
+        clipMap.putAll(results)
+
+        println("Finished loading ${clipMap.count { it.value.isLoaded }} audio clips successfully (${clipMap.size} total).")
+
+        return@withContext clipMap.toMap()
+    }
+
+    fun createChain(page: Int, clipMap: Map<String, DecodedAudioClip>, entries: List<String>): StateChain {
+        val groups = mutableListOf<Group>()
 
         entries.map {
             "${it.split(" ")[0]} ${it.split(" ")[1]} ${it.split(" ")[2]}"
@@ -61,32 +108,44 @@ object KeySound {
             val x = entry.split(" ")[2].toInt()
             val y = entry.split(" ")[1].toInt()
 
-            val entries = entries.filter {
+            val matchingEntries = entries.filter {
                 it.split(" ")[1].toInt() == y && it.split(" ")[2].toInt() == x
             }
 
-            if (entries.count() > 1) {
+            if (matchingEntries.count() > 1) {
                 groups.add(
                     Group(
-                        name = "Single ${index + 1}",
+                        name = "Multi $x,$y",
                         stateChain = StateChain(
                             devices = listOf(
                                 CoordinateFilterChainDeviceState(
                                     filters = listOf(Pair(x, y))
                                 ),
                                 MultiGroupChainDeviceState(
-                                    groups = entries.map { entry ->
-                                        val clip = entry.split(" ")[3].trim()
-                                        Group(
-                                            name = clip,
-                                            stateChain = StateChain(
-                                                devices = listOf(
-                                                    ClipChainDeviceState(
-                                                        audioKey = clipMap[clip]!!
+                                    groups = matchingEntries.mapNotNull { entry ->
+                                        val clipName = entry.split(" ")[3].trim()
+                                        val audioClip = clipMap[clipName]
+
+                                        if (audioClip?.isLoaded == true) {
+                                            Group(
+                                                name = clipName,
+                                                stateChain = StateChain(
+                                                    devices = listOf(
+                                                        ClipChainDeviceState(
+                                                            fileName = audioClip.name,
+                                                            rawData = audioClip.rawData,
+                                                            sampleRate = audioClip.sampleRate,
+                                                            channels = audioClip.channels,
+                                                            bitDepth = audioClip.bitDepth,
+                                                            isLoaded = true
+                                                        )
                                                     )
                                                 )
                                             )
-                                        )
+                                        } else {
+                                            println("Skipping unloaded audio clip: $clipName")
+                                            null
+                                        }
                                     }
                                 )
                             )
@@ -94,28 +153,38 @@ object KeySound {
                     )
                 )
             } else {
-                val clip = entries[0].split(" ")[3].trim()
+                // Single clip for coordinate
+                val clipName = matchingEntries[0].split(" ")[3].trim()
+                val audioClip = clipMap[clipName]
 
-                groups.add(
-                    Group(
-                        name = "Single ${index + 1}",
-                        stateChain = StateChain(
-                            devices = listOf(
-                                CoordinateFilterChainDeviceState(
-                                    filters = listOf(Pair(x, y))
-                                ),
-                                ClipChainDeviceState(
-                                    audioKey = clipMap[clip]!!,
+                if (audioClip?.isLoaded == true) {
+                    groups.add(
+                        Group(
+                            name = "Single $x,$y",
+                            stateChain = StateChain(
+                                devices = listOf(
+                                    CoordinateFilterChainDeviceState(
+                                        filters = listOf(Pair(x, y))
+                                    ),
+                                    ClipChainDeviceState(
+                                        fileName = audioClip.name,
+                                        rawData = audioClip.rawData,
+                                        sampleRate = audioClip.sampleRate,
+                                        channels = audioClip.channels,
+                                        bitDepth = audioClip.bitDepth,
+                                        isLoaded = true
+                                    )
                                 )
                             )
                         )
                     )
-                )
+                } else {
+                    println("Skipping unloaded audio clip: $clipName")
+                }
             }
         }
 
-
-        println("Page ${page + 1} (audio) not fully implemented yet.")
+        println("Page ${page + 1} (audio) created with ${groups.size} sound groups.")
 
         return StateChain(
             devices = listOf(

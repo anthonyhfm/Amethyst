@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -14,9 +13,38 @@ class GenericMidiExtAdapter(
     private val xml: XmlElement,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val fileRef = xml.querySelector("MxDFullFileDrop")[0]
+        val fileRef = xml.querySelector("MxDFullFileDrop")
 
-        val filePath: String = FileRef.resolveFileReference(fileRef)
+        if (fileRef.isEmpty()) {
+            return emptyList()
+        }
+
+        val projectPath = AbletonConverter.file!!.parent()!!.path
+
+        val filePath: String = when (AbletonConverter.liveVersion) {
+            AbletonConverter.LiveVersion.LIVE_11 -> {
+                val relativePath = fileRef[0].querySelector("RelativePath")[0].attributes["Value"] ?: ""
+
+                "$projectPath/$relativePath"
+            }
+
+            else -> {
+                val relativePathElements = fileRef.first().localQuerySelector("FileRef").first().children.first()
+                    .localQuerySelector("RelativePath").first()
+
+                val fileName = fileRef.first().localQuerySelector("FileRef").first().children.first()
+                    .localQuerySelector("Name").first()
+                    .attributes["Value"] ?: ""
+
+                var pathString = projectPath
+
+                relativePathElements.children.forEach {
+                    pathString += "/${it.attributes["Dir"]}"
+                }
+
+                "$pathString/$fileName"
+            }
+        }
 
         return listOf(
             MidiFileImporter.loadFile(PlatformFile(filePath))

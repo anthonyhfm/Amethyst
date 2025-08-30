@@ -14,17 +14,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -54,17 +54,47 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                             mode = FileKitMode.Single,
                             title = "Select Audio File",
                             type = FileKitType.File(
-                                extensions = listOf("wav", "ogg", "mp3")
+                                extensions = AudioDecoder.getSupportedFormats()
                             )
                         )
 
-                        file?.let {
-                            val uuid = AudioPlayer.loadAudio(file.readBytes())
-
-                            state.update {
-                                it.copy(
-                                    audioKey = uuid
+                        file?.let { selectedFile ->
+                            try {
+                                // Decode audio file using new AudioDecoder
+                                val audioSignal = AudioDecoder.decodeAudioData(
+                                    audioData = selectedFile.readBytes(),
+                                    fileName = selectedFile.name
                                 )
+
+                                audioSignal?.let { signal ->
+                                    state.update { currentState ->
+                                        currentState.copy(
+                                            fileName = selectedFile.name,
+                                            rawData = signal.rawData,
+                                            sampleRate = signal.sampleRate,
+                                            channels = signal.channels,
+                                            bitDepth = signal.bitDepth,
+                                            isLoaded = true
+                                        )
+                                    }
+                                    println("Audio loaded successfully: ${selectedFile.name}")
+                                } ?: run {
+                                    println("Failed to decode audio file: ${selectedFile.name}")
+                                    state.update { currentState ->
+                                        currentState.copy(
+                                            fileName = "Failed to load",
+                                            isLoaded = false
+                                        )
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                println("Error loading audio file: ${e.message}")
+                                state.update { currentState ->
+                                    currentState.copy(
+                                        fileName = "Error loading file",
+                                        isLoaded = false
+                                    )
+                                }
                             }
                         }
                     }
@@ -73,16 +103,16 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                 Icon(Icons.Default.FileOpen, null)
             }
 
-            if (deviceState.audioKey.isEmpty()) {
+            if (!deviceState.isLoaded) {
                 Text(
-                    text = "Please select an audio file",
+                    text = if (deviceState.fileName.isEmpty()) "Please select an audio file" else deviceState.fileName,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(vertical = 6.dp)
                 )
             } else {
                 Text(
-                    text = WorkspaceRepository.audioRegistry[deviceState.audioKey]?.name ?: "Unnamed Audio",
+                    text = deviceState.fileName,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(vertical = 6.dp)
@@ -92,24 +122,24 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
     }
 
     override fun signalEnter(n: List<Signal>) {
-        n.filterIsInstance<Signal.Midi>().forEach {
-            if (it.velocity != 0) {
-                val audioClip = WorkspaceRepository.audioRegistry[state.value.audioKey]
+        n.filterIsInstance<Signal.Midi>().forEach { midiSignal ->
+            if (midiSignal.velocity != 0 && state.value.isLoaded) {
+                val deviceState = state.value
 
-                if (audioClip != null) {
-                    val audioSignal = Signal.AudioSignal(
-                        origin = this,
-                        rawData = audioClip.data,
-                        sampleRate = 44100,
-                        channels = 2,
-                        bitDepth = 16,
-                        audioKey = state.value.audioKey
-                    )
+                // Create AudioSignal directly from stored PCM data
+                val audioSignal = Signal.AudioSignal(
+                    origin = this,
+                    rawData = deviceState.rawData,
+                    sampleRate = deviceState.sampleRate,
+                    channels = deviceState.channels,
+                    bitDepth = deviceState.bitDepth
+                )
 
-                    signalExit?.invoke(listOf(audioSignal))
-                } else {
-                    signalExit?.invoke(n)
-                }
+                signalExit?.invoke(listOf(audioSignal))
+            } else if (midiSignal.velocity != 0 && !state.value.isLoaded) {
+                println("Clip device triggered but no audio loaded")
+                // Pass through the original signal if no audio is loaded
+                signalExit?.invoke(n)
             }
         }
     }
@@ -117,5 +147,35 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
 
 @Serializable
 data class ClipChainDeviceState(
-    val audioKey: String = "",
-) : DeviceState()
+    val fileName: String = "",
+    val rawData: ByteArray? = null,
+    val sampleRate: Int = 44100,
+    val channels: Int = 2,
+    val bitDepth: Int = 16,
+    val isLoaded: Boolean = false
+) : DeviceState() {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ClipChainDeviceState) return false
+        if (fileName != other.fileName) return false
+        if (rawData != null) {
+            if (other.rawData == null) return false
+            if (!rawData.contentEquals(other.rawData)) return false
+        } else if (other.rawData != null) return false
+        if (sampleRate != other.sampleRate) return false
+        if (channels != other.channels) return false
+        if (bitDepth != other.bitDepth) return false
+        if (isLoaded != other.isLoaded) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = fileName.hashCode()
+        result = 31 * result + (rawData?.contentHashCode() ?: 0)
+        result = 31 * result + sampleRate
+        result = 31 * result + channels
+        result = 31 * result + bitDepth
+        result = 31 * result + isLoaded.hashCode()
+        return result
+    }
+}
