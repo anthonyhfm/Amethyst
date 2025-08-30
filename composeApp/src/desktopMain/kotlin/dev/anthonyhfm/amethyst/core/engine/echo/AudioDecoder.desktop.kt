@@ -8,6 +8,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.sound.sampled.*
 import kotlin.math.min
+import org.jflac.FLACDecoder
+import org.jflac.PCMProcessor
+import org.jflac.metadata.StreamInfo
+import org.jflac.util.ByteData
 
 actual object AudioDecoder {
 
@@ -101,15 +105,236 @@ actual object AudioDecoder {
         }
     }
 
-    // FLAC Decoder
+    // FLAC Decoder using JFLAC library
     private fun decodeFlac(audioData: ByteArray): Signal.AudioSignal? {
         return try {
-            val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
-            decodeFromAudioInputStream(audioInputStream)
+            // Try JFLAC first for better FLAC support
+            decodeFlacWithJFLAC(audioData)
         } catch (e: Exception) {
-            println("Failed to decode FLAC: ${e.message}")
-            null
+            println("Failed to decode FLAC with JFLAC: ${e.message}")
+            // Fallback to AudioSystem approach
+            try {
+                val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
+                decodeFromAudioInputStream(audioInputStream)
+            } catch (fallbackException: Exception) {
+                println("Fallback FLAC decoding also failed: ${fallbackException.message}")
+                null
+            }
         }
+    }
+
+    /**
+     * Decode FLAC using JFLAC library for better compatibility
+     */
+    private fun decodeFlacWithJFLAC(audioData: ByteArray): Signal.AudioSignal? {
+        val pcmProcessor = FlacPCMDataCollector()
+
+        try {
+            val decoder = FLACDecoder(ByteArrayInputStream(audioData))
+            decoder.addPCMProcessor(pcmProcessor)
+            decoder.decode()
+
+            val streamInfo = pcmProcessor.getStreamInfo()
+            val pcmData = pcmProcessor.getPCMData()
+
+            if (streamInfo == null || pcmData.isEmpty()) {
+                println("FLAC decoding failed: No stream info or PCM data")
+                return null
+            }
+
+            // Convert FLAC data to target format (44.1kHz, 16-bit, Stereo)
+            return convertFlacToTargetFormat(pcmData, streamInfo)
+
+        } catch (e: Exception) {
+            println("JFLAC decoding error: ${e.message}")
+            throw e
+        }
+    }
+
+    /**
+     * Custom PCM processor to collect FLAC audio data
+     */
+    private class FlacPCMDataCollector : PCMProcessor {
+        private val pcmChunks = mutableListOf<ByteArray>()
+        private var streamInfo: StreamInfo? = null
+
+        override fun processStreamInfo(streamInfo: StreamInfo) {
+            this.streamInfo = streamInfo
+        }
+
+        override fun processPCM(pcm: ByteData) {
+            // Copy the PCM data chunk
+            val chunk = ByteArray(pcm.len)
+            System.arraycopy(pcm.data, 0, chunk, 0, pcm.len)
+            pcmChunks.add(chunk)
+        }
+
+        fun getStreamInfo(): StreamInfo? = streamInfo
+
+        fun getPCMData(): ByteArray {
+            if (pcmChunks.isEmpty()) return ByteArray(0)
+
+            val totalSize = pcmChunks.sumOf { it.size }
+            val result = ByteArray(totalSize)
+            var offset = 0
+
+            for (chunk in pcmChunks) {
+                System.arraycopy(chunk, 0, result, offset, chunk.size)
+                offset += chunk.size
+            }
+
+            return result
+        }
+    }
+
+    /**
+     * Convert FLAC PCM data to target format (44.1kHz, 16-bit, Stereo)
+     */
+    private fun convertFlacToTargetFormat(pcmData: ByteArray, streamInfo: StreamInfo): Signal.AudioSignal {
+        val sourceSampleRate = streamInfo.sampleRate
+        val sourceChannels = streamInfo.channels
+        val sourceBitsPerSample = streamInfo.bitsPerSample
+
+        println("FLAC source format: ${sourceSampleRate}Hz, ${sourceChannels}ch, ${sourceBitsPerSample}bit")
+
+        // Target format
+        val targetSampleRate = 44100
+        val targetChannels = 2
+        val targetBitsPerSample = 16
+
+        var processedData = pcmData
+
+        // Step 1: Convert bit depth if necessary
+        if (sourceBitsPerSample != targetBitsPerSample) {
+            processedData = convertBitDepth(
+                processedData,
+                sourceBitsPerSample,
+                targetBitsPerSample,
+                sourceChannels
+            )
+        }
+
+        // Step 2: Convert channels (mono to stereo)
+        if (sourceChannels == 1 && targetChannels == 2) {
+            processedData = convertMonoToStereoFlac(processedData, targetBitsPerSample)
+        }
+
+        // Step 3: Resample if necessary
+        if (sourceSampleRate != targetSampleRate) {
+            processedData = resampleAudio(
+                processedData,
+                sourceSampleRate,
+                targetSampleRate,
+                targetChannels,
+                targetBitsPerSample
+            )
+        }
+
+        return Signal.AudioSignal(
+            origin = "AudioDecoder.FLAC",
+            rawData = processedData,
+            sampleRate = targetSampleRate,
+            channels = targetChannels,
+            bitDepth = targetBitsPerSample
+        )
+    }
+
+    /**
+     * Convert bit depth of audio samples
+     */
+    private fun convertBitDepth(data: ByteArray, sourceBits: Int, targetBits: Int, channels: Int): ByteArray {
+        if (sourceBits == targetBits) return data
+
+        val sourceBytesPerSample = sourceBits / 8
+        val targetBytesPerSample = targetBits / 8
+        val sampleCount = data.size / (sourceBytesPerSample * channels)
+        val result = ByteArray(sampleCount * targetBytesPerSample * channels)
+
+        for (i in 0 until sampleCount * channels) {
+            val sourceOffset = i * sourceBytesPerSample
+            val targetOffset = i * targetBytesPerSample
+
+            when {
+                sourceBits == 24 && targetBits == 16 -> {
+                    // 24-bit to 16-bit: take the upper 16 bits
+                    result[targetOffset] = data[sourceOffset + 1]
+                    result[targetOffset + 1] = data[sourceOffset + 2]
+                }
+                sourceBits == 32 && targetBits == 16 -> {
+                    // 32-bit to 16-bit: take the upper 16 bits
+                    result[targetOffset] = data[sourceOffset + 2]
+                    result[targetOffset + 1] = data[sourceOffset + 3]
+                }
+                sourceBits == 8 && targetBits == 16 -> {
+                    // 8-bit to 16-bit
+                    val sample = (data[sourceOffset].toInt() and 0xFF) - 128
+                    val sample16 = sample * 256
+                    result[targetOffset] = (sample16 and 0xFF).toByte()
+                    result[targetOffset + 1] = ((sample16 shr 8) and 0xFF).toByte()
+                }
+                else -> {
+                    // Default: copy what fits
+                    val copyBytes = min(sourceBytesPerSample, targetBytesPerSample)
+                    System.arraycopy(data, sourceOffset, result, targetOffset, copyBytes)
+                }
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * Convert mono to stereo for FLAC
+     */
+    private fun convertMonoToStereoFlac(data: ByteArray, bitsPerSample: Int): ByteArray {
+        val bytesPerSample = bitsPerSample / 8
+        val sampleCount = data.size / bytesPerSample
+        val result = ByteArray(data.size * 2)
+
+        for (i in 0 until sampleCount) {
+            val sourceOffset = i * bytesPerSample
+            val leftOffset = i * 2 * bytesPerSample
+            val rightOffset = leftOffset + bytesPerSample
+
+            // Copy sample to both left and right channels
+            System.arraycopy(data, sourceOffset, result, leftOffset, bytesPerSample)
+            System.arraycopy(data, sourceOffset, result, rightOffset, bytesPerSample)
+        }
+
+        return result
+    }
+
+    /**
+     * Simple linear interpolation resampling
+     */
+    private fun resampleAudio(
+        data: ByteArray,
+        sourceSampleRate: Int,
+        targetSampleRate: Int,
+        channels: Int,
+        bitsPerSample: Int
+    ): ByteArray {
+        if (sourceSampleRate == targetSampleRate) return data
+
+        val bytesPerSample = bitsPerSample / 8
+        val bytesPerFrame = bytesPerSample * channels
+        val sourceFrames = data.size / bytesPerFrame
+        val targetFrames = (sourceFrames.toLong() * targetSampleRate / sourceSampleRate).toInt()
+        val result = ByteArray(targetFrames * bytesPerFrame)
+
+        val ratio = sourceFrames.toDouble() / targetFrames.toDouble()
+
+        for (i in 0 until targetFrames) {
+            val sourceIndex = (i * ratio).toInt()
+            val sourceOffset = sourceIndex * bytesPerFrame
+            val targetOffset = i * bytesPerFrame
+
+            if (sourceOffset + bytesPerFrame <= data.size) {
+                System.arraycopy(data, sourceOffset, result, targetOffset, bytesPerFrame)
+            }
+        }
+
+        return result
     }
 
     // OGG Decoder
