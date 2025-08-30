@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.audio.AudioPlayer
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -20,38 +21,12 @@ class OriginalSimplerAdapter(
         val samplePart = player.querySelector("MultiSamplePart").getOrNull(0) ?: return emptyList()
         val sampleRef = samplePart.localQuerySelector("SampleRef")[0]
 
-        val projectPath = AbletonConverter.file!!.parent()!!.path
-
-        val filePath: String = when (AbletonConverter.liveVersion) {
-            AbletonConverter.LiveVersion.LIVE_11 -> {
-                val relativePath = sampleRef.querySelector("RelativePath")[0].attributes["Value"] ?: ""
-
-                "$projectPath/$relativePath"
-            }
-
-            else -> {
-                val relativePathElements = sampleRef.localQuerySelector("FileRef")[0]
-                    .localQuerySelector("RelativePath").first()
-
-                val fileName = sampleRef.localQuerySelector("FileRef")[0]
-                    .localQuerySelector("Name").first()
-                    .attributes["Value"] ?: ""
-
-                var pathString = AbletonConverter.file!!.parent()!!.path
-                relativePathElements.children.forEach {
-                    pathString += "/${it.attributes["Dir"]}"
-                }
-
-                "$pathString/$fileName"
-            }
-        }
+        val filePath: String = FileRef.resolveFileReference(sampleRef.querySelector("FileRef")[0])
 
         val sampleStart = samplePart.querySelector("SampleStart")[0].attributes["Value"]?.toLong() ?: 0L
         val sampleEnd = samplePart.querySelector("SampleEnd")[0].attributes["Value"]?.toLong() ?: 0L
 
         val audioFile = PlatformFile(filePath)
-
-        println()
 
         var clipKey = ""
         runBlocking {
