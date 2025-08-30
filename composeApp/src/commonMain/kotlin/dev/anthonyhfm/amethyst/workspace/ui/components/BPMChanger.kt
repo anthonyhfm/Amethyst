@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.workspace.ui.components
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.metronome
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,9 +37,10 @@ fun BPMChanger() {
     Row(
         modifier = Modifier
             .clip(CircleShape)
-            .height(42.dp)
+            .height(44.dp)
             .width(112.dp)
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(0.2f), CircleShape)
             .padding(horizontal = 12.dp),
 
         verticalAlignment = Alignment.CenterVertically
@@ -46,7 +48,7 @@ fun BPMChanger() {
         Icon(
             painter = painterResource(Res.drawable.metronome),
             contentDescription = "Beats per minute",
-            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+            tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .size(24.dp)
         )
@@ -75,7 +77,7 @@ fun BPMChanger() {
             textStyle = MaterialTheme.typography.titleMedium.copy(
                 textAlign = TextAlign.Center,
                 lineHeight = MaterialTheme.typography.titleMedium.fontSize,
-                color = MaterialTheme.colorScheme.onTertiaryContainer
+                color = MaterialTheme.colorScheme.onSurface,
             ),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number

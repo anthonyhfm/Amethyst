@@ -16,10 +16,8 @@ object ShortcutManager {
     fun handleShortcut(keyEvent: KeyEvent): Boolean {
         if (keyEvent.type != KeyEventType.KeyDown) return false
 
-
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.Z) {
             return if (keyEvent.isShiftPressed) {
-                // Ctrl+Shift+Z = Redo
                 UndoManager.redo()
                 true
             } else {

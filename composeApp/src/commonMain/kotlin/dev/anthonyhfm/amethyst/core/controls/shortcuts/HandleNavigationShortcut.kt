@@ -1,10 +1,21 @@
 package dev.anthonyhfm.amethyst.core.controls.shortcuts
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Preview
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceModePickerItem
 import kotlinx.coroutines.flow.update
 
 fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
@@ -12,7 +23,32 @@ fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
     val chainDeviceSelections = currentSelections.filterIsInstance<Selectable.ChainDevice>()
     val groupChainItemSelections = currentSelections.filterIsInstance<Selectable.GroupChainItem>()
 
-    // Handle ChainDevice navigation (left/right)
+    if (keyEvent.isAltPressed && WorkspaceRepository.mode.value.selectable) {
+        val selectableModes = listOf(
+            WorkspaceContract.WorkspaceMode.Layout(),
+            WorkspaceContract.WorkspaceMode.Preview(),
+            WorkspaceContract.WorkspaceMode.LightsChain(),
+            WorkspaceContract.WorkspaceMode.SamplingChain(),
+            WorkspaceContract.WorkspaceMode.Timeline(),
+        )
+
+        if (keyEvent.key == Key.DirectionLeft || keyEvent.key == Key.DirectionRight) {
+            val currentMode = WorkspaceRepository.mode.value
+            val currentIndex = selectableModes.indexOfFirst { it::class == currentMode::class }
+            val nextIndex = if (keyEvent.key == Key.DirectionLeft) {
+                if (currentIndex - 1 < 0) selectableModes.size - 1 else currentIndex - 1
+            } else {
+                if (currentIndex + 1 >= selectableModes.size) 0 else currentIndex + 1
+            }
+
+            WorkspaceRepository.switchMode(selectableModes[nextIndex])
+
+            return true
+        }
+
+        return true
+    }
+
     if (chainDeviceSelections.size == 1) {
         val currentSelection = chainDeviceSelections.first()
         val chain = currentSelection.parent
@@ -21,7 +57,6 @@ fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
         if (currentIndex >= 0) {
             when (keyEvent.key) {
                 Key.DirectionLeft -> {
-                    // Navigate to previous device (left)
                     val previousIndex = currentIndex - 1
                     if (previousIndex >= 0) {
                         val previousDevice = chain.devices.value[previousIndex]
@@ -37,7 +72,6 @@ fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
                 }
 
                 Key.DirectionRight -> {
-                    // Navigate to next device (right)
                     val nextIndex = currentIndex + 1
                     if (nextIndex < chain.devices.value.size) {
                         val nextDevice = chain.devices.value[nextIndex]

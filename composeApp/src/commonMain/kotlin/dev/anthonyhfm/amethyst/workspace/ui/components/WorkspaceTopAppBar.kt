@@ -58,13 +58,7 @@ fun WorkspaceTopAppBar(
 
         BPMChanger()
 
-        FilledIconButton(
-            onClick = {
-                WorkspaceRepository.resetMulti()
-            }
-        ) {
-            Icon(Icons.Default.RestartAlt, null)
-        }
+        CleanupButtons()
 
         FilledIconButton(
             onClick = {
