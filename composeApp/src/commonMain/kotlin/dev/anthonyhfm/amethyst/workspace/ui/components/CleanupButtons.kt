@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
@@ -60,7 +61,7 @@ fun CleanupButtons() {
                 .clip(CircleShape)
                 .height(44.dp)
                 .clickable {
-                    WorkspaceRepository.resetMulti()
+                    Heaven.clear()
                 },
 
             contentAlignment = Alignment.Center,

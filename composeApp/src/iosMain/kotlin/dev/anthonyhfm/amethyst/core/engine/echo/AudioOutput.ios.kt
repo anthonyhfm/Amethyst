@@ -53,11 +53,14 @@ actual object AudioOutput {
 
             // Configure audio session
             val audioSession = AVAudioSession.sharedInstance()
-            audioSession.category = AVAudioSessionCategoryPlayback
+            audioSession.setCategory(AVAudioSessionCategoryPlayback)
             audioSession.setActive(true)
 
             // Start audio engine
-            audioEngine?.start()
+            audioEngine?.startAndReturnError(null)?.let { error ->
+                println("Error starting AVAudioEngine: $error")
+                return
+            }
 
             isInitialized = true
             println("iOS AVAudioEngine initialized successfully")
