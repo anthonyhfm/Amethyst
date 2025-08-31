@@ -15,6 +15,7 @@
  */
 package com.mohamedrejeb.compose.dnd.reorder
 
+import androidx.compose.ui.Modifier
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItemScope
 
@@ -26,6 +27,10 @@ internal class ReorderableItemScopeImpl<T>(
 ) : ReorderableItemScope {
     override val isDragging: Boolean
         get() = state.draggedItem?.key == key
+
+    override fun Modifier.dragAnchor(): Modifier {
+        return this
+    }
 }
 
 internal class ReorderableItemScopeShadowImpl(
@@ -33,4 +38,8 @@ internal class ReorderableItemScopeShadowImpl(
 ) : ReorderableItemScope {
     override val isDragging: Boolean
         get() = false
+
+    override fun Modifier.dragAnchor(): Modifier {
+        return this
+    }
 }

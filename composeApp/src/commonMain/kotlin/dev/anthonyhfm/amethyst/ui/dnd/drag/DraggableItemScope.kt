@@ -15,7 +15,10 @@
  */
 package com.mohamedrejeb.compose.dnd.drag
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import com.mohamedrejeb.compose.dnd.DragAndDropState
+import com.mohamedrejeb.compose.dnd.gesture.detectDragStartGesture
 
 /**
  * Draggable item scope
@@ -26,14 +29,43 @@ import com.mohamedrejeb.compose.dnd.DragAndDropState
 interface DraggableItemScope {
     val key: Any
     val isDragging: Boolean
+
+    /**
+     * Modifier that makes only this specific element draggable within a DraggableItem.
+     * Use this to create drag anchors/handles instead of making the entire item draggable.
+     */
+    fun Modifier.dragAnchor(): Modifier
 }
 
 internal class DraggableItemScopeImpl<T>(
     val state: DragAndDropState<T>,
     override val key: Any,
+    private val draggableItemState: DraggableItemState<T>,
+    private val enabled: Boolean,
+    private val dragAfterLongPress: Boolean,
+    private val requireFirstDownUnconsumed: Boolean,
 ) : DraggableItemScope {
     override val isDragging: Boolean
         get() = state.draggedItem?.key == key
+
+    override fun Modifier.dragAnchor(): Modifier = this.pointerInput(
+        key,
+        enabled,
+        state,
+        state.enabled,
+        draggableItemState,
+        dragAfterLongPress,
+        requireFirstDownUnconsumed,
+    ) {
+        detectDragStartGesture(
+            key = key,
+            state = state,
+            draggableItemState = draggableItemState,
+            enabled = enabled && state.enabled,
+            dragAfterLongPress = dragAfterLongPress,
+            requireFirstDownUnconsumed = requireFirstDownUnconsumed,
+        )
+    }
 }
 
 internal class DraggableItemScopeShadowImpl(
@@ -41,4 +73,6 @@ internal class DraggableItemScopeShadowImpl(
 ) : DraggableItemScope {
     override val isDragging: Boolean
         get() = false
+
+    override fun Modifier.dragAnchor(): Modifier = this
 }

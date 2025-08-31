@@ -40,6 +40,7 @@ import com.mohamedrejeb.compose.dnd.DragAndDropState
  * @param dropAnimationSpec - animation spec for the position drop animation
  * @param sizeDropAnimationSpec - animation spec for the size drop animation
  * @param draggableContent The content of the draggable item, if null, the content of the item will be used.
+ * @param useDragAnchor if true, the entire item won't be draggable and you must use dragAnchor() modifier within the content
  * @param content - content that will be shown when item is not dragged
  */
 @Composable
@@ -56,12 +57,31 @@ fun <T> DraggableItem(
     dropAnimationSpec: AnimationSpec<Offset> = SpringSpec(),
     sizeDropAnimationSpec: AnimationSpec<Size> = SpringSpec(),
     draggableContent: (@Composable () -> Unit)? = null,
+    useDragAnchor: Boolean = false,
     content: @Composable DraggableItemScope.() -> Unit,
 ) {
-    val draggableItemScopeImpl = remember(key, state) {
+    val draggableItemState = remember(key) {
+        DraggableItemState(
+            key = key,
+            data = data,
+            positionInRoot = Offset.Zero,
+            size = Size.Zero,
+            dropTargets = dropTargets,
+            dropStrategy = dropStrategy,
+            dropAnimationSpec = dropAnimationSpec,
+            sizeDropAnimationSpec = sizeDropAnimationSpec,
+            content = draggableContent ?: {},
+        )
+    }
+
+    val draggableItemScopeImpl = remember(key, state, draggableItemState, enabled, dragAfterLongPress, requireFirstDownUnconsumed) {
         DraggableItemScopeImpl(
             key = key,
             state = state,
+            draggableItemState = draggableItemState,
+            enabled = enabled,
+            dragAfterLongPress = dragAfterLongPress,
+            requireFirstDownUnconsumed = requireFirstDownUnconsumed,
         )
     }
 
@@ -76,7 +96,7 @@ fun <T> DraggableItem(
         key = key,
         data = data,
         state = state,
-        enabled = enabled,
+        enabled = enabled && !useDragAnchor, // Disable automatic dragging if using drag anchor
         dragAfterLongPress = dragAfterLongPress,
         requireFirstDownUnconsumed = requireFirstDownUnconsumed,
         dropTargets = dropTargets,

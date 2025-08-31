@@ -484,8 +484,8 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                     DraggableItem(
                         state = dragAndDropState,
                         key = device.selectionUUID,
-                        dragAfterLongPress = true,
                         data = device,
+                        useDragAnchor = true, // Enable drag anchor mode
                     ) {
                         TitleBarModifierProvider(
                             Modifier
@@ -497,6 +497,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                                         )
                                     )
                                 }
+                                .dragAnchor() // Add drag anchor to title bar
                         ) {
                             LaunchedEffect(dragAndDropState.draggedItem) {
                                 device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
