@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.workspace.ui.components
 
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.novation
-import amethyst.composeapp.generated.resources.piano
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -161,7 +160,7 @@ enum class LaunchpadTab(val displayName: String, val icon: DrawableResource) {
     ),
     Other(
         displayName = "Other",
-        icon = Res.drawable.piano
+        icon = Res.drawable.novation
     )
 }
 
