@@ -14,7 +14,6 @@ import kotlin.math.round
 import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
-
     fun loadFile(file: PlatformFile, bpm: Double = 120.0): KeyframesChainDeviceContract.KeyframesChainDeviceState {
         val data = try {
             runBlocking { file.readBytes() }
