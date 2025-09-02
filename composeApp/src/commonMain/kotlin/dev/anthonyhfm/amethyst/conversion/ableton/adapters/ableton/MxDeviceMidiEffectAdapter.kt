@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiEx
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DelayAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.FlipAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.InfinityAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.IrisAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.TwistAdapter
@@ -69,6 +70,16 @@ class MxDeviceMidiEffectAdapter(
             MaxDeviceMatcher(79581, 51271),
             MaxDeviceMatcher(80022, 36805) -> {
                 return DelayAdapter(readDataBlob(blob.text!!)).toDeviceStates()
+            }
+
+            MaxDeviceMatcher(148081, 63576),
+            MaxDeviceMatcher(147568, 4278),
+            MaxDeviceMatcher(138711, 3885),
+            MaxDeviceMatcher(135201, 64959),
+            MaxDeviceMatcher(134829, 39407),
+            MaxDeviceMatcher(134637, 11782),
+            MaxDeviceMatcher(111310, 39693) -> {
+                return FlipAdapter(readDataBlob(blob.text!!)).toDeviceStates()
             }
 
             MaxDeviceMatcher(91230, 33545),
