@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmIndexToDuration
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -102,23 +103,6 @@ class IrisAdapter (
             8 -> "1/4"
             else -> "1/8" // Default to 1/8 if unknown
         }
-    }
-
-    fun rythmIndexToDuration(timing: String, bpm: Double, steps: Int): Duration {
-        val factor = timing.split('/').let { parts ->
-            if (parts.size == 2) {
-                val num = parts[0].trim().toFloatOrNull()
-                val den = parts[1].trim().toFloatOrNull()
-                if (num != null && den != null && den != 0f) num / den else 1f / 8f
-            } else {
-                1f / 8f // Default to 1/8 if unknown
-            }
-        }
-
-        val fraction = factor * 4
-        val secondsPerQuarter = 60.0 / bpm
-        println("Converted $timing at $bpm BPM to ${(secondsPerQuarter * fraction * 1000).toInt()} ms")
-        return ((secondsPerQuarter * fraction * 1000).toInt() * steps).milliseconds
     }
 
     @Serializable
