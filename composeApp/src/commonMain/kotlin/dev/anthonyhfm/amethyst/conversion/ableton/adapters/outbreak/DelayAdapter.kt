@@ -21,8 +21,6 @@ class DelayAdapter(
 
         val bpm = AbletonConverter.bpm
 
-        println("Data $dataObj")
-
         val delayMs = if (dataObj.freeModeEnabled.first().toInt() == 1) {
             dataObj.rateMs.first().toInt()
         } else {

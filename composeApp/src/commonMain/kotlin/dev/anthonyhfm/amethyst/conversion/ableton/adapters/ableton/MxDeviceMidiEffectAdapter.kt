@@ -64,6 +64,9 @@ class MxDeviceMidiEffectAdapter(
                 return TwistAdapter(readDataBlob(blob.text!!)).toDeviceStates()
             }
 
+            MaxDeviceMatcher(47076, 64779),
+            MaxDeviceMatcher(59062, 30081),
+            MaxDeviceMatcher(79581, 51271),
             MaxDeviceMatcher(80022, 36805) -> {
                 return DelayAdapter(readDataBlob(blob.text!!)).toDeviceStates()
             }
