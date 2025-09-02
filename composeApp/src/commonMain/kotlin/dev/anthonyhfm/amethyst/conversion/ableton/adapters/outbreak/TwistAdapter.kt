@@ -27,8 +27,6 @@ class TwistAdapter (
             ignoreUnknownKeys = true
         }.decodeFromString(data.decodeToString())
 
-        println("Twist Data: ${data.decodeToString()}")
-
         val bpm = AbletonConverter.bpm
 
         val deviceGroups = mutableListOf<Group>()
