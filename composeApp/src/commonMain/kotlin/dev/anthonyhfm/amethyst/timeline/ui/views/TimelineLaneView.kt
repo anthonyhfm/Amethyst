@@ -6,7 +6,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -39,6 +42,7 @@ fun TimelineLaneView(scrollState: ScrollState) {
     val viewModel: TimelineViewModel = koinViewModel()
     val tracks by viewModel.tracks.collectAsState()
     val zoomLevel by viewModel.zoomLevel.collectAsState()
+    val playheadPositionMs by viewModel.playheadPositionMs.collectAsState()
 
     // Calculate content width based on the longest track
     val maxDurationMs = tracks.maxOfOrNull { track ->
@@ -50,24 +54,58 @@ fun TimelineLaneView(scrollState: ScrollState) {
 
     val contentWidth = (maxDurationMs * zoomLevel + 1000).dp // Add some padding
 
-    Column(
+    Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
             .fillMaxSize()
             .border(1.dp, MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(12.dp)
     ) {
-        tracks.forEach { track ->
-            TimelineLane(
-                track = track,
-                zoomLevel = zoomLevel,
-                contentWidth = contentWidth,
-                scrollState = scrollState
-            )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            tracks.forEach { track ->
+                TimelineLane(
+                    track = track,
+                    zoomLevel = zoomLevel,
+                    contentWidth = contentWidth,
+                    scrollState = scrollState
+                )
+            }
         }
+
+        // Playhead cursor - positioned over the timeline lanes
+        PlayheadCursor(
+            positionMs = playheadPositionMs,
+            zoomLevel = zoomLevel,
+            scrollState = scrollState
+        )
     }
+}
+
+@Composable
+fun PlayheadCursor(
+    positionMs: Long,
+    zoomLevel: Float,
+    scrollState: ScrollState
+) {
+    val playheadPixelPosition = (positionMs * zoomLevel).roundToInt()
+    val scrollOffset = scrollState.value
+
+    // Calculate cursor position relative to the timeline content
+    val cursorXPosition = playheadPixelPosition - scrollOffset + 12 // 12dp for padding
+
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(cursorXPosition, 0) }
+            .width(2.dp)
+            .fillMaxHeight()
+            .background(
+                color = Color.Red,
+                shape = RoundedCornerShape(1.dp)
+            )
+    )
 }
 
 @Composable

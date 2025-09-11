@@ -1,7 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.rememberScrollState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
@@ -16,11 +15,14 @@ class TimelineViewModel : ViewModel() {
     private val _tracks = MutableStateFlow<List<TimelineTrack<*>>>(emptyList())
     val tracks: StateFlow<List<TimelineTrack<*>>> = _tracks.asStateFlow()
 
-    private val _zoomLevel = MutableStateFlow(0.06f) // 1.0 = fully zoomed in (1dp = 1ms)
+    private val _zoomLevel = MutableStateFlow(1f)
     val zoomLevel: StateFlow<Float> = _zoomLevel.asStateFlow()
 
     private val _scrollState = MutableStateFlow<ScrollState?>(null)
     val scrollState: StateFlow<ScrollState?> = _scrollState.asStateFlow()
+
+    val playheadPositionMs = TimelineRepository.playheadPositionMs
+    val isPlaying = TimelineRepository.isPlaying
 
     init {
         initializeDemoData()
@@ -32,12 +34,11 @@ class TimelineViewModel : ViewModel() {
                 startTimeMs = 0L,
                 durationMs = 3000L,
                 fileName = "drum_loop.wav",
-                rawData = null, // We'll add PCM data later
+                rawData = null,
                 sampleRate = 44100,
                 channels = 2,
                 bitDepth = 16
             )
-
             entries[5000L] = AudioEntry(
                 startTimeMs = 5000L,
                 durationMs = 2500L,
@@ -64,6 +65,10 @@ class TimelineViewModel : ViewModel() {
         val track3 = AudioTimelineTrack()
 
         _tracks.value = listOf(track1, track2, track3)
+
+        _tracks.value.forEach { track ->
+            TimelineRepository.addTrack(track)
+        }
     }
 
     fun addAudioEntry(trackIndex: Int, audioEntry: AudioEntry) {
@@ -78,7 +83,7 @@ class TimelineViewModel : ViewModel() {
     }
 
     fun setZoomLevel(zoom: Float) {
-        _zoomLevel.value = zoom.coerceIn(0.1f, 10.0f)
+        _zoomLevel.value = zoom.coerceIn(0.01f, 10.0f)
     }
 
     fun zoomBy(factor: Float) {
@@ -96,5 +101,21 @@ class TimelineViewModel : ViewModel() {
 
     fun setScrollState(scrollState: ScrollState) {
         _scrollState.value = scrollState
+    }
+
+    fun play() {
+        TimelineRepository.play()
+    }
+
+    fun pause() {
+        TimelineRepository.pause()
+    }
+
+    fun stop() {
+        TimelineRepository.stop()
+    }
+
+    fun setPlayheadPosition(positionMs: Long) {
+        TimelineRepository.setPlayheadPosition(positionMs)
     }
 }
