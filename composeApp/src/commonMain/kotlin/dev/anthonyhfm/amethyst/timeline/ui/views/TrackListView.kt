@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -66,8 +67,8 @@ fun TrackInfo() {
         )
 
         Icon(
-            imageVector = Icons.Default.Lightbulb,
-            contentDescription = "Light Track Icon",
+            imageVector = Icons.Default.Audiotrack,
+            contentDescription = "Audio Track Icon",
             tint = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier
                 .align(Alignment.End)

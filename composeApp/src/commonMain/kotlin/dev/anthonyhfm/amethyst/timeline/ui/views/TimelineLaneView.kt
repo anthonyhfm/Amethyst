@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,7 +29,7 @@ fun TimelineLaneView() {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         for (i in 0..2) {
-            TimelineLane()
+            TimelineLane() // Fake Lanes - replace with real data
         }
     }
 }
@@ -44,5 +43,13 @@ fun TimelineLane() {
             .height(96.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(8.dp),
-    )
+    ) {
+        Box( // Fake Clip - replace with real data
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .height(84.dp)
+                .width(300.dp)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+        )
+    }
 }
