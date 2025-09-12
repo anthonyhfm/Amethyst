@@ -48,7 +48,8 @@ class MxDeviceMidiEffectAdapter(
         }
 
         when (MaxDeviceMatcher(fileSize, crc)) {
-            MaxDeviceMatcher(55316, 55855) -> { // Depths Selector
+            MaxDeviceMatcher(55316, 55855),
+            MaxDeviceMatcher(35337, 2349), -> { // Depths Selector
                 return DepthsSelectorAdapter(readDataBlob(blob.text!!)).toDeviceStates()
             }
 
