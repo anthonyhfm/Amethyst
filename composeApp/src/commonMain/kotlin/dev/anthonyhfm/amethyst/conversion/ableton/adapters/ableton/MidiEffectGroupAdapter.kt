@@ -20,7 +20,15 @@ class MidiEffectGroupAdapter(
             GroupChainDeviceState(
                 groups = branches.mapIndexed { index, branch ->
                     Group(
-                        name = branch.querySelector("UserName")[0].attributes["Value"] ?: "Chain ${index + 1}",
+                        name = branch.querySelector("UserName")[0].attributes["Value"].let {
+                            if (it != null) {
+                                return@let it.ifEmpty {
+                                    "Chain ${index + 1}"
+                                }
+                            } else {
+                                return@let "Chain #"
+                            }
+                        },
                         stateChain = StateChain(
                             devices = mutableListOf<DeviceState>().apply {
                                 val zoneSettings = branch.localQuerySelector("ZoneSettings")[0]
