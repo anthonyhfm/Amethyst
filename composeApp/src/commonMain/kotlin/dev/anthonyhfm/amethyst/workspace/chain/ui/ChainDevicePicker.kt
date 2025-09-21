@@ -22,6 +22,8 @@ import androidx.compose.material.icons.twotone.Pause
 import androidx.compose.material.icons.twotone.RotateLeft
 import androidx.compose.material.icons.twotone.Science
 import androidx.compose.material.icons.twotone.ShapeLine
+import androidx.compose.material.icons.twotone.Stop
+import androidx.compose.material.icons.twotone.StopCircle
 import androidx.compose.material.icons.twotone.Timeline
 import androidx.compose.material.icons.twotone.Timer
 import androidx.compose.material.icons.twotone.Transform
@@ -30,6 +32,7 @@ import androidx.compose.runtime.Composable
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
@@ -62,6 +65,10 @@ fun getLightsMenu(): MenuItem<String> {
 
             item("device_group", "Group") {
                 icon(Icons.TwoTone.Group)
+            }
+
+            item("device_choke", "Choke") {
+                icon(Icons.TwoTone.StopCircle)
             }
 
             item("device_multi", "Multi") {
@@ -229,6 +236,7 @@ fun ChainDevicePicker(
         "device_delay" to DelayChainDevice(),
         "device_gradient" to GradientChainDevice(),
         "device_group" to GroupChainDevice(),
+        "device_choke" to ChokeChainDevice(),
         "device_multi" to MultiGroupChainDevice(),
         "device_keyframes" to KeyframesChainDevice(),
         "device_layer" to LayerChainDevice(),
