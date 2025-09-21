@@ -13,7 +13,7 @@ import org.jflac.util.ByteData
 
 actual object AudioDecoder {
 
-    private val supportedFormats = listOf("wav", "mp3", "flac", "ogg", "m4a", "aac")
+    private val supportedFormats = listOf("wav", "mp3", "flac", "ogg", "m4a", "aac", "aif", "aiff")
 
     actual suspend fun decodeAudioFile(
         filePath: String,
@@ -52,6 +52,7 @@ actual object AudioDecoder {
                 "flac" -> decodeFlac(audioData, sampleStart, sampleEnd)
                 "ogg" -> decodeOgg(audioData, sampleStart, sampleEnd)
                 "m4a", "aac" -> decodeM4a(audioData, sampleStart, sampleEnd)
+                "aif", "aiff" -> decodeAif(audioData, sampleStart, sampleEnd)
                 else -> {
                     println("Unsupported audio format: $extension")
                     null
@@ -67,18 +68,21 @@ actual object AudioDecoder {
         }
     }
 
+    actual fun getSupportedFormats(): List<String> = supportedFormats.toList()
+
     actual fun isFormatSupported(fileName: String): Boolean {
         val extension = fileName.substringAfterLast('.', "").lowercase()
         return extension in supportedFormats
     }
 
-    actual fun getSupportedFormats(): List<String> = supportedFormats.toList()
-
-    // WAV Decoder mit korrektem Sample-Cutting
     private fun decodeWav(audioData: ByteArray, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal? {
         return try {
             val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
             val sourceFormat = audioInputStream.format
+
+            if (sourceFormat.sampleSizeInBits == 32) {
+                return decodeWavWith32BitSupport(audioData, sourceFormat, sampleStart, sampleEnd)
+            }
 
             val trimmedStream = if (sampleStart != null || sampleEnd != null) {
                 trimAudioInputStream(audioInputStream, sourceFormat, sampleStart, sampleEnd)
@@ -93,11 +97,143 @@ actual object AudioDecoder {
         }
     }
 
-    // MP3 Decoder
+    private fun decodeWavWith32BitSupport(
+        audioData: ByteArray,
+        sourceFormat: AudioFormat,
+        sampleStart: Long?,
+        sampleEnd: Long?
+    ): Signal.AudioSignal? {
+        return try {
+            val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
+            val rawData = audioInputStream.readAllBytes()
+            audioInputStream.close()
+
+            val trimmedData = if (sampleStart != null || sampleEnd != null) {
+                trimRawAudioData(rawData, sourceFormat, sampleStart, sampleEnd)
+            } else {
+                rawData
+            }
+
+            val convertedData = convert32BitTo16BitImproved(trimmedData, sourceFormat)
+
+            val targetFormat = AudioFormat(
+                AudioFormat.Encoding.PCM_SIGNED,
+                sourceFormat.sampleRate,
+                16,
+                sourceFormat.channels,
+                sourceFormat.channels * 2,
+                sourceFormat.sampleRate,
+                false
+            )
+
+            val bytesPerSample = 2 * sourceFormat.channels
+            val totalSamples = convertedData.size / bytesPerSample
+            val durationMs = (totalSamples * 1000L) / sourceFormat.sampleRate.toInt()
+
+            Signal.AudioSignal(
+                origin = "AudioDecoder.WAV32",
+                rawData = convertedData,
+                sampleRate = sourceFormat.sampleRate.toInt(),
+                channels = sourceFormat.channels,
+                bitDepth = 16,
+                durationMs = durationMs
+            )
+
+        } catch (e: Exception) {
+            println("32-bit WAV conversion failed: ${e.message}")
+            null
+        }
+    }
+
+    private fun trimRawAudioData(
+        audioData: ByteArray,
+        format: AudioFormat,
+        sampleStart: Long?,
+        sampleEnd: Long?
+    ): ByteArray {
+        if (sampleStart == null && sampleEnd == null) return audioData
+
+        val bytesPerFrame = format.frameSize
+        val totalFrames = audioData.size / bytesPerFrame
+
+        val startFrame = (sampleStart ?: 0L).coerceAtLeast(0L)
+        val endFrame = (sampleEnd ?: totalFrames.toLong()).coerceAtMost(totalFrames.toLong())
+
+        if (startFrame >= endFrame || startFrame >= totalFrames) {
+            return ByteArray(0)
+        }
+
+        val startByte = (startFrame * bytesPerFrame).toInt()
+        val endByte = (endFrame * bytesPerFrame).toInt()
+
+        return audioData.sliceArray(startByte until endByte)
+    }
+
+    private fun convert32BitTo16BitImproved(data: ByteArray, sourceFormat: AudioFormat): ByteArray {
+        val channels = sourceFormat.channels
+        val sourceBytesPerSample = 4
+        val targetBytesPerSample = 2
+        val sampleCount = data.size / (sourceBytesPerSample * channels)
+
+        val result = ByteArray(sampleCount * targetBytesPerSample * channels)
+
+        for (i in 0 until sampleCount * channels) {
+            val sourceOffset = i * sourceBytesPerSample
+            val targetOffset = i * targetBytesPerSample
+
+            val sample32 = if (sourceFormat.encoding == AudioFormat.Encoding.PCM_FLOAT) {
+                convertFloat32ToInt16(data, sourceOffset)
+            } else {
+                convertInt32ToInt16(data, sourceOffset, sourceFormat.isBigEndian)
+            }
+
+            result[targetOffset] = (sample32 and 0xFF).toByte()
+            result[targetOffset + 1] = ((sample32 shr 8) and 0xFF).toByte()
+        }
+
+        return result
+    }
+
+    private fun convertFloat32ToInt16(data: ByteArray, offset: Int): Int {
+        val intBits = (data[offset].toInt() and 0xFF) or
+                     ((data[offset + 1].toInt() and 0xFF) shl 8) or
+                     ((data[offset + 2].toInt() and 0xFF) shl 16) or
+                     ((data[offset + 3].toInt() and 0xFF) shl 24)
+
+        val floatValue = Float.fromBits(intBits)
+        val clampedValue = floatValue.coerceIn(-1.0f, 1.0f)
+        val sample16 = (clampedValue * 32767.0f).toInt()
+
+        return sample16.coerceIn(-32768, 32767)
+    }
+
+    private fun convertInt32ToInt16(data: ByteArray, offset: Int, isBigEndian: Boolean): Int {
+        val sample32 = if (isBigEndian) {
+            ((data[offset].toInt() and 0xFF) shl 24) or
+            ((data[offset + 1].toInt() and 0xFF) shl 16) or
+            ((data[offset + 2].toInt() and 0xFF) shl 8) or
+            (data[offset + 3].toInt() and 0xFF)
+        } else {
+            (data[offset].toInt() and 0xFF) or
+            ((data[offset + 1].toInt() and 0xFF) shl 8) or
+            ((data[offset + 2].toInt() and 0xFF) shl 16) or
+            ((data[offset + 3].toInt() and 0xFF) shl 24)
+        }
+
+        val sample16 = (sample32 shr 16)
+        val dither = (sample32 and 0xFFFF) shr 15
+
+        return (sample16 + dither).coerceIn(-32768, 32767)
+    }
+
     private fun decodeMp3(audioData: ByteArray, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal? {
         return try {
             val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
             val sourceFormat = audioInputStream.format
+
+            if (sourceFormat.sampleSizeInBits <= 0) {
+                return decodeMp3WithForceConversion(audioData, sampleStart, sampleEnd)
+            }
 
             val trimmedStream = if (sampleStart != null || sampleEnd != null) {
                 trimAudioInputStream(audioInputStream, sourceFormat, sampleStart, sampleEnd)
@@ -107,17 +243,234 @@ actual object AudioDecoder {
 
             decodeFromAudioInputStream(trimmedStream)
         } catch (e: Exception) {
-            println("Failed to decode MP3: ${e.message}")
+            decodeMp3WithForceConversion(audioData, sampleStart, sampleEnd)
+        }
+    }
+
+    private fun decodeMp3WithForceConversion(audioData: ByteArray, sampleStart: Long?, sampleEnd: Long?): Signal.AudioSignal? {
+        return try {
+            val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
+            val sourceFormat = audioInputStream.format
+            val targetFormat = createRobustTargetFormat(sourceFormat)
+            val convertedStream = performMultiStageConversion(audioInputStream, targetFormat)
+
+            val trimmedStream = if (sampleStart != null || sampleEnd != null) {
+                trimAudioInputStream(convertedStream, convertedStream.format, sampleStart, sampleEnd)
+            } else {
+                convertedStream
+            }
+
+            decodeFromAudioInputStream(trimmedStream)
+
+        } catch (e: Exception) {
+            println("Force conversion failed: ${e.message}")
             null
         }
     }
 
-    // FLAC Decoder
+    private fun createRobustTargetFormat(sourceFormat: AudioFormat): AudioFormat {
+        val sampleRate = when {
+            sourceFormat.sampleRate <= 0 || sourceFormat.sampleRate.isNaN() -> 44100f
+            else -> sourceFormat.sampleRate
+        }
+
+        val channels = when {
+            sourceFormat.channels <= 0 -> 2
+            sourceFormat.channels == 1 -> 2
+            sourceFormat.channels > 2 -> 2
+            else -> sourceFormat.channels
+        }
+
+        return AudioFormat(
+            AudioFormat.Encoding.PCM_SIGNED,
+            sampleRate,
+            16,
+            channels,
+            channels * 2,
+            sampleRate,
+            false
+        )
+    }
+
+    private fun performMultiStageConversion(sourceStream: AudioInputStream, targetFormat: AudioFormat): AudioInputStream {
+        var currentStream = sourceStream
+        val sourceFormat = sourceStream.format
+
+        try {
+            if (sourceFormat.encoding != AudioFormat.Encoding.PCM_SIGNED) {
+                val intermediateFormat = AudioFormat(
+                    AudioFormat.Encoding.PCM_SIGNED,
+                    sourceFormat.sampleRate,
+                    16,
+                    sourceFormat.channels,
+                    sourceFormat.channels * 2,
+                    sourceFormat.sampleRate,
+                    false
+                )
+
+                if (AudioSystem.isConversionSupported(intermediateFormat, sourceFormat)) {
+                    currentStream = AudioSystem.getAudioInputStream(intermediateFormat, currentStream)
+                } else {
+                    currentStream = convertToValidPCMManually(currentStream)
+                }
+            }
+
+            val currentFormat = currentStream.format
+            if (currentFormat.channels != targetFormat.channels) {
+                val channelFormat = AudioFormat(
+                    currentFormat.encoding,
+                    currentFormat.sampleRate,
+                    currentFormat.sampleSizeInBits,
+                    targetFormat.channels,
+                    targetFormat.channels * (currentFormat.sampleSizeInBits / 8),
+                    currentFormat.sampleRate,
+                    currentFormat.isBigEndian
+                )
+
+                if (AudioSystem.isConversionSupported(channelFormat, currentFormat)) {
+                    currentStream = AudioSystem.getAudioInputStream(channelFormat, currentStream)
+                } else {
+                    currentStream = convertChannelsManually(currentStream, targetFormat.channels)
+                }
+            }
+
+            val finalFormat = currentStream.format
+            if (!formatsAreEquivalent(finalFormat, targetFormat)) {
+                if (AudioSystem.isConversionSupported(targetFormat, finalFormat)) {
+                    currentStream = AudioSystem.getAudioInputStream(targetFormat, currentStream)
+                }
+            }
+
+            return currentStream
+
+        } catch (e: Exception) {
+            return sourceStream
+        }
+    }
+
+    private fun convertToValidPCMManually(audioInputStream: AudioInputStream): AudioInputStream {
+        return try {
+            val sourceFormat = audioInputStream.format
+            val data = audioInputStream.readAllBytes()
+            audioInputStream.close()
+
+            val pcmFormat = AudioFormat(
+                AudioFormat.Encoding.PCM_SIGNED,
+                if (sourceFormat.sampleRate > 0) sourceFormat.sampleRate else 44100f,
+                16,
+                if (sourceFormat.channels > 0) sourceFormat.channels else 2,
+                if (sourceFormat.channels > 0) sourceFormat.channels * 2 else 4,
+                if (sourceFormat.sampleRate > 0) sourceFormat.sampleRate else 44100f,
+                false
+            )
+
+            val processedData = if (data.size % pcmFormat.frameSize == 0) {
+                data
+            } else {
+                val validFrames = data.size / pcmFormat.frameSize
+                val validSize = validFrames * pcmFormat.frameSize
+                data.sliceArray(0 until validSize)
+            }
+
+            AudioInputStream(
+                ByteArrayInputStream(processedData),
+                pcmFormat,
+                processedData.size / pcmFormat.frameSize.toLong()
+            )
+
+        } catch (e: Exception) {
+            audioInputStream
+        }
+    }
+
+    private fun convertChannelsManually(audioInputStream: AudioInputStream, targetChannels: Int): AudioInputStream {
+        return try {
+            val sourceFormat = audioInputStream.format
+            val sourceData = audioInputStream.readAllBytes()
+            audioInputStream.close()
+
+            if (sourceFormat.channels == targetChannels) {
+                return AudioInputStream(
+                    ByteArrayInputStream(sourceData),
+                    sourceFormat,
+                    sourceData.size / sourceFormat.frameSize.toLong()
+                )
+            }
+
+            val bytesPerSample = sourceFormat.sampleSizeInBits / 8
+            val sourceChannels = sourceFormat.channels
+            val sourceFrames = sourceData.size / (bytesPerSample * sourceChannels)
+
+            val targetData = ByteArray(sourceFrames * bytesPerSample * targetChannels)
+
+            for (frame in 0 until sourceFrames) {
+                val sourceFrameOffset = frame * bytesPerSample * sourceChannels
+                val targetFrameOffset = frame * bytesPerSample * targetChannels
+
+                when {
+                    sourceChannels == 1 && targetChannels == 2 -> {
+                        System.arraycopy(sourceData, sourceFrameOffset, targetData, targetFrameOffset, bytesPerSample)
+                        System.arraycopy(sourceData, sourceFrameOffset, targetData, targetFrameOffset + bytesPerSample, bytesPerSample)
+                    }
+                    sourceChannels > targetChannels -> {
+                        for (ch in 0 until targetChannels) {
+                            System.arraycopy(
+                                sourceData,
+                                sourceFrameOffset + ch * bytesPerSample,
+                                targetData,
+                                targetFrameOffset + ch * bytesPerSample,
+                                bytesPerSample
+                            )
+                        }
+                    }
+                    else -> {
+                        val copyChannels = minOf(sourceChannels, targetChannels)
+                        for (ch in 0 until copyChannels) {
+                            System.arraycopy(
+                                sourceData,
+                                sourceFrameOffset + ch * bytesPerSample,
+                                targetData,
+                                targetFrameOffset + ch * bytesPerSample,
+                                bytesPerSample
+                            )
+                        }
+                    }
+                }
+            }
+
+            val targetFormat = AudioFormat(
+                sourceFormat.encoding,
+                sourceFormat.sampleRate,
+                sourceFormat.sampleSizeInBits,
+                targetChannels,
+                targetChannels * bytesPerSample,
+                sourceFormat.sampleRate,
+                sourceFormat.isBigEndian
+            )
+
+            AudioInputStream(
+                ByteArrayInputStream(targetData),
+                targetFormat,
+                targetData.size / targetFormat.frameSize.toLong()
+            )
+
+        } catch (e: Exception) {
+            audioInputStream
+        }
+    }
+
+    private fun formatsAreEquivalent(format1: AudioFormat, format2: AudioFormat): Boolean {
+        return format1.encoding == format2.encoding &&
+                format1.sampleRate == format2.sampleRate &&
+                format1.sampleSizeInBits == format2.sampleSizeInBits &&
+                format1.channels == format2.channels &&
+                format1.isBigEndian == format2.isBigEndian
+    }
+
     private fun decodeFlac(audioData: ByteArray, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal? {
         return try {
             decodeFlacWithJFLAC(audioData, sampleStart, sampleEnd)
         } catch (e: Exception) {
-            println("Failed to decode FLAC with JFLAC: ${e.message}")
             try {
                 val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
                 val sourceFormat = audioInputStream.format
@@ -130,13 +483,11 @@ actual object AudioDecoder {
 
                 decodeFromAudioInputStream(trimmedStream)
             } catch (fallbackException: Exception) {
-                println("Fallback FLAC decoding also failed: ${fallbackException.message}")
                 null
             }
         }
     }
 
-    // OGG Decoder
     private fun decodeOgg(audioData: ByteArray, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal? {
         return try {
             val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
@@ -150,12 +501,10 @@ actual object AudioDecoder {
 
             decodeFromAudioInputStream(trimmedStream)
         } catch (e: Exception) {
-            println("Failed to decode OGG: ${e.message}")
             null
         }
     }
 
-    // M4A/AAC Decoder
     private fun decodeM4a(audioData: ByteArray, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal? {
         return try {
             val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
@@ -169,14 +518,27 @@ actual object AudioDecoder {
 
             decodeFromAudioInputStream(trimmedStream)
         } catch (e: Exception) {
-            println("Failed to decode M4A/AAC: ${e.message}")
             null
         }
     }
 
-    /**
-     * Trimme AudioInputStream mit der ursprünglichen Sample-Rate für korrekte Timings
-     */
+    private fun decodeAif(audioData: ByteArray, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal? {
+        return try {
+            val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audioData))
+            val sourceFormat = audioInputStream.format
+
+            val trimmedStream = if (sampleStart != null || sampleEnd != null) {
+                trimAudioInputStream(audioInputStream, sourceFormat, sampleStart, sampleEnd)
+            } else {
+                audioInputStream
+            }
+
+            decodeFromAudioInputStream(trimmedStream)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun trimAudioInputStream(
         audioInputStream: AudioInputStream,
         sourceFormat: AudioFormat,
@@ -211,9 +573,6 @@ actual object AudioDecoder {
         )
     }
 
-    /**
-     * FLAC Decoder mit JFLAC Library
-     */
     private fun decodeFlacWithJFLAC(audioData: ByteArray, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal? {
         val pcmProcessor = FlacPCMDataCollector()
 
@@ -226,28 +585,62 @@ actual object AudioDecoder {
             val pcmData = pcmProcessor.getPCMData()
 
             if (streamInfo == null || pcmData.isEmpty()) {
-                println("FLAC decoding failed: No stream info or PCM data")
                 return null
             }
 
-            // Trim audio BEFORE format conversion to maintain correct timing
             val trimmedData = if (sampleStart != null || sampleEnd != null) {
                 trimAudioDataAtOriginalRate(pcmData, streamInfo.sampleRate, streamInfo.channels, streamInfo.bitsPerSample, sampleStart, sampleEnd)
             } else {
                 pcmData
             }
 
-            return convertFlacToTargetFormat(trimmedData, streamInfo)
+            val targetSampleRate = 44100
+            val targetChannels = 2
+            val targetBitsPerSample = 16
+
+            var processedData = trimmedData
+
+            if (streamInfo.bitsPerSample != targetBitsPerSample) {
+                processedData = convertBitDepth(
+                    processedData,
+                    streamInfo.bitsPerSample,
+                    targetBitsPerSample,
+                    streamInfo.channels
+                )
+            }
+
+            if (streamInfo.channels == 1) {
+                processedData = convertMonoToStereoFlac(processedData, targetBitsPerSample)
+            }
+
+            if (streamInfo.sampleRate != targetSampleRate) {
+                processedData = resampleAudioImproved(
+                    processedData,
+                    streamInfo.sampleRate,
+                    targetSampleRate,
+                    targetChannels,
+                    targetBitsPerSample
+                )
+            }
+
+            val bytesPerSample = (targetBitsPerSample / 8) * targetChannels
+            val totalSamples = processedData.size / bytesPerSample
+            val durationMs = (totalSamples * 1000L) / targetSampleRate
+
+            return Signal.AudioSignal(
+                origin = "AudioDecoder.FLAC",
+                rawData = processedData,
+                sampleRate = targetSampleRate,
+                channels = targetChannels,
+                bitDepth = targetBitsPerSample,
+                durationMs = durationMs
+            )
 
         } catch (e: Exception) {
-            println("JFLAC decoding error: ${e.message}")
             throw e
         }
     }
 
-    /**
-     * Custom PCM processor to collect FLAC audio data
-     */
     private class FlacPCMDataCollector : PCMProcessor {
         private val pcmChunks = mutableListOf<ByteArray>()
         private var streamInfo: StreamInfo? = null
@@ -280,9 +673,6 @@ actual object AudioDecoder {
         }
     }
 
-    /**
-     * Trim audio data at the original sample rate
-     */
     private fun trimAudioDataAtOriginalRate(
         audioData: ByteArray,
         sampleRate: Int,
@@ -306,58 +696,6 @@ actual object AudioDecoder {
         return audioData.sliceArray(startByte until endByte)
     }
 
-    /**
-     * Convert FLAC PCM data to target format (44.1kHz, 16-bit, Stereo)
-     */
-    private fun convertFlacToTargetFormat(pcmData: ByteArray, streamInfo: StreamInfo): Signal.AudioSignal {
-        val sourceSampleRate = streamInfo.sampleRate
-        val sourceChannels = streamInfo.channels
-        val sourceBitsPerSample = streamInfo.bitsPerSample
-
-        val targetSampleRate = 44100
-        val targetChannels = 2
-        val targetBitsPerSample = 16
-
-        var processedData = pcmData
-
-        // Step 1: Convert bit depth if necessary
-        if (sourceBitsPerSample != targetBitsPerSample) {
-            processedData = convertBitDepth(
-                processedData,
-                sourceBitsPerSample,
-                targetBitsPerSample,
-                sourceChannels
-            )
-        }
-
-        // Step 2: Convert channels (mono to stereo)
-        if (sourceChannels == 1) {
-            processedData = convertMonoToStereoFlac(processedData, targetBitsPerSample)
-        }
-
-        // Step 3: Resample if necessary
-        if (sourceSampleRate != targetSampleRate) {
-            processedData = resampleAudioImproved(
-                processedData,
-                sourceSampleRate,
-                targetSampleRate,
-                targetChannels,
-                targetBitsPerSample
-            )
-        }
-
-        return Signal.AudioSignal(
-            origin = "AudioDecoder.FLAC",
-            rawData = processedData,
-            sampleRate = targetSampleRate,
-            channels = targetChannels,
-            bitDepth = targetBitsPerSample
-        )
-    }
-
-    /**
-     * Convert bit depth of audio samples
-     */
     private fun convertBitDepth(data: ByteArray, sourceBits: Int, targetBits: Int, channels: Int): ByteArray {
         if (sourceBits == targetBits) return data
 
@@ -372,22 +710,36 @@ actual object AudioDecoder {
 
             when {
                 sourceBits == 24 && targetBits == 16 -> {
-                    result[targetOffset] = data[sourceOffset + 1]
-                    result[targetOffset + 1] = data[sourceOffset + 2]
+                    val sample24 = ((data[sourceOffset + 2].toInt() and 0xFF) shl 16) or
+                                  ((data[sourceOffset + 1].toInt() and 0xFF) shl 8) or
+                                  (data[sourceOffset].toInt() and 0xFF)
+                    val sample16 = (sample24 shr 8).toShort()
+                    result[targetOffset] = (sample16.toInt() and 0xFF).toByte()
+                    result[targetOffset + 1] = ((sample16.toInt() shr 8) and 0xFF).toByte()
                 }
                 sourceBits == 32 && targetBits == 16 -> {
-                    result[targetOffset] = data[sourceOffset + 2]
-                    result[targetOffset + 1] = data[sourceOffset + 3]
+                    val sample32 = ((data[sourceOffset + 3].toInt() and 0xFF) shl 24) or
+                                  ((data[sourceOffset + 2].toInt() and 0xFF) shl 16) or
+                                  ((data[sourceOffset + 1].toInt() and 0xFF) shl 8) or
+                                  (data[sourceOffset].toInt() and 0xFF)
+                    val sample16 = (sample32 shr 16).toShort()
+                    result[targetOffset] = (sample16.toInt() and 0xFF).toByte()
+                    result[targetOffset + 1] = ((sample16.toInt() shr 8) and 0xFF).toByte()
                 }
                 sourceBits == 8 && targetBits == 16 -> {
-                    val sample = (data[sourceOffset].toInt() and 0xFF) - 128
-                    val sample16 = sample * 256
+                    val sample8 = (data[sourceOffset].toInt() and 0xFF) - 128
+                    val sample16 = sample8 * 256
                     result[targetOffset] = (sample16 and 0xFF).toByte()
                     result[targetOffset + 1] = ((sample16 shr 8) and 0xFF).toByte()
                 }
                 else -> {
                     val copyBytes = min(sourceBytesPerSample, targetBytesPerSample)
                     System.arraycopy(data, sourceOffset, result, targetOffset, copyBytes)
+                    if (targetBytesPerSample > sourceBytesPerSample) {
+                        for (j in copyBytes until targetBytesPerSample) {
+                            result[targetOffset + j] = 0
+                        }
+                    }
                 }
             }
         }
@@ -395,9 +747,6 @@ actual object AudioDecoder {
         return result
     }
 
-    /**
-     * Convert mono to stereo for FLAC
-     */
     private fun convertMonoToStereoFlac(data: ByteArray, bitsPerSample: Int): ByteArray {
         val bytesPerSample = bitsPerSample / 8
         val sampleCount = data.size / bytesPerSample
@@ -415,9 +764,6 @@ actual object AudioDecoder {
         return result
     }
 
-    /**
-     * Verbesserte Resampling-Funktion mit linearer Interpolation
-     */
     private fun resampleAudioImproved(
         data: ByteArray,
         sourceSampleRate: Int,
@@ -468,157 +814,170 @@ actual object AudioDecoder {
         return result
     }
 
-    /**
-     * Common decoder for AudioInputStream
-     */
     private fun decodeFromAudioInputStream(audioInputStream: AudioInputStream): Signal.AudioSignal? {
         return try {
             val sourceFormat = audioInputStream.format
-
-            val targetFormat = AudioFormat(
-                AudioFormat.Encoding.PCM_SIGNED,
-                44100f,
-                16,
-                2,
-                4,
-                44100f,
-                false
-            )
+            val targetFormat = determineOptimalFormat(sourceFormat)
 
             val convertedStream = if (AudioSystem.isConversionSupported(targetFormat, sourceFormat)) {
                 AudioSystem.getAudioInputStream(targetFormat, audioInputStream)
             } else {
-                convertToTargetFormat(audioInputStream, targetFormat)
+                convertToTargetFormatSafely(audioInputStream, targetFormat)
             }
 
             val pcmData = convertedStream.readAllBytes()
             convertedStream.close()
             audioInputStream.close()
 
-            val processedData = ensureLittleEndian(pcmData, targetFormat)
+            val processedData = normalizeAudioDataForOpenAL(pcmData, targetFormat)
+
+            val sampleRate = targetFormat.sampleRate.toInt()
+            val channels = targetFormat.channels
+            val bitDepth = targetFormat.sampleSizeInBits
+            val bytesPerSample = (bitDepth / 8) * channels
+            val totalSamples = processedData.size / bytesPerSample
+            val durationMs = (totalSamples * 1000L) / sampleRate
 
             Signal.AudioSignal(
                 origin = "AudioDecoder",
                 rawData = processedData,
-                sampleRate = targetFormat.sampleRate.toInt(),
-                channels = targetFormat.channels,
-                bitDepth = targetFormat.sampleSizeInBits
+                sampleRate = sampleRate,
+                channels = channels,
+                bitDepth = bitDepth,
+                durationMs = durationMs
             )
 
         } catch (e: Exception) {
-            println("Failed to decode audio stream: ${e.message}")
             null
         }
     }
 
-    private fun convertToTargetFormat(audioInputStream: AudioInputStream, targetFormat: AudioFormat): AudioInputStream {
+    private fun determineOptimalFormat(sourceFormat: AudioFormat): AudioFormat {
+        val targetSampleRate = when {
+            sourceFormat.sampleRate <= 0 || sourceFormat.sampleRate.isNaN() -> 44100f
+            sourceFormat.sampleRate <= 22050f -> 22050f
+            sourceFormat.sampleRate <= 44100f -> 44100f
+            sourceFormat.sampleRate <= 48000f -> 48000f
+            sourceFormat.sampleRate <= 96000f -> 48000f
+            else -> 44100f
+        }
+
+        val targetChannels = when {
+            sourceFormat.channels <= 0 -> 2
+            sourceFormat.channels == 1 -> 2
+            sourceFormat.channels > 2 -> 2
+            else -> sourceFormat.channels
+        }
+
+        return AudioFormat(
+            AudioFormat.Encoding.PCM_SIGNED,
+            targetSampleRate,
+            16,
+            targetChannels,
+            targetChannels * 2,
+            targetSampleRate,
+            false
+        )
+    }
+
+    private fun convertToTargetFormatSafely(audioInputStream: AudioInputStream, targetFormat: AudioFormat): AudioInputStream {
         var currentStream = audioInputStream
         val sourceFormat = audioInputStream.format
 
-        // Step 1: Convert encoding if needed
-        if (sourceFormat.encoding != AudioFormat.Encoding.PCM_SIGNED) {
-            val pcmFormat = AudioFormat(
-                AudioFormat.Encoding.PCM_SIGNED,
-                sourceFormat.sampleRate,
-                16,
-                sourceFormat.channels,
-                sourceFormat.channels * 2,
-                sourceFormat.sampleRate,
-                false
-            )
+        try {
+            if (sourceFormat.encoding != AudioFormat.Encoding.PCM_SIGNED) {
+                val pcmFormat = AudioFormat(
+                    AudioFormat.Encoding.PCM_SIGNED,
+                    sourceFormat.sampleRate,
+                    maxOf(sourceFormat.sampleSizeInBits, 16),
+                    sourceFormat.channels,
+                    sourceFormat.channels * maxOf(sourceFormat.sampleSizeInBits, 16) / 8,
+                    sourceFormat.sampleRate,
+                    false
+                )
 
-            if (AudioSystem.isConversionSupported(pcmFormat, sourceFormat)) {
-                currentStream = AudioSystem.getAudioInputStream(pcmFormat, currentStream)
+                if (AudioSystem.isConversionSupported(pcmFormat, sourceFormat)) {
+                    currentStream = AudioSystem.getAudioInputStream(pcmFormat, currentStream)
+                }
             }
-        }
 
-        // Step 2: Convert sample rate if needed
-        val currentFormat = currentStream.format
-        if (currentFormat.sampleRate != targetFormat.sampleRate) {
-            val sampleRateFormat = AudioFormat(
-                currentFormat.encoding,
-                targetFormat.sampleRate,
-                currentFormat.sampleSizeInBits,
-                currentFormat.channels,
-                currentFormat.frameSize,
-                targetFormat.sampleRate,
-                currentFormat.isBigEndian
-            )
-
-            if (AudioSystem.isConversionSupported(sampleRateFormat, currentFormat)) {
-                currentStream = AudioSystem.getAudioInputStream(sampleRateFormat, currentStream)
-            }
-        }
-
-        // Step 3: Convert channels if needed
-        val currentFormat2 = currentStream.format
-        if (currentFormat2.channels != 2) {
-            val stereoFormat = AudioFormat(
-                currentFormat2.encoding,
-                currentFormat2.sampleRate,
-                currentFormat2.sampleSizeInBits,
-                2,
-                4,
-                currentFormat2.frameRate,
-                currentFormat2.isBigEndian
-            )
-
-            if (AudioSystem.isConversionSupported(stereoFormat, currentFormat2)) {
-                currentStream = AudioSystem.getAudioInputStream(stereoFormat, currentStream)
+            val currentFormat = currentStream.format
+            if (AudioSystem.isConversionSupported(targetFormat, currentFormat)) {
+                currentStream = AudioSystem.getAudioInputStream(targetFormat, currentStream)
             } else {
-                currentStream = convertMonoToStereo(currentStream)
+                currentStream = convertChannelsSafely(currentStream, targetFormat.channels)
+                currentStream = convertSampleRateSafely(currentStream, targetFormat.sampleRate)
             }
-        }
 
-        // Step 4: Convert to final format
-        val currentFormat3 = currentStream.format
-        if (AudioSystem.isConversionSupported(targetFormat, currentFormat3)) {
-            currentStream = AudioSystem.getAudioInputStream(targetFormat, currentStream)
-        }
+            return currentStream
 
-        return currentStream
+        } catch (e: Exception) {
+            return audioInputStream
+        }
     }
 
-    private fun convertMonoToStereo(monoStream: AudioInputStream): AudioInputStream {
-        val monoFormat = monoStream.format
-        val stereoFormat = AudioFormat(
-            monoFormat.encoding,
-            monoFormat.sampleRate,
-            monoFormat.sampleSizeInBits,
-            2,
-            4,
-            monoFormat.frameRate,
-            monoFormat.isBigEndian
-        )
+    private fun convertChannelsSafely(audioInputStream: AudioInputStream, targetChannels: Int): AudioInputStream {
+        val currentFormat = audioInputStream.format
 
-        val monoData = monoStream.readAllBytes()
-        val stereoData = ByteArray(monoData.size * 2)
-
-        for (i in monoData.indices step 2) {
-            stereoData[i * 2] = monoData[i]
-            stereoData[i * 2 + 1] = monoData[i + 1]
-            stereoData[i * 2 + 2] = monoData[i]
-            stereoData[i * 2 + 3] = monoData[i + 1]
+        if (currentFormat.channels == targetChannels) {
+            return audioInputStream
         }
 
-        return AudioInputStream(
-            ByteArrayInputStream(stereoData),
-            stereoFormat,
-            stereoData.size / stereoFormat.frameSize.toLong()
+        val newFormat = AudioFormat(
+            currentFormat.encoding,
+            currentFormat.sampleRate,
+            currentFormat.sampleSizeInBits,
+            targetChannels,
+            targetChannels * (currentFormat.sampleSizeInBits / 8),
+            currentFormat.frameRate,
+            currentFormat.isBigEndian
         )
+
+        return if (AudioSystem.isConversionSupported(newFormat, currentFormat)) {
+            AudioSystem.getAudioInputStream(newFormat, audioInputStream)
+        } else {
+            audioInputStream
+        }
     }
 
-    private fun ensureLittleEndian(data: ByteArray, format: AudioFormat): ByteArray {
-        if (!format.isBigEndian) {
-            return data
+    private fun convertSampleRateSafely(audioInputStream: AudioInputStream, targetSampleRate: Float): AudioInputStream {
+        val currentFormat = audioInputStream.format
+
+        if (currentFormat.sampleRate == targetSampleRate) {
+            return audioInputStream
         }
 
+        val newFormat = AudioFormat(
+            currentFormat.encoding,
+            targetSampleRate,
+            currentFormat.sampleSizeInBits,
+            currentFormat.channels,
+            currentFormat.frameSize,
+            targetSampleRate,
+            currentFormat.isBigEndian
+        )
+
+        return if (AudioSystem.isConversionSupported(newFormat, currentFormat)) {
+            AudioSystem.getAudioInputStream(newFormat, audioInputStream)
+        } else {
+            audioInputStream
+        }
+    }
+
+    private fun normalizeAudioDataForOpenAL(data: ByteArray, format: AudioFormat): ByteArray {
+        return if (format.isBigEndian && format.sampleSizeInBits == 16) {
+            swapEndianness16Bit(data)
+        } else {
+            data
+        }
+    }
+
+    private fun swapEndianness16Bit(data: ByteArray): ByteArray {
         val result = ByteArray(data.size)
-        val sampleSize = format.sampleSizeInBits / 8
-
-        for (i in data.indices step sampleSize) {
-            for (j in 0 until sampleSize) {
-                result[i + j] = data[i + sampleSize - 1 - j]
+        for (i in data.indices step 2) {
+            if (i + 1 < data.size) {
+                result[i] = data[i + 1]
+                result[i + 1] = data[i]
             }
         }
 
