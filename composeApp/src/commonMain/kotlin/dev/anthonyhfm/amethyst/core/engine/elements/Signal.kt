@@ -31,6 +31,7 @@ sealed interface Signal {
         val sampleRate: Int = 44100,
         val channels: Int = 2,
         val bitDepth: Int = 16,
+        val durationMs: Long = 0,
     ) : Signal {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -43,6 +44,7 @@ sealed interface Signal {
             if (sampleRate != other.sampleRate) return false
             if (channels != other.channels) return false
             if (bitDepth != other.bitDepth) return false
+            if (durationMs != other.durationMs) return false
             return true
         }
 
@@ -52,6 +54,7 @@ sealed interface Signal {
             result = 31 * result + sampleRate
             result = 31 * result + channels
             result = 31 * result + bitDepth
+            result = 31 * result + durationMs.hashCode()
             return result
         }
     }
