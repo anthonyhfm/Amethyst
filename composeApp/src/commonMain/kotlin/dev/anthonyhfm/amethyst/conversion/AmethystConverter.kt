@@ -16,5 +16,6 @@ import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 interface AmethystConverter {
     fun convertToWorkspace(
         path: String,
+        palettePath: String? = ""
     ) : SaveableWorkspaceData
 }

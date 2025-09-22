@@ -27,7 +27,7 @@ class IrisAdapter (
 
         val bpm = AbletonConverter.bpm
 
-        val novationPalette = Palettes.novation
+        val palette = AbletonConverter.palette
         val filteredVelocities = data.fadeVelocities.filter { it != 0 }
 
         val timing = when {
@@ -45,7 +45,7 @@ class IrisAdapter (
 
         val gradientDevice = GradientChainDeviceState(
             gradientData = List(filteredVelocities.size) { index ->
-                val color = novationPalette.getOrElse(filteredVelocities[index]) { index -> Triple(0, 0, 0) }
+                val color = palette.getOrElse(filteredVelocities[index]) { index -> Triple(0, 0, 0) }
 
                 GradientChainDeviceState.GradientColor(
                     position = index.toFloat() / (filteredVelocities.size - 1),

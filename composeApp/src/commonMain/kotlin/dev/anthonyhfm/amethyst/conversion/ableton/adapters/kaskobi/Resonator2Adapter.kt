@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.util.Palettes
@@ -29,6 +30,8 @@ class Resonator2Adapter(
     val xml: XmlElement
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
+        val palette = AbletonConverter.palette
+        
         val parameterList = xml.querySelector("ParameterList")[1]
         val direction = Json {
             ignoreUnknownKeys = true
@@ -271,9 +274,9 @@ class Resonator2Adapter(
                             for (i in 0 until colorCount) {
                                 add(
                                     GradientChainDeviceState.GradientColor(
-                                        r = Palettes.novation[gradientColors[i]].first / 63f,
-                                        g = Palettes.novation[gradientColors[i]].second / 63f,
-                                        b = Palettes.novation[gradientColors[i]].third / 63f,
+                                        r = palette[gradientColors[i]].first / 63f,
+                                        g = palette[gradientColors[i]].second / 63f,
+                                        b = palette[gradientColors[i]].third / 63f,
                                         position = i.toFloat() / (colorCount - 1).coerceAtLeast(1)
                                     )
                                 )
@@ -284,9 +287,9 @@ class Resonator2Adapter(
                     )
                 } else {
                     ColorChainDeviceState(
-                        r = Palettes.novation[gradientColors[0]].first / 63f,
-                        g = Palettes.novation[gradientColors[0]].second / 63f,
-                        b = Palettes.novation[gradientColors[0]].third / 63f,
+                        r = palette[gradientColors[0]].first / 63f,
+                        g = palette[gradientColors[0]].second / 63f,
+                        b = palette[gradientColors[0]].third / 63f,
                     )
                 }
             } else null

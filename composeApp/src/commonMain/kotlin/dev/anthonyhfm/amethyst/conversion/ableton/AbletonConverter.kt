@@ -4,13 +4,18 @@ import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.reader.BPMReader
 import dev.anthonyhfm.amethyst.conversion.ableton.reader.MidiChainReader
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonImporterConfig
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
+import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.exists
+import io.github.vinceglb.filekit.readString
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 
 object AbletonConverter : AmethystConverter {
@@ -23,13 +28,22 @@ object AbletonConverter : AmethystConverter {
     var liveVersion: LiveVersion? = null
         private set
 
-    override fun convertToWorkspace(path: String): SaveableWorkspaceData {
+    var palette: Array<Triple<Int, Int, Int>> = Palettes.novation
+        private set
+
+    override fun convertToWorkspace(path: String, palettePath: String?): SaveableWorkspaceData {
         file = PlatformFile(path)
 
         val file = Zip.decode(path) // Decompresses the .als GZIP format
         val abletonXml = SimpleXmlParser.parse(file.decodeToString())
 
         bpm = BPMReader().readBPM(abletonXml)
+
+        val paletteFile = PlatformFile(palettePath ?: "")
+        runBlocking {
+            val content = paletteFile.readString()
+            palette = PaletteFileParser.parsePaletteFileContent(content)
+        }
 
         val minorVersion: String = abletonXml.attributes["MinorVersion"]!!
 

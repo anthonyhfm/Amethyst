@@ -34,6 +34,9 @@ class StartWindowViewModel() : ViewModel() {
 
     val loadingState: MutableStateFlow<String?> = MutableStateFlow(null)
 
+    val showAbletonImportWizard: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val abletonSetPath: MutableStateFlow<String> = MutableStateFlow("")
+
     fun openGitHubWebsite() {
         Desktop.getDesktop().browse(
             URI("https://github.com/anthonyhfm/amethyst")
@@ -97,15 +100,8 @@ class StartWindowViewModel() : ViewModel() {
                 }
 
                 "als" -> {
-                    loadingState.update { "Converting Ableton Live-Set.." }
-
-                    GlobalScope.launch {
-                        WorkspaceRepository.loadWorkspace(
-                            workspaceData = AbletonConverter.convertToWorkspace(file.path)
-                        )
-
-                        onOpenEditor?.invoke()
-                    }
+                    abletonSetPath.value = file.path
+                    showAbletonImportWizard.value = true
                 }
 
                 "zip" -> {
@@ -146,6 +142,18 @@ class StartWindowViewModel() : ViewModel() {
 
                 onOpenEditor?.invoke()
             }
+        }
+    }
+
+    fun startAbletonConversion(customPalettePath: String) {
+        loadingState.update { "Converting Ableton Live-Set.." }
+
+        GlobalScope.launch {
+            WorkspaceRepository.loadWorkspace(
+                workspaceData = AbletonConverter.convertToWorkspace(abletonSetPath.value, customPalettePath)
+            )
+
+            onOpenEditor?.invoke()
         }
     }
 

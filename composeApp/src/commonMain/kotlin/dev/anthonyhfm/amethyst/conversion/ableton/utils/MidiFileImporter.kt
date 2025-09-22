@@ -16,7 +16,7 @@ import kotlin.math.round
 import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
-    fun loadFile(file: PlatformFile, bpm: Double = 120.0): KeyframesChainDeviceContract.KeyframesChainDeviceState {
+    fun loadFile(file: PlatformFile, bpm: Double = 120.0, palette: Array<Triple<Int, Int, Int>> = Palettes.novation): KeyframesChainDeviceContract.KeyframesChainDeviceState {
         val data = try {
             runBlocking { file.readBytes() }
         } catch (e: Exception) {
@@ -176,8 +176,8 @@ object MidiFileImporter {
                         val filtered = currentFrame.entries.filterNot { it.x == x && it.y == y }
                         val updatedEntries =
                             if (noteOn) {
-                                val idx = velocity.coerceIn(0, Palettes.novation.size - 1)
-                                val triple = Palettes.novation[idx]
+                                val idx = velocity.coerceIn(0, palette.size - 1)
+                                val triple = palette[idx]
                                 filtered + KeyframesChainDeviceContract.KeyframesEntry(
                                     x = x,
                                     y = y,

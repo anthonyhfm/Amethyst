@@ -31,8 +31,6 @@ fun WorkspaceWindow() {
 
     Window(
         onCloseRequest = {
-            AudioOutput.cleanup()
-
             exitProcess(0)
         },
         title = "Amethyst",

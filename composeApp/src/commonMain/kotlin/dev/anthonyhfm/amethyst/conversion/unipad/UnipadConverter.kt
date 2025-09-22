@@ -16,7 +16,7 @@ import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import kotlinx.coroutines.runBlocking
 
 object UnipadConverter : AmethystConverter {
-    override fun convertToWorkspace(path: String): SaveableWorkspaceData {
+    override fun convertToWorkspace(path: String, palettePath: String?): SaveableWorkspaceData {
         val entries = Zip.getEntries(path)
 
         if (!entries.contains(ZipEntry("Info")) && !entries.contains(ZipEntry("info"))) {

@@ -20,6 +20,7 @@ class GenericMidiExtAdapter(
         }
 
         val projectPath = AbletonConverter.file!!.parent()!!.path
+        val palette = AbletonConverter.palette
 
         val filePath: String = when (AbletonConverter.liveVersion) {
             AbletonConverter.LiveVersion.LIVE_11 -> {
@@ -47,7 +48,7 @@ class GenericMidiExtAdapter(
         }
 
         return listOf(
-            MidiFileImporter.loadFile(PlatformFile(filePath))
+            MidiFileImporter.loadFile(PlatformFile(filePath), palette = palette)
         )
     }
 }

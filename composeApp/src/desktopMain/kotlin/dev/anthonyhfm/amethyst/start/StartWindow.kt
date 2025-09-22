@@ -62,6 +62,7 @@ fun StartWindow(
     ) {
         val viewModel = viewModel { StartWindowViewModel() }
         val loadingMessage: String? by viewModel.loadingState.collectAsState()
+        val showAbletonImportWizard: Boolean by viewModel.showAbletonImportWizard.collectAsState()
 
         viewModel.onOpenEditor = {
             onOpenEditor()
@@ -70,6 +71,20 @@ fun StartWindow(
         if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
             window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
             window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
+        }
+
+        if (showAbletonImportWizard) {
+            AbletonImportWizard(
+                viewModel.abletonSetPath.value
+                    .replace(".als", "")
+                    .split("/").last(),
+                onStartConversion = { customPalettePath ->
+                    viewModel.startAbletonConversion(customPalettePath)
+                },
+                onCancel = {
+                    viewModel.showAbletonImportWizard.value = false
+                }
+            )
         }
 
         if (loadingMessage != null) {

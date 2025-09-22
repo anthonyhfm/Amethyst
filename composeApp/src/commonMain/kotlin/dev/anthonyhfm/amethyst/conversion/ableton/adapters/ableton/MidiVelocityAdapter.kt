@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.util.Palettes
@@ -16,12 +17,14 @@ class MidiVelocityAdapter(
             .querySelector("Manual")
             .first()
             .attributes["Value"]?.toInt() ?: 127
+        
+        val palette = AbletonConverter.palette
 
         return listOf(
             ColorChainDeviceState(
-                r = Palettes.novation[velocity].first / 63f,
-                g = Palettes.novation[velocity].second / 63f,
-                b = Palettes.novation[velocity].third / 63f,
+                r = palette[velocity].first / 63f,
+                g = palette[velocity].second / 63f,
+                b = palette[velocity].third / 63f,
             )
         )
     }
