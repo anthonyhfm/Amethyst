@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
@@ -132,12 +133,14 @@ class SwitchChainDevice : GenericChainDevice<SwitchChainDeviceState>() {
             }
 
             if (down) {
-                WorkspaceRepository.setMacroValue(
-                    index = state.value.macro,
-                    macro = WorkspaceRepository.macros.value[state.value.macro].copy(
-                        value = state.value.value
+                Heaven.schedule(10.0, false) {
+                    WorkspaceRepository.setMacroValue(
+                        index = state.value.macro,
+                        macro = WorkspaceRepository.macros.value[state.value.macro].copy(
+                            value = state.value.value
+                        )
                     )
-                )
+                }
             }
         }
     }
