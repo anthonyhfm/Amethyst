@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -139,7 +140,12 @@ class MidiEffectGroupAdapter(
                                                         ),
                                                         SwitchChainDeviceState(
                                                             macro = 0,
-                                                            value = i + 1
+                                                            value = i
+                                                        ),
+                                                        ColorChainDeviceState(
+                                                            r = 0f,
+                                                            g = 0f,
+                                                            b = 0f,
                                                         )
                                                     )
                                                 )
@@ -161,6 +167,11 @@ class MidiEffectGroupAdapter(
                                                         SwitchChainDeviceState(
                                                             macro = 0,
                                                             value = i + 8
+                                                        ),
+                                                        ColorChainDeviceState(
+                                                            r = 0f,
+                                                            g = 0f,
+                                                            b = 0f,
                                                         )
                                                     )
                                                 )
