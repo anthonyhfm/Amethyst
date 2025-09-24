@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.nev.WormholeAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DelayAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.FlipAdapter
@@ -102,6 +103,10 @@ class MxDeviceMidiEffectAdapter(
 
             "25a0f03868c45af4d06bcead0a1bc6ce" -> {
                 return GenericMidiExtAdapter(xml).toDeviceStates()
+            }
+
+            "3d3de9b05506f279ad6cfe14d26e0084" -> {
+                return WormholeAdapter(readDataBlob(blob.text!!)).toDeviceStates()
             }
 
             else -> {
