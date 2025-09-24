@@ -10,17 +10,17 @@ object AbletonLayoutDetector {
             it.querySelector("MidiInputRouting").first()
                 .querySelector("UpperDisplayString").first()
                 .attributes["Value"]
-        }.distinct()/*.filter {
+        }.distinct().filter {
             it?.lowercase()?.contains("launchpad") ?: false
-        }*/
+        }
 
         val launchpadOutputs = tracks.map {
             it.querySelector("MidiOutputRouting").first()
                 .querySelector("UpperDisplayString").first()
                 .attributes["Value"]
-        }.distinct()/*.filter {
+        }.distinct().filter {
             it?.lowercase()?.contains("launchpad") ?: false
-        }*/
+        }
 
         println("Launchpads Found: ${launchpadInputs.size} inputs, ${launchpadOutputs.size} outputs")
 
