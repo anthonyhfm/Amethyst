@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
+import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.parent
 import io.github.vinceglb.filekit.path
 
@@ -29,6 +30,20 @@ object FileRef {
                 }
 
                 return pathString
+            }
+
+            6 -> {
+                println(refXml)
+            }
+
+            1 -> {
+                val parent = refXml.querySelector("RelativePathElement")
+                    .last()
+                    .attributes["Dir"]
+
+                if (AbletonConverter.file?.parent()?.parent()?.name == parent) {
+                    return AbletonConverter.file!!.parent()!!.parent()!!.path + "/" +  refXml.querySelector("Name").first().attributes["Value"]
+                }
             }
 
             else -> {
