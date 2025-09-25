@@ -86,6 +86,7 @@ class MxDeviceMidiEffectAdapter(
                 return Resonator2Adapter(readDataBlob(blob.text!!), xml).toDeviceStates()
             }
 
+            "8b7dc60359dadae0ef6755eddcbe0185",
             "25a0f03868c45af4d06bcead0a1bc6ce",
             "494a1455eac528aee9d94055dcdb4463",
             "aacfc91a06f6ce784ace184ad436da47",
