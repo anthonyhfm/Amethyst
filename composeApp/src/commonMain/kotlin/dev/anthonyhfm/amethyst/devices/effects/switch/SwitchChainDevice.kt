@@ -133,7 +133,7 @@ class SwitchChainDevice : GenericChainDevice<SwitchChainDeviceState>() {
             }
 
             if (down) {
-                Heaven.schedule(10.0) {
+                Heaven.schedule(0.0) {
                     WorkspaceRepository.setMacroValue(
                         index = state.value.macro,
                         macro = WorkspaceRepository.macros.value[state.value.macro].copy(
