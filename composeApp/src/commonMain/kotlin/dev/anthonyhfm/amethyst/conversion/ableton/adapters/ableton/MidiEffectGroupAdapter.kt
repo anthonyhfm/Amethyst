@@ -29,7 +29,7 @@ class MidiEffectGroupAdapter(
         groups.addAll(
             branches.mapIndexed { index, branch ->
                 val enabled = branch.querySelector("Speaker")
-                    .first()
+                    .last()
                     .querySelector("Manual")
                     .first()
                     .attributes["Value"]?.toBoolean() ?: true
