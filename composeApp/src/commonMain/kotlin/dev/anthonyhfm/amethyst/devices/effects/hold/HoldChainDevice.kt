@@ -155,12 +155,6 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
 
             if (down) {
                 if (state.value.onRelease) {
-                    if (signal is Signal.LED) {
-                        signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
-                    } else if (signal is Signal.Midi) {
-                        signalExit?.invoke(listOf(signal.copy(velocity = 0)))
-                    }
-
                     return@forEach
                 }
 
@@ -183,10 +177,12 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                     return@forEach
                 }
 
-                if (signal is Signal.LED) {
-                    signalExit?.invoke(listOf(signal.copy(color = Color.White)))
-                } else if (signal is Signal.Midi) {
-                    signalExit?.invoke(listOf(signal.copy(velocity = 127)))
+                Heaven.schedule(0.0){
+                    if (signal is Signal.LED) {
+                        signalExit?.invoke(listOf(signal.copy(color = Color.White)))
+                    } else if (signal is Signal.Midi) {
+                        signalExit?.invoke(listOf(signal.copy(velocity = 127)))
+                    }
                 }
 
                 if (state.value.infinite) {
