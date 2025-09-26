@@ -26,6 +26,13 @@ class MidiEffectGroupAdapter(
 
         val groups = mutableListOf<Group>()
 
+        // Check for Velocity Arpeggiator preset
+        val branch1Name = branches.getOrNull(0)?.querySelector("UserName")?.first()?.attributes?.get("Value")?.ifEmpty { null }
+        val branch2Name = branches.getOrNull(1)?.querySelector("UserName")?.first()?.attributes?.get("Value")?.ifEmpty { null }
+        if (branch1Name == "Magic" && branch2Name == "Rate Preview") {
+            return VelocityArpeggiatorAdapter(xml).toDeviceStates()
+        }
+
         groups.addAll(
             branches.mapIndexed { index, branch ->
                 val enabled = branch.querySelector("Speaker")
