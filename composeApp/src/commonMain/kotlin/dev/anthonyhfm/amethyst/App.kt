@@ -8,6 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import dev.anthonyhfm.amethyst.core.koin.amethystKoinModule
+import dev.anthonyhfm.amethyst.home.Home
+import dev.anthonyhfm.amethyst.ui.theme.AMETHYST_THEME
 import dev.anthonyhfm.amethyst.workspace.Workspace
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
@@ -21,13 +23,10 @@ fun App() {
         }
     ) {
         MaterialTheme(
-            colorScheme = darkColorScheme()
+            colorScheme = AMETHYST_THEME
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-            ) {
-                Workspace()
+            Surface {
+                Home()
             }
         }
     }
