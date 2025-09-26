@@ -1,11 +1,7 @@
-package dev.anthonyhfm.amethyst.core.heaven.utils
+package dev.anthonyhfm.amethyst.core.engine.utils
 
 import java.util.*
 
-/**
- * Android implementation using optimized Java collections.
- * Leverages Android's optimized ArrayList implementation.
- */
 actual class SortedList<K : Comparable<K>, V> actual constructor() {
     private val keyList = ArrayList<K>()
     private val valueList = ArrayList<V>()
@@ -20,16 +16,16 @@ actual class SortedList<K : Comparable<K>, V> actual constructor() {
     }
 
     actual fun containsKey(key: K): Boolean {
-        return Collections.binarySearch(keyList, key) >= 0
+        return keyList.binarySearch(key) >= 0
     }
 
     actual operator fun get(key: K): V? {
-        val index = Collections.binarySearch(keyList, key)
+        val index = keyList.binarySearch(key)
         return if (index >= 0) valueList[index] else null
     }
 
     actual operator fun set(key: K, value: V) {
-        val index = Collections.binarySearch(keyList, key)
+        val index = keyList.binarySearch(key)
         if (index >= 0) {
             valueList[index] = value
         } else {
@@ -40,7 +36,7 @@ actual class SortedList<K : Comparable<K>, V> actual constructor() {
     }
 
     actual fun remove(key: K): V? {
-        val index = Collections.binarySearch(keyList, key)
+        val index = keyList.binarySearch(key)
         return if (index >= 0) {
             keyList.removeAt(index)
             valueList.removeAt(index)

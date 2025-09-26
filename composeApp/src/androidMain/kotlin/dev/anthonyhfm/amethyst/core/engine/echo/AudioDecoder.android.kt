@@ -6,47 +6,49 @@ import kotlinx.coroutines.withContext
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaCodec
-import android.media.AudioFormat
 import java.io.File
-import java.io.FileInputStream
 import java.nio.ByteBuffer
 
 actual object AudioDecoder {
 
     private val supportedFormats = listOf("wav", "mp3", "flac", "m4a", "aac", "ogg")
 
-    actual suspend fun decodeAudioFile(filePath: String): Signal.AudioSignal? = withContext(Dispatchers.IO) {
+    actual suspend fun decodeAudioFile(
+        filePath: String,
+        sampleStart: Long?,
+        sampleEnd: Long?
+    ): Signal.AudioSignal? = withContext(Dispatchers.IO) {
         try {
             val file = File(filePath)
             if (!file.exists()) {
                 println("Audio file not found: $filePath")
                 return@withContext null
             }
-
-            return@withContext decodeWithMediaExtractor(filePath)
-
+            return@withContext decodeWithMediaExtractor(filePath, sampleStart, sampleEnd)
         } catch (e: Exception) {
             println("Failed to load audio file '$filePath': ${e.message}")
             e.printStackTrace()
-            return@withContext null
+            null
         }
     }
 
-    actual suspend fun decodeAudioData(audioData: ByteArray, fileName: String): Signal.AudioSignal? = withContext(Dispatchers.IO) {
+    actual suspend fun decodeAudioData(
+        audioData: ByteArray,
+        fileName: String,
+        sampleStart: Long?,
+        sampleEnd: Long?
+    ): Signal.AudioSignal? = withContext(Dispatchers.IO) {
         try {
-            // Create temporary file for MediaExtractor
-            val tempFile = File.createTempFile("audio_decode", ".${fileName.substringAfterLast('.')}")
+            val ext = fileName.substringAfterLast('.', "tmp")
+            val tempFile = File.createTempFile("audio_decode", ".$ext")
             tempFile.writeBytes(audioData)
-
-            val result = decodeWithMediaExtractor(tempFile.absolutePath)
+            val result = decodeWithMediaExtractor(tempFile.absolutePath, sampleStart, sampleEnd)
             tempFile.delete()
-
-            return@withContext result
-
+            result
         } catch (e: Exception) {
             println("Failed to decode audio data for '$fileName': ${e.message}")
             e.printStackTrace()
-            return@withContext null
+            null
         }
     }
 
@@ -57,18 +59,19 @@ actual object AudioDecoder {
 
     actual fun getSupportedFormats(): List<String> = supportedFormats.toList()
 
-    private fun decodeWithMediaExtractor(filePath: String): Signal.AudioSignal? {
+    private fun decodeWithMediaExtractor(
+        filePath: String,
+        sampleStart: Long?,
+        sampleEnd: Long?
+    ): Signal.AudioSignal? {
         var extractor: MediaExtractor? = null
         var decoder: MediaCodec? = null
-
         try {
             extractor = MediaExtractor()
             extractor.setDataSource(filePath)
 
-            // Find audio track
             var audioTrackIndex = -1
             var audioFormat: MediaFormat? = null
-
             for (i in 0 until extractor.trackCount) {
                 val format = extractor.getTrackFormat(i)
                 val mime = format.getString(MediaFormat.KEY_MIME)
@@ -78,20 +81,16 @@ actual object AudioDecoder {
                     break
                 }
             }
-
             if (audioTrackIndex == -1 || audioFormat == null) {
                 println("No audio track found in file")
                 return null
             }
-
             extractor.selectTrack(audioTrackIndex)
 
-            // Get audio properties
-            val mime = audioFormat.getString(MediaFormat.KEY_MIME) ?: ""
-            val sampleRate = audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-            val channels = audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            val mime = audioFormat.getString(MediaFormat.KEY_MIME) ?: return null
+            val sourceSampleRate = audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+            val sourceChannels = audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
 
-            // Create and configure decoder
             decoder = MediaCodec.createDecoderByType(mime)
             decoder.configure(audioFormat, null, null, 0)
             decoder.start()
@@ -100,78 +99,89 @@ actual object AudioDecoder {
             val outputBuffers = decoder.outputBuffers
             val bufferInfo = MediaCodec.BufferInfo()
 
-            var isEOS = false
-            val pcmDataList = mutableListOf<ByteArray>()
+            val pcmChunks = ArrayList<ByteArray>()
+            var endOfStream = false
 
-            while (!isEOS) {
-                // Feed input
-                val inputBufferIndex = decoder.dequeueInputBuffer(10000)
-                if (inputBufferIndex >= 0) {
-                    val inputBuffer = inputBuffers[inputBufferIndex]
+            while (!endOfStream) {
+                val inIndex = decoder.dequeueInputBuffer(10_000)
+                if (inIndex >= 0) {
+                    val inputBuffer: ByteBuffer = inputBuffers[inIndex]
                     val sampleSize = extractor.readSampleData(inputBuffer, 0)
-
                     if (sampleSize < 0) {
-                        decoder.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        decoder.queueInputBuffer(
+                            inIndex, 0, 0, 0,
+                            MediaCodec.BUFFER_FLAG_END_OF_STREAM
+                        )
                     } else {
-                        val presentationTimeUs = extractor.sampleTime
-                        decoder.queueInputBuffer(inputBufferIndex, 0, sampleSize, presentationTimeUs, 0)
+                        decoder.queueInputBuffer(
+                            inIndex, 0, sampleSize,
+                            extractor.sampleTime,
+                            0
+                        )
                         extractor.advance()
                     }
                 }
 
-                // Get output
-                val outputBufferIndex = decoder.dequeueOutputBuffer(bufferInfo, 10000)
+                val outIndex = decoder.dequeueOutputBuffer(bufferInfo, 10_000)
                 when {
-                    outputBufferIndex >= 0 -> {
-                        val outputBuffer = outputBuffers[outputBufferIndex]
-
+                    outIndex >= 0 -> {
+                        val outputBuffer: ByteBuffer = outputBuffers[outIndex]
                         if (bufferInfo.size > 0) {
-                            val pcmData = ByteArray(bufferInfo.size)
-                            outputBuffer.get(pcmData)
-                            outputBuffer.rewind()
-                            pcmDataList.add(pcmData)
+                            val bytes = ByteArray(bufferInfo.size)
+                            outputBuffer.get(bytes)
+                            outputBuffer.clear()
+                            pcmChunks.add(bytes)
                         }
-
-                        decoder.releaseOutputBuffer(outputBufferIndex, false)
-
-                        if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
-                            isEOS = true
-                        }
+                        val flagsEnd = bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                        decoder.releaseOutputBuffer(outIndex, false)
+                        if (flagsEnd) endOfStream = true
                     }
-                    outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                        // Output format changed
-                        val newFormat = decoder.outputFormat
-                        println("Output format changed: $newFormat")
+                    outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+
+                    }
+                    outIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> {
+
+                        decoder.outputBuffers.let {  }
                     }
                 }
             }
 
-            // Combine all PCM data
-            val totalSize = pcmDataList.sumOf { it.size }
-            val combinedPcmData = ByteArray(totalSize)
-            var offset = 0
-            for (data in pcmDataList) {
-                System.arraycopy(data, 0, combinedPcmData, offset, data.size)
-                offset += data.size
+            val sourceFrameSize = sourceChannels * 2
+            val totalSize = pcmChunks.sumOf { it.size }
+            val sourcePcm = ByteArray(totalSize)
+            var copyPos = 0
+            for (c in pcmChunks) {
+                System.arraycopy(c, 0, sourcePcm, copyPos, c.size)
+                copyPos += c.size
             }
 
-            // Convert to target format (44.1kHz, 16-bit, Stereo)
-            val convertedData = convertToTargetFormat(
-                pcmData = combinedPcmData,
-                sourceSampleRate = sampleRate,
-                sourceChannels = channels,
+            val trimmedSource = trimPcm(
+                pcm = sourcePcm,
+                frameSize = sourceFrameSize,
+                sampleStart = sampleStart,
+                sampleEnd = sampleEnd
+            )
+
+            val converted = convertToTargetFormat(
+                pcmData = trimmedSource,
+                sourceSampleRate = sourceSampleRate,
+                sourceChannels = sourceChannels,
                 targetSampleRate = 44100,
                 targetChannels = 2
             )
 
+            val targetFrameSize = 2 * 2
+            val totalFrames = if (targetFrameSize > 0) converted.size / targetFrameSize else 0
+            val durationMs = if (totalFrames > 0) (totalFrames * 1000L) / 44100L else 0L
+
             return Signal.AudioSignal(
-                origin = "AudioDecoder",
-                rawData = convertedData,
+                origin = "AudioDecoder.Android",
+                rawData = converted,
                 sampleRate = 44100,
                 channels = 2,
-                bitDepth = 16
+                bitDepth = 16,
+                durationMs = durationMs
             )
-
         } catch (e: Exception) {
             println("Failed to decode audio with MediaExtractor: ${e.message}")
             e.printStackTrace()
@@ -181,10 +191,25 @@ actual object AudioDecoder {
                 decoder?.stop()
                 decoder?.release()
                 extractor?.release()
-            } catch (e: Exception) {
-                println("Error cleaning up decoder/extractor: ${e.message}")
-            }
+            } catch (_: Exception) {}
         }
+    }
+
+    private fun trimPcm(
+        pcm: ByteArray,
+        frameSize: Int,
+        sampleStart: Long?,
+        sampleEnd: Long?
+    ): ByteArray {
+        if (sampleStart == null && sampleEnd == null) return pcm
+        if (frameSize <= 0) return pcm
+        val totalFrames = pcm.size / frameSize
+        val startFrame = (sampleStart ?: 0L).coerceAtLeast(0L).coerceAtMost(totalFrames.toLong())
+        val endFrame = (sampleEnd ?: totalFrames.toLong()).coerceAtLeast(0L).coerceAtMost(totalFrames.toLong())
+        if (startFrame >= endFrame) return ByteArray(0)
+        val startByte = (startFrame * frameSize).toInt()
+        val endByte = (endFrame * frameSize).toInt().coerceAtMost(pcm.size)
+        return pcm.copyOfRange(startByte, endByte)
     }
 
     private fun convertToTargetFormat(
@@ -194,94 +219,80 @@ actual object AudioDecoder {
         targetSampleRate: Int,
         targetChannels: Int
     ): ByteArray {
-        var convertedData = pcmData
-
-        // Convert sample rate if needed
+        var data = pcmData
         if (sourceSampleRate != targetSampleRate) {
-            convertedData = resampleAudio(convertedData, sourceSampleRate, targetSampleRate, sourceChannels)
+            data = resampleLinear16(data, sourceSampleRate, targetSampleRate, sourceChannels)
         }
-
-        // Convert channels if needed
         if (sourceChannels != targetChannels) {
-            convertedData = convertChannels(convertedData, sourceChannels, targetChannels)
+            data = convertChannels16(data, sourceChannels, targetChannels)
         }
-
-        return convertedData
+        return data
     }
 
-    private fun resampleAudio(
+    private fun resampleLinear16(
         pcmData: ByteArray,
         sourceSampleRate: Int,
         targetSampleRate: Int,
         channels: Int
     ): ByteArray {
-        // Simple linear interpolation resampling
-        val ratio = sourceSampleRate.toDouble() / targetSampleRate.toDouble()
-        val bytesPerSample = 2 // 16-bit
+        val bytesPerSample = 2
         val frameSize = channels * bytesPerSample
-
-        val sourceFrames = pcmData.size / frameSize
-        val targetFrames = (sourceFrames / ratio).toInt()
-        val targetData = ByteArray(targetFrames * frameSize)
-
+        val sourceFrames = if (frameSize > 0) pcmData.size / frameSize else 0
+        if (sourceFrames == 0 || sourceSampleRate == targetSampleRate) return pcmData
+        val ratio = sourceSampleRate.toDouble() / targetSampleRate.toDouble()
+        val targetFrames = (sourceFrames / ratio).toInt().coerceAtLeast(1)
+        val target = ByteArray(targetFrames * frameSize)
         for (i in 0 until targetFrames) {
-            val sourceIndex = (i * ratio).toInt()
-            val sourceOffset = sourceIndex * frameSize
-            val targetOffset = i * frameSize
-
-            if (sourceOffset + frameSize <= pcmData.size) {
-                System.arraycopy(pcmData, sourceOffset, targetData, targetOffset, frameSize)
-            }
+            val srcIndex = (i * ratio).toInt().coerceAtMost(sourceFrames - 1)
+            val srcByte = srcIndex * frameSize
+            val destByte = i * frameSize
+            System.arraycopy(pcmData, srcByte, target, destByte, frameSize)
         }
-
-        return targetData
+        return target
     }
 
-    private fun convertChannels(pcmData: ByteArray, sourceChannels: Int, targetChannels: Int): ByteArray {
-        val bytesPerSample = 2 // 16-bit
+    private fun convertChannels16(pcmData: ByteArray, sourceChannels: Int, targetChannels: Int): ByteArray {
+        if (sourceChannels == targetChannels) return pcmData
+        val bytesPerSample = 2
         val sourceFrameSize = sourceChannels * bytesPerSample
-        val targetFrameSize = targetChannels * bytesPerSample
-        val frames = pcmData.size / sourceFrameSize
+        val frames = if (sourceFrameSize > 0) pcmData.size / sourceFrameSize else 0
+        if (frames == 0) return ByteArray(0)
+        return when {
+            sourceChannels == 1 && targetChannels == 2 -> {
+                val target = ByteArray(frames * targetChannels * bytesPerSample)
+                var inPos = 0
+                var outPos = 0
+                while (inPos + 1 < pcmData.size) {
+                    val b0 = pcmData[inPos]
+                    val b1 = pcmData[inPos + 1]
 
-        val targetData = ByteArray(frames * targetFrameSize)
-
-        for (i in 0 until frames) {
-            val sourceOffset = i * sourceFrameSize
-            val targetOffset = i * targetFrameSize
-
-            when {
-                sourceChannels == 1 && targetChannels == 2 -> {
-                    // Mono to Stereo: duplicate mono channel
-                    targetData[targetOffset] = pcmData[sourceOffset]
-                    targetData[targetOffset + 1] = pcmData[sourceOffset + 1]
-                    targetData[targetOffset + 2] = pcmData[sourceOffset]
-                    targetData[targetOffset + 3] = pcmData[sourceOffset + 1]
+                    target[outPos] = b0
+                    target[outPos + 1] = b1
+                    target[outPos + 2] = b0
+                    target[outPos + 3] = b1
+                    inPos += 2
+                    outPos += 4
                 }
-                sourceChannels == 2 && targetChannels == 1 -> {
-                    // Stereo to Mono: average both channels
-                    val left = (pcmData[sourceOffset].toInt() and 0xFF) or ((pcmData[sourceOffset + 1].toInt() and 0xFF) shl 8)
-                    val right = (pcmData[sourceOffset + 2].toInt() and 0xFF) or ((pcmData[sourceOffset + 3].toInt() and 0xFF) shl 8)
-                    val mono = ((left + right) / 2).toShort()
-                    targetData[targetOffset] = (mono.toInt() and 0xFF).toByte()
-                    targetData[targetOffset + 1] = ((mono.toInt() shr 8) and 0xFF).toByte()
+                target
+            }
+            sourceChannels == 2 && targetChannels == 1 -> {
+                val target = ByteArray(frames * targetChannels * bytesPerSample)
+                var inPos = 0
+                var outPos = 0
+                while (inPos + 3 < pcmData.size) {
+                    val left = (pcmData[inPos].toInt() and 0xFF) or ((pcmData[inPos + 1].toInt() and 0xFF) shl 8)
+                    val right = (pcmData[inPos + 2].toInt() and 0xFF) or ((pcmData[inPos + 3].toInt() and 0xFF) shl 8)
+                    val mono = ((left + right) / 2).coerceIn(-32768, 32767)
+                    target[outPos] = (mono and 0xFF).toByte()
+                    target[outPos + 1] = ((mono shr 8) and 0xFF).toByte()
+                    inPos += 4
+                    outPos += 2
                 }
-                else -> {
-                    // Copy as-is or truncate/pad as needed
-                    val copySize = minOf(sourceFrameSize, targetFrameSize)
-                    System.arraycopy(pcmData, sourceOffset, targetData, targetOffset, copySize)
-                }
+                target
+            }
+            else -> {
+                pcmData
             }
         }
-
-        return targetData
-    }
-
-    actual suspend fun decodeAudioData(
-        audioData: ByteArray,
-        fileName: String,
-        sampleStart: Long?,
-        sampleEnd: Long?
-    ): Signal.AudioSignal? {
-        TODO("Not yet implemented")
     }
 }
