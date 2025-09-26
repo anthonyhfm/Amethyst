@@ -1,125 +1,57 @@
-package dev.anthonyhfm.amethyst.core.heaven.utils
-
-import kotlinx.cinterop.*
-import platform.Foundation.*
-import platform.darwin.*
+package dev.anthonyhfm.amethyst.core.engine.utils
 
 /**
- * iOS implementation using native Foundation collections for maximum performance.
- * Leverages NSMutableArray's optimized C implementation and binary search.
+ * Shared implementation using Kotlin collections.
+ * Simplified version using mutableListOf and binarySearch.
  */
 actual class SortedList<K : Comparable<K>, V> actual constructor() {
-    // Use NSMutableArray for native iOS performance
-    private val keyArray = NSMutableArray()
-    private val valueArray = NSMutableArray()
+    private val keyList = mutableListOf<K>()
+    private val valueList = mutableListOf<V>()
 
-    actual val size: Int get() = keyArray.count.toInt()
-
-    actual val keys: List<K>
-        get() = (0 until size).map {
-            @Suppress("UNCHECKED_CAST")
-            keyArray.objectAtIndex(it.toULong()) as K
-        }
-
-    actual val values: List<V>
-        get() = (0 until size).map {
-            @Suppress("UNCHECKED_CAST")
-            valueArray.objectAtIndex(it.toULong()) as V
-        }
+    actual val size: Int get() = keyList.size
+    actual val keys: List<K> get() = keyList
+    actual val values: List<V> get() = valueList
 
     actual fun clear() {
-        keyArray.removeAllObjects()
-        valueArray.removeAllObjects()
+        keyList.clear()
+        valueList.clear()
     }
 
-    actual fun containsKey(key: K): Boolean {
-        return nativeBinarySearch(key) >= 0
-    }
+    actual fun containsKey(key: K): Boolean = binarySearch(key) >= 0
 
     actual operator fun get(key: K): V? {
-        val index = nativeBinarySearch(key)
-        return if (index >= 0) {
-            @Suppress("UNCHECKED_CAST")
-            valueArray.objectAtIndex(index.toULong()) as V
-        } else null
+        val idx = binarySearch(key)
+        return if (idx >= 0) valueList[idx] else null
     }
 
     actual operator fun set(key: K, value: V) {
-        val index = nativeBinarySearch(key)
-        if (index >= 0) {
-            // Key exists, update value
-            valueArray.replaceObjectAtIndex(index.toULong(), value as Any)
+        val idx = binarySearch(key)
+        if (idx >= 0) {
+            valueList[idx] = value
         } else {
-            // Key doesn't exist, insert at correct position
-            val insertIndex = -(index + 1)
-            keyArray.insertObject(key as Any, insertIndex.toULong())
-            valueArray.insertObject(value as Any, insertIndex.toULong())
+            val insertIndex = -(idx + 1)
+            keyList.add(insertIndex, key)
+            valueList.add(insertIndex, value)
         }
     }
 
     actual fun remove(key: K): V? {
-        val index = nativeBinarySearch(key)
-        return if (index >= 0) {
-            @Suppress("UNCHECKED_CAST")
-            val removedValue = valueArray.objectAtIndex(index.toULong()) as V
-            keyArray.removeObjectAtIndex(index.toULong())
-            valueArray.removeObjectAtIndex(index.toULong())
-            removedValue
-        } else {
-            null
-        }
+        val idx = binarySearch(key)
+        return if (idx >= 0) {
+            keyList.removeAt(idx)
+            valueList.removeAt(idx)
+        } else null
     }
 
-    actual fun isEmpty(): Boolean = keyArray.count == 0UL
+    actual fun isEmpty(): Boolean = keyList.isEmpty()
 
-    actual fun getKeyAt(index: Int): K {
-        @Suppress("UNCHECKED_CAST")
-        return keyArray.objectAtIndex(index.toULong()) as K
-    }
-
-    actual fun getValueAt(index: Int): V {
-        @Suppress("UNCHECKED_CAST")
-        return valueArray.objectAtIndex(index.toULong()) as V
-    }
+    actual fun getKeyAt(index: Int): K = keyList[index]
+    actual fun getValueAt(index: Int): V = valueList[index]
 
     actual fun removeAt(index: Int) {
-        keyArray.removeObjectAtIndex(index.toULong())
-        valueArray.removeObjectAtIndex(index.toULong())
+        keyList.removeAt(index)
+        valueList.removeAt(index)
     }
 
-    // Use NSArray's native binary search for optimal performance
-    @OptIn(ExperimentalForeignApi::class)
-    private fun nativeBinarySearch(key: K): Int {
-        if (keyArray.count == 0UL) return -1
-
-        // Use NSArray's built-in binary search using NSComparator
-        val comparator = { obj1: Any?, obj2: Any? ->
-            @Suppress("UNCHECKED_CAST")
-            val k1 = obj1 as K
-            @Suppress("UNCHECKED_CAST")
-            val k2 = obj2 as K
-
-            when {
-                k1 < k2 -> NSOrderedAscending
-                k1 > k2 -> NSOrderedDescending
-                else -> NSOrderedSame
-            }
-        }
-
-        val searchOptions = NSBinarySearchingFirstEqual or NSBinarySearchingInsertionIndex
-        val index = keyArray.indexOfObject(
-            key as Any,
-            inSortedRange = NSMakeRange(0UL, keyArray.count),
-            options = searchOptions,
-            usingComparator = comparator
-        )
-
-        // Check if exact match was found
-        return if (index < keyArray.count &&
-                   (keyArray.objectAtIndex(index) as K) == key) {
-            index.toInt()
-        } else {
-            -(index.toInt() + 1)
-        }
-    }
+    private fun binarySearch(key: K): Int = keyList.binarySearch(key)
 }

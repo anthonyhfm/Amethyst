@@ -49,7 +49,7 @@ kotlin {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
-            implementation("org.jetbrains.compose.material3:material3:1.9.0-alpha04")
+            implementation("org.jetbrains.compose.material3:material3:1.9.0-beta06")
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             implementation(compose.components.resources)
@@ -63,6 +63,7 @@ kotlin {
             runtimeOnly(libs.koin.compose)
             runtimeOnly(libs.koin.compose.viewmodel)
             implementation(libs.koin.compose.viewmodel.navigation)
+            implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.0")
 
             implementation(libs.colorpicker.compose)
             implementation(libs.reorderable)

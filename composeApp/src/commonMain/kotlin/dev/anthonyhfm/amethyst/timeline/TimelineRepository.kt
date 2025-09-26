@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.TimeSource
 
 object TimelineRepository {
     val tracks: MutableStateFlow<List<TimelineTrack<*>>> = MutableStateFlow(emptyList())
@@ -61,11 +62,19 @@ object TimelineRepository {
     }
 
     private fun startPlayback() {
+        val startMark = TimeSource.Monotonic.markNow()
+        val startPosition = _playheadPositionMs.value
+
         playbackJob = playbackScope.launch {
             while (_isPlaying.value) {
-                delay(4L)
-                _playheadPositionMs.update { it + 4L }
+                val elapsedMs = startMark.elapsedNow().inWholeMilliseconds
+                val newPosition = startPosition + elapsedMs
+
+                _playheadPositionMs.value = newPosition
                 updatePlayingEntries()
+
+                // Use more precise timing (1ms instead of 4ms)
+                delay(1L)
             }
         }
     }
@@ -85,24 +94,27 @@ object TimelineRepository {
             }
         }
 
+        // Stop entries that should no longer be playing
         activeEntries.removeAll { entry ->
             val shouldStop = currentPosition < entry.startTimeMs || currentPosition >= entry.endTimeMs
             if (shouldStop) {
                 entry.stop()
+                println("Timeline: Stopped ${entry.fileName} at ${currentPosition}ms")
             }
             shouldStop
         }
 
+        // Start entries that should be playing
         allEntries.forEach { entry ->
             val shouldPlay = currentPosition >= entry.startTimeMs &&
                            currentPosition < entry.endTimeMs &&
                            !activeEntries.contains(entry)
 
             if (shouldPlay) {
-                val offsetInEntry = currentPosition - entry.startTimeMs
-
-                entry.start(startAt = offsetInEntry)
+                // CRITICAL FIX: Pass currentPosition, not offset
+                entry.start(startAt = currentPosition)
                 activeEntries.add(entry)
+                println("Timeline: Started ${entry.fileName} at ${currentPosition}ms (entry starts at ${entry.startTimeMs}ms)")
             }
         }
     }
