@@ -16,6 +16,5 @@ fun rythmIndexToDuration(timing: String, bpm: Double, steps: Int): Duration {
 
     val fraction = factor * 4
     val secondsPerQuarter = 60.0 / bpm
-    println("Converted $timing at $bpm BPM to ${(secondsPerQuarter * fraction * 1000).toInt()} ms")
     return ((secondsPerQuarter * fraction * 1000).toInt() * steps).milliseconds
 }
