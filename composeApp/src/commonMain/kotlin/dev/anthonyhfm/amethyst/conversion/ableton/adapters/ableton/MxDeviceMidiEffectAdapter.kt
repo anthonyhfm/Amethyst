@@ -82,8 +82,8 @@ class MxDeviceMidiEffectAdapter(
                     return InfinityAdapter().toDeviceStates()
                 }
 
-                "feecaed62c2637a73325446a1ed1e25e",
-                "32b6bec96552a6e40f6743787a20b9df" -> {
+                "feecaed62c2637a73325446a1ed1e25e" -> {
+                    println("Pager hash detected: $hash")
                     AbletonConverter.special = ProjectSpecials(
                         useKaskobiPageSwitcher = true
                     )
