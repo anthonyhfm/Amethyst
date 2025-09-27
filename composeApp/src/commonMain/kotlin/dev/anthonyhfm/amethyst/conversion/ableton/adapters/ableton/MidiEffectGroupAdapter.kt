@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.readDataBlob
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.MultiAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -11,7 +13,6 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import kotlin.math.abs
 
 class MidiEffectGroupAdapter(
     private val xml: XmlElement
@@ -42,6 +43,8 @@ class MidiEffectGroupAdapter(
                     .attributes["Value"]?.toBoolean() ?: true
 
                 if (!enabled) return@mapIndexed null
+
+                // TODO: implement multi for lights
 
                 Group(
                     name = branch.querySelector("UserName")[0].attributes["Value"].let {
@@ -109,6 +112,54 @@ class MidiEffectGroupAdapter(
                                         }
                                     )
                                 )
+                            }
+
+                            // Multisampling logic
+                            // TODO: replace simple multi name checking for max plugin with hash check
+                            val branchElements = branch.querySelector("DeviceChain")[0]
+                                .querySelector("Devices")[0]
+                                .children
+
+                            if (branchElements.size >= 2) {
+                                val multiDevice = branchElements.find {
+                                    (it.querySelector("Name")[0].attributes["Value"]?.lowercase()?.contains("multi")
+                                        ?: false)
+                                            && !it.querySelector("Name")[0].attributes["Value"]?.lowercase()
+                                        ?.contains("reset")!!
+                                }
+                                val randomDevice = branchElements.find {
+                                    it.name == "MidiRandom"
+                                }
+                                val lightsContainer = branchElements.find {
+                                    it.name == "MidiEffectGroupDevice"
+                                }
+
+                                if (multiDevice != null && lightsContainer != null) {
+                                    println("Found multi and container, using MultiAdapter")
+                                    val multiDataBlob = multiDevice.localQuerySelector("BlobSlot")[0]
+                                        .localQuerySelector("Value")[0]
+                                        .localQuerySelector("MxDBlob")[0]
+                                        .localQuerySelector("Blob")[0]
+
+                                    addAll(
+                                        MultiAdapter(
+                                            blob = readDataBlob(multiDataBlob.text!!),
+                                            containerXml = lightsContainer
+                                        ).toDeviceStates()
+                                    )
+
+                                    return@apply
+                                } else if (randomDevice != null && lightsContainer != null) {
+                                    println("Found random and container, using RandomDeviceMultisamplingAdapter")
+                                    addAll(
+                                        RandomDeviceMultisamplingAdapter(
+                                            randomDeviceXml = randomDevice,
+                                            containerXml = lightsContainer
+                                        ).toDeviceStates()
+                                    )
+
+                                    return@apply
+                                }
                             }
 
                             addAll(
