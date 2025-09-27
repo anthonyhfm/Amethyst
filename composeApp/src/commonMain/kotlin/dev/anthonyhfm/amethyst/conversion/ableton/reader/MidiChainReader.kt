@@ -27,10 +27,13 @@ class MidiChainReader(
         return StateChain(
             devices = adapters.filter { it != null }.map {
                 it!!.toDeviceStates()
-            }.flatten()
-                .plus(
-                    OffsetChainDeviceState(offsetX = outputOffset.x, offsetY = outputOffset.y)
-                )
+            }.flatten().toMutableList().apply {
+                if (outputOffset != IntOffset.Zero) {
+                    add(
+                        OffsetChainDeviceState(offsetX = outputOffset.x, offsetY = outputOffset.y)
+                    )
+                }
+            }
         )
     }
 

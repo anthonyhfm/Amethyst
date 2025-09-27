@@ -90,7 +90,7 @@ kotlin {
             implementation("io.github.vyfor:kpresence:0.6.5")
 
             // LWJGL Platform Detection
-            val lwjglVersion = "3.3.4"
+            val lwjglVersion = "3.3.6"
             val lwjglNatives = when (org.gradle.internal.os.OperatingSystem.current()) {
                 org.gradle.internal.os.OperatingSystem.LINUX -> "natives-linux"
                 org.gradle.internal.os.OperatingSystem.MAC_OS -> if (System.getProperty("os.arch") == "aarch64") "natives-macos-arm64" else "natives-macos"

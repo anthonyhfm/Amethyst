@@ -76,7 +76,7 @@ class MidiEffectGroupAdapter(
                             val minKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 0
                             val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127
 
-                            if (hasChains /*|| AbletonConverter.special.useKaskobiPageSwitcher*/) {
+                            if (hasChains || AbletonConverter.special.useKaskobiPageSwitcher) {
                                 if (maxMacro - minMacro == 0) {
                                     add(
                                         MacroFilterChainDeviceState(
