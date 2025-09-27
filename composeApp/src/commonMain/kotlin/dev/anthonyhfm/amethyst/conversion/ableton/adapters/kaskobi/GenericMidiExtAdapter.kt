@@ -53,6 +53,7 @@ class GenericMidiExtAdapter(
             MidiFileImporter.loadFile(
                 file = PlatformFile(filePath),
                 palette = palette,
+                bpm = AbletonConverter.bpm,
                 xyOffset = offset
             )
         )

@@ -22,7 +22,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun TimeDial(
     headline: String = "Duration",
     timing: Timing,
-    onSelectTiming: (timing: Timing, msValue: Int) -> Unit,
+    onSelectTiming: (timing: Timing, msValue: Long) -> Unit,
     enabled: Boolean = true,
     text: String? = null,
 ) {
@@ -40,7 +40,7 @@ fun TimeDial(
             onValueChange = {
                 onSelectTiming(
                     Timing.Duration((it * 1000).toInt().milliseconds),
-                    (it * 1000).toInt().milliseconds.inMs.toInt()
+                    (it * 1000).toInt().milliseconds.inWholeMilliseconds
                 )
             },
             headline = headline,
@@ -88,18 +88,15 @@ fun TimeDial(
             },
             enabled = enabled
         )
-        // TODO: add back right click to switch to ms mode
     }
 }
 
-fun Timing.toMsValue(bpm: Double): Int = when (this) {
-    is Timing.Duration -> this.duration.inMs.toInt()
-
+fun Timing.toMsValue(bpm: Double): Long = when (this) {
+    is Timing.Duration -> this.duration.inWholeMilliseconds
     is Timing.Rythm -> {
-        val fraction: Float = timing.factor * 4
-        val secondsPerQuarter = 60.0 / bpm
-
-        (secondsPerQuarter * fraction * 1000).toInt()
+        val beats = timing.factor * 4.0
+        val msPerBeat = 60_000.0 / bpm
+        kotlin.math.round(beats * msPerBeat).toLong()
     }
 }
 

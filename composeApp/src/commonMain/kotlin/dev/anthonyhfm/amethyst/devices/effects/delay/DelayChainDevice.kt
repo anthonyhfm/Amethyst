@@ -98,6 +98,6 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>() {
 @Serializable
 data class DelayChainDeviceState(
     val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
-    val delayMs: Int = 0,
+    val delayMs: Long = 0,
     val gate: Float = 0.5f, // 100% = 0.5f, 200% = 1.0f
 ) : DeviceState()

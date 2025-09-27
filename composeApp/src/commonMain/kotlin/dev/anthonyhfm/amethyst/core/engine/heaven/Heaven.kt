@@ -5,7 +5,6 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.core.util.StopWatch
 import kotlinx.atomicfu.atomic
-
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
@@ -14,6 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToLong
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -37,23 +37,26 @@ object Heaven {
     private val jobsMutex = Mutex()
     private val jobsList = mutableListOf<Pair<Long, MutableList<ScheduledJob>>>()
 
-    @Volatile
-    private var prev: Long = 0L
+    @Volatile private var prev: Long = 0L
+    @Volatile private var lastRender: Long = -1L
+    @Volatile private var renderAt: Long = -1L
 
-    @Volatile
-    private var lastRender: Long = -1L
-
-    @Volatile
-    private var renderAt: Long = -1L
+    // Fester Zeitanker für eine Playback-Session
+    @Volatile private var epochTicks: Long = 0L
 
     private val deviceMutex = Mutex()
-
     var fps: Int = GlobalSettings.perforanceFPS
 
     private val stopWatch = StopWatch()
     private val renderScope = CoroutineScope(Dispatchers.Main.limitedParallelism(1) + SupervisorJob())
+    private val jobIdCounter = atomic(0)
 
-    private fun msToTicks(ms: Double): Long = (ms / 1000 * stopWatch.frequency).toLong()
+    // Präzises Runden statt floor, Overloads für Long/Double
+    private fun msToTicks(ms: Long): Long =
+        ((ms / 1000.0) * stopWatch.frequency).roundToLong()
+
+    private fun msToTicks(ms: Double): Long =
+        (ms / 1000.0 * stopWatch.frequency).roundToLong()
 
     fun midiEnter(signals: List<Signal.LED>) {
         renderScope.launch {
@@ -63,12 +66,36 @@ object Heaven {
         wake()
     }
 
-    private val jobIdCounter = atomic(0)
+    // Start einer Timeline: alle absoluten Startzeiten beziehen sich auf diesen Anker
+    fun beginTimeline() {
+        epochTicks = stopWatch.elapsedTicks()
+        prev = epochTicks
+        wake()
+    }
 
+    // Absolutes Scheduling in ms seit beginTimeline()
+    fun scheduleAt(absoluteStartMs: Long, owner: Any? = null, job: () -> Unit): String {
+        // Fallback: falls jemand vergessen hat, den Anker zu setzen
+        if (epochTicks == 0L) beginTimeline()
+
+        val jobId = "job_${jobIdCounter.incrementAndGet()}_${absoluteStartMs}"
+        val targetTime = epochTicks + msToTicks(absoluteStartMs)
+        val scheduledJob = ScheduledJob(jobId, targetTime, job, owner)
+
+        renderScope.launch {
+            jobQueue.send(scheduledJob)
+            cancel()
+        }
+        wake()
+        return jobId
+    }
+
+    // Relatives Scheduling: besser nicht für ganze Timelines verwenden
     @OptIn(ExperimentalTime::class)
     fun schedule(delayInMs: Double, owner: Any? = null, job: () -> Unit): String {
+        val now = stopWatch.elapsedTicks()
         val jobId = "job_${jobIdCounter.incrementAndGet()}_${Clock.System.now().toEpochMilliseconds()}"
-        val targetTime = prev + msToTicks(delayInMs)
+        val targetTime = now + msToTicks(delayInMs)
         val scheduledJob = ScheduledJob(jobId, targetTime, job, owner)
 
         renderScope.launch {
@@ -82,9 +109,7 @@ object Heaven {
     fun cancelJobs(filter: (ScheduledJob) -> Boolean) {
         renderScope.launch {
             jobsMutex.withLock {
-                jobsList.forEach { (_, jobs) ->
-                    jobs.removeAll(filter)
-                }
+                jobsList.forEach { (_, jobs) -> jobs.removeAll(filter) }
                 jobsList.removeAll { it.second.isEmpty() }
             }
         }
@@ -101,24 +126,24 @@ object Heaven {
     @Volatile private var renderJob: Job? = null
     private val isAwake: Boolean get() = renderJob?.isActive == true
 
+    // Zeit in ms, einfach aus der Uhr, ohne prev manipulieren
     val time: Double
-        get() {
-            if (!isAwake) prev = stopWatch.elapsedTicks() - 1
-            return prev * 1000.0 / stopWatch.frequency
-        }
+        get() = stopWatch.elapsedTicks() * 1000.0 / stopWatch.frequency
 
     private fun wake() {
         if (isAwake) return
 
-        prev = stopWatch.elapsedTicks() - 1
+        prev = stopWatch.elapsedTicks()
 
         renderJob = renderScope.launch {
             try {
                 while (true) {
                     val hasNewJobs = processJobQueue()
 
-                    val hasWork = renderAt >= 0 || hasNewJobs ||
-                            jobsList.isNotEmpty() || !signalQueue.isEmpty
+                    val hasWork = renderAt >= 0 ||
+                            hasNewJobs ||
+                            jobsList.isNotEmpty() ||
+                            !signalQueue.isEmpty
 
                     if (!hasWork) {
                         delay(10)
@@ -128,17 +153,17 @@ object Heaven {
                         }
                     }
 
+                    // Echtzeit lesen
                     prev = stopWatch.elapsedTicks()
 
                     executeReadyJobs(prev)
 
                     val changed = processSignals()
 
+                    // Einfaches Frame-Pacing: mindestens 1000/fps Abstand
                     if (changed && renderAt < 0) {
-                        renderAt = max(
-                            prev + msToTicks(250.0 / fps),
-                            lastRender + msToTicks(1000.0 / fps)
-                        )
+                        val minStep = msToTicks(1000.0 / fps)
+                        renderAt = max(prev, lastRender + minStep)
                     } else if (renderAt in 0..<prev) {
                         Screen.draw()
                         lastRender = prev
@@ -169,7 +194,6 @@ object Heaven {
 
             jobsMutex.withLock {
                 val insertIndex = findInsertPosition(scheduledJob.targetTime)
-
                 if (insertIndex < jobsList.size && jobsList[insertIndex].first == scheduledJob.targetTime) {
                     jobsList[insertIndex].second.add(scheduledJob)
                 } else {
@@ -248,10 +272,12 @@ object Heaven {
                             val posX = signal.x - device.position.value.x.toInt() + device.layout.offsetX
                             val posY = abs(signal.y - 9 - device.position.value.y.toInt()) - device.layout.offsetY
 
-                            midiCalls.add(MidiCall(
-                                device,
-                                signal.copy(x = posX, y = posY)
-                            ))
+                            midiCalls.add(
+                                MidiCall(
+                                    device,
+                                    signal.copy(x = posX, y = posY)
+                                )
+                            )
 
                             changed = true
                         }
@@ -281,20 +307,15 @@ object Heaven {
                 devices.forEach { it.screen.clear() }
             }
 
-            while (!signalQueue.isEmpty) {
-                signalQueue.tryReceive()
-            }
-            while (!jobQueue.isEmpty) {
-                jobQueue.tryReceive()
-            }
+            while (!signalQueue.isEmpty) signalQueue.tryReceive()
+            while (!jobQueue.isEmpty) jobQueue.tryReceive()
 
-            jobsMutex.withLock {
-                jobsList.clear()
-            }
+            jobsMutex.withLock { jobsList.clear() }
 
             prev = 0L
             lastRender = -1L
             renderAt = -1L
+            epochTicks = 0L
 
             cancel()
         }

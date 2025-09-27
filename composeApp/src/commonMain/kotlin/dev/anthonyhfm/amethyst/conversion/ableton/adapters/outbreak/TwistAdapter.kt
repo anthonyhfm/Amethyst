@@ -39,7 +39,7 @@ class TwistAdapter (
                     val isFreeMode = dataObj.freeModeEnabledStates[index] == 1
 
                     val delayMs = if (isFreeMode) {
-                        dataObj.smoothModeValues[index]
+                        dataObj.smoothModeValues[index].toLong()
                     } else {
                         val timingString = twistRateIndexToTiming(
                             when (index) {
@@ -55,7 +55,7 @@ class TwistAdapter (
                             }
                         ) ?: "1/8"
 
-                        rythmIndexToDuration(timingString, bpm, 1).toInt(
+                        rythmIndexToDuration(timingString, bpm, 1).toLong(
                             DurationUnit.MILLISECONDS
                         )
                     }

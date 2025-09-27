@@ -65,9 +65,9 @@ class MidiNoteLengthAdapter(
                     Timing.Duration(timeLength.milliseconds)
                 },
                 delayMs = if (isSync) {
-                    syncedLength.inWholeMilliseconds.toInt()
+                    syncedLength.inWholeMilliseconds
                 } else {
-                    timeLength.toInt()
+                    timeLength.toLong()
                 },
                 gate = gate / 200.0f,
             )

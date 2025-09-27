@@ -22,15 +22,15 @@ class DelayAdapter(
         val bpm = AbletonConverter.bpm
 
         val delayMs = if (dataObj.freeModeEnabled.first().toInt() == 1) {
-            dataObj.rateMs.first().toInt()
+            dataObj.rateMs.first().toLong()
         } else {
             val timingString = delayRateIndexToTiming(dataObj.rateIndex.first().toInt()) ?: "1/8"
-            rythmIndexToDuration(timingString, bpm, 1).inWholeMilliseconds.toInt()
+            rythmIndexToDuration(timingString, bpm, 1).inWholeMilliseconds
         }
 
         return listOf(
             DelayChainDeviceState(
-                timing = Timing.Duration(delayMs.milliseconds),
+                timing = Timing.Duration(delayMs.toLong().milliseconds),
                 delayMs = delayMs,
                 gate = (dataObj.gatePercentage.first().toFloat() / 100.0f) * 0.5f,
             )

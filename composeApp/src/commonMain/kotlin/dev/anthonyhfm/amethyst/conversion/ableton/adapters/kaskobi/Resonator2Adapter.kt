@@ -16,7 +16,8 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.math.roundToInt
+import kotlin.math.roundToLong
+import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -120,7 +121,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(-steps, steps))
                                         )
                                     )
@@ -139,7 +140,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(0, steps))
                                         )
                                     )
@@ -158,7 +159,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(steps, steps))
                                         )
                                     )
@@ -177,7 +178,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(-steps, 0))
                                         )
                                     )
@@ -196,7 +197,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(steps, 0))
                                         )
                                     )
@@ -215,7 +216,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(-steps, -steps))
                                         )
                                     )
@@ -234,7 +235,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(0, -steps))
                                         )
                                     )
@@ -253,7 +254,7 @@ class Resonator2Adapter(
                                             isolate = isolation,
                                             type = CopyChainDeviceState.CopyType.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToInt(),
+                                            delayMs = stepDelayValue.roundToLong(),
                                             offsets = listOf(Pair(steps, -steps))
                                         )
                                     )
@@ -265,7 +266,7 @@ class Resonator2Adapter(
             ),
             HoldChainDeviceState(
                 timing = Timing.Duration(noteLengthValue.milliseconds),
-                delayMs = noteLengthValue.roundToInt(),
+                delayMs = noteLengthValue.roundToLong(),
             ),
             if (gradientEnabled) {
                 if (colorCount > 1) {

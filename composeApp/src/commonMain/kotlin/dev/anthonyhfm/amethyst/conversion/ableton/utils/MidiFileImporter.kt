@@ -13,6 +13,7 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
+import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
@@ -118,12 +119,11 @@ object MidiFileImporter {
 
         var currentTick = 0L
 
-
         fun cloneFrameAfterTickAdvance() {
             val last = frames.last()
             val newEntries = last.entries.map { it.copy() }
             currentFrame = last.copy(
-                timing = Timing.Duration(100.milliseconds), // Platzhalter
+                timing = Timing.Duration(100.milliseconds),
                 entries = newEntries,
                 _internalUuid = UUID.randomUUID()
             )
@@ -134,7 +134,7 @@ object MidiFileImporter {
             val delta = readVarLen()
             if (delta > 0) {
                 currentTick += delta
-                // Vor Delta-End: vorheriges Frame bekommt später seine Dauer (post processing)
+
                 frameTicks.add(currentTick)
                 cloneFrameAfterTickAdvance()
             }
@@ -213,7 +213,7 @@ object MidiFileImporter {
                             when (metaType) {
                                 0x2F -> {
                                     if (length > 0 && requireBytes(length)) offset += length
-                                    offset = trackEnd // stop
+                                    offset = trackEnd
                                 }
                                 0x51 -> {
                                     if (length >= 3 && requireBytes(3)) {
@@ -224,7 +224,6 @@ object MidiFileImporter {
                                             val tempo = (b1 shl 16) or (b2 shl 8) or b3
                                             if (tempo > 0) {
                                                 usPerQuarter = tempo.toLong()
-                                                // Tempo-Wechsel an aktueller Tick-Position registrieren
                                                 tempoChanges.add(currentTick to usPerQuarter)
                                             }
                                         }
@@ -267,11 +266,10 @@ object MidiFileImporter {
                 var tempoIndex = tempoChanges.indexOfLast { it.first <= startTick }
                 if (tempoIndex < 0) tempoIndex = 0
                 while (pos < endTick) {
-                    val (tempoTick, tempoUSPQ) = tempoChanges[tempoIndex]
+                    val (_, tempoUSPQ) = tempoChanges[tempoIndex]
                     val nextTempoTick = if (tempoIndex + 1 < tempoChanges.size) tempoChanges[tempoIndex + 1].first else Long.MAX_VALUE
                     val segmentEnd = minOf(endTick, nextTempoTick)
                     val ticks = segmentEnd - pos
-                    // (ticks * usPerQuarter) / ppq  => Mikrosekunden
                     acc += (ticks * tempoUSPQ) / ppq
                     pos = segmentEnd
                     if (segmentEnd == nextTempoTick && tempoIndex + 1 < tempoChanges.size) tempoIndex++
@@ -286,7 +284,7 @@ object MidiFileImporter {
                 val endTick = frameTicks[i + 1]
                 val intervalUs = intervalMicros(startTick, endTick)
                 cumulativeUs += intervalUs
-                val roundedTotalMs = (cumulativeUs + 500) / 1000 // nearest ms
+                val roundedTotalMs = (cumulativeUs + 500) / 1000
                 val frameMs = (roundedTotalMs - prevRoundedMs).toInt()
                 prevRoundedMs = roundedTotalMs
                 if (frameMs > 0) {
@@ -295,14 +293,13 @@ object MidiFileImporter {
                         _internalUuid = UUID.randomUUID()
                     )
                 } else {
-                    // Null-Dauern vermeiden
                     frames[i] = frames[i].copy(
                         timing = Timing.Duration(1.milliseconds),
                         _internalUuid = UUID.randomUUID()
                     )
                 }
             }
-            // Letztes (placeholder) Frame entfernen falls ohne Notenänderung oder 0 Dauer
+
             if (frames.isNotEmpty()) {
                 val last = frames.last()
                 val penultimate = if (frames.size >= 2) frames[frames.size - 2] else null
@@ -312,6 +309,33 @@ object MidiFileImporter {
                     // Falls behalten: Dauer minimal setzen
                     frames[frames.lastIndex] = last.copy(
                         timing = Timing.Duration(50.milliseconds),
+                        _internalUuid = UUID.randomUUID()
+                    )
+                }
+            }
+
+            val speedFactor = 0.96
+            if (speedFactor != 1.0 && frames.isNotEmpty()) {
+                val durMs = frames.map { f ->
+                    when (val t = f.timing) {
+                        is Timing.Duration -> t.duration.inWholeMilliseconds
+                        is Timing.Rythm -> {
+                            val fraction = t.timing.factor * 4.0
+                            (fraction * (60000.0 / bpm)).roundToLong()
+                        }
+                    }
+                }
+                val cum = LongArray(durMs.size + 1)
+                for (i in durMs.indices) cum[i + 1] = cum[i] + durMs[i]
+
+                val scaledCum = LongArray(cum.size) { i ->
+                    (cum[i] * speedFactor).roundToLong()
+                }
+
+                for (i in durMs.indices) {
+                    val newMs = (scaledCum[i + 1] - scaledCum[i]).coerceAtLeast(0L)
+                    frames[i] = frames[i].copy(
+                        timing = Timing.Duration(newMs.toInt().milliseconds),
                         _internalUuid = UUID.randomUUID()
                     )
                 }
