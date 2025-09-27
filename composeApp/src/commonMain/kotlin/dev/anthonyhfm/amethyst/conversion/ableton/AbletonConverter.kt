@@ -10,6 +10,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayout
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayoutDetector
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.OriginalSimplerPrerenderer
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.util.Palettes
@@ -29,6 +30,8 @@ import kotlinx.coroutines.runBlocking
 object AbletonConverter : AmethystConverter {
     var file: PlatformFile? = null
         private set
+
+    var special = ProjectSpecials()
 
     var bpm: Double = 120.0
         private set
@@ -50,6 +53,30 @@ object AbletonConverter : AmethystConverter {
         val file = Zip.decode(path) // Decompresses the .als GZIP format
         val abletonXml = SimpleXmlParser.parse(file.decodeToString())
         val audioRenderer = OriginalSimplerPrerenderer()
+
+        val layout: AbletonLayout = AbletonLayoutDetector.detectLayout(
+            tracks = abletonXml.querySelector("MidiTrack")
+        )
+
+        when (layout) {
+            is AbletonLayout.Single -> {
+                audioMap = layout.audioTrack?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf()
+            }
+
+            is AbletonLayout.Dual2Light -> {
+                val leftTracks = listOfNotNull(layout.audioLeft, layout.lightsLeft)
+                val rightTracks = listOfNotNull(layout.audioRight, layout.lightsRight)
+
+                audioMap = audioRenderer.decodeAll(leftTracks + rightTracks)
+            }
+
+            is AbletonLayout.Dual4Light -> {
+                val leftTracks = listOfNotNull(layout.audioLeft, layout.lightsLeft, layout.lightsLeftToRight)
+                val rightTracks = listOfNotNull(layout.audioRight, layout.lightsRight, layout.lightsRightToLeft)
+
+                audioMap = audioRenderer.decodeAll(leftTracks + rightTracks)
+            }
+        }
 
         bpm = BPMReader().readBPM(abletonXml)
 
@@ -73,10 +100,6 @@ object AbletonConverter : AmethystConverter {
 
             else -> null
         }
-
-        val layout: AbletonLayout = AbletonLayoutDetector.detectLayout(
-            tracks = abletonXml.querySelector("MidiTrack")
-        )
 
         val lights = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
             StateChain(
@@ -118,14 +141,17 @@ object AbletonConverter : AmethystConverter {
                                 Group(
                                     name = "Right",
                                     stateChain = layout.lightsRight?.let {
-                                        MidiChainReader()
+                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right to Left",
                                     stateChain = layout.lightsRightToLeft?.let {
-                                        MidiChainReader(outputOffset = IntOffset(x = -10, y = 0))
+                                        MidiChainReader(
+                                            offset = IntOffset(x = 10, y = 0),
+                                            outputOffset = IntOffset(x = -10, y = 0)
+                                        )
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 )
@@ -136,16 +162,6 @@ object AbletonConverter : AmethystConverter {
             )
         } else {
             (layout as AbletonLayout.Single).lightsTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
-        }
-
-        if (layout is AbletonLayout.Dual2Light) {
-            audioMap = layout.audioLeft?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf()
-            audioMap = audioMap + (layout.audioRight?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf())
-        } else if (layout is AbletonLayout.Dual4Light) {
-            audioMap = layout.audioLeft?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf()
-            audioMap = audioMap + (layout.audioRight?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf())
-        } else {
-            audioMap = (layout as AbletonLayout.Single).audioTrack?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf()
         }
 
         val samples = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
@@ -193,9 +209,6 @@ object AbletonConverter : AmethystConverter {
         } else {
             (layout as AbletonLayout.Single).audioTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
         }
-
-        audioMap = mapOf() // Clear the map to free memory after conversion is done
-        MxDeviceMidiEffectAdapter.fileHashMap.clear()
 
         return SaveableWorkspaceData(
             title = this.file?.nameWithoutExtension ?: "Ableton Converted Workspace",

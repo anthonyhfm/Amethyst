@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.start
 
-import androidx.compose.runtime.MutableState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter

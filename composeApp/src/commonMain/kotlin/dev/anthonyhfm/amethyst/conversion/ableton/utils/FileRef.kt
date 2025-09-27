@@ -10,7 +10,7 @@ object FileRef {
         val projectPath = AbletonConverter.file!!.parent()!!.path
 
         val relativePathType: Int = refXml.querySelector("RelativePathType")[0].attributes["Value"]?.toInt() ?: -1
-
+        
         when (relativePathType) {
             3 -> {
                 var pathString: String = projectPath

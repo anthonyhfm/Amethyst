@@ -4,13 +4,12 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimpl
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-
-// ...
 
 class OriginalSimplerPrerenderer {
     fun decodeAll(tracksList: List<XmlElement>): Map<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState> {
@@ -38,6 +37,11 @@ class OriginalSimplerPrerenderer {
     private suspend fun decodeAudio(data: OriginalSimplerAdapter.OriginalSimplerData): ClipChainDeviceState =
         withContext(Dispatchers.IO) {
             val audioFile = PlatformFile(data.filePath)
+
+            if (!audioFile.exists()) {
+                return@withContext ClipChainDeviceState()
+            }
+
             val audioSignal = AudioDecoder.decodeAudioData(
                 audioData = audioFile.readBytes(), // siehe Fix 3 unten
                 fileName = audioFile.name,

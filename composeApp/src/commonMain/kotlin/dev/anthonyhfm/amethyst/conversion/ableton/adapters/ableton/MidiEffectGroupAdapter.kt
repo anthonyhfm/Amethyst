@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import androidx.compose.ui.unit.IntOffset
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.readDataBlob
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes
@@ -75,7 +76,7 @@ class MidiEffectGroupAdapter(
                             val minKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 0
                             val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127
 
-                            if (hasChains) {
+                            if (hasChains /*|| AbletonConverter.special.useKaskobiPageSwitcher*/) {
                                 if (maxMacro - minMacro == 0) {
                                     add(
                                         MacroFilterChainDeviceState(
@@ -83,7 +84,7 @@ class MidiEffectGroupAdapter(
                                             value = minMacro,
                                         )
                                     )
-                                } else {
+                                } else if (maxMacro - minMacro != 127) {
                                     add(
                                         GroupChainDeviceState(
                                             groups = (minMacro..maxMacro).map { key ->
@@ -184,9 +185,11 @@ class MidiEffectGroupAdapter(
                                 branch.querySelector("DeviceChain")[0]
                                     .querySelector("Devices")[0]
                                     .children.mapNotNull { child ->
-                                        resolveAdapter(child)
-                                            ?.toDeviceStates()
-                                            ?.firstOrNull()
+                                        resolveAdapter(
+                                            xml = child,
+                                            offset = offset,
+                                            outputOffset = outputOffset
+                                        )?.toDeviceStates()?.firstOrNull()
                                     }
                             )
                         }
@@ -211,7 +214,7 @@ class MidiEffectGroupAdapter(
                                                     devices = listOf(
                                                         CoordinateFilterChainDeviceState(
                                                             filters = listOf(
-                                                                Pair(9, 1 + i)
+                                                                Pair(9 + offset.x, (1 + i) + offset.y)
                                                             )
                                                         ),
                                                         SwitchChainDeviceState(
@@ -237,7 +240,7 @@ class MidiEffectGroupAdapter(
                                                     devices = listOf(
                                                         CoordinateFilterChainDeviceState(
                                                             filters = listOf(
-                                                                Pair(0, 1 + i)
+                                                                Pair(0 + offset.x, (1 + i) + offset.y)
                                                             )
                                                         ),
                                                         SwitchChainDeviceState(

@@ -35,7 +35,7 @@ class OriginalSimplerAdapter(
             val samplePart = player.querySelector("MultiSamplePart").getOrNull(0) ?: return null
             val sampleRef = samplePart.localQuerySelector("SampleRef")[0]
 
-            val filePath: String = FileRef.resolveFileReference(sampleRef.querySelector("FileRef")[0])
+            val filePath: String = FileRef.resolveFileReference(sampleRef.querySelector("FileRef").first())
 
             val sampleStart = samplePart.querySelector("SampleStart")[0].attributes["Value"]?.toLong() ?: 0L
             val sampleEnd = samplePart.querySelector("SampleEnd")[0].attributes["Value"]?.toLong() ?: 0L

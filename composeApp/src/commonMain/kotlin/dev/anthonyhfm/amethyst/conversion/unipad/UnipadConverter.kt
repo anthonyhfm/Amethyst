@@ -16,6 +16,7 @@ import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import kotlinx.coroutines.runBlocking
 
 object UnipadConverter : AmethystConverter {
+    // Accept extra parameter but ignore it for Unipad
     override fun convertToWorkspace(path: String, palettePath: String?): SaveableWorkspaceData {
         val entries = Zip.getEntries(path)
 

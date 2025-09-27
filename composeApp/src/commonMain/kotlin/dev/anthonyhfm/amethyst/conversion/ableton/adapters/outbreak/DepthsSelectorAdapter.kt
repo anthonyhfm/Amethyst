@@ -21,6 +21,6 @@ class DepthsSelectorAdapter(
     @Serializable
     data class DepthsSelectorData(
         @SerialName("live.numbox")
-        val layerField: List<Int>,
+        val layerField: List<Int> = listOf(0),
     )
 }

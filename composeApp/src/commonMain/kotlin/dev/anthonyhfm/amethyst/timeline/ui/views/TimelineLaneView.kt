@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.timeline.ui.views
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -30,10 +32,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
+import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.extension
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
 
@@ -44,6 +50,8 @@ fun TimelineLaneView(scrollState: ScrollState) {
     val zoomLevel by viewModel.zoomLevel.collectAsState()
     val playheadPositionMs by viewModel.playheadPositionMs.collectAsState()
 
+    println("TimelineLaneView: Recomposing with ${tracks.size} tracks, zoomLevel: $zoomLevel")
+
     // Calculate content width based on the longest track
     val maxDurationMs = tracks.maxOfOrNull { track ->
         when (track) {
@@ -53,6 +61,8 @@ fun TimelineLaneView(scrollState: ScrollState) {
     } ?: 10000L // Default minimum width
 
     val contentWidth = (maxDurationMs * zoomLevel + 1000).dp // Add some padding
+
+    println("TimelineLaneView: maxDurationMs: $maxDurationMs, contentWidth: $contentWidth")
 
     Box(
         modifier = Modifier
@@ -65,12 +75,20 @@ fun TimelineLaneView(scrollState: ScrollState) {
         Column(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            tracks.forEach { track ->
+            tracks.forEachIndexed { index, track ->
+                println("TimelineLaneView: Rendering track $index")
                 TimelineLane(
                     track = track,
                     zoomLevel = zoomLevel,
                     contentWidth = contentWidth,
-                    scrollState = scrollState
+                    scrollState = scrollState,
+                    onDropInFile = { file ->
+                        viewModel.addAudioFileToTrack(
+                            trackIndex = index,
+                            file = file,
+                            at = (playheadPositionMs ?: 0L)
+                        )
+                    }
                 )
             }
         }
@@ -113,7 +131,8 @@ fun TimelineLane(
     track: TimelineTrack<*>,
     zoomLevel: Float,
     contentWidth: androidx.compose.ui.unit.Dp,
-    scrollState: ScrollState
+    scrollState: ScrollState,
+    onDropInFile: (file: PlatformFile) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -122,6 +141,18 @@ fun TimelineLane(
             .height(96.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(8.dp)
+            .fileDropTarget(
+                onHover = { isHovering, offset, files ->
+                    // Optional: Handle hover state if needed
+                },
+                onDrop = { files ->
+                    val audioFiles = files.filter { it.extension.lowercase() in AudioDecoder.getSupportedFormats() }
+
+                    if (audioFiles.isNotEmpty()) {
+                        onDropInFile(audioFiles.first())
+                    }
+                }
+            )
             .horizontalScroll(scrollState)
     ) {
         // Content container with proper width
@@ -133,7 +164,9 @@ fun TimelineLane(
             // Render all entries in this track
             when (track) {
                 is AudioTimelineTrack -> {
+                    println("TimelineLane: Rendering AudioTimelineTrack with ${track.entries.size} entries")
                     track.entries.values.forEach { audioEntry ->
+                        println("TimelineLane: Found audio entry: ${audioEntry.fileName}, duration: ${audioEntry.durationMs}ms")
                         AudioClip(
                             audioEntry = audioEntry,
                             zoomLevel = zoomLevel

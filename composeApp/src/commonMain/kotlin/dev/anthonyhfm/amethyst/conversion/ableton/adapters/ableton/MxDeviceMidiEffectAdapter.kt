@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import androidx.compose.ui.unit.IntOffset
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
@@ -14,6 +15,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.InfinityAdap
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.IrisAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.TwistAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -82,13 +84,18 @@ class MxDeviceMidiEffectAdapter(
 
                 "feecaed62c2637a73325446a1ed1e25e",
                 "32b6bec96552a6e40f6743787a20b9df" -> {
-                    return PageSwitcherAdapter(blob.text!!).toDeviceStates()
+                    /*AbletonConverter.special = ProjectSpecials(
+                        useKaskobiPageSwitcher = true
+                    )*/
+
+                    return emptyList()
                 }
 
                 "d8c48c67824319295bb5bf7abda47f27" -> {
                     return Resonator2Adapter(readDataBlob(blob.text!!), xml).toDeviceStates()
                 }
 
+                "031356ce98ba9104607ea3e57c8fd37e",
                 "8b7dc60359dadae0ef6755eddcbe0185",
                 "25a0f03868c45af4d06bcead0a1bc6ce",
                 "494a1455eac528aee9d94055dcdb4463",

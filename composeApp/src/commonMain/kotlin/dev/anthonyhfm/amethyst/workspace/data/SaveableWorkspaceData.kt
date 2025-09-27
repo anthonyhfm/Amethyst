@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.workspace.data
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 @Serializable
 data class SaveableWorkspaceData(
@@ -35,7 +37,8 @@ data class SaveableWorkspaceData(
 }
 
 @Serializable
-data class RecentWorkspace(
+data class RecentWorkspace @OptIn(ExperimentalTime::class) constructor(
     val title: String,
     val path: String,
+    val lastOpened: Long = Clock.System.now().toEpochMilliseconds()
 )
