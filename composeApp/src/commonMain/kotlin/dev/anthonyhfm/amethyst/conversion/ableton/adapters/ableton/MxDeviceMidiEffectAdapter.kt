@@ -1,6 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
-import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
@@ -18,11 +18,12 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.bookmarkData
 import io.github.vinceglb.filekit.nameWithoutExtension
 
 class MxDeviceMidiEffectAdapter(
-    private val xml: XmlElement
+    private val xml: XmlElement,
+    val offset: IntOffset = IntOffset.Zero,
+    val outputOffset: IntOffset = IntOffset.Zero
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val patchSlot = xml.localQuerySelector("PatchSlot")[0]
@@ -99,7 +100,7 @@ class MxDeviceMidiEffectAdapter(
                 "4b74eea1e5ee0db42171418717c02561",
                 "4dd48ac60e858928fff89a28865ce735",
                 "d53dcb292a173ab7853183f3cab7620c"-> {
-                    return GenericMidiExtAdapter(xml).toDeviceStates()
+                    return GenericMidiExtAdapter(xml, offset).toDeviceStates()
                 }
 
                 "9f50358372279f946cae0fdac0cfbf56", // Wormhole Lite, unsure if this actually works!

@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.core.util.Palettes
@@ -12,11 +13,15 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
-import kotlin.math.round
 import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
-    fun loadFile(file: PlatformFile, bpm: Double = 120.0, palette: Array<Triple<Int, Int, Int>> = Palettes.novation): KeyframesChainDeviceContract.KeyframesChainDeviceState {
+    fun loadFile(
+        file: PlatformFile,
+        bpm: Double = 120.0,
+        palette: Array<Triple<Int, Int, Int>> = Palettes.novation,
+        xyOffset: IntOffset = IntOffset.Zero
+    ): KeyframesChainDeviceContract.KeyframesChainDeviceState {
         val data = try {
             runBlocking { file.readBytes() }
         } catch (e: Exception) {
@@ -90,7 +95,6 @@ object MidiFileImporter {
 
         var usPerQuarter = (60000000.0 / bpm).toLong()
 
-        // ---- Prepare frames ----
         val frames = mutableListOf<KeyframesChainDeviceContract.Frame>()
         var currentFrame = KeyframesChainDeviceContract.Frame(
             timing = Timing.Duration(100.milliseconds),
@@ -98,15 +102,12 @@ object MidiFileImporter {
         )
         frames.add(currentFrame)
 
-        // NEU: absolute Tick-Position jedes Frames (Start-Tick). Erstes Frame startet bei 0.
         val frameTicks = mutableListOf<Long>(0L)
 
-        // NEU: Tempo-Änderungen als (Tick, usPerQuarter)
         val tempoChanges = mutableListOf(0L to usPerQuarter)
 
         var runningStatus: Int? = null
 
-        // ---- Read single track ----
         if (!requireBytes(8)) return KeyframesChainDeviceContract.KeyframesChainDeviceState()
         val trackId = readString(4)
         val trackLength = readInt32()
@@ -115,12 +116,9 @@ object MidiFileImporter {
         }
         val trackEnd = offset + trackLength
 
-        // NEU: nur noch absolute Tick-Zeit (kein fehleranfälliges Mikrosekunden-Cycling)
         var currentTick = 0L
 
-        // ENTFERNT: totalMicroseconds / usRemainder / msRemainder / accumulateAndClone()
 
-        // Frame-Klon ohne Dauerberechnung (Dauer wird nachträglich im zweiten Pass gesetzt)
         fun cloneFrameAfterTickAdvance() {
             val last = frames.last()
             val newEntries = last.entries.map { it.copy() }
@@ -170,8 +168,8 @@ object MidiFileImporter {
 
                     if (pitch in 0 until DRUM_RACK_TO_XY.size) {
                         val xy = DRUM_RACK_TO_XY[pitch]
-                        val x = xy % 10
-                        val y = 9 - (xy / 10) // UI expects flipped Y
+                        val x = (xy % 10) + xyOffset.x
+                        val y = (9 - (xy / 10)) + xyOffset.y
 
                         val filtered = currentFrame.entries.filterNot { it.x == x && it.y == y }
                         val updatedEntries =
@@ -259,9 +257,7 @@ object MidiFileImporter {
             }
         }
 
-        // POST-PROCESS: exakte Dauern aus Ticks + Tempo-Segmenten
         if (frames.size > 1) {
-            // Sortieren (Sicherheit)
             tempoChanges.sortBy { it.first }
 
             fun intervalMicros(startTick: Long, endTick: Long): Long {
@@ -322,7 +318,6 @@ object MidiFileImporter {
             }
         }
 
-        // ...existing code (renderAnimation)...
         var renderedAnimation: List<Pair<Int, List<Signal>>> = emptyList()
         KeyframesChainDevice().apply {
             state.update { it.copy(frames = frames) }

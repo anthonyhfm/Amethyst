@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.readDataBlob
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
@@ -16,7 +17,9 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import io.github.vinceglb.filekit.PlatformFile
 
 class DrumGroupDeviceAdapter(
-    private val xml: XmlElement
+    private val xml: XmlElement,
+    val offset: IntOffset = IntOffset.Zero,
+    val outputOffset: IntOffset = IntOffset.Zero
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<XmlElement> = xml.localQuerySelector("Branches").first().children

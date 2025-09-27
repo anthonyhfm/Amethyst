@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.readDataBlob
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes
@@ -20,7 +21,9 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import io.github.vinceglb.filekit.PlatformFile
 
 class MidiEffectGroupAdapter(
-    private val xml: XmlElement
+    private val xml: XmlElement,
+    private val offset: IntOffset = IntOffset.Zero,
+    private val outputOffset: IntOffset = IntOffset.Zero
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<XmlElement> = xml.localQuerySelector("Branches").first().children
@@ -84,7 +87,6 @@ class MidiEffectGroupAdapter(
                                     add(
                                         GroupChainDeviceState(
                                             groups = (minMacro..maxMacro).map { key ->
-
                                                 Group(
                                                     name = "Key $key",
                                                     stateChain = StateChain(
@@ -113,7 +115,7 @@ class MidiEffectGroupAdapter(
                                             val x: Int = xy % 10
                                             val y: Int = xy / 10
 
-                                            Pair(x,  9 - y)
+                                            Pair(x + offset.x,  (9 - y) + offset.y)
                                         }
                                     )
                                 )

@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
@@ -85,30 +86,48 @@ object AbletonConverter : AmethystConverter {
                             listOf(
                                 Group(
                                     name = "Left",
-                                    stateChain = layout.lightsLeft?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.lightsLeft?.let {
+                                        MidiChainReader()
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
-                                    stateChain = layout.lightsRight?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.lightsRight?.let {
+                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 )
                             )
                         } else if (layout is AbletonLayout.Dual4Light) {
                             listOf(
                                 Group(
                                     name = "Left",
-                                    stateChain = layout.lightsLeft?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.lightsLeft?.let {
+                                        MidiChainReader()
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Left to Right",
-                                    stateChain = layout.lightsLeftToRight?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.lightsLeftToRight?.let {
+                                        MidiChainReader(outputOffset = IntOffset(x = 10, y = 0))
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
-                                    stateChain = layout.lightsRight?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.lightsRight?.let {
+                                        MidiChainReader()
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right to Left",
-                                    stateChain = layout.lightsRightToLeft?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.lightsRightToLeft?.let {
+                                        MidiChainReader(outputOffset = IntOffset(x = -10, y = 0))
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 )
                             )
                         } else error("This should never happen")
@@ -126,7 +145,7 @@ object AbletonConverter : AmethystConverter {
             audioMap = layout.audioLeft?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf()
             audioMap = audioMap + (layout.audioRight?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf())
         } else {
-            (layout as AbletonLayout.Single).audioTrack?.let { audioRenderer.decodeAll(listOf(it)) }
+            audioMap = (layout as AbletonLayout.Single).audioTrack?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf()
         }
 
         val samples = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
@@ -137,23 +156,35 @@ object AbletonConverter : AmethystConverter {
                             listOf(
                                 Group(
                                     name = "Left",
-                                    stateChain = layout.audioLeft?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.audioLeft?.let {
+                                        MidiChainReader()
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
-                                    stateChain = layout.audioRight?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.audioRight?.let {
+                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 )
                             )
                         } else if (layout is AbletonLayout.Dual4Light) {
                             listOf(
                                 Group(
                                     name = "Left",
-                                    stateChain = layout.audioLeft?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+                                    stateChain = layout.audioLeft?.let {
+                                        MidiChainReader()
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
-                                    stateChain = layout.audioRight?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
-                                ),
+                                    stateChain = layout.audioRight?.let {
+                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
+                                            .readMidiChain(it)
+                                    } ?: StateChain(emptyList())
+                                )
                             )
                         } else error("This should never happen")
                     )

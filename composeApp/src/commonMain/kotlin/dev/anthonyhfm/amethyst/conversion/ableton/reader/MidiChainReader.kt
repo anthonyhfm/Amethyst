@@ -1,10 +1,15 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.reader
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
-class MidiChainReader {
+class MidiChainReader(
+    offset: IntOffset = IntOffset.Zero,
+    outputOffset: IntOffset = IntOffset.Zero,
+) {
     fun readMidiChain(xmlElement: XmlElement): StateChain {
         val chainDevices = xmlElement.querySelector("DeviceChain")[0]
             .querySelector("DeviceChain")[0]

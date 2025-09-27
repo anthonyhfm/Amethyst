@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
@@ -11,6 +12,7 @@ import io.github.vinceglb.filekit.path
 
 class GenericMidiExtAdapter(
     private val xml: XmlElement,
+    private val offset: IntOffset,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val fileRef = xml.querySelector("MxDFullFileDrop")
@@ -48,7 +50,11 @@ class GenericMidiExtAdapter(
         }
 
         return listOf(
-            MidiFileImporter.loadFile(PlatformFile(filePath), palette = palette)
+            MidiFileImporter.loadFile(
+                file = PlatformFile(filePath),
+                palette = palette,
+                xyOffset = offset
+            )
         )
     }
 }
