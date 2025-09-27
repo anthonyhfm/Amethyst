@@ -16,7 +16,9 @@ class OriginalSimplerPrerenderer {
     fun decodeAll(tracksList: List<XmlElement>): Map<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState> {
         val simplers = tracksList
             .flatMap { it.querySelector("OriginalSimpler") }
-            .map { OriginalSimplerAdapter.getSimplerData(it) }
+            .mapNotNull {
+                OriginalSimplerAdapter.getSimplerData(it)
+            }
 
         val limitedIO = Dispatchers.Default.limitedParallelism(8)
         val gate = Semaphore(8)

@@ -30,10 +30,10 @@ class OriginalSimplerAdapter(
     )
 
     companion object {
-        fun getSimplerData(xml: XmlElement): OriginalSimplerData {
+        fun getSimplerData(xml: XmlElement): OriginalSimplerData? {
             val player = xml.localQuerySelector("Player")[0]
-            val samplePart = player.querySelector("MultiSamplePart").getOrNull(0)
-            val sampleRef = samplePart!!.localQuerySelector("SampleRef")[0]
+            val samplePart = player.querySelector("MultiSamplePart").getOrNull(0) ?: return null
+            val sampleRef = samplePart.localQuerySelector("SampleRef")[0]
 
             val filePath: String = FileRef.resolveFileReference(sampleRef.querySelector("FileRef")[0])
 
