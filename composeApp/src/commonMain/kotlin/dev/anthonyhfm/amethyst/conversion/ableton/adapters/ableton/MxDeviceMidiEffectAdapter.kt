@@ -101,6 +101,7 @@ class MxDeviceMidiEffectAdapter(
                     return GenericMidiExtAdapter(xml).toDeviceStates()
                 }
 
+                "9f50358372279f946cae0fdac0cfbf56", // Wormhole Lite, unsure if this actually works!
                 "3d3de9b05506f279ad6cfe14d26e0084" -> {
                     return WormholeAdapter(readDataBlob(blob.text!!)).toDeviceStates()
                 }
