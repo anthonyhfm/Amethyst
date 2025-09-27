@@ -10,6 +10,10 @@ import kotlinx.cinterop.*
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 actual object AudioDecoder {
 
+    private const val TARGET_SR = 44100.0
+    private const val TARGET_CHANNELS: UInt = 2u
+    private const val TARGET_BITS = 16
+
     private val supportedFormats = listOf("wav", "mp3", "m4a", "aac", "aif", "aiff")
 
     actual suspend fun decodeAudioFile(
@@ -19,7 +23,7 @@ actual object AudioDecoder {
     ): Signal.AudioSignal? = withContext(Dispatchers.Default) {
         try {
             val url = NSURL.fileURLWithPath(filePath)
-            return@withContext decodeFromURL(url, sampleStart, sampleEnd)
+            decodeFromURL(url, sampleStart, sampleEnd)
         } catch (e: Exception) {
             println("Failed to load audio file '$filePath': ${e.message}")
             null
@@ -33,10 +37,16 @@ actual object AudioDecoder {
         sampleEnd: Long?
     ): Signal.AudioSignal? = withContext(Dispatchers.Default) {
         try {
-            val nsData = audioData.usePinned { pinned ->
-                NSData.create(bytes = pinned.addressOf(0), length = audioData.size.toULong())
+            val ext = fileName.substringAfterLast('.', "tmp")
+            val tempPath = NSTemporaryDirectory() + "/amethyst_tmp_${NSUUID().UUIDString}.$ext"
+            audioData.usePinned { pinned ->
+                val nsData = NSData.create(bytes = pinned.addressOf(0), length = audioData.size.toULong())
+                nsData.writeToFile(tempPath, true)
             }
-            return@withContext decodeFromNSData(nsData, fileName, sampleStart, sampleEnd)
+            val url = NSURL.fileURLWithPath(tempPath)
+            val signal = decodeFromURL(url, sampleStart, sampleEnd)
+            NSFileManager.defaultManager.removeItemAtPath(tempPath, null)
+            signal
         } catch (e: Exception) {
             println("Failed to decode audio data for '$fileName': ${e.message}")
             null
@@ -51,161 +61,139 @@ actual object AudioDecoder {
     actual fun getSupportedFormats(): List<String> = supportedFormats.toList()
 
     private fun decodeFromURL(url: NSURL, sampleStart: Long?, sampleEnd: Long?): Signal.AudioSignal? {
-        return try {
-            memScoped {
-                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                val audioFile = AVAudioFile(url, errorPtr.ptr)
-                if (errorPtr.value != null) {
-                    println("Failed to open audio file: ${errorPtr.value?.localizedDescription}")
-                    return null
-                }
-                decodeFromAVAudioFile(audioFile, sampleStart, sampleEnd)
+        memScoped {
+            val err = alloc<ObjCObjectVar<NSError?>>()
+            val avFile = AVAudioFile(url, err.ptr)
+            if (err.value != null || avFile == null) {
+                println("Failed to open audio file: ${err.value?.localizedDescription}")
+                return null
             }
-        } catch (e: Exception) {
-            println("Failed to decode from URL: ${e.message}")
-            null
+            return decodeViaConverter(avFile, sampleStart, sampleEnd)
         }
     }
 
-    private fun decodeFromNSData(data: NSData, fileName: String, sampleStart: Long?, sampleEnd: Long?): Signal.AudioSignal? {
-        return try {
-            val ext = fileName.substringAfterLast('.', "tmp")
-            val tempPath = NSTemporaryDirectory() + "/amethyst_tmp_${NSUUID().UUIDString}.$ext"
-            data.writeToFile(tempPath, true)
-            val url = NSURL.fileURLWithPath(tempPath)
-            val signal = decodeFromURL(url, sampleStart, sampleEnd)
-            NSFileManager.defaultManager.removeItemAtPath(tempPath, null)
-            signal
-        } catch (e: Exception) {
-            println("Failed to decode from NSData via temp file: ${e.message}")
-            null
-        }
-    }
-
-    private fun decodeFromAVAudioFile(
-        audioFile: AVAudioFile,
+    private fun decodeViaConverter(
+        avFile: AVAudioFile,
         sampleStart: Long?,
         sampleEnd: Long?
-    ): Signal.AudioSignal? {
-        return try {
-            val format = audioFile.processingFormat
-            val totalFrames = audioFile.length
+    ): Signal.AudioSignal? = memScoped {
+        try {
+            val inFmt = avFile.processingFormat
+            val inRate = inFmt.sampleRate
+            val inCh = inFmt.channelCount
 
-            memScoped {
-                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                val buffer: AVAudioPCMBuffer = AVAudioPCMBuffer(pCMFormat = format, frameCapacity = totalFrames.toUInt())
-                audioFile.readIntoBuffer(buffer, errorPtr.ptr)
-                if (errorPtr.value != null) {
-                    println("Failed to read audio data: ${errorPtr.value?.localizedDescription}")
-                    return null
-                }
-
-                val frameLength = buffer.frameLength.toLong()
-                val start = (sampleStart ?: 0L).coerceIn(0L, frameLength)
-                val end = (sampleEnd ?: frameLength).coerceIn(0L, frameLength)
-                val effStart = if (start > end) end else start
-                val effEnd = if (end < effStart) effStart else end
-                val framesToCopy = (effEnd - effStart).coerceAtLeast(0L)
-
-                val channelCount = format.channelCount.toInt().coerceAtLeast(1)
-                val isInt16 = format.commonFormat == AVAudioPCMFormatInt16
-                val isFloat32 = format.commonFormat == AVAudioPCMFormatFloat32
-                val interleaved = format.interleaved
-
-                val outBytes = ByteArray((framesToCopy * channelCount * 2).toInt())
-
-                if (framesToCopy == 0L) {
-                    return Signal.AudioSignal(
-                        origin = "AudioDecoder",
-                        rawData = outBytes,
-                        sampleRate = format.sampleRate.toInt(),
-                        channels = channelCount,
-                        bitDepth = 16,
-                        durationMs = 0
-                    )
-                }
-
-                if (isInt16) {
-                    val channelData = buffer.int16ChannelData
-                    if (channelData != null) {
-                        var outIndex = 0
-                        for (frame in effStart until effEnd) {
-                            for (ch in 0 until channelCount) {
-                                val sample = if (interleaved) {
-                                    val basePtr = channelData[0]!!
-                                    basePtr[((frame * channelCount) + ch).toInt()].toInt()
-                                } else {
-                                    val chPtr = channelData[ch]!!
-                                    chPtr[frame.toInt()].toInt()
-                                }
-                                outBytes[outIndex++] = (sample and 0xFF).toByte()
-                                outBytes[outIndex++] = ((sample shr 8) and 0xFF).toByte()
-                            }
-                        }
-                    }
-                } else if (isFloat32) {
-                    val channelData = buffer.floatChannelData
-                    if (channelData != null) {
-                        var outIndex = 0
-                        for (frame in effStart until effEnd) {
-                            for (ch in 0 until channelCount) {
-                                val fSample = if (interleaved) {
-                                    val basePtr = channelData[0]!!
-                                    basePtr[((frame * channelCount) + ch).toInt()]
-                                } else {
-                                    val chPtr = channelData[ch]!!
-                                    chPtr[frame.toInt()]
-                                }
-                                val clamped = fSample.coerceIn(-1f, 1f)
-                                val sample = (clamped * 32767f).toInt().coerceIn(-32768, 32767)
-                                outBytes[outIndex++] = (sample and 0xFF).toByte()
-                                outBytes[outIndex++] = ((sample shr 8) and 0xFF).toByte()
-                            }
-                        }
-                    }
-                } else {
-                    val channelData = buffer.int16ChannelData
-                    if (channelData != null) {
-                        var outIndex = 0
-                        for (frame in effStart until effEnd) {
-                            for (ch in 0 until channelCount) {
-                                val sample = if (interleaved) {
-                                    val basePtr = channelData[0]!!
-                                    basePtr[((frame * channelCount) + ch).toInt()].toInt()
-                                } else {
-                                    val chPtr = channelData[ch]!!
-                                    chPtr[frame.toInt()].toInt()
-                                }
-                                outBytes[outIndex++] = (sample and 0xFF).toByte()
-                                outBytes[outIndex++] = ((sample shr 8) and 0xFF).toByte()
-                            }
-                        }
-                    } else {
-                        println("Unsupported commonFormat -> returning empty")
-                        return Signal.AudioSignal(
-                            origin = "AudioDecoder",
-                            rawData = ByteArray(0),
-                            sampleRate = format.sampleRate.toInt(),
-                            channels = channelCount,
-                            bitDepth = 16,
-                            durationMs = 0
-                        )
-                    }
-                }
-
-                val durationMs = if (format.sampleRate > 0.0) ((framesToCopy * 1000.0) / format.sampleRate).toLong() else 0L
-
-                Signal.AudioSignal(
-                    origin = "AudioDecoder",
-                    rawData = outBytes,
-                    sampleRate = format.sampleRate.toInt(),
-                    channels = channelCount,
-                    bitDepth = 16,
-                    durationMs = durationMs
-                )
+            val outFmt = AVAudioFormat(
+                commonFormat = AVAudioPCMFormatInt16,
+                sampleRate = TARGET_SR,
+                channels = TARGET_CHANNELS,
+                interleaved = true
+            ) ?: run {
+                println("Failed to create target AVAudioFormat")
+                return null
             }
+
+            val converter = AVAudioConverter(fromFormat = inFmt, toFormat = outFmt)
+            if (converter == null) {
+                println("Failed to create AVAudioConverter")
+                return null
+            }
+
+            val totalFrames: Long = avFile.length
+            val start = (sampleStart ?: 0L).coerceAtLeast(0L).let { if (totalFrames > 0) it.coerceAtMost(totalFrames) else it }
+            val end = (sampleEnd ?: totalFrames.takeIf { it > 0 } ?: Long.MAX_VALUE)
+                .coerceAtLeast(0L)
+                .let { if (totalFrames > 0) it.coerceAtMost(totalFrames) else it }
+
+            if (start > 0) avFile.framePosition = start
+
+            val inChunkFrames: UInt = 4096u
+            val ratio = if (inRate > 0.0) TARGET_SR / inRate else 1.0
+            val outChunkFrames: UInt = maxOf(1024u, (inChunkFrames.toDouble() * ratio).toUInt())
+
+            val inBuf = AVAudioPCMBuffer(pCMFormat = inFmt, frameCapacity = inChunkFrames)
+            val outBuf = AVAudioPCMBuffer(pCMFormat = outFmt, frameCapacity = outChunkFrames)
+            if (inBuf == null || outBuf == null) {
+                println("Failed to allocate AVAudioPCMBuffer")
+                return null
+            }
+
+            val outChunks = ArrayList<ByteArray>()
+            var framesLeft = if (end == Long.MAX_VALUE || end <= start) Long.MAX_VALUE else (end - start)
+            val errIn = alloc<ObjCObjectVar<NSError?>>()
+            val errConv = alloc<ObjCObjectVar<NSError?>>()
+
+            loop@ while (true) {
+                val wantIn = if (framesLeft == Long.MAX_VALUE) inChunkFrames.toLong()
+                else minOf(framesLeft, inChunkFrames.toLong())
+                if (wantIn <= 0) break
+
+                val framesToRead = wantIn.toUInt()
+                val okRead = avFile.readIntoBuffer(inBuf, frameCount = framesToRead, error = errIn.ptr)
+                if (!okRead) {
+                    val e = errIn.value
+                    if (e != null) println("Read error: ${e.localizedDescription}")
+                }
+                val gotIn = inBuf.frameLength.toLong()
+                if (gotIn <= 0) break // EOF
+
+                outBuf.frameLength = 0u
+                val okConv = converter.convertToBuffer(outBuf, fromBuffer = inBuf, error = errConv.ptr)
+                if (!okConv) {
+                    val e = errConv.value
+                    if (e != null) println("Convert error: ${e.localizedDescription}")
+                }
+
+                val produced = outBuf.frameLength.toLong()
+                if (produced > 0) {
+                    val bytes = (produced * TARGET_CHANNELS.toLong() * 2L).toInt()
+                    val outBA = ByteArray(bytes)
+                    val basePtr = outBuf.int16ChannelData?.get(0) ?: run {
+                        var idx = 0
+                        for (f in 0 until produced) {
+                            for (c in 0 until TARGET_CHANNELS.toInt()) {
+                                outBA[idx++] = 0
+                                outBA[idx++] = 0
+                            }
+                        }
+                        outChunks.add(outBA)
+                        inBuf.frameLength = 0u
+                        continue@loop
+                    }
+                    val bytePtr = basePtr.reinterpret<ByteVar>()
+                    outBA.usePinned { pinned ->
+                        platform.posix.memcpy(pinned.addressOf(0), bytePtr, bytes.convert())
+                    }
+                    outChunks.add(outBA)
+                }
+
+                if (framesLeft != Long.MAX_VALUE) framesLeft -= gotIn
+                inBuf.frameLength = 0u
+
+                if (framesLeft <= 0L) break
+            }
+
+            val totalBytes = outChunks.sumOf { it.size }
+            val outAll = ByteArray(totalBytes)
+            var pos = 0
+            for (chunk in outChunks) {
+                chunk.copyInto(outAll, destinationOffset = pos)
+                pos += chunk.size
+            }
+
+            val bytesPerFrame = TARGET_CHANNELS.toInt() * 2
+            val frames = if (bytesPerFrame > 0) outAll.size / bytesPerFrame else 0
+            val durMs = if (TARGET_SR > 0.0) ((frames.toDouble() * 1000.0) / TARGET_SR).toLong() else 0L
+
+            Signal.AudioSignal(
+                origin = "AudioDecoder.iOS",
+                rawData = outAll,
+                sampleRate = TARGET_SR.toInt(),
+                channels = TARGET_CHANNELS.toInt(),
+                bitDepth = TARGET_BITS,
+                durationMs = durMs
+            )
         } catch (e: Exception) {
-            println("Failed to decode AVAudioFile: ${e.message}")
+            println("Failed to decode with converter: ${e.message}")
             null
         }
     }
