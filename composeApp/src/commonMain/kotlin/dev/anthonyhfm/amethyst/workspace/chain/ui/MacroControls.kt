@@ -139,7 +139,7 @@ fun MacroList() {
                 headline = "Macro ${index + 1}",
                 text = macro.value.toString(),
                 steps = IntArray(128) { it }.toList(),
-                value = 0,
+                value = macro.value,
                 onResolveTextValue = {
                     val valueText = it.trim().toIntOrNull()
 
