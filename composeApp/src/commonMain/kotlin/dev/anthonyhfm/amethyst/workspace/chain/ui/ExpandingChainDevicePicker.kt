@@ -1,4 +1,3 @@
-
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -48,6 +47,8 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain.Companion.pack
 
 @Composable
 fun ExpandingChainDevicePicker(
+    // Identify the destination chain of this drop zone to prevent self-drops
+    destinationChain: Chain,
     dragAndDropState: DragAndDropState<GenericChainDevice<*>> = rememberDragAndDropState(),
     expanded: Boolean = false,
     forceOff: Boolean = false,
@@ -80,30 +81,44 @@ fun ExpandingChainDevicePicker(
                 state = dragAndDropState,
                 key = remember { UUID.randomUUID() },
                 onDrop = { state ->
+                    val dragged = state.data
+
+                    // Prevent dropping a group-like device into its own chain or any of its subchains
+                    if (isDroppingIntoSelf(dragged, destinationChain)) {
+                        return@dropTarget
+                    }
+
                     val device = StateChain.unpackDevice(
-                        if (state.data.state.value is GroupChainDeviceState) {
-                            (state.data as GroupChainDevice).packState()
-                        } else if (state.data.state.value is MultiGroupChainDeviceState) {
-                            (state.data as MultiGroupChainDevice).packState()
-                        } else if (state.data.state.value is ChokeChainDeviceState) {
-                            (state.data as ChokeChainDevice).state.value.copy(
-                                stateChain = pack((state.data as ChokeChainDevice).state.value.chain)
+                        when (dragged.state.value) {
+                            is GroupChainDeviceState -> (dragged as GroupChainDevice).packState()
+                            is MultiGroupChainDeviceState -> (dragged as MultiGroupChainDevice).packState()
+                            is ChokeChainDeviceState -> (dragged as ChokeChainDevice).state.value.copy(
+                                stateChain = pack((dragged as ChokeChainDevice).state.value.chain)
                             )
-                        } else {
-                            state.data.state.value
+                            else -> dragged.state.value
                         }
                     )
 
-                    var originChain: Chain?
-                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
-                        originChain = WorkspaceRepository.samplingChain.findDeviceChain(state.data.selectionUUID)
-                        WorkspaceRepository.samplingChain.remove(state.data.selectionUUID, false)
+                    println("State: ${'$'}{dragged.state.value}")
+
+                    val originChain: Chain = if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                        val oc = WorkspaceRepository.samplingChain.findDeviceChain(dragged.selectionUUID) ?: return@dropTarget
+                        WorkspaceRepository.samplingChain.remove(dragged.selectionUUID, false)
+                        oc
                     } else {
-                        originChain = WorkspaceRepository.lightsChain.findDeviceChain(state.data.selectionUUID)
-                        WorkspaceRepository.lightsChain.remove(state.data.selectionUUID, false)
+                        val oc = WorkspaceRepository.lightsChain.findDeviceChain(dragged.selectionUUID) ?: return@dropTarget
+                        WorkspaceRepository.lightsChain.remove(dragged.selectionUUID, false)
+                        oc
                     }
 
-                    onDropDevice(device, Pair(originChain!!.devices.value.indexOfFirst { it.selectionUUID == state.data.selectionUUID }, state.data.selectionUUID), originChain)
+                    onDropDevice(
+                        device,
+                        Pair(
+                            originChain.devices.value.indexOfFirst { it.selectionUUID == dragged.selectionUUID },
+                            dragged.selectionUUID
+                        ),
+                        originChain
+                    )
                 }
             ),
 
@@ -140,4 +155,28 @@ fun ExpandingChainDevicePicker(
             }
         }
     }
+}
+
+private fun isDroppingIntoSelf(
+    dragged: GenericChainDevice<*>,
+    destinationChain: Chain
+): Boolean {
+    return when (dragged) {
+        is GroupChainDevice -> dragged.state.value.groups.any { it.chain.containsChain(destinationChain) }
+        is MultiGroupChainDevice -> dragged.state.value.groups.any { it.chain.containsChain(destinationChain) }
+        is ChokeChainDevice -> dragged.state.value.chain.containsChain(destinationChain)
+        else -> false
+    }
+}
+
+private fun Chain.containsChain(target: Chain): Boolean {
+    if (this === target) return true
+    for (device in this.devices.value) {
+        when (device) {
+            is GroupChainDevice -> if (device.state.value.groups.any { it.chain.containsChain(target) }) return true
+            is MultiGroupChainDevice -> if (device.state.value.groups.any { it.chain.containsChain(target) }) return true
+            is ChokeChainDevice -> if (device.state.value.chain.containsChain(target)) return true
+        }
+    }
+    return false
 }

@@ -420,6 +420,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
 
         if (devices.isEmpty()) {
             ExpandingChainDevicePicker(
+                destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                 dragAndDropState = dragAndDropState,
                 expanded = true,
                 expandedWidth = 100.dp,
@@ -454,6 +455,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ExpandingChainDevicePicker(
+                    destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                     dragAndDropState = dragAndDropState,
                     onAddComponent = {
                         groupsState.groups[groupsState.openedGroupIndex].chain.add(it, 0)
@@ -524,6 +526,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                     }
 
                     ExpandingChainDevicePicker(
+                        destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                         dragAndDropState = dragAndDropState,
                         onAddComponent = {
                             groupsState.groups[groupsState.openedGroupIndex].chain.add(it, index + 1)

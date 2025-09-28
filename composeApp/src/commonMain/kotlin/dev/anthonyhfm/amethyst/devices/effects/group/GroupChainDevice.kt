@@ -331,6 +331,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
 
         if (devices.isEmpty()) {
             ExpandingChainDevicePicker(
+                destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                 dragAndDropState = dragAndDropState,
                 expanded = true,
                 expandedWidth = 100.dp,
@@ -365,6 +366,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ExpandingChainDevicePicker(
+                    destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                     dragAndDropState = dragAndDropState,
                     onAddComponent = {
                         groupsState.groups[groupsState.openedGroupIndex].chain.add(it, 0)
@@ -435,6 +437,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                     }
 
                     ExpandingChainDevicePicker(
+                        destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                         dragAndDropState = dragAndDropState,
                         onAddComponent = {
                             groupsState.groups[groupsState.openedGroupIndex].chain.add(it, index + 1)

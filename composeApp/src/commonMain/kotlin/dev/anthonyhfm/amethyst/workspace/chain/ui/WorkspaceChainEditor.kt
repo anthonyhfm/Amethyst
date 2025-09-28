@@ -85,6 +85,10 @@ fun WorkspaceChainEditor(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         ExpandingChainDevicePicker(
+                            destinationChain = when (WorkspaceRepository.mode.value) {
+                                is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                else -> WorkspaceRepository.lightsChain
+                            },
                             dragAndDropState = dragAndDropState,
                             expanded = false,
                             onAddComponent = {
@@ -158,6 +162,10 @@ fun WorkspaceChainEditor(
                                 }
 
                                 ExpandingChainDevicePicker(
+                                    destinationChain = when (WorkspaceRepository.mode.value) {
+                                        is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                        else -> WorkspaceRepository.lightsChain
+                                    },
                                     dragAndDropState = dragAndDropState,
                                     expanded = index == devices.lastIndex,
                                     onAddComponent = {
@@ -185,6 +193,10 @@ fun WorkspaceChainEditor(
                 }
             } else {
                 ExpandingChainDevicePicker(
+                    destinationChain = when (WorkspaceRepository.mode.value) {
+                        is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                        else -> WorkspaceRepository.lightsChain
+                    },
                     dragAndDropState = dragAndDropState,
                     expanded = true,
                     onAddComponent = {
