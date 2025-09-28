@@ -21,7 +21,7 @@ class MultiAdapter(
             ignoreUnknownKeys = true
         }.decodeFromString(blob.decodeToString())
 
-        val branches = containerXml.localQuerySelector("Branches").let {
+        var branches = containerXml.localQuerySelector("Branches").let {
             if (it.isNotEmpty()) {
                 it.first().children
             } else {
@@ -32,6 +32,24 @@ class MultiAdapter(
         if (branches.isEmpty()) {
             println("No branches found in Multi container!")
             return listOf()
+        }
+
+        if (containerXml.name == "MidiEffectGroupDevice" || containerXml.name == "InstrumentGroupDevice") {
+            // check each chain for range of notes, if it's bigger than 1, duplicate the chain for each note
+            branches = branches.map { branch ->
+                val zoneSettings = branch.localQuerySelector("ZoneSettings")[0]
+                val minKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 127
+                val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127
+
+                if (maxKey > minKey) {
+                    // duplicate chain for each note
+                    List(maxKey - minKey + 1) { note ->
+                        branch.copy()
+                    }
+                } else {
+                    listOf(branch)
+                }
+            }.flatten()
         }
 
         val steps = dataObj.steps.first().toInt()
