@@ -1,7 +1,15 @@
 package dev.anthonyhfm.amethyst.devices.audio.clip
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.Icon
@@ -13,6 +21,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
@@ -20,6 +30,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -36,7 +47,6 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
 
     @Composable
     override fun Content() {
-        val scope = rememberCoroutineScope()
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
@@ -45,79 +55,120 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(200.dp)
+                .width(
+                    width = if (deviceState.isLoaded) {
+                        500.dp
+                    } else {
+                        200.dp
+                    }
+                )
         ) {
-            IconButton(
-                onClick = {
-                    scope.launch {
-                        val file = FileKit.openFilePicker(
-                            mode = FileKitMode.Single,
-                            title = "Select Audio File",
-                            type = FileKitType.File(
-                                extensions = AudioDecoder.getSupportedFormats()
-                            )
+            if (deviceState.isLoaded) {
+                AudioView()
+            } else {
+                EmptyDeviceView()
+            }
+        }
+    }
+
+    @Composable
+    private fun AudioView() {
+        val deviceState by state.collectAsState()
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Red)
+            ) {
+                WaveformView(
+                    signal = Signal.AudioSignal(
+                        origin = this,
+                        rawData = deviceState.rawData,
+                        sampleRate = deviceState.sampleRate,
+                        channels = deviceState.channels,
+                        bitDepth = deviceState.bitDepth
+                    ),
+                    modifier = Modifier
+                        .fillMaxSize()
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .height(80.dp)
+                    .fillMaxWidth()
+            ) {
+
+            }
+        }
+    }
+
+    @Composable
+    private fun EmptyDeviceView() {
+        val scope = rememberCoroutineScope()
+        val deviceState by state.collectAsState()
+
+        IconButton(
+            onClick = {
+                scope.launch {
+                    val file = FileKit.openFilePicker(
+                        mode = FileKitMode.Single,
+                        title = "Select Audio File",
+                        type = FileKitType.File(
+                            extensions = AudioDecoder.getSupportedFormats()
                         )
+                    )
 
-                        file?.let { selectedFile ->
-                            try {
-                                // Decode audio file using new AudioDecoder
-                                val audioSignal = AudioDecoder.decodeAudioData(
-                                    audioData = selectedFile.readBytes(),
-                                    fileName = selectedFile.name
-                                )
+                    file?.let { selectedFile ->
+                        try {
+                            // Decode audio file using new AudioDecoder
+                            val audioSignal = AudioDecoder.decodeAudioData(
+                                audioData = selectedFile.readBytes(),
+                                fileName = selectedFile.name
+                            )
 
-                                audioSignal?.let { signal ->
-                                    state.update { currentState ->
-                                        currentState.copy(
-                                            fileName = selectedFile.name,
-                                            rawData = signal.rawData,
-                                            sampleRate = signal.sampleRate,
-                                            channels = signal.channels,
-                                            bitDepth = signal.bitDepth,
-                                            isLoaded = true
-                                        )
-                                    }
-                                    println("Audio loaded successfully: ${selectedFile.name}")
-                                } ?: run {
-                                    println("Failed to decode audio file: ${selectedFile.name}")
-                                    state.update { currentState ->
-                                        currentState.copy(
-                                            fileName = "Failed to load",
-                                            isLoaded = false
-                                        )
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                println("Error loading audio file: ${e.message}")
+                            audioSignal?.let { signal ->
                                 state.update { currentState ->
                                     currentState.copy(
-                                        fileName = "Error loading file",
+                                        fileName = selectedFile.name,
+                                        rawData = signal.rawData,
+                                        sampleRate = signal.sampleRate,
+                                        channels = signal.channels,
+                                        bitDepth = signal.bitDepth,
+                                        isLoaded = true
+                                    )
+                                }
+                                println("Audio loaded successfully: ${selectedFile.name}")
+                            } ?: run {
+                                println("Failed to decode audio file: ${selectedFile.name}")
+                                state.update { currentState ->
+                                    currentState.copy(
+                                        fileName = "Failed to load",
                                         isLoaded = false
                                     )
                                 }
                             }
+                        } catch (e: Exception) {
+                            println("Error loading audio file: ${e.message}")
+                            state.update { currentState ->
+                                currentState.copy(
+                                    fileName = "Error loading file",
+                                    isLoaded = false
+                                )
+                            }
                         }
                     }
                 }
-            ) {
-                Icon(Icons.Default.FileOpen, null)
             }
-
-            if (!deviceState.isLoaded) {
-                Text(
-                    text = if (deviceState.fileName.isEmpty()) "Please select an audio file" else deviceState.fileName,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(vertical = 6.dp)
-                )
-            } else {
-                Text(
-                    text = deviceState.fileName,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(vertical = 6.dp)
-                )
-            }
+        ) {
+            Icon(Icons.Default.FileOpen, null)
         }
     }
 
@@ -153,29 +204,4 @@ data class ClipChainDeviceState(
     val channels: Int = 2,
     val bitDepth: Int = 16,
     val isLoaded: Boolean = false
-) : DeviceState() {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is ClipChainDeviceState) return false
-        if (fileName != other.fileName) return false
-        if (rawData != null) {
-            if (other.rawData == null) return false
-            if (!rawData.contentEquals(other.rawData)) return false
-        } else if (other.rawData != null) return false
-        if (sampleRate != other.sampleRate) return false
-        if (channels != other.channels) return false
-        if (bitDepth != other.bitDepth) return false
-        if (isLoaded != other.isLoaded) return false
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = fileName.hashCode()
-        result = 31 * result + (rawData?.contentHashCode() ?: 0)
-        result = 31 * result + sampleRate
-        result = 31 * result + channels
-        result = 31 * result + bitDepth
-        result = 31 * result + isLoaded.hashCode()
-        return result
-    }
-}
+) : DeviceState()

@@ -27,7 +27,7 @@ sealed interface Signal {
 
     data class AudioSignal(
         override val origin: Any?,
-        val rawData: ByteArray? = null,  // Raw audio data (PCM samples) - das einzige was zählt
+        val rawData: ByteArray? = null,
         val sampleRate: Int = 44100,
         val channels: Int = 2,
         val bitDepth: Int = 16,
