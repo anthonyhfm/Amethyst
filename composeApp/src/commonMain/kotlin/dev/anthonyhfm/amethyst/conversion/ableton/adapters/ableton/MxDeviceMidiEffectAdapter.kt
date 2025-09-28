@@ -55,6 +55,13 @@ class MxDeviceMidiEffectAdapter(
 
         try {
             when (hash) {
+                "bd5d1649fed009d5399a9e8e84a0b036",
+                "1e55e95bbcbd08f6f6739b235b5da30b",
+                "cc9e206793622e0a03041c05ec7ed8ca",
+                "306012649f1a5eca6e6b4e5dca3f6159",
+                "a6d42dc12c6529eb4ff4be9f6a0cef71",
+                "fe1b005361b8f099ca487aae25cc16d6",
+                "fe575828d488675752a087c80401af63",
                 "e8726f6b3088125c4c6aaff083b1730b",
                 "9a7f0ac3bc4d354c2a560427b6093f87"-> {
                     return TwistAdapter(readDataBlob(blob.text!!)).toDeviceStates()
@@ -65,10 +72,18 @@ class MxDeviceMidiEffectAdapter(
                     return DelayAdapter(readDataBlob(blob.text!!)).toDeviceStates()
                 }
 
+                "4ca220e9b84d740854eb8e1b00843265",
+                "1140e1f12d76876e36441b17f9b0f189",
+                "8f88406409ddaf7dd8413e1b5e01f859",
+                "e15e0b9e248adfeeb57d7f9c54a978d8",
+                "dfb2c1c6968c8547b26efd31c69dd555",
+                "620a46951d419c62150da25467ec044b",
                 "811c3c410fce75959c8ab17220186701" -> {
                     return FlipAdapter(readDataBlob(blob.text!!)).toDeviceStates()
                 }
 
+                "4ab1f1c29a3ac9e447756a9d075c2a6b",
+                "4feeb78db6367007b1badf8f9d2c1cae",
                 "bcfb325a212a70bdd0acdbf740114389",
                 "a591e409a908e4bd1898152222cc8336"-> {
                     return IrisAdapter(readDataBlob(blob.text!!)).toDeviceStates()
@@ -83,6 +98,9 @@ class MxDeviceMidiEffectAdapter(
                     return DepthsMixerAdapter(readDataBlob(blob.text!!), offset).toDeviceStates()
                 }
 
+                "07b41f57975c3f6b65b37be548c23377",
+                "db42168ef06e75ab599a30570c565b20",
+                "5ef8dd91805de9f50000565f21d1485c",
                 "4daa43e6e4704693794cb14a33cc00fa" -> {
                     return InfinityAdapter().toDeviceStates()
                 }
@@ -100,6 +118,9 @@ class MxDeviceMidiEffectAdapter(
                     return Resonator2Adapter(readDataBlob(blob.text!!), xml).toDeviceStates()
                 }
 
+                "8131f56b0fed3013999374d7e27b0ae0",
+                "433a3efd3c017d799519fc80ec31a53d",
+                "e10191145ac3fcc5c9de4bc5e6997764",
                 "7295b9ab0878170b1080e2a89feed177",
                 "7aed2a19a3776486492e9abc1307d8ba",
                 "031356ce98ba9104607ea3e57c8fd37e",
