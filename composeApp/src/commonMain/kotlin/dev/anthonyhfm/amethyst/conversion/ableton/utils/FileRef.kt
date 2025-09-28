@@ -47,7 +47,7 @@ object FileRef {
                     .attributes["Dir"]
 
                 if (PlatformFile(projectPath).list().firstOrNull { it.name == parent }?.exists() ?: false) {
-                    return "$projectPath/$parent/${refXml.querySelector("Name").getOrNull(1)?.attributes?.get("Value") ?: refXml.querySelector("Name").getOrNull(0)?.attributes?.get("Value")}"
+                    return "$projectPath/$parent/${refXml.querySelector("Name").getOrNull(0)?.attributes?.get("Value")}"
                 }
             }
 

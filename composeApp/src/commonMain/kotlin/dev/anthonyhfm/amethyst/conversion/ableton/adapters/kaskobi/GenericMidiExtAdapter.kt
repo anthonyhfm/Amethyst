@@ -17,15 +17,13 @@ class GenericMidiExtAdapter(
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val fileRef = xml.querySelector("MxDFullFileDrop")
+            .first()
+            .querySelector("FileRef")
+            .firstOrNull() ?: return emptyList()
 
-        if (fileRef.isEmpty()) {
-            return emptyList()
-        }
-
-        val projectPath = AbletonConverter.file!!.parent()!!.path
         val palette = AbletonConverter.palette
 
-        val filePath: String = FileRef.resolveFileReference(fileRef.first())
+        val filePath: String = FileRef.resolveFileReference(fileRef)
 
         return listOf(
             MidiFileImporter.loadFile(
