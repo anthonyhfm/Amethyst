@@ -94,10 +94,6 @@ class MxDeviceMidiEffectAdapter(
                     return DepthsSelectorAdapter(readDataBlob(blob.text!!), offset).toDeviceStates()
                 }
 
-                "11d58c1fb5d3ba0593e905ee8940652c" -> { // Special Handling for Dual covers only
-                    return DepthsMixerAdapter(readDataBlob(blob.text!!), offset).toDeviceStates()
-                }
-
                 "07b41f57975c3f6b65b37be548c23377",
                 "db42168ef06e75ab599a30570c565b20",
                 "5ef8dd91805de9f50000565f21d1485c",

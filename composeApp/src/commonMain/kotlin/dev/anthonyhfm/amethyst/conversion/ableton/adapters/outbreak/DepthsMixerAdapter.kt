@@ -17,6 +17,8 @@ class DepthsMixerAdapter(
         if (AbletonConverter.projectLayout is AbletonLayout.Dual2Light) {
             val data = Json.decodeFromString<DepthsMixerData>(blob.decodeToString())
 
+            println("Found mixer with channel ${data.channel[0]} at offset $offset")
+
             mixerReceivers[data.channel[0]] = offset
         }
 

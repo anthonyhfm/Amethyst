@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.reader.BPMReader
 import dev.anthonyhfm.amethyst.conversion.ableton.reader.MidiChainReader
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayout
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayoutDetector
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.Dual2LightLayoutScanner
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.OriginalSimplerPrerenderer
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
@@ -104,6 +105,11 @@ object AbletonConverter : AmethystConverter {
             minorVersion.startsWith("12") -> LiveVersion.LIVE_12
 
             else -> null
+        }
+
+        if (layout is AbletonLayout.Dual2Light) {
+            layout.lightsLeft?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, IntOffset.Zero) }
+            layout.lightsRight?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, IntOffset(x = 10, y = 0)) }
         }
 
         val lights = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
