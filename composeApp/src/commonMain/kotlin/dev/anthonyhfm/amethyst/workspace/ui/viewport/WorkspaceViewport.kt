@@ -1,6 +1,12 @@
 package dev.anthonyhfm.amethyst.workspace.ui.viewport
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -12,9 +18,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,14 +30,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.shadow.DropShadowPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -56,6 +62,22 @@ fun WorkspaceViewport(
     val color = MaterialTheme.colorScheme.onSurface.copy(0.2f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
     val selections by SelectionManager.selections.collectAsState()
+
+    LaunchedEffect(elements.size, viewportSize.value) {
+        if (viewportSize.value.width <= 0f || viewportSize.value.height <= 0f) return@LaunchedEffect
+
+        val launchpads = elements.filterIsInstance<LaunchpadViewportElement>()
+        if (launchpads.isNotEmpty()) {
+            ViewportController.centerLaunchpads(
+                viewportOffset = viewportState.offset,
+                viewportZoom = viewportState.zoom,
+                elements = launchpads,
+                viewportSize = viewportSize.value,
+                gridSize = gridSize,
+                onEvent = onEvent
+            )
+        }
+    }
 
     Box(
         modifier = modifier
@@ -90,7 +112,7 @@ fun WorkspaceViewport(
                 .fillMaxSize()
                 .pointerInput("pan") {
                     detectDragGestures(
-                        onDrag = { input, offset ->
+                        onDrag = { _, offset ->
                             onEvent(WorkspaceContract.Event.OnPanViewport(offset))
                         }
                     )
@@ -125,7 +147,7 @@ fun WorkspaceViewport(
             }
         }
 
-        elements.forEachIndexed { index, element ->
+        elements.forEach { element ->
             Box(
                 modifier = Modifier
                     .size(
@@ -248,6 +270,41 @@ fun WorkspaceViewport(
                 }
 
                 element.Content()
+            }
+        }
+
+        val originSizeDp = 48.dp
+        // center pixel of grid (0,0) in viewport coordinates
+        val centerPxX = viewportState.offset.x
+        val centerPxY = viewportState.offset.y
+
+        // Convert dp -> px using the same density used for grid (computed earlier)
+        val originSizePx = (originSizeDp.value * density)
+        val offsetX = (centerPxX - originSizePx / 2f).roundToInt()
+        val offsetY = (centerPxY - originSizePx / 2f).roundToInt()
+
+        AnimatedVisibility(
+            visible = WorkspaceRepository.mode.collectAsState().value is WorkspaceContract.WorkspaceMode.Layout,
+            modifier = Modifier
+                .offset { IntOffset(offsetX, offsetY) }
+                .size(originSizeDp)
+                .zIndex(10000f),
+
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .size(originSizeDp)
+            ) {
+                Text(
+                    text = "0,0",
+                    modifier = Modifier
+                        .align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.5f)
+                )
             }
         }
     }
