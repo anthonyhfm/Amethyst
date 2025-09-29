@@ -3,7 +3,9 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.readDataBlob
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MultiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.MultiAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
@@ -48,7 +50,6 @@ class DrumGroupDeviceAdapter(
                                 )
 
                                 // Multisampling logic
-                                // TODO: replace simple multi name checking for max plugin with hash check
                                 val branchElements = branch.querySelector("DeviceChain")[0]
                                     .querySelector("Devices")[0]
                                     .children
@@ -68,7 +69,9 @@ class DrumGroupDeviceAdapter(
                                         val hash = file.getFileHash()
                                         hash
                                     }
-                                    val multiHashMatches = MULTI_HASHES.contains(potentialMultiDeviceHash)
+                                    val outbreakMultiHashMatches = MULTI_HASHES.contains(potentialMultiDeviceHash)
+                                    val kaskobiMultiHashMatches = KASKOBI_MULTI_HASHES.contains(potentialMultiDeviceHash)
+                                    val multiHashMatches = outbreakMultiHashMatches || kaskobiMultiHashMatches
 
                                     val randomDevice = branchElements.find {
                                         it.name == "MidiRandom"
@@ -87,10 +90,19 @@ class DrumGroupDeviceAdapter(
 
                                         addAll(
                                             try {
-                                                MultiAdapter(
-                                                    blob = readDataBlob(multiDataBlob.text!!),
-                                                    containerXml = samplesContainer
-                                                ).toDeviceStates()
+                                                if (outbreakMultiHashMatches) {
+                                                    MultiAdapter(
+                                                        blob = readDataBlob(multiDataBlob.text!!),
+                                                        containerXml = samplesContainer
+                                                    ).toDeviceStates()
+                                                } else if (kaskobiMultiHashMatches) {
+                                                    MultiEffectAdapter(
+                                                        deviceXml = potentialMultiDevice,
+                                                        containerXml = samplesContainer
+                                                    ).toDeviceStates()
+                                                } else {
+                                                    listOf()
+                                                }
                                             } catch (e: Exception) {
                                                 println("Error parsing Multi plugin with hash $potentialMultiDeviceHash")
                                                 println("Error: ${e.message}")

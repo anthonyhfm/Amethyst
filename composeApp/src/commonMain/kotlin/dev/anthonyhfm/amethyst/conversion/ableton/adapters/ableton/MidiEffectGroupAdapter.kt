@@ -5,7 +5,9 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.readDataBlob
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MultiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.MultiAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
@@ -123,7 +125,6 @@ class MidiEffectGroupAdapter(
                             }
 
                             // Multisampling logic
-                            // TODO: replace simple multi name checking for max plugin with hash check
                             val branchElements = branch.querySelector("DeviceChain")[0]
                                 .querySelector("Devices")[0]
                                 .children
@@ -143,7 +144,9 @@ class MidiEffectGroupAdapter(
                                     val hash = file.getFileHash()
                                     hash
                                 }
-                                val multiHashMatches = MULTI_HASHES.contains(potentialMultiDeviceHash)
+                                val outbreakMultiHashMatches = MULTI_HASHES.contains(potentialMultiDeviceHash)
+                                val kaskobiMultiHashMatches = KASKOBI_MULTI_HASHES.contains(potentialMultiDeviceHash)
+                                val multiHashMatches = outbreakMultiHashMatches || kaskobiMultiHashMatches
 
                                 val randomDevice = branchElements.find {
                                     it.name == "MidiRandom"
@@ -162,10 +165,19 @@ class MidiEffectGroupAdapter(
 
                                     addAll(
                                         try {
-                                            MultiAdapter(
-                                                blob = readDataBlob(multiDataBlob.text!!),
-                                                containerXml = lightsContainer
-                                            ).toDeviceStates()
+                                            if (outbreakMultiHashMatches) {
+                                                MultiAdapter(
+                                                    blob = readDataBlob(multiDataBlob.text!!),
+                                                    containerXml = lightsContainer
+                                                ).toDeviceStates()
+                                            } else if (kaskobiMultiHashMatches) {
+                                                MultiEffectAdapter(
+                                                    deviceXml = potentialMultiDevice,
+                                                    containerXml = lightsContainer
+                                                ).toDeviceStates()
+                                            } else {
+                                                listOf()
+                                            }
                                         } catch (e: Exception) {
                                             println("Error reading multi plugin with hash $potentialMultiDeviceHash, falling back to normal chain")
                                             println("Error: ${e.message}")
