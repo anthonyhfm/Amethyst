@@ -27,12 +27,13 @@ actual object AudioOutput {
     private val isWindows = (platform == Platform.Desktop.Windows)
     private val MIX_SAMPLE_RATE = if (isWindows) 48_000 else 44_100
 
-    // Optimierte Buffergrößen für stabile, niedrige Latenz
-    private val CHUNK_FRAMES = 256 // vorher 128, jetzt ca. 5,3ms bei 48kHz
-    private const val STREAM_BUFFERS = 6 // vorher 4, jetzt ca. 32ms Gesamtpufferung
-    private const val MAX_SOURCES = 16
+    // Plattformspezifische Buffergrößen und Taktung
+    private val CHUNK_FRAMES = if (isWindows) 480 else 256 // 10ms bei 48kHz auf Windows
+    private val STREAM_BUFFERS = if (isWindows) 6 else 6
+    private val MAX_SOURCES = 16
 
-    private val ALC_REFRESH_HZ = (MIX_SAMPLE_RATE / CHUNK_FRAMES).coerceIn(60, 960)
+    // Plattformspezifische Refresh-Rate
+    private val ALC_REFRESH_HZ = if (isWindows) 100 else (MIX_SAMPLE_RATE / CHUNK_FRAMES).coerceIn(60, 960)
 
     // Dedicated audio thread + scope
     private val executor = Executors.newSingleThreadExecutor { r ->
@@ -134,7 +135,7 @@ actual object AudioOutput {
 
     private fun startWorkerOnAudioThread() {
         processingJob = alScope.launch {
-            val tickMs = 3L // vorher 1-2ms, jetzt 3ms für weniger CPU-Last
+            val tickMs = if (isWindows) 5L else 3L // Windows: 5ms, andere: 3ms
             while (isActive && isInitialized) {
                 try {
                     pumpStreaming()
