@@ -20,34 +20,40 @@ abstract class AbletonAdapter {
             offset: IntOffset = IntOffset.Zero,
             outputOffset: IntOffset = IntOffset.Zero
         ): AbletonAdapter? {
-            return when (xml.name) {
-                "MidiEffectGroupDevice", "InstrumentGroupDevice" -> MidiEffectGroupAdapter(
-                    xml = xml,
-                    offset = offset,
-                    outputOffset = outputOffset
-                )
+            try {
+                return when (xml.name) {
+                    "MidiEffectGroupDevice", "InstrumentGroupDevice" -> MidiEffectGroupAdapter(
+                        xml = xml,
+                        offset = offset,
+                        outputOffset = outputOffset
+                    )
 
-                "DrumGroupDevice" -> DrumGroupDeviceAdapter(
-                    xml = xml,
-                    offset = offset,
-                    outputOffset = outputOffset
-                )
+                    "DrumGroupDevice" -> DrumGroupDeviceAdapter(
+                        xml = xml,
+                        offset = offset,
+                        outputOffset = outputOffset
+                    )
 
-                "OriginalSimpler" -> OriginalSimplerAdapter(xml)
-                "MidiVelocity" -> MidiVelocityAdapter(xml)
-                "MidiNoteLength" -> MidiNoteLengthAdapter(xml)
+                    "OriginalSimpler" -> OriginalSimplerAdapter(xml)
+                    "MidiVelocity" -> MidiVelocityAdapter(xml)
+                    "MidiNoteLength" -> MidiNoteLengthAdapter(xml)
 
-                "MxDeviceMidiEffect" -> MxDeviceMidiEffectAdapter(
-                    xml = xml,
-                    offset = offset,
-                    outputOffset = outputOffset
-                ) // Will resolve max plugins
+                    "MxDeviceMidiEffect" -> MxDeviceMidiEffectAdapter(
+                        xml = xml,
+                        offset = offset,
+                        outputOffset = outputOffset
+                    ) // Will resolve max plugins
 
-                else -> {
-                    println("Unsupported Ableton XML element: ${xml.name}")
-                    null
+                    else -> {
+                        println("Unsupported Ableton XML element: ${xml.name}")
+                        null
+                    }
                 }
+            } catch (e: Exception) {
+                println("Error while resolving Ableton adapter for element ${xml.name}: ${e.message}")
             }
+
+            return null
         }
     }
 }
