@@ -27,9 +27,9 @@ actual object AudioOutput {
     private val isWindows = (platform == Platform.Desktop.Windows)
     private val MIX_SAMPLE_RATE = if (isWindows) 48_000 else 44_100
 
-    // Slightly larger buffering for stability under GC/jitter
-    private val CHUNK_FRAMES = 512
-    private const val STREAM_BUFFERS = 8
+    // Optimierte Buffergrößen für stabile, niedrige Latenz
+    private val CHUNK_FRAMES = 256 // vorher 128, jetzt ca. 5,3ms bei 48kHz
+    private const val STREAM_BUFFERS = 6 // vorher 4, jetzt ca. 32ms Gesamtpufferung
     private const val MAX_SOURCES = 16
 
     private val ALC_REFRESH_HZ = (MIX_SAMPLE_RATE / CHUNK_FRAMES).coerceIn(60, 960)
@@ -134,7 +134,7 @@ actual object AudioOutput {
 
     private fun startWorkerOnAudioThread() {
         processingJob = alScope.launch {
-            val tickMs = if (isWindows) 1L else 2L
+            val tickMs = 3L // vorher 1-2ms, jetzt 3ms für weniger CPU-Last
             while (isActive && isInitialized) {
                 try {
                     pumpStreaming()
@@ -181,22 +181,30 @@ actual object AudioOutput {
         val toRemove = ArrayList<String>(2)
 
         for ((key, src) in sources) {
-            var processed = AL10.alGetSourcei(src.alSource, AL10.AL_BUFFERS_PROCESSED)
-            while (processed > 0) {
+            val processed = AL10.alGetSourcei(src.alSource, AL10.AL_BUFFERS_PROCESSED)
+            val queued = AL10.alGetSourcei(src.alSource, AL11.AL_BUFFERS_QUEUED)
+            val state = AL10.alGetSourcei(src.alSource, AL10.AL_SOURCE_STATE)
+            if (processed > 0 || queued < STREAM_BUFFERS) {
+                println("[AudioOutput] Source $key: processed=$processed, queued=$queued, state=$state, readBytes=${src.readBytes}/${src.pcm.size}")
+            }
+            var proc = processed
+            while (proc > 0) {
                 AL10.alSourceUnqueueBuffers(src.alSource, src.tmpUnqueue)
-
                 val wrote = fillChunk(src)
                 if (wrote > 0) {
                     src.scratch.limit(wrote)
                     AL10.alBufferData(src.tmpUnqueue[0], src.format, src.scratch, src.sampleRate)
                     AL10.alSourceQueueBuffers(src.alSource, src.tmpUnqueue)
+                } else {
+                    println("[AudioOutput] Source $key: fillChunk returned 0 (no more data)")
                 }
-                processed--
+                proc--
             }
-
-            val queued = AL10.alGetSourcei(src.alSource, AL11.AL_BUFFERS_QUEUED)
-            val state  = AL10.alGetSourcei(src.alSource, AL10.AL_SOURCE_STATE)
-            val finished = queued == 0 && src.readBytes >= src.pcm.size && state != AL10.AL_PLAYING
+            val queuedAfter = AL10.alGetSourcei(src.alSource, AL11.AL_BUFFERS_QUEUED)
+            if (queuedAfter == 0 && src.readBytes < src.pcm.size) {
+                println("[AudioOutput] Source $key: Buffer underrun! queued=0, readBytes=${src.readBytes}, pcm.size=${src.pcm.size}")
+            }
+            val finished = queuedAfter == 0 && src.readBytes >= src.pcm.size && state != AL10.AL_PLAYING
             if (finished) {
                 src.cleanup()
                 toRemove.add(key)
