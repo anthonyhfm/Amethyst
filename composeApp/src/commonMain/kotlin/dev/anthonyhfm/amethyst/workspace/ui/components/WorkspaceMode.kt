@@ -70,6 +70,11 @@ fun WorkspaceMode(
             mode = WorkspaceContract.WorkspaceMode.SamplingChain(),
             text = "Sampling Chain",
             icon = Icons.Default.MusicNote
+        ),
+        WorkspaceModePickerItem(
+            mode = WorkspaceContract.WorkspaceMode.Timeline(),
+            text = "Timeline",
+            icon = Icons.Default.Timeline
         )
     )
 

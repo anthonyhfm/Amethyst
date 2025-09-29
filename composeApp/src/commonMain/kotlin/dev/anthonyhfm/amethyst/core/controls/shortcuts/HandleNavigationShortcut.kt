@@ -21,7 +21,7 @@ fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
             WorkspaceContract.WorkspaceMode.Preview(),
             WorkspaceContract.WorkspaceMode.LightsChain(),
             WorkspaceContract.WorkspaceMode.SamplingChain(),
-            // WorkspaceContract.WorkspaceMode.Timeline(),
+            WorkspaceContract.WorkspaceMode.Timeline(),
         )
 
         if (keyEvent.key == Key.DirectionLeft || keyEvent.key == Key.DirectionRight) {
