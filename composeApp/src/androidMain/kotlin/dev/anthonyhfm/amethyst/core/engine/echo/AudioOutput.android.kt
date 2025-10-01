@@ -5,270 +5,378 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
-import android.media.AudioTimestamp
 import android.os.Build
 import android.os.Process
 import kotlinx.coroutines.*
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.abs
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 actual object AudioOutput {
+    // Mixer- und Geräteeinstellungen
     private var isInitialized = false
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val active = ConcurrentHashMap<String, Source>()
-
-    private var deviceSampleRate = 48_000
+    private var deviceSampleRate = 48_000 // Default 48k (wird in initialize() mit Native-Rate überschrieben)
+    private var bytesPerFrame = 4 // Stereo 16-bit
     private var deviceFramesPerBuffer = 240
+    private var minBufferBytes = 0
 
+    // Mixer-Chunking (ähnlich Desktop): Frames nahe HW-Puffergröße
     private var chunkFrames = 256
-    private val streamBuffers = 3
+
+    // Single AudioTrack + Software-Mixer
+    private var track: AudioTrack? = null
+    private var mixerJob: Job? = null
+
+    // Dedizierter Thread für deterministische Latenz
+    private val executor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "Amethyst-Android-Audio").apply { isDaemon = true; priority = Thread.NORM_PRIORITY + 1 }
+    }
+    private val mixerScope = CoroutineScope(SupervisorJob() + executor.asCoroutineDispatcher())
+
+    // Aktive Quellen, geschützt durch 'lock'
+    private val sources = LinkedHashMap<String, Source>()
+    private val lock = Any()
 
     private data class Source(
         val id: String,
-        val track: AudioTrack,
-        val writerJob: Job?,
-        val startedAtMs: Long,
-        val writtenFrames: AtomicLong,
-        val sampleRate: Int,
-        val channels: Int,
-        val stopFlag: AtomicBoolean = AtomicBoolean(false)
+        val pcm: ByteArray, // 16-bit LE, Stereo, @deviceSampleRate
+        var frameCursor: Int, // in Frames
+        val totalFrames: Int,
+        val gain: Float = 1f,
+        val done: AtomicBoolean = AtomicBoolean(false)
     )
 
     init { initialize() }
 
     private fun initialize() {
         try {
-            val am = runCatching {
-                val app = Class.forName("android.app.ActivityThread")
-                    .getMethod("currentApplication")
-                    .invoke(null) as? android.app.Application
+            // Gerätesample-Rate und Frames/Buffer bestimmen
+            val am = try {
+                val app = Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as? android.app.Application
                 app?.getSystemService(android.content.Context.AUDIO_SERVICE) as? AudioManager
-            }.getOrNull()
+            } catch (_: Throwable) { null }
 
-            val srProp = am?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull()
-            val fpbProp = am?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull()
-
-            val native = AudioTrack.getNativeOutputSampleRate(AudioManager.STREAM_MUSIC)
-
-            deviceSampleRate = when {
-                srProp != null && srProp > 0 -> srProp
-                native > 0 -> native
-                else -> 44_100
-            }
-
-            deviceFramesPerBuffer = when {
-                fpbProp != null && fpbProp > 0 -> fpbProp
-
-                deviceSampleRate == 48_000 -> 240
-                deviceSampleRate == 44_100 -> 256
-                else -> 256
-            }
-
-            chunkFrames = maxOf(128, min(deviceFramesPerBuffer, 512))
-
-            isInitialized = true
-        } catch (_: Throwable) {
             val native = AudioTrack.getNativeOutputSampleRate(AudioManager.STREAM_MUSIC)
             deviceSampleRate = if (native > 0) native else 48_000
-            deviceFramesPerBuffer = if (deviceSampleRate == 48_000) 240 else 256
-            chunkFrames = maxOf(128, min(deviceFramesPerBuffer, 512))
+
+            deviceFramesPerBuffer = am?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull()
+                ?.takeIf { it > 0 } ?: if (deviceSampleRate == 48_000) 240 else 256
+
+            // Chunk nahe HW-Buffergröße für Stabilität, aber min 128 / max 512
+            chunkFrames = deviceFramesPerBuffer.coerceIn(128, 512)
+
+            // AudioTrack anlegen (STREAM, 16-bit Stereo) mit kleinem Buffer nahe minBuf
+            val chMask = AudioFormat.CHANNEL_OUT_STEREO
+            val encoding = AudioFormat.ENCODING_PCM_16BIT
+            val minBuf = AudioTrack.getMinBufferSize(deviceSampleRate, chMask, encoding).coerceAtLeast(0)
+            val chunkBytes = chunkFrames * bytesPerFrame
+            // Reduzierter Buffer für geringe Latenz, aber nicht unter minBuf
+            val bufferSize = maxOf(minBuf, chunkBytes * 2)
+            minBufferBytes = minBuf
+
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            val format = AudioFormat.Builder()
+                .setSampleRate(deviceSampleRate)
+                .setChannelMask(chMask)
+                .setEncoding(encoding)
+                .build()
+
+            track = if (Build.VERSION.SDK_INT >= 26) {
+                AudioTrack.Builder()
+                    .setAudioAttributes(attrs)
+                    .setAudioFormat(format)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .setBufferSizeInBytes(bufferSize)
+                    .also {
+                        try { it.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY) } catch (_: Throwable) { }
+                    }
+                    .build()
+            } else {
+                @Suppress("DEPRECATION")
+                AudioTrack(
+                    AudioManager.STREAM_MUSIC,
+                    deviceSampleRate,
+                    chMask,
+                    encoding,
+                    bufferSize,
+                    AudioTrack.MODE_STREAM
+                )
+            }
+
+            if (track?.state != AudioTrack.STATE_INITIALIZED) {
+                try { track?.release() } catch (_: Throwable) {}
+                track = null
+                return
+            }
+
+            // Mixer starten
+            startMixer()
             isInitialized = true
+        } catch (_: Throwable) {
+            isInitialized = false
+        }
+    }
+
+    private fun startMixer() {
+        val t = track ?: return
+        mixerJob?.cancel()
+
+        mixerJob = mixerScope.launch {
+            try { Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO) } catch (_: Throwable) {}
+
+            val mixShorts = ShortArray(chunkFrames * 2) // Stereo Frames -> 2 shorts
+            val accum = IntArray(chunkFrames * 2)
+            val fadeFrames = (deviceSampleRate / 500).coerceIn(48, 256) // ~2 ms bei 48kHz
+            val headroom = 0.96 // etwas Reserve
+
+            // Soft-Limiter mit sanfteren Konstanten für weniger Artefakte
+            var limiterGain = 1.0
+            val attack = 0.15 // schneller als Release
+            val release = 0.02 // langsamer für Transparenz
+
+            // Start sofort
+            try {
+                if (t.playState != AudioTrack.PLAYSTATE_PLAYING) t.play()
+            } catch (_: Throwable) {}
+
+            // Writer-Status
+            var framesWritten: Long = 0
+            var pendingBuf: ShortArray? = null
+            var pendingOff = 0
+            var pendingLen = 0
+
+            fun mixInto(activeOnly: Boolean = false) {
+                java.util.Arrays.fill(accum, 0)
+
+                var hadActive = false
+                synchronized(lock) {
+                    val it = sources.values.iterator()
+                    while (it.hasNext()) {
+                        val src = it.next()
+                        if (src.done.get()) { it.remove(); continue }
+
+                        val remainFrames = src.totalFrames - src.frameCursor
+                        if (remainFrames <= 0) { src.done.set(true); it.remove(); continue }
+                        val framesNow = min(chunkFrames, remainFrames)
+
+                        var f = 0
+                        var byteOff = src.frameCursor * bytesPerFrame
+                        var mixIdx = 0
+                        while (f < framesNow) {
+                            val l = ((src.pcm[byteOff].toInt() and 0xFF) or ((src.pcm[byteOff + 1].toInt() and 0xFF) shl 8)).let { if (it > 32767) it - 65536 else it }
+                            val r = ((src.pcm[byteOff + 2].toInt() and 0xFF) or ((src.pcm[byteOff + 3].toInt() and 0xFF) shl 8)).let { if (it > 32767) it - 65536 else it }
+
+                            // Kurze Fade-In/Out-Rampen
+                            val frameIdx = src.frameCursor + f
+                            val fadeInMul = (frameIdx.toFloat() / fadeFrames).coerceIn(0f, 1f)
+                            val fadeOutMul = ((src.totalFrames - frameIdx).toFloat() / fadeFrames).coerceIn(0f, 1f)
+                            val fadeMul = min(fadeInMul, fadeOutMul)
+
+                            val g = (src.gain * fadeMul * headroom).toFloat()
+                            accum[mixIdx]     = accum[mixIdx]     + (l * g).toInt()
+                            accum[mixIdx + 1] = accum[mixIdx + 1] + (r * g).toInt()
+
+                            byteOff += 4
+                            mixIdx += 2
+                            f++
+                        }
+                        src.frameCursor += framesNow
+                        hadActive = true
+                        if (src.frameCursor >= src.totalFrames) { src.done.set(true); it.remove() }
+                    }
+                }
+
+                // Wenn nur aktive Quellen gewünscht und keine aktiv -> Stille erzeugen
+                if (!hadActive && activeOnly) {
+                    java.util.Arrays.fill(mixShorts, 0)
+                    pendingBuf = mixShorts
+                    pendingOff = 0
+                    pendingLen = mixShorts.size
+                    return
+                }
+
+                // Peak ermitteln und sanft zum Ziel gain glätten
+                var peak = 0
+                var i = 0
+                while (i < accum.size) {
+                    val a = abs(accum[i])
+                    if (a > peak) peak = a
+                    val b = abs(accum[i + 1])
+                    if (b > peak) peak = b
+                    i += 2
+                }
+                val target = if (peak > 32767) 32767.0 / peak.toDouble() else 1.0
+                val alpha = if (target < limiterGain) attack else release
+                limiterGain += (target - limiterGain) * alpha
+
+                // In Shorts umwandeln
+                i = 0
+                var si = 0
+                while (i < accum.size) {
+                    val l = (accum[i] * limiterGain).toInt().coerceIn(-32768, 32767)
+                    val r = (accum[i + 1] * limiterGain).toInt().coerceIn(-32768, 32767)
+                    mixShorts[si] = l.toShort()
+                    mixShorts[si + 1] = r.toShort()
+                    i += 2
+                    si += 2
+                }
+
+                pendingBuf = mixShorts
+                pendingOff = 0
+                pendingLen = mixShorts.size
+            }
+
+            suspend fun writeBlockingAll() {
+                val buf = pendingBuf ?: return
+                while (pendingLen > 0 && isActive) {
+                    val wrote = t.write(buf, pendingOff, pendingLen, AudioTrack.WRITE_BLOCKING)
+                    if (wrote > 0) {
+                        pendingOff += wrote
+                        pendingLen -= wrote
+                        framesWritten += (wrote / 2).toLong() // shorts -> frames
+                    } else {
+                        // Fehlerfall -> kurz warten und erneut versuchen
+                        try { t.play() } catch (_: Throwable) {}
+                        delay(1)
+                    }
+                }
+            }
+
+            // Hauptschleife: kontinuierlich Chunks schreiben (Stille wenn keine aktiven Quellen)
+            while (isActive) {
+                if (pendingLen == 0) {
+                    mixInto(activeOnly = false)
+                }
+                writeBlockingAll()
+                // Minimale Pause, um CPU zu schonen; Chunks ~5ms-10ms
+                delay(1)
+            }
         }
     }
 
     actual fun play(audioSignal: Signal.AudioSignal): String? {
         if (!isInitialized) return null
-        val data = audioSignal.rawData ?: return null
-        if (data.isEmpty()) return null
+        val raw = audioSignal.rawData ?: return null
+        if (raw.isEmpty()) return null
 
-        val sr = if (audioSignal.sampleRate > 0) audioSignal.sampleRate else deviceSampleRate
-        val targetSr = if (sr == deviceSampleRate) sr else deviceSampleRate
-        val targetCh = when (audioSignal.channels) {
-            1, 2 -> audioSignal.channels
-            else -> 2
-        }
-        val targetEnc = if (audioSignal.bitDepth == 8) AudioFormat.ENCODING_PCM_8BIT else AudioFormat.ENCODING_PCM_16BIT
+        // In Ziel-Device-Format konvertieren (Stereo, 16-bit, @deviceSampleRate)
+        val srcCh = if (audioSignal.channels in 1..2) audioSignal.channels else 2
+        val srcRate = if (audioSignal.sampleRate > 0) audioSignal.sampleRate else deviceSampleRate
+        val srcBits = if (audioSignal.bitDepth == 8) 8 else 16
 
-        val pcm = if (sr != targetSr && audioSignal.bitDepth == 16) {
-            resampleLinear16(data, sr, targetSr, targetCh)
-        } else data
+        val pcm16 = if (srcBits == 16) raw else pcm8To16(raw)
+        val rateFixed = if (srcRate != deviceSampleRate) resampleLinear16(pcm16, srcRate, deviceSampleRate, srcCh) else pcm16
+        val stereo16 = if (srcCh != 2) convertChannels16(rateFixed, srcCh, 2) else rateFixed
 
-        val isShort = pcm.size <= targetSr * targetCh * 2 / 2
-        val mode = if (isShort) AudioTrack.MODE_STATIC else AudioTrack.MODE_STREAM
-
-        val chMask = if (targetCh == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
-
-        val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_GAME)
-            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-            .also {
-                if (Build.VERSION.SDK_INT >= 21) it.setFlags(AudioAttributes.FLAG_LOW_LATENCY)
-            }
-            .build()
-
-        val format = AudioFormat.Builder()
-            .setEncoding(targetEnc)
-            .setChannelMask(chMask)
-            .setSampleRate(targetSr)
-            .build()
-
-        val minBuf = AudioTrack.getMinBufferSize(targetSr, chMask, targetEnc)
-        val bytesPerFrame = targetCh * (if (targetEnc == AudioFormat.ENCODING_PCM_8BIT) 1 else 2)
-        val chunkBytes = chunkFrames * bytesPerFrame
-        val streamBufBytes = maxOf(minBuf, chunkBytes * streamBuffers)
-
-        val track = if (Build.VERSION.SDK_INT >= 26) {
-            AudioTrack.Builder()
-                .setAudioAttributes(attrs)
-                .setAudioFormat(format)
-                .setTransferMode(mode)
-                .setBufferSizeInBytes(if (mode == AudioTrack.MODE_STATIC) pcm.size else streamBufBytes)
-                .also {
-                    try {
-                        if (Build.VERSION.SDK_INT >= 26) {
-                            it.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-                        }
-                    } catch (_: Throwable) {}
-                }
-                .build()
-        } else {
-            @Suppress("DEPRECATION")
-            AudioTrack(
-                AudioManager.STREAM_MUSIC,
-                targetSr,
-                chMask,
-                targetEnc,
-                if (mode == AudioTrack.MODE_STATIC) pcm.size else streamBufBytes,
-                mode
-            )
-        }
-
-        if (track.state != AudioTrack.STATE_INITIALIZED) {
-            track.release()
-            return null
-        }
+        val totalFrames = stereo16.size / bytesPerFrame
+        if (totalFrames <= 0) return null
 
         val id = "aud_${System.nanoTime()}"
         val src = Source(
             id = id,
-            track = track,
-            writerJob = null,
-            startedAtMs = System.currentTimeMillis(),
-            writtenFrames = AtomicLong(0),
-            sampleRate = targetSr,
-            channels = targetCh
+            pcm = stereo16,
+            frameCursor = 0,
+            totalFrames = totalFrames,
+            gain = 1f
         )
 
-        if (mode == AudioTrack.MODE_STATIC) {
-            val written = track.write(pcm, 0, pcm.size)
-            if (written <= 0) { track.release(); return null }
-            src.writtenFrames.set((written / bytesPerFrame).toLong())
-            track.play()
-
-            val job = scope.launch {
-                val frames = written / bytesPerFrame
-                val ms = (frames * 1000L) / targetSr + 20
-                delay(ms)
-                stop(id)
-            }
-
-            active[id] = src.copy(writerJob = job)
-            return id
-        } else {
-            val job = scope.launch {
-                try {
-                    Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
-                } catch (_: Throwable) {}
-
-                var offset = 0
-                val initial = min(pcm.size, chunkBytes * 2)
-                var wrote = 0
-                while (wrote < initial) {
-                    val n = track.write(pcm, offset + wrote, min(chunkBytes, initial - wrote), AudioTrack.WRITE_BLOCKING)
-                    if (n < 0) break
-                    wrote += n
-                }
-                src.writtenFrames.addAndGet((wrote / bytesPerFrame).toLong())
-
-                track.play()
-
-                offset += wrote
-                while (isActive && !src.stopFlag.get() && offset < pcm.size) {
-                    val toWrite = min(chunkBytes, pcm.size - offset)
-                    val n = track.write(pcm, offset, toWrite, AudioTrack.WRITE_BLOCKING)
-                    if (n < 0) break
-                    offset += n
-                    src.writtenFrames.addAndGet((n / bytesPerFrame).toLong())
-
-                    if (chunkFrames <= 256) {
-                        yield()
-                    } else {
-                        delay(1)
-                    }
-                }
-
-                val remainFrames = track.playbackHeadPositionFramesSafe(bytesPerFrame)?.let { head ->
-                    val writtenF = src.writtenFrames.get()
-                    (writtenF - head).coerceAtLeast(0)
-                } ?: 0
-                val tailMs = (remainFrames * 1000L) / targetSr + 10
-                if (tailMs > 0) delay(tailMs)
-
-                stop(id)
-            }
-            active[id] = src.copy(writerJob = job)
-            return id
-        }
+        synchronized(lock) { sources[id] = src }
+        return id
     }
 
     actual fun stop(sourceId: String) {
-        val s = active.remove(sourceId) ?: return
-        try {
-            s.stopFlag.set(true)
-            s.writerJob?.cancel()
-            s.track.stop()
-        } catch (_: Throwable) {}
-        try { s.track.flush() } catch (_: Throwable) {}
-        try { s.track.release() } catch (_: Throwable) {}
+        synchronized(lock) { sources.remove(sourceId)?.done?.set(true) }
     }
 
     actual fun stopAll() {
-        val ids = active.keys.toList()
-        ids.forEach { stop(it) }
+        synchronized(lock) {
+            sources.values.forEach { it.done.set(true) }
+            sources.clear()
+        }
     }
 
-    private fun AudioTrack.playbackHeadPositionFramesSafe(bytesPerFrame: Int): Long? {
-        try {
-            val ts = AudioTimestamp()
-            if (this.getTimestamp(ts)) {
-                return ts.framePosition
-            }
-        } catch (_: Throwable) { }
+    // ===== Hilfsfunktionen: Konvertierung =====
 
-        return try {
-            @Suppress("DEPRECATION")
-            this.playbackHeadPosition.toLong()
-        } catch (_: Throwable) { null }
+    private fun pcm8To16(src: ByteArray): ByteArray {
+        val out = ByteArray(src.size * 2)
+        var i = 0
+        var o = 0
+        while (i < src.size) {
+            val s = (src[i].toInt() and 0xFF) - 128
+            val s16 = s * 256
+            out[o] = (s16 and 0xFF).toByte()
+            out[o + 1] = ((s16 ushr 8) and 0xFF).toByte()
+            i++
+            o += 2
+        }
+        return out
+    }
+
+    private fun convertChannels16(pcmData: ByteArray, sourceChannels: Int, targetChannels: Int): ByteArray {
+        if (sourceChannels == targetChannels) return pcmData
+        val bps = 2
+        val srcFrame = sourceChannels * bps
+        val frames = if (srcFrame > 0) pcmData.size / srcFrame else 0
+        if (frames == 0) return ByteArray(0)
+
+        return when {
+            sourceChannels == 1 && targetChannels == 2 -> {
+                val dst = ByteArray(frames * targetChannels * bps)
+                var inPos = 0
+                var outPos = 0
+                while (inPos + 1 < pcmData.size) {
+                    val b0 = pcmData[inPos]
+                    val b1 = pcmData[inPos + 1]
+                    // L
+                    dst[outPos] = b0; dst[outPos + 1] = b1
+                    // R
+                    dst[outPos + 2] = b0; dst[outPos + 3] = b1
+                    inPos += 2
+                    outPos += 4
+                }
+                dst
+            }
+            sourceChannels == 2 && targetChannels == 1 -> {
+                val dst = ByteArray(frames * targetChannels * bps)
+                var inPos = 0
+                var outPos = 0
+                while (inPos + 3 < pcmData.size) {
+                    val l = (pcmData[inPos].toInt() and 0xFF) or ((pcmData[inPos + 1].toInt() and 0xFF) shl 8)
+                    val r = (pcmData[inPos + 2].toInt() and 0xFF) or ((pcmData[inPos + 3].toInt() and 0xFF) shl 8)
+                    val ls = if (l > 32767) l - 65536 else l
+                    val rs = if (r > 32767) r - 65536 else r
+                    val m = ((ls + rs) / 2).coerceIn(-32768, 32767)
+                    dst[outPos] = (m and 0xFF).toByte()
+                    dst[outPos + 1] = ((m ushr 8) and 0xFF).toByte()
+                    inPos += 4
+                    outPos += 2
+                }
+                dst
+            }
+            else -> pcmData
+        }
     }
 
     private fun resampleLinear16(
         pcm: ByteArray,
-        srcRate: Int,
-        dstRate: Int,
+        sourceSampleRate: Int,
+        targetSampleRate: Int,
         channels: Int
     ): ByteArray {
-        if (srcRate == dstRate) return pcm
+        if (sourceSampleRate == targetSampleRate) return pcm
         val bps = 2
         val srcFrame = channels * bps
         val srcFrames = if (srcFrame > 0) pcm.size / srcFrame else 0
         if (srcFrames <= 1) return pcm
 
-        val ratio = dstRate.toDouble() / srcRate.toDouble()
-        val dstFrames = (srcFrames * ratio).roundToInt().coerceAtLeast(1)
+        val ratio = targetSampleRate.toDouble() / sourceSampleRate.toDouble()
+        val dstFrames = (srcFrames * ratio).toInt().coerceAtLeast(1)
         val dst = ByteArray(dstFrames * srcFrame)
 
         fun rd16LE(buf: ByteArray, off: Int): Int {
@@ -296,7 +404,7 @@ actual object AudioOutput {
                 val off = c * bps
                 val s0 = rd16LE(pcm, base0 + off)
                 val s1 = rd16LE(pcm, base1 + off)
-                val interp = (s0 + (s1 - s0) * frac).toInt()
+                val interp = (s0 + ((s1 - s0) * frac)).toInt()
                 wr16LE(dst, outBase + off, interp)
                 c++
             }
