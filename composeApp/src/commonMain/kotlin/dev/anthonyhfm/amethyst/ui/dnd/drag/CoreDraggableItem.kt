@@ -16,14 +16,18 @@
 package com.mohamedrejeb.compose.dnd.drag
 
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
@@ -148,6 +152,19 @@ internal fun <T> CoreDraggableItem(
                 )
             },
     ) {
-        content()
+        val isBeingDragged = state.draggedItem?.key == key
+        // Sanfte Placeholder Transparenz & leichte Schrumpfung während der Shadow aktiv ist
+        val placeholderAlpha by animateFloatAsState(
+            targetValue = if (isBeingDragged) 0.15f else 1f,
+            animationSpec = spring(stiffness = 260f, dampingRatio = 0.85f), label = "placeholderAlpha"
+        )
+        val placeholderScale by animateFloatAsState(
+            targetValue = if (isBeingDragged) 0.96f else 1f,
+            animationSpec = spring(stiffness = 260f, dampingRatio = 0.85f), label = "placeholderScale"
+        )
+
+        Box(Modifier.graphicsLayer { alpha = placeholderAlpha; scaleX = placeholderScale; scaleY = placeholderScale }) {
+            content()
+        }
     }
 }

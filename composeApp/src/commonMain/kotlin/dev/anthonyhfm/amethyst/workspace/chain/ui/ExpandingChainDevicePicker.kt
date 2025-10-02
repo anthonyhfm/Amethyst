@@ -54,31 +54,36 @@ fun ExpandingChainDevicePicker(
     dragAndDropState: DragAndDropState<GenericChainDevice<*>> = rememberDragAndDropState(),
     expanded: Boolean = false,
     forceOff: Boolean = false,
-    expandedWidth: Dp = 56.dp,
+    expandedWidth: Dp = 56.dp, // width when actual dragged item hovers (drop target focus)
+    collapsedWidth: Dp = 12.dp, // default gap
+    hoverWidth: Dp = 56.dp,     // width on normal pointer hover / explicit expand
+    dragPresenceWidth: Dp = 18.dp, // width for all slots while a drag is happening elsewhere
+    indicatorWidth: Dp = 3.dp,
     onAddComponent: (GenericChainDevice<*>) -> Unit,
     onDropDevice: (device: GenericChainDevice<*>, Pair<Int, String>, originChain: Chain) -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovering: Boolean by interaction.collectIsHoveredAsState()
     var pickerVisible: Boolean by remember { mutableStateOf(false) }
-
     val dropKey = remember { UUID.randomUUID() }
     var isDropHover by remember { mutableStateOf(false) }
 
-    val active = hovering || expanded || pickerVisible || isDropHover || dragAndDropState.draggedItem != null
-    val dynamicExpandedWidth = if (isDropHover) expandedWidth + 20.dp else expandedWidth
+    val hasGlobalDrag = dragAndDropState.draggedItem != null
 
     val targetWidth by animateDpAsState(
         targetValue = when {
-            forceOff -> 12.dp
-            active -> dynamicExpandedWidth
-            else -> 12.dp
+            forceOff -> collapsedWidth
+            isDropHover -> expandedWidth                          // FULL size only on real drop hover
+            hovering || pickerVisible || expanded -> hoverWidth   // pointer / explicit hover
+            hasGlobalDrag -> dragPresenceWidth                    // global drag but not over this zone
+            else -> collapsedWidth
         }, label = "ExpandingPickerWidth"
     )
 
-    val showButton = !forceOff && active && targetWidth > 28.dp
+    // Show add button only on pointer/explicit hover (not just because something is being dragged globally)
+    val showButton = !forceOff && !isDropHover && (hovering || pickerVisible || expanded)
 
-    // Alpha Animationen statt AnimatedVisibility (stabiler auf Desktop/JS)
+    // Alpha animations reuse existing states (recompute because we changed show logic)
     val indicatorAlpha by animateFloatAsState(
         targetValue = if (isDropHover) 1f else 0f,
         animationSpec = tween(120), label = "IndicatorAlpha"

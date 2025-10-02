@@ -15,18 +15,21 @@
  */
 package com.mohamedrejeb.compose.dnd.drag
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.mohamedrejeb.compose.dnd.DragAndDropInfoImpl
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.LocalDragAndDropInfo
@@ -36,28 +39,58 @@ internal fun <T> DraggedItemShadow(
     state: DragAndDropState<T>,
 ) {
     val density = LocalDensity.current
-    val draggedItemPositionInRoot = remember {
-        mutableStateOf(Offset.Zero)
-    }
+    val draggedItemPositionInRoot = remember { mutableStateOf(Offset.Zero) }
+
+    // Ziel-Translation berechnen (rohe Werte)
+    val rawX = (state.dragPositionAnimatable.value.x + state.dragPosition.value.x) - draggedItemPositionInRoot.value.x
+    val rawY = (state.dragPositionAnimatable.value.y + state.dragPosition.value.y) - draggedItemPositionInRoot.value.y
+
+    // Sanfte Feder-Animation für Translation
+    val animatedX by animateFloatAsState(
+        targetValue = rawX,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.82f), label = "dragX"
+    )
+    val animatedY by animateFloatAsState(
+        targetValue = rawY,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.82f), label = "dragY"
+    )
+
+    // Scale & Elevation für optisches Herauslösen des Items
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(state.draggedItem) { appeared = state.draggedItem != null }
+    val scale by animateFloatAsState(
+        targetValue = if (appeared) 1.05f else 0.95f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = 0.7f), label = "dragScale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow), label = "dragAlpha"
+    )
+    val elevation by animateFloatAsState(
+        targetValue = if (appeared) 18f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow), label = "dragElevation"
+    )
 
     Box(
         modifier = Modifier
-            .size(
-                with(density) {
-                    state.dragSizeAnimatable.value.toDpSize()
-                }
-            ).onPlaced {
-                draggedItemPositionInRoot.value = it.positionInRoot()
-            }.graphicsLayer {
-                val dragPositionX = state.dragPositionAnimatable.value.x + state.dragPosition.value.x
-                val dragPositionY = state.dragPositionAnimatable.value.y + state.dragPosition.value.y
-                translationX = dragPositionX - draggedItemPositionInRoot.value.x
-                translationY = dragPositionY - draggedItemPositionInRoot.value.y
-            },
+            .size(with(density) { state.dragSizeAnimatable.value.toDpSize() })
+            .onPlaced { draggedItemPositionInRoot.value = it.positionInRoot() }
+            .graphicsLayer {
+                translationX = animatedX
+                translationY = animatedY
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = elevation
+                this.alpha = alpha
+            }
     ) {
-        CompositionLocalProvider(
-            LocalDragAndDropInfo provides DragAndDropInfoImpl(isShadow = true)
-        ) {
+        CompositionLocalProvider(LocalDragAndDropInfo provides DragAndDropInfoImpl(isShadow = true)) {
+            // Overlay leichte Tönung hinter Content für „Card“ Effekt
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(Color.Black.copy(alpha = 0.04f))
+            )
             state.currentDraggableItem?.content?.invoke()
         }
     }
