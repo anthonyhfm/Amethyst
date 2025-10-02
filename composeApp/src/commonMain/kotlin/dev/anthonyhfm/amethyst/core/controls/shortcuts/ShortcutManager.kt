@@ -11,6 +11,7 @@ import androidx.compose.ui.input.key.type
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.shortcuts.handleRenameShortcut
 
 object ShortcutManager {
     fun handleShortcut(keyEvent: KeyEvent): Boolean {
@@ -57,6 +58,10 @@ object ShortcutManager {
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.S) {
             println("TODO: Save")
             return true
+        }
+
+        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.R) {
+            return handleRenameShortcut(keyEvent)
         }
 
         if (keyEvent.key == Key.DirectionDown || keyEvent.key == Key.DirectionUp || keyEvent.key == Key.DirectionLeft || keyEvent.key == Key.DirectionRight) {

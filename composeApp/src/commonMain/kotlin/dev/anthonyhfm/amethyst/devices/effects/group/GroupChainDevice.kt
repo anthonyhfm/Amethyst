@@ -10,6 +10,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -25,21 +30,46 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.debugInspectorInfo
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
@@ -58,17 +88,23 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuArea
 import dev.anthonyhfm.amethyst.ui.contextmenu.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.chain.ui.AnimatedInsertedDevice
 import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
 import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+
 
 class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
     override val state = MutableStateFlow(GroupChainDeviceState())
@@ -167,6 +203,20 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
             }
         }
 
+        val renamingGroupIndex = remember { mutableStateOf<Int?>(null) }
+
+        // React to external rename requests via SelectionManager
+        val renameRequest = SelectionManager.renameRequest.collectAsState().value
+        LaunchedEffect(renameRequest) {
+            renameRequest?.let { req ->
+                if (req.parentUUID == this@GroupChainDevice.selectionUUID) {
+                    renamingGroupIndex.value = req.groupIndex
+                    // Clear the request so it doesn't retrigger
+                    SelectionManager.renameRequest.value = null
+                }
+            }
+        }
+
         LazyColumn(
             state = lazyListState,
             modifier = Modifier
@@ -185,7 +235,8 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                             ContextMenuItem("Copy") { copyGroup(group) },
                             ContextMenuItem("Paste") { pasteGroup(index) },
                             ContextMenuItem("Duplicate") { duplicateGroup(index) },
-                            ContextMenuItem("Remove") { removeGroup(index) },
+                            ContextMenuItem("Rename") { renamingGroupIndex.value = index },
+                            ContextMenuItem("Remove") { removeGroup(index) }
                         )
                     ) {
                         GroupItem(
@@ -216,6 +267,10 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                                         }
                                     }
                                 }
+                            },
+                            renameEnabled = renamingGroupIndex.value == index,
+                            onRenameChange = { enabled ->
+                                renamingGroupIndex.value = if (enabled) index else null
                             }
                         )
                     }
@@ -239,13 +294,35 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
         group: Group,
         index: Int,
         selected: Boolean,
-        onSelect: (shiftPressed: Boolean, ctrlPressed: Boolean) -> Unit
+        onSelect: (shiftPressed: Boolean, ctrlPressed: Boolean) -> Unit,
+        renameEnabled: Boolean = false,
+        onRenameChange: (Boolean) -> Unit,
     ) {
         val selections by SelectionManager.selections.collectAsState()
         val isSelectedInManager = selections.any {
             it is Selectable.GroupChainItem &&
                     it.parent == this@GroupChainDevice &&
                     it.groupIndex == index
+        }
+
+        val textValue = remember { mutableStateOf(TextFieldValue(group.name)) }
+        val focusRequester = FocusRequester()
+
+        LaunchedEffect(renameEnabled) {
+            if (renameEnabled) {
+                // Sync text with current group name when starting rename and focus immediately
+                textValue.value = TextFieldValue(group.name)
+                focusRequester.requestFocus()
+            } else {
+                focusRequester.freeFocus()
+            }
+        }
+
+        LaunchedEffect(isSelectedInManager) {
+            if (!isSelectedInManager && renameEnabled) {
+                onRenameChange(false)
+                textValue.value = TextFieldValue(group.name)
+            }
         }
 
         Box(
@@ -261,27 +338,74 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                         else -> MaterialTheme.colorScheme.tertiaryContainer
                     }
                 )
-                .clickable {
-                    onSelect(
-                        ModifierKeysState.isShiftPressed,
-                        ModifierKeysState.isCtrlPressed
+                .combinedClickable(
+                    onClick = {
+                        if (isSelectedInManager && !renameEnabled) {
+                            onRenameChange(true)
+                        } else {
+                            onSelect(
+                                ModifierKeysState.isShiftPressed,
+                                ModifierKeysState.isCtrlPressed
+                            )
+                        }
+                    }
+                )
+        ) {
+            if (!renameEnabled) {
+                Text(
+                    text = group.name.replace("#", "${index + 1}"),
+                    style = MaterialTheme.typography.labelLarge,
+                    lineHeight = MaterialTheme.typography.labelLarge.fontSize,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 6.dp),
+                    color = when {
+                        isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
+                        selected -> MaterialTheme.colorScheme.onTertiary
+                        else -> MaterialTheme.colorScheme.onTertiaryContainer
+                    }
+                )
+            } else {
+                val customTextSelectionColors = TextSelectionColors(
+                    handleColor = MaterialTheme.colorScheme.secondaryContainer,
+                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                )
+
+                CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
+                    BasicTextField(
+                        value = textValue.value,
+                        onValueChange = { textValue.value = it },
+                        singleLine = true,
+                        modifier = Modifier
+                            .focusRequester(focusRequester)
+                            .onFocusSelectAll(textValue)
+                            .align(Alignment.CenterStart)
+                            .padding(start = 6.dp)
+                            .onKeyEvent { ev ->
+                                if (ev.key == Key.Enter) {
+                                    renameGroup(index, textValue.value.text)
+                                    onRenameChange(false)
+                                    return@onKeyEvent true
+                                }
+                                if (ev.key == Key.Escape) {
+                                    onRenameChange(false)
+                                    textValue.value = TextFieldValue(group.name)
+                                    return@onKeyEvent true
+                                }
+
+                                false
+                            },
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrectEnabled = false,
+                            keyboardType = KeyboardType.Unspecified,
+                            imeAction = ImeAction.Done
+                        ),
+                        textStyle = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onPrimary),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.onPrimary),
                     )
                 }
-        ) {
-            Text(
-                text = group.name.replace("#", "${index + 1}"),
-                style = MaterialTheme.typography.labelLarge,
-                lineHeight = MaterialTheme.typography.labelLarge.fontSize,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 6.dp),
-
-                color = when {
-                    isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
-                    selected -> MaterialTheme.colorScheme.onTertiary
-                    else -> MaterialTheme.colorScheme.onTertiaryContainer
-                }
-            )
+            }
         }
     }
 
