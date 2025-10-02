@@ -1,11 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -13,11 +11,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,8 +25,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drop.dropTarget
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
@@ -47,7 +50,6 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain.Companion.pack
 
 @Composable
 fun ExpandingChainDevicePicker(
-    // Identify the destination chain of this drop zone to prevent self-drops
     destinationChain: Chain,
     dragAndDropState: DragAndDropState<GenericChainDevice<*>> = rememberDragAndDropState(),
     expanded: Boolean = false,
@@ -60,31 +62,52 @@ fun ExpandingChainDevicePicker(
     val hovering: Boolean by interaction.collectIsHoveredAsState()
     var pickerVisible: Boolean by remember { mutableStateOf(false) }
 
+    val dropKey = remember { UUID.randomUUID() }
+    var isDropHover by remember { mutableStateOf(false) }
+
+    val active = hovering || expanded || pickerVisible || isDropHover || dragAndDropState.draggedItem != null
+    val dynamicExpandedWidth = if (isDropHover) expandedWidth + 20.dp else expandedWidth
+
+    val targetWidth by animateDpAsState(
+        targetValue = when {
+            forceOff -> 12.dp
+            active -> dynamicExpandedWidth
+            else -> 12.dp
+        }, label = "ExpandingPickerWidth"
+    )
+
+    val showButton = !forceOff && active && targetWidth > 28.dp
+
+    // Alpha Animationen statt AnimatedVisibility (stabiler auf Desktop/JS)
+    val indicatorAlpha by animateFloatAsState(
+        targetValue = if (isDropHover) 1f else 0f,
+        animationSpec = tween(120), label = "IndicatorAlpha"
+    )
+    val buttonAlpha by animateFloatAsState(
+        targetValue = if (showButton) 1f else 0f,
+        animationSpec = tween(150), label = "ButtonAlpha"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .width(
-                if (forceOff) {
-                    12.dp
-                } else {
-                    animateDpAsState(
-                        targetValue = if (hovering || expanded || pickerVisible) {
-                            expandedWidth
-                        } else {
-                            12.dp
-                        }
-                    ).value
-                }
-            )
-            .hoverable(interaction)
+            .width(targetWidth)
             .dropTarget(
                 state = dragAndDropState,
-                key = remember { UUID.randomUUID() },
+                key = dropKey,
+                onDragEnter = { state ->
+                    val dragged = state.data
+                    if (!isDroppingIntoSelf(dragged, destinationChain)) {
+                        isDropHover = true
+                    }
+                },
+                onDragExit = {
+                    isDropHover = false
+                },
                 onDrop = { state ->
                     val dragged = state.data
-
-                    // Prevent dropping a group-like device into its own chain or any of its subchains
                     if (isDroppingIntoSelf(dragged, destinationChain)) {
+                        isDropHover = false
                         return@dropTarget
                     }
 
@@ -99,59 +122,77 @@ fun ExpandingChainDevicePicker(
                         }
                     )
 
-                    println("State: ${'$'}{dragged.state.value}")
-
-                    val originChain: Chain = if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
-                        val oc = WorkspaceRepository.samplingChain.findDeviceChain(dragged.selectionUUID) ?: return@dropTarget
+                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                        val oc = WorkspaceRepository.samplingChain.findDeviceChain(dragged.selectionUUID) ?: run {
+                            isDropHover = false
+                            return@dropTarget
+                        }
+                        val originalIndex = oc.devices.value.indexOfFirst { it.selectionUUID == dragged.selectionUUID }
+                        if (originalIndex == -1) {
+                            isDropHover = false
+                            return@dropTarget
+                        }
                         WorkspaceRepository.samplingChain.remove(dragged.selectionUUID, false)
-                        oc
+                        onDropDevice(device, Pair(originalIndex, dragged.selectionUUID), oc)
                     } else {
-                        val oc = WorkspaceRepository.lightsChain.findDeviceChain(dragged.selectionUUID) ?: return@dropTarget
+                        val oc = WorkspaceRepository.lightsChain.findDeviceChain(dragged.selectionUUID) ?: run {
+                            isDropHover = false
+                            return@dropTarget
+                        }
+                        val originalIndex = oc.devices.value.indexOfFirst { it.selectionUUID == dragged.selectionUUID }
+                        if (originalIndex == -1) {
+                            isDropHover = false
+                            return@dropTarget
+                        }
                         WorkspaceRepository.lightsChain.remove(dragged.selectionUUID, false)
-                        oc
+                        onDropDevice(device, Pair(originalIndex, dragged.selectionUUID), oc)
                     }
 
-                    onDropDevice(
-                        device,
-                        Pair(
-                            originChain.devices.value.indexOfFirst { it.selectionUUID == dragged.selectionUUID },
-                            dragged.selectionUUID
-                        ),
-                        originChain
-                    )
+                    isDropHover = false
                 }
-            ),
-
+            )
+            .hoverable(interaction),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AnimatedVisibility(
-            visible = !forceOff && (hovering || expanded || pickerVisible),
-            enter = scaleIn() + fadeIn(),
-            exit = scaleOut() + fadeOut()
+        Box(
+            modifier = Modifier
+                .fillMaxSize(),
+
+            contentAlignment = Alignment.Center
         ) {
-            Box {
-                IconButton(
-                    onClick = {
-                        pickerVisible = true
-                    }
+            if (indicatorAlpha > 0.01f) {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .graphicsLayer(alpha = indicatorAlpha)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .zIndex(2f)
+                )
+            }
+
+            if (buttonAlpha > 0.01f && indicatorAlpha < 0.01f) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .graphicsLayer(alpha = buttonAlpha)
+                        .zIndex(3f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add a new device"
+                    IconButton(onClick = { pickerVisible = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add a new device"
+                        )
+                    }
+
+                    ChainDevicePicker(
+                        visible = pickerVisible,
+                        sampling = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain,
+                        onDismiss = { pickerVisible = false },
+                        onPickComponent = { onAddComponent(it) }
                     )
                 }
-
-                ChainDevicePicker(
-                    visible = pickerVisible,
-                    sampling = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain,
-                    onDismiss = {
-                        pickerVisible = false
-                    },
-                    onPickComponent = {
-                        onAddComponent(it)
-                    }
-                )
             }
         }
     }

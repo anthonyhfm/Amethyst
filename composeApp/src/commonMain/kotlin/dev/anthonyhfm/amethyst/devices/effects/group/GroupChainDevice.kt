@@ -341,20 +341,26 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                 onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                     if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
 
-                    groupsState.groups[groupsState.openedGroupIndex].chain.add(
+                    val targetChain = groupsState.groups[groupsState.openedGroupIndex].chain
+                    val insertionIndex = 0
+                    val finalIndex = if (originChain === targetChain) {
+                        if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                    } else insertionIndex
+                    val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
+
+                    targetChain.add(
                         device,
+                        safeIndex,
                         fromUser = false
                     )
 
                     UndoManager.addAction(
                         UndoableAction.MovedChainDevice(
                             chainBefore = originChain,
-                            chainAfter = groupsState.groups[groupsState.openedGroupIndex].chain,
+                            chainAfter = targetChain,
                             device = device,
                             fromIndex = originalIndex,
-                            toIndex = groupsState.groups[groupsState.openedGroupIndex].chain.devices.value.indexOfFirst {
-                                it.selectionUUID == device.selectionUUID
-                            },
+                            toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
                         )
                     )
                 }
@@ -374,20 +380,26 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                     onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                         if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
 
-                        groupsState.groups[groupsState.openedGroupIndex].chain.add(
+                        val targetChain = groupsState.groups[groupsState.openedGroupIndex].chain
+                        val insertionIndex = 0
+                        val finalIndex = if (originChain === targetChain) {
+                            if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                        } else insertionIndex
+                        val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
+
+                        targetChain.add(
                             device,
+                            safeIndex,
                             fromUser = false
                         )
 
                         UndoManager.addAction(
                             UndoableAction.MovedChainDevice(
                                 chainBefore = originChain,
-                                chainAfter = groupsState.groups[groupsState.openedGroupIndex].chain,
+                                chainAfter = targetChain,
                                 device = device,
                                 fromIndex = originalIndex,
-                                toIndex = groupsState.groups[groupsState.openedGroupIndex].chain.devices.value.indexOfFirst {
-                                    it.selectionUUID == device.selectionUUID
-                                },
+                                toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
                             )
                         )
                     }
@@ -445,20 +457,26 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                         onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                             if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
 
-                            groupsState.groups[groupsState.openedGroupIndex].chain.add(
+                            val targetChain = groupsState.groups[groupsState.openedGroupIndex].chain
+                            val insertionIndex = index + 1
+                            val finalIndex = if (originChain === targetChain) {
+                                if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                            } else insertionIndex
+                            val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
+
+                            targetChain.add(
                                 device,
+                                safeIndex,
                                 fromUser = false
                             )
 
                             UndoManager.addAction(
                                 UndoableAction.MovedChainDevice(
                                     chainBefore = originChain,
-                                    chainAfter = groupsState.groups[groupsState.openedGroupIndex].chain,
+                                    chainAfter = targetChain,
                                     device = device,
                                     fromIndex = originalIndex,
-                                    toIndex = groupsState.groups[groupsState.openedGroupIndex].chain.devices.value.indexOfFirst {
-                                        it.selectionUUID == device.selectionUUID
-                                    },
+                                    toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
                                 )
                             )
                         }

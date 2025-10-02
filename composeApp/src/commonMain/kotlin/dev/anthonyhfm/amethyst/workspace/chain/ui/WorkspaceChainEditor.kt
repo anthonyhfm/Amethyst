@@ -84,6 +84,7 @@ fun WorkspaceChainEditor(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Picker vor dem ersten Element: Einfügen an Index 0
                         ExpandingChainDevicePicker(
                             destinationChain = when (WorkspaceRepository.mode.value) {
                                 is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
@@ -95,7 +96,13 @@ fun WorkspaceChainEditor(
                                 onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
                             },
                             onDropDevice = { device, (originalIndex, _), originChain ->
-                                chain!!.add(device, 0, fromUser = false)
+                                val insertionIndex = 0
+                                val finalIndex = if (originChain === chain) {
+                                    // Wenn aus derselben Chain und ursprünglicher Index < Zielindex, dann verschiebt sich der Zielindex um -1
+                                    if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                                } else insertionIndex
+                                val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                                chain!!.add(device, safeIndex, fromUser = false)
 
                                 UndoManager.addAction(
                                     UndoableAction.MovedChainDevice(
@@ -103,9 +110,7 @@ fun WorkspaceChainEditor(
                                         chainAfter = chain!!,
                                         device = device,
                                         fromIndex = originalIndex,
-                                        toIndex = chain!!.devices.value.indexOfFirst {
-                                            it.selectionUUID == device.selectionUUID
-                                        },
+                                        toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
                                     )
                                 )
                             }
@@ -117,7 +122,7 @@ fun WorkspaceChainEditor(
                                     state = dragAndDropState,
                                     key = device.selectionUUID,
                                     data = device,
-                                    useDragAnchor = true, // Enable drag anchor mode
+                                    useDragAnchor = true,
                                 ) {
                                     TitleBarModifierProvider(
                                         Modifier
@@ -126,16 +131,13 @@ fun WorkspaceChainEditor(
                                                     Selectable.ChainDevice(
                                                         parent = when (WorkspaceRepository.mode.value) {
                                                             is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-
-                                                            else -> {
-                                                                WorkspaceRepository.lightsChain
-                                                            }
+                                                            else -> WorkspaceRepository.lightsChain
                                                         },
                                                         device = device
                                                     )
                                                 )
                                             }
-                                            .dragAnchor() // Add drag anchor to title bar
+                                            .dragAnchor()
                                     ) {
                                         LaunchedEffect(dragAndDropState.draggedItem) {
                                             device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
@@ -147,13 +149,11 @@ fun WorkspaceChainEditor(
                                                     dragAndDropState = dragAndDropState
                                                 )
                                             }
-
                                             is MultiGroupChainDevice -> {
                                                 device.Content(
                                                     dragAndDropState = dragAndDropState
                                                 )
                                             }
-
                                             else -> {
                                                 device.Content()
                                             }
@@ -161,6 +161,8 @@ fun WorkspaceChainEditor(
                                     }
                                 }
 
+                                // Picker nach jedem Element: Einfügen an Index index+1
+                                val insertionIndex = index + 1
                                 ExpandingChainDevicePicker(
                                     destinationChain = when (WorkspaceRepository.mode.value) {
                                         is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
@@ -169,10 +171,14 @@ fun WorkspaceChainEditor(
                                     dragAndDropState = dragAndDropState,
                                     expanded = index == devices.lastIndex,
                                     onAddComponent = {
-                                        onEvent(WorkspaceContract.Event.AddChainDevice(it, index + 1))
+                                        onEvent(WorkspaceContract.Event.AddChainDevice(it, insertionIndex))
                                     },
                                     onDropDevice = { device, (originalIndex, _), originChain ->
-                                        chain!!.add(device, 0, fromUser = false)
+                                        val finalIndex = if (originChain === chain) {
+                                            if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                                        } else insertionIndex
+                                        val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                                        chain!!.add(device, safeIndex, fromUser = false)
 
                                         UndoManager.addAction(
                                             UndoableAction.MovedChainDevice(
@@ -180,9 +186,7 @@ fun WorkspaceChainEditor(
                                                 chainAfter = chain!!,
                                                 device = device,
                                                 fromIndex = originalIndex,
-                                                toIndex = chain!!.devices.value.indexOfFirst {
-                                                    it.selectionUUID == device.selectionUUID
-                                                },
+                                                toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
                                             )
                                         )
                                     }
@@ -203,7 +207,12 @@ fun WorkspaceChainEditor(
                         onEvent(WorkspaceContract.Event.AddChainDevice(it))
                     },
                     onDropDevice = { device, (originalIndex, _), originChain ->
-                        chain!!.add(device, 0, fromUser = false)
+                        val insertionIndex = 0
+                        val finalIndex = if (originChain === chain) {
+                            if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                        } else insertionIndex
+                        val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                        chain!!.add(device, safeIndex, fromUser = false)
 
                         UndoManager.addAction(
                             UndoableAction.MovedChainDevice(
@@ -211,9 +220,7 @@ fun WorkspaceChainEditor(
                                 chainAfter = chain!!,
                                 device = device,
                                 fromIndex = originalIndex,
-                                toIndex = chain!!.devices.value.indexOfFirst {
-                                    it.selectionUUID == device.selectionUUID
-                                },
+                                toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
                             )
                         )
                     }
