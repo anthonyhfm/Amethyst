@@ -266,6 +266,18 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
 
         val renamingGroupIndex = remember { mutableStateOf<Int?>(null) }
 
+        // React to external rename requests via SelectionManager
+        val renameRequest = SelectionManager.renameRequest.collectAsState().value
+        LaunchedEffect(renameRequest) {
+            renameRequest?.let { req ->
+                if (req.parentUUID == this@MultiGroupChainDevice.selectionUUID) {
+                    renamingGroupIndex.value = req.groupIndex
+                    // Clear the request so it doesn't retrigger
+                    SelectionManager.renameRequest.value = null
+                }
+            }
+        }
+
         val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
             state.update {
                 it.copy(
@@ -368,6 +380,8 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
 
         LaunchedEffect(renameEnabled) {
             if (renameEnabled) {
+                // Sync text with current group name when starting rename and focus immediately
+                textValue.value = TextFieldValue(group.name)
                 focusRequester.requestFocus()
             } else {
                 focusRequester.freeFocus()
@@ -438,7 +452,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                             .align(Alignment.CenterStart)
                             .padding(start = 6.dp)
                             .onKeyEvent { ev ->
-                                if (ev.key == Key.Enter && ev.type == KeyEventType.KeyUp) {
+                                if (ev.key == Key.Enter) {
                                     renameGroup(index, textValue.value.text)
                                     onRenameChange(false)
                                     return@onKeyEvent true
@@ -448,6 +462,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                                     textValue.value = TextFieldValue(group.name)
                                     return@onKeyEvent true
                                 }
+
                                 false
                             },
                         keyboardOptions = KeyboardOptions(

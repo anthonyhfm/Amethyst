@@ -203,6 +203,18 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
 
         val renamingGroupIndex = remember { mutableStateOf<Int?>(null) }
 
+        // React to external rename requests via SelectionManager
+        val renameRequest = SelectionManager.renameRequest.collectAsState().value
+        LaunchedEffect(renameRequest) {
+            renameRequest?.let { req ->
+                if (req.parentUUID == this@GroupChainDevice.selectionUUID) {
+                    renamingGroupIndex.value = req.groupIndex
+                    // Clear the request so it doesn't retrigger
+                    SelectionManager.renameRequest.value = null
+                }
+            }
+        }
+
         LazyColumn(
             state = lazyListState,
             modifier = Modifier
@@ -296,6 +308,8 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
 
         LaunchedEffect(renameEnabled) {
             if (renameEnabled) {
+                // Sync text with current group name when starting rename and focus immediately
+                textValue.value = TextFieldValue(group.name)
                 focusRequester.requestFocus()
             } else {
                 focusRequester.freeFocus()
@@ -366,7 +380,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                             .align(Alignment.CenterStart)
                             .padding(start = 6.dp)
                             .onKeyEvent { ev ->
-                                if (ev.key == Key.Enter && ev.type == KeyEventType.KeyUp) {
+                                if (ev.key == Key.Enter) {
                                     renameGroup(index, textValue.value.text)
                                     onRenameChange(false)
                                     return@onKeyEvent true
@@ -376,6 +390,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                                     textValue.value = TextFieldValue(group.name)
                                     return@onKeyEvent true
                                 }
+
                                 false
                             },
                         keyboardOptions = KeyboardOptions(
