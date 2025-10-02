@@ -96,6 +96,7 @@ fun WorkspaceChainEditor(
                                 onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
                             },
                             onDropDevice = { device, (originalIndex, _), originChain ->
+                                DeviceInsertionAnimator.register(device.selectionUUID)
                                 val insertionIndex = 0
                                 val finalIndex = if (originChain === chain) {
                                     // Wenn aus derselben Chain und ursprünglicher Index < Zielindex, dann verschiebt sich der Zielindex um -1
@@ -143,19 +144,21 @@ fun WorkspaceChainEditor(
                                             device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
                                         }
 
-                                        when (device) {
-                                            is GroupChainDevice -> {
-                                                device.Content(
-                                                    dragAndDropState = dragAndDropState
-                                                )
-                                            }
-                                            is MultiGroupChainDevice -> {
-                                                device.Content(
-                                                    dragAndDropState = dragAndDropState
-                                                )
-                                            }
-                                            else -> {
-                                                device.Content()
+                                        AnimatedInsertedDevice(id = device.selectionUUID) {
+                                            when (device) {
+                                                is GroupChainDevice -> {
+                                                    device.Content(
+                                                        dragAndDropState = dragAndDropState
+                                                    )
+                                                }
+                                                is MultiGroupChainDevice -> {
+                                                    device.Content(
+                                                        dragAndDropState = dragAndDropState
+                                                    )
+                                                }
+                                                else -> {
+                                                    device.Content()
+                                                }
                                             }
                                         }
                                     }
@@ -174,6 +177,7 @@ fun WorkspaceChainEditor(
                                         onEvent(WorkspaceContract.Event.AddChainDevice(it, insertionIndex))
                                     },
                                     onDropDevice = { device, (originalIndex, _), originChain ->
+                                        DeviceInsertionAnimator.register(device.selectionUUID)
                                         val finalIndex = if (originChain === chain) {
                                             if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
                                         } else insertionIndex
@@ -207,6 +211,7 @@ fun WorkspaceChainEditor(
                         onEvent(WorkspaceContract.Event.AddChainDevice(it))
                     },
                     onDropDevice = { device, (originalIndex, _), originChain ->
+                        DeviceInsertionAnimator.register(device.selectionUUID)
                         val insertionIndex = 0
                         val finalIndex = if (originChain === chain) {
                             if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
