@@ -527,57 +527,19 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
         val groupsState by state.collectAsState()
         val devices by groupsState.groups[groupsState.openedGroupIndex].chain.devices
 
-        if (devices.isEmpty()) {
-            ExpandingChainDevicePicker(
-                destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
-                dragAndDropState = dragAndDropState,
-                expanded = true,
-                expandedWidth = 100.dp,
-                onAddComponent = {
-                    groupsState.groups[groupsState.openedGroupIndex].chain.add(it)
-                },
-                onDropDevice = { device, (originalIndex, originalUUID), originChain ->
-                    if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
-
-                    DeviceInsertionAnimator.register(device.selectionUUID)
-                    val targetChain = groupsState.groups[groupsState.openedGroupIndex].chain
-                    val insertionIndex = 0
-                    val finalIndex = if (originChain === targetChain) {
-                        if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                    } else insertionIndex
-                    val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
-
-                    targetChain.add(
-                        device,
-                        safeIndex,
-                        fromUser = false
-                    )
-
-                    UndoManager.addAction(
-                        UndoableAction.MovedChainDevice(
-                            chainBefore = originChain,
-                            chainAfter = targetChain,
-                            device = device,
-                            fromIndex = originalIndex,
-                            toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
-                        )
-                    )
-                }
-            )
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        key(devices) {
+            if (devices.isEmpty()) {
                 ExpandingChainDevicePicker(
                     destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                     dragAndDropState = dragAndDropState,
+                    expanded = true,
+                    expandedWidth = 100.dp,
                     onAddComponent = {
-                        groupsState.groups[groupsState.openedGroupIndex].chain.add(it, 0)
+                        groupsState.groups[groupsState.openedGroupIndex].chain.add(it)
                     },
                     onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                         if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
+
                         DeviceInsertionAnimator.register(device.selectionUUID)
                         val targetChain = groupsState.groups[groupsState.openedGroupIndex].chain
                         val insertionIndex = 0
@@ -603,67 +565,23 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                         )
                     }
                 )
-
-                devices.forEachIndexed { index, device ->
-                    DraggableItem(
-                        state = dragAndDropState,
-                        key = device.selectionUUID,
-                        data = device,
-                        useDragAnchor = true, // Enable drag anchor mode
-                    ) {
-                        TitleBarModifierProvider(
-                            Modifier
-                                .clickable {
-                                    SelectionManager.select(
-                                        Selectable.ChainDevice(
-                                            parent = groupsState.groups[groupsState.openedGroupIndex].chain,
-                                            device = device
-                                        )
-                                    )
-                                }
-                                .dragAnchor() // Add drag anchor to title bar
-                        ) {
-                            LaunchedEffect(dragAndDropState.draggedItem) {
-                                device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
-                            }
-
-                            when (device) {
-                                is GroupChainDevice -> {
-                                    AnimatedInsertedDevice(device.selectionUUID) {
-                                        device.Content(
-                                            dragAndDropState = dragAndDropState
-                                        )
-                                    }
-                                }
-
-                                is MultiGroupChainDevice -> {
-                                    AnimatedInsertedDevice(device.selectionUUID) {
-                                        device.Content(
-                                            dragAndDropState = dragAndDropState
-                                        )
-                                    }
-                                }
-
-                                else -> {
-                                    AnimatedInsertedDevice(device.selectionUUID) {
-                                        device.Content()
-                                    }
-                                }
-                            }
-                        }
-                    }
-
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxHeight(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     ExpandingChainDevicePicker(
                         destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
                         dragAndDropState = dragAndDropState,
                         onAddComponent = {
-                            groupsState.groups[groupsState.openedGroupIndex].chain.add(it, index + 1)
+                            groupsState.groups[groupsState.openedGroupIndex].chain.add(it, 0)
                         },
                         onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                             if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
                             DeviceInsertionAnimator.register(device.selectionUUID)
                             val targetChain = groupsState.groups[groupsState.openedGroupIndex].chain
-                            val insertionIndex = index + 1
+                            val insertionIndex = 0
                             val finalIndex = if (originChain === targetChain) {
                                 if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
                             } else insertionIndex
@@ -686,6 +604,90 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                             )
                         }
                     )
+
+                    devices.forEachIndexed { index, device ->
+                        DraggableItem(
+                            state = dragAndDropState,
+                            key = device.selectionUUID,
+                            data = device,
+                            useDragAnchor = true, // Enable drag anchor mode
+                        ) {
+                            TitleBarModifierProvider(
+                                Modifier
+                                    .clickable {
+                                        SelectionManager.select(
+                                            Selectable.ChainDevice(
+                                                parent = groupsState.groups[groupsState.openedGroupIndex].chain,
+                                                device = device
+                                            )
+                                        )
+                                    }
+                                    .dragAnchor() // Add drag anchor to title bar
+                            ) {
+                                LaunchedEffect(dragAndDropState.draggedItem) {
+                                    device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
+                                }
+
+                                when (device) {
+                                    is GroupChainDevice -> {
+                                        AnimatedInsertedDevice(device.selectionUUID) {
+                                            device.Content(
+                                                dragAndDropState = dragAndDropState
+                                            )
+                                        }
+                                    }
+
+                                    is MultiGroupChainDevice -> {
+                                        AnimatedInsertedDevice(device.selectionUUID) {
+                                            device.Content(
+                                                dragAndDropState = dragAndDropState
+                                            )
+                                        }
+                                    }
+
+                                    else -> {
+                                        AnimatedInsertedDevice(device.selectionUUID) {
+                                            device.Content()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        ExpandingChainDevicePicker(
+                            destinationChain = groupsState.groups[groupsState.openedGroupIndex].chain,
+                            dragAndDropState = dragAndDropState,
+                            onAddComponent = {
+                                groupsState.groups[groupsState.openedGroupIndex].chain.add(it, index + 1)
+                            },
+                            onDropDevice = { device, (originalIndex, originalUUID), originChain ->
+                                if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
+                                DeviceInsertionAnimator.register(device.selectionUUID)
+                                val targetChain = groupsState.groups[groupsState.openedGroupIndex].chain
+                                val insertionIndex = index + 1
+                                val finalIndex = if (originChain === targetChain) {
+                                    if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                                } else insertionIndex
+                                val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
+
+                                targetChain.add(
+                                    device,
+                                    safeIndex,
+                                    fromUser = false
+                                )
+
+                                UndoManager.addAction(
+                                    UndoableAction.MovedChainDevice(
+                                        chainBefore = originChain,
+                                        chainAfter = targetChain,
+                                        device = device,
+                                        fromIndex = originalIndex,
+                                        toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
+                                    )
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
