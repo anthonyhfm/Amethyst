@@ -21,16 +21,21 @@ class Chain : SignalReceiver() {
     }
 
     fun reroute() {
-        if (devices.value.isNotEmpty()) {
-            for (i in 1..devices.value.size) {
-                devices.value[i - 1].signalExit = {
-                    devices.value[i].signalEnter(it)
-                }
+        val list = devices.value
+        if (list.isEmpty()) {
+            return
+        }
+        // Verkette alle Geräte in Reihenfolge
+        for (i in 0 until list.lastIndex) {
+            val current = list[i]
+            val next = list[i + 1]
+            current.signalExit = { signals ->
+                next.signalEnter(signals)
             }
-
-            devices.value[devices.value.lastIndex].signalExit = {
-                signalExit?.invoke(it)
-            }
+        }
+        // Letztes Gerät leitet nach außen weiter
+        list.last().signalExit = { signals ->
+            signalExit?.invoke(signals)
         }
     }
 
@@ -44,7 +49,7 @@ class Chain : SignalReceiver() {
         if (fromUser) {
             UndoManager.addAction(
                 UndoableAction.ChainDeviceCreation(
-                    parent = this,
+                    parent = this@Chain,
                     device = device
                 )
             )

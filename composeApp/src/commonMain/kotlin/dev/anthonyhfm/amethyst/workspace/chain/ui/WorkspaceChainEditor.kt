@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,159 +78,160 @@ fun WorkspaceChainEditor(
                 .padding(vertical = 12.dp)
                 .horizontalScroll(scrollState)
         ) {
-            if (devices.isNotEmpty()) {
-                DragAndDropContainer(
-                    state = dragAndDropState,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
+            key(devices) {
+                if (devices.isNotEmpty()) {
+                    DragAndDropContainer(
+                        state = dragAndDropState,
                     ) {
-                        // Picker vor dem ersten Element: Einfügen an Index 0
-                        ExpandingChainDevicePicker(
-                            destinationChain = when (WorkspaceRepository.mode.value) {
-                                is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-                                else -> WorkspaceRepository.lightsChain
-                            },
-                            dragAndDropState = dragAndDropState,
-                            expanded = false,
-                            onAddComponent = {
-                                onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
-                            },
-                            onDropDevice = { device, (originalIndex, _), originChain ->
-                                DeviceInsertionAnimator.register(device.selectionUUID)
-                                val insertionIndex = 0
-                                val finalIndex = if (originChain === chain) {
-                                    // Wenn aus derselben Chain und ursprünglicher Index < Zielindex, dann verschiebt sich der Zielindex um -1
-                                    if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                                } else insertionIndex
-                                val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
-                                chain!!.add(device, safeIndex, fromUser = false)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Picker vor dem ersten Element: Einfügen an Index 0
+                            ExpandingChainDevicePicker(
+                                destinationChain = when (WorkspaceRepository.mode.value) {
+                                    is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                    else -> WorkspaceRepository.lightsChain
+                                },
+                                dragAndDropState = dragAndDropState,
+                                expanded = false,
+                                onAddComponent = {
+                                    onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
+                                },
+                                onDropDevice = { device, (originalIndex, _), originChain ->
+                                    DeviceInsertionAnimator.register(device.selectionUUID)
+                                    val insertionIndex = 0
+                                    val finalIndex = if (originChain === chain) {
+                                        if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                                    } else insertionIndex
+                                    val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                                    chain!!.add(device, safeIndex, fromUser = false)
 
-                                UndoManager.addAction(
-                                    UndoableAction.MovedChainDevice(
-                                        chainBefore = originChain,
-                                        chainAfter = chain!!,
-                                        device = device,
-                                        fromIndex = originalIndex,
-                                        toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
-                                    )
-                                )
-                            }
-                        )
-
-                        Row {
-                            devices.forEachIndexed { index, device ->
-                                DraggableItem(
-                                    state = dragAndDropState,
-                                    key = device.selectionUUID,
-                                    data = device,
-                                    useDragAnchor = true,
-                                ) {
-                                    TitleBarModifierProvider(
-                                        Modifier
-                                            .clickable {
-                                                SelectionManager.select(
-                                                    Selectable.ChainDevice(
-                                                        parent = when (WorkspaceRepository.mode.value) {
-                                                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-                                                            else -> WorkspaceRepository.lightsChain
-                                                        },
-                                                        device = device
-                                                    )
-                                                )
-                                            }
-                                            .dragAnchor()
-                                    ) {
-                                        LaunchedEffect(dragAndDropState.draggedItem) {
-                                            device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
-                                        }
-
-                                        AnimatedInsertedDevice(id = device.selectionUUID) {
-                                            when (device) {
-                                                is GroupChainDevice -> {
-                                                    device.Content(
-                                                        dragAndDropState = dragAndDropState
-                                                    )
-                                                }
-                                                is MultiGroupChainDevice -> {
-                                                    device.Content(
-                                                        dragAndDropState = dragAndDropState
-                                                    )
-                                                }
-                                                else -> {
-                                                    device.Content()
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Picker nach jedem Element: Einfügen an Index index+1
-                                val insertionIndex = index + 1
-                                ExpandingChainDevicePicker(
-                                    destinationChain = when (WorkspaceRepository.mode.value) {
-                                        is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-                                        else -> WorkspaceRepository.lightsChain
-                                    },
-                                    dragAndDropState = dragAndDropState,
-                                    expanded = index == devices.lastIndex,
-                                    onAddComponent = {
-                                        onEvent(WorkspaceContract.Event.AddChainDevice(it, insertionIndex))
-                                    },
-                                    onDropDevice = { device, (originalIndex, _), originChain ->
-                                        DeviceInsertionAnimator.register(device.selectionUUID)
-                                        val finalIndex = if (originChain === chain) {
-                                            if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                                        } else insertionIndex
-                                        val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
-                                        chain!!.add(device, safeIndex, fromUser = false)
-
-                                        UndoManager.addAction(
-                                            UndoableAction.MovedChainDevice(
-                                                chainBefore = originChain,
-                                                chainAfter = chain!!,
-                                                device = device,
-                                                fromIndex = originalIndex,
-                                                toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
-                                            )
+                                    UndoManager.addAction(
+                                        UndoableAction.MovedChainDevice(
+                                            chainBefore = originChain,
+                                            chainAfter = chain!!,
+                                            device = device,
+                                            fromIndex = originalIndex,
+                                            toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
                                         )
+                                    )
+                                }
+                            )
+
+                            Row {
+                                devices.forEachIndexed { index, device ->
+                                    DraggableItem(
+                                        state = dragAndDropState,
+                                        key = device.selectionUUID,
+                                        data = device,
+                                        useDragAnchor = true,
+                                    ) {
+                                        TitleBarModifierProvider(
+                                            Modifier
+                                                .clickable {
+                                                    SelectionManager.select(
+                                                        Selectable.ChainDevice(
+                                                            parent = when (WorkspaceRepository.mode.value) {
+                                                                is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                                                else -> WorkspaceRepository.lightsChain
+                                                            },
+                                                            device = device
+                                                        )
+                                                    )
+                                                }
+                                                .dragAnchor()
+                                        ) {
+                                            LaunchedEffect(dragAndDropState.draggedItem) {
+                                                device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
+                                            }
+
+                                            AnimatedInsertedDevice(id = device.selectionUUID) {
+                                                when (device) {
+                                                    is GroupChainDevice -> {
+                                                        device.Content(
+                                                            dragAndDropState = dragAndDropState
+                                                        )
+                                                    }
+                                                    is MultiGroupChainDevice -> {
+                                                        device.Content(
+                                                            dragAndDropState = dragAndDropState
+                                                        )
+                                                    }
+                                                    else -> {
+                                                        device.Content()
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
-                                )
+
+                                    // Picker nach jedem Element: Einfügen an Index index+1
+                                    val insertionIndex = index + 1
+                                    ExpandingChainDevicePicker(
+                                        destinationChain = when (WorkspaceRepository.mode.value) {
+                                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                            else -> WorkspaceRepository.lightsChain
+                                        },
+                                        dragAndDropState = dragAndDropState,
+                                        expanded = index == devices.lastIndex,
+                                        onAddComponent = {
+                                            onEvent(WorkspaceContract.Event.AddChainDevice(it, insertionIndex))
+                                        },
+                                        onDropDevice = { device, (originalIndex, _), originChain ->
+                                            DeviceInsertionAnimator.register(device.selectionUUID)
+                                            val finalIndex = if (originChain === chain) {
+                                                if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                                            } else insertionIndex
+                                            val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                                            chain!!.add(device, safeIndex, fromUser = false)
+
+                                            UndoManager.addAction(
+                                                UndoableAction.MovedChainDevice(
+                                                    chainBefore = originChain,
+                                                    chainAfter = chain!!,
+                                                    device = device,
+                                                    fromIndex = originalIndex,
+                                                    toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
+                                                )
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                ExpandingChainDevicePicker(
-                    destinationChain = when (WorkspaceRepository.mode.value) {
-                        is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-                        else -> WorkspaceRepository.lightsChain
-                    },
-                    dragAndDropState = dragAndDropState,
-                    expanded = true,
-                    onAddComponent = {
-                        onEvent(WorkspaceContract.Event.AddChainDevice(it))
-                    },
-                    onDropDevice = { device, (originalIndex, _), originChain ->
-                        DeviceInsertionAnimator.register(device.selectionUUID)
-                        val insertionIndex = 0
-                        val finalIndex = if (originChain === chain) {
-                            if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                        } else insertionIndex
-                        val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
-                        chain!!.add(device, safeIndex, fromUser = false)
+                } else {
+                    ExpandingChainDevicePicker(
+                        destinationChain = when (WorkspaceRepository.mode.value) {
+                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                            else -> WorkspaceRepository.lightsChain
+                        },
+                        dragAndDropState = dragAndDropState,
+                        expanded = true,
+                        onAddComponent = {
+                            onEvent(WorkspaceContract.Event.AddChainDevice(it))
+                        },
+                        onDropDevice = { device, (originalIndex, _), originChain ->
+                            DeviceInsertionAnimator.register(device.selectionUUID)
+                            val insertionIndex = 0
+                            val finalIndex = if (originChain === chain) {
+                                if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                            } else insertionIndex
+                            val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                            chain!!.add(device, safeIndex, fromUser = false)
 
-                        UndoManager.addAction(
-                            UndoableAction.MovedChainDevice(
-                                chainBefore = originChain,
-                                chainAfter = chain!!,
-                                device = device,
-                                fromIndex = originalIndex,
-                                toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
+                            UndoManager.addAction(
+                                UndoableAction.MovedChainDevice(
+                                    chainBefore = originChain,
+                                    chainAfter = chain!!,
+                                    device = device,
+                                    fromIndex = originalIndex,
+                                    toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
+                                )
                             )
-                        )
-                    }
-                )
+                        }
+                    )
+                }
             }
         }
 

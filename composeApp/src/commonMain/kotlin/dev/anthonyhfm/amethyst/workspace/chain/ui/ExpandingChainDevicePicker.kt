@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,15 +37,10 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain.Companion.pack
 
 @Composable
 fun ExpandingChainDevicePicker(
@@ -80,10 +74,8 @@ fun ExpandingChainDevicePicker(
         }, label = "ExpandingPickerWidth"
     )
 
-    // Show add button only on pointer/explicit hover (not just because something is being dragged globally)
     val showButton = !forceOff && !isDropHover && (hovering || pickerVisible || expanded)
 
-    // Alpha animations reuse existing states (recompute because we changed show logic)
     val indicatorAlpha by animateFloatAsState(
         targetValue = if (isDropHover) 1f else 0f,
         animationSpec = tween(120), label = "IndicatorAlpha"
@@ -116,16 +108,7 @@ fun ExpandingChainDevicePicker(
                         return@dropTarget
                     }
 
-                    val device = StateChain.unpackDevice(
-                        when (dragged.state.value) {
-                            is GroupChainDeviceState -> (dragged as GroupChainDevice).packState()
-                            is MultiGroupChainDeviceState -> (dragged as MultiGroupChainDevice).packState()
-                            is ChokeChainDeviceState -> (dragged as ChokeChainDevice).state.value.copy(
-                                stateChain = pack((dragged as ChokeChainDevice).state.value.chain)
-                            )
-                            else -> dragged.state.value
-                        }
-                    )
+                    val device = dragged // reuse original instance to keep state
 
                     if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
                         val oc = WorkspaceRepository.samplingChain.findDeviceChain(dragged.selectionUUID) ?: run {
@@ -163,13 +146,12 @@ fun ExpandingChainDevicePicker(
         Box(
             modifier = Modifier
                 .fillMaxSize(),
-
             contentAlignment = Alignment.Center
         ) {
             if (indicatorAlpha > 0.01f) {
                 Box(
                     modifier = Modifier
-                        .width(4.dp)
+                        .width(indicatorWidth)
                         .fillMaxHeight()
                         .graphicsLayer(alpha = indicatorAlpha)
                         .background(MaterialTheme.colorScheme.primary)

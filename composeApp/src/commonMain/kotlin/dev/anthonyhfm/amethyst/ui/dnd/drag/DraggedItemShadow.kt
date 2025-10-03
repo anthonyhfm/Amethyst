@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import com.mohamedrejeb.compose.dnd.DragAndDropInfoImpl
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.LocalDragAndDropInfo
@@ -41,21 +40,11 @@ internal fun <T> DraggedItemShadow(
     val density = LocalDensity.current
     val draggedItemPositionInRoot = remember { mutableStateOf(Offset.Zero) }
 
-    // Ziel-Translation berechnen (rohe Werte)
+    // Direkte (unverzögerte) Positionsberechnung ohne zusätzliche Feder-Interpolation
     val rawX = (state.dragPositionAnimatable.value.x + state.dragPosition.value.x) - draggedItemPositionInRoot.value.x
     val rawY = (state.dragPositionAnimatable.value.y + state.dragPosition.value.y) - draggedItemPositionInRoot.value.y
 
-    // Sanfte Feder-Animation für Translation
-    val animatedX by animateFloatAsState(
-        targetValue = rawX,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.82f), label = "dragX"
-    )
-    val animatedY by animateFloatAsState(
-        targetValue = rawY,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.82f), label = "dragY"
-    )
-
-    // Scale & Elevation für optisches Herauslösen des Items
+    // Erscheinungs-/Drop Transition (Scale, Alpha, Elevation) bleibt erhalten
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(state.draggedItem) { appeared = state.draggedItem != null }
     val scale by animateFloatAsState(
@@ -84,8 +73,9 @@ internal fun <T> DraggedItemShadow(
             .size(with(density) { state.dragSizeAnimatable.value.toDpSize() })
             .onPlaced { draggedItemPositionInRoot.value = it.positionInRoot() }
             .graphicsLayer {
-                translationX = animatedX
-                translationY = animatedY
+                // Sofortige, direkte Folge des Cursors
+                translationX = rawX
+                translationY = rawY
                 scaleX = scale
                 scaleY = scale
                 shadowElevation = elevation
