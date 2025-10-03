@@ -41,7 +41,6 @@ fun WaveformView(
     Box(
         modifier = modifier
             .background(bg)
-            .padding(8.dp)
     ) {
         Canvas(
             Modifier
