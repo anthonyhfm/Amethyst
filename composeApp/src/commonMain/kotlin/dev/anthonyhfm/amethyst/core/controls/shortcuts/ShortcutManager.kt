@@ -12,8 +12,21 @@ import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.handleRenameShortcut
+import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import io.github.vinceglb.filekit.dialogs.deprecated.openFileSaver
+import io.github.vinceglb.filekit.dialogs.openFileSaver
+import io.github.vinceglb.filekit.path
+import io.github.vinceglb.filekit.write
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToByteArray
 
 object ShortcutManager {
+    @OptIn(ExperimentalSerializationApi::class)
     fun handleShortcut(keyEvent: KeyEvent): Boolean {
         if (keyEvent.type != KeyEventType.KeyDown) return false
 
@@ -56,7 +69,23 @@ object ShortcutManager {
         }
 
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.S) {
-            println("TODO: Save")
+            var path = WorkspaceRepository.saveableWorkspaceData?.path
+
+            if (path == null) {
+                runBlocking {
+                    path = FileKit.openFileSaver(
+                        suggestedName = "project",
+                        extension = "amproj"
+                    )?.path
+                }
+            }
+
+            runBlocking {
+                PlatformFile(path ?: return@runBlocking).write(
+                    AmethystProtoBuf.encodeToByteArray(WorkspaceRepository.saveWorkspace())
+                )
+            }
+
             return true
         }
 

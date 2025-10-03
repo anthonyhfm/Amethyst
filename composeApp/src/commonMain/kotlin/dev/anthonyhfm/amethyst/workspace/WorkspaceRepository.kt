@@ -41,7 +41,7 @@ object WorkspaceRepository {
     var bounds: Pair<IntOffset, IntSize> = Pair(IntOffset(0, 0), IntSize(0, 0))
         private set
 
-    private var saveableWorkspaceData: SaveableWorkspaceData? = null
+    var saveableWorkspaceData: SaveableWorkspaceData? = null
 
     private val _macros: MutableStateFlow<List<Macro>> = MutableStateFlow(listOf(Macro(1)))
     val macros: StateFlow<List<Macro>> = _macros.asStateFlow()
