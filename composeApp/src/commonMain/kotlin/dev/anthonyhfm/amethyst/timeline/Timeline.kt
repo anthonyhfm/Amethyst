@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.timeline
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +11,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.timeline.ui.views.PlaybackControls
 import dev.anthonyhfm.amethyst.timeline.ui.views.TimelineView
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -38,11 +36,6 @@ fun Timeline() {
                 .padding(paddingValues)
         ) {
             TimelineView()
-
-            // Add playback controls at the top
-            PlaybackControls(
-                modifier = Modifier.padding(16.dp)
-            )
         }
     }
 }

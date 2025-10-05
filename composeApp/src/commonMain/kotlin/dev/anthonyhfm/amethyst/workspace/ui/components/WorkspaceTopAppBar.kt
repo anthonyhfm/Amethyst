@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.timeline.ui.components.TimelinePlaybackControls
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
@@ -55,6 +56,10 @@ fun WorkspaceTopAppBar(
         }
 
         Spacer(Modifier.weight(1f))
+
+        if (mode is WorkspaceContract.WorkspaceMode.Timeline) {
+            TimelinePlaybackControls()
+        }
 
         BPMChanger()
 
