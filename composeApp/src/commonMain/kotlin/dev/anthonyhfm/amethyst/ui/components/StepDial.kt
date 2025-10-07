@@ -147,7 +147,7 @@ fun <T> StepTextDial(
     var editing by remember { mutableStateOf(false) }
     var textValue by remember { mutableStateOf(text) }
 
-    val focusRequester = FocusRequester()
+    val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(editing) {
         if (editing) {
