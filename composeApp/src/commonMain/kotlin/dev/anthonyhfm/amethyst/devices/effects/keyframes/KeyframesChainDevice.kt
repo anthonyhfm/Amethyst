@@ -100,6 +100,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
     }
 
     fun onEvent(event: Event) {
+        println("Event: $event")
         when (event) {
             is Event.OnPaintButton -> {
                 state.update { state ->
@@ -110,21 +111,71 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
                                 element = state.frames[state.currentFrameIndex].copy(
                                     entries = state.frames[state.currentFrameIndex].entries.toMutableList().apply {
                                         val index: Int = indexOfFirst { it.x == event.x && it.y == event.y }
+                                        val selectedColor = Triple(state.selectedColor.first, state.selectedColor.second, state.selectedColor.third)
 
                                         if (index != -1) {
-                                            removeAt(index)
+                                            val entry = get(index)
+                                            if (Triple(entry.r, entry.g, entry.b) == selectedColor) {
+                                                // same color -> set to black (off)
+                                                removeAt(index)
+                                                add(
+                                                    KeyframesEntry(
+                                                        x = event.x,
+                                                        y = event.y,
+                                                        r = 0f,
+                                                        g = 0f,
+                                                        b = 0f
+                                                    )
+                                                )
+                                                Heaven.midiEnter(
+                                                    listOf(
+                                                        Signal.LED(
+                                                            origin = this,
+                                                            x = event.x,
+                                                            y = event.y,
+                                                            color = Color.Black,
+                                                            layer = 0
+                                                        )
+                                                    )
+                                                )
+                                            } else { // different color -> update
+                                                removeAt(index)
+                                                add(
+                                                    KeyframesEntry(
+                                                        x = event.x,
+                                                        y = event.y,
+                                                        r = selectedColor.first,
+                                                        g = selectedColor.second,
+                                                        b = selectedColor.third
+                                                    )
+                                                )
+                                                Heaven.midiEnter(
+                                                    listOf(
+                                                        Signal.LED(
+                                                            origin = this,
+                                                            x = event.x,
+                                                            y = event.y,
+                                                            color = Color(
+                                                                red = selectedColor.first,
+                                                                green = selectedColor.second,
+                                                                blue = selectedColor.third
+                                                            ),
+                                                            layer = 0
+                                                        )
+                                                    )
+                                                )
                                         }
-
+                                        } else {
+                                            // Kein Eintrag vorhanden -> hinzufügen
                                         add(
-                                            element = KeyframesEntry(
+                                                KeyframesEntry(
                                                 x = event.x,
                                                 y = event.y,
-                                                r = state.selectedColor.first,
-                                                g = state.selectedColor.second,
-                                                b = state.selectedColor.third
+                                                    r = selectedColor.first,
+                                                    g = selectedColor.second,
+                                                    b = selectedColor.third
                                             )
                                         )
-
                                         Heaven.midiEnter(
                                             listOf(
                                                 Signal.LED(
@@ -132,14 +183,15 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
                                                     x = event.x,
                                                     y = event.y,
                                                     color = Color(
-                                                        red = state.selectedColor.first,
-                                                        green = state.selectedColor.second,
-                                                        blue = state.selectedColor.third
+                                                            red = selectedColor.first,
+                                                            green = selectedColor.second,
+                                                            blue = selectedColor.third
                                                     ),
                                                     layer = 0
                                                 )
                                             )
                                         )
+                                    }
                                     }
                                 )
                             )
