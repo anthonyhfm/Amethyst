@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,27 +31,33 @@ fun RecentColorsRow(
 
     Text("Recent Colors", Modifier.padding(bottom = 4.dp), style = MaterialTheme.typography.titleMedium)
 
-    FlowRow(
+    Box(
         modifier = Modifier
             .fillMaxWidth(),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+
+        contentAlignment = Alignment.Center
     ) {
-        colors.forEach { rgb ->
-            val isSelected = rgb == selected
-            val color = Color(rgb.first, rgb.second, rgb.third)
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(color)
-                    .border(
-                        width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        shape = RoundedCornerShape(6.dp)
-                    )
-                    .clickable { onPick(color) }
-            )
+        FlowRow(
+            modifier = Modifier,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            colors.forEach { rgb ->
+                val isSelected = rgb == selected
+                val color = Color(rgb.first, rgb.second, rgb.third)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(color)
+                        .border(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .clickable { onPick(color) }
+                )
+            }
         }
     }
 }

@@ -61,7 +61,6 @@ kotlin {
 
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.0")
 
-            implementation(libs.colorpicker.compose)
             implementation(libs.reorderable)
 
             implementation(libs.kotlinx.serialization.protobuf)

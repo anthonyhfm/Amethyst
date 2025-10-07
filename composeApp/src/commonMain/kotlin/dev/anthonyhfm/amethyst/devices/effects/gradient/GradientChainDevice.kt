@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.gradient
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -20,9 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.github.skydoves.colorpicker.compose.BrightnessSlider
-import com.github.skydoves.colorpicker.compose.HsvColorPicker
-import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
@@ -40,6 +38,10 @@ import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.ui.components.ColorPicker
+import dev.anthonyhfm.amethyst.ui.components.HuePickerBar
+import dev.anthonyhfm.amethyst.ui.components.HexColorEditor
+import dev.anthonyhfm.amethyst.ui.components.rememberColorPickerState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -56,16 +58,42 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
             .find { it.parent == this }
             ?.selectionUUID
 
-        val controller = key(selectedColor) {
-            rememberColorPickerController()
+        val selectedGradientColor = deviceState.gradientData.find { it.selectionUUID == selectedColor }
+
+        val colorPickerState = key(selectedColor) {
+            selectedGradientColor?.let {
+                rememberColorPickerState(initialColor = Color(it.r, it.g, it.b))
+            }
         }
 
-        LaunchedEffect(selectedColor) {
-            if (selectedColor != null) {
-                val color = deviceState.gradientData.find { it.selectionUUID == selectedColor }
-                if (color != null) {
-                    controller.selectByColor(Color(color.r, color.g, color.b), false)
-                }
+        LaunchedEffect(selectedGradientColor?.r, selectedGradientColor?.g, selectedGradientColor?.b) {
+            val cp = colorPickerState ?: return@LaunchedEffect
+            val grad = selectedGradientColor ?: return@LaunchedEffect
+            val current = cp.color
+            val eps = 0.0005f
+            if (kotlin.math.abs(current.red - grad.r) > eps ||
+                kotlin.math.abs(current.green - grad.g) > eps ||
+                kotlin.math.abs(current.blue - grad.b) > eps) {
+                cp.setColor(Color(grad.r, grad.g, grad.b))
+            }
+        }
+
+        LaunchedEffect(colorPickerState?.color) {
+            val cp = colorPickerState ?: return@LaunchedEffect
+            val grad = selectedGradientColor ?: return@LaunchedEffect
+            val newColor = cp.color
+            val eps = 0.0005f
+            if (kotlin.math.abs(newColor.red - grad.r) < eps &&
+                kotlin.math.abs(newColor.green - grad.g) < eps &&
+                kotlin.math.abs(newColor.blue - grad.b) < eps) {
+                return@LaunchedEffect
+            }
+            state.update { old ->
+                val list = old.gradientData.toMutableList()
+                val index = list.indexOfFirst { it.selectionUUID == grad.selectionUUID }
+                if (index == -1) return@update old
+                list[index] = list[index].copy(r = newColor.red, g = newColor.green, b = newColor.blue)
+                old.copy(gradientData = list)
             }
         }
 
@@ -76,7 +104,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
             modifier = Modifier
                 .width(
                     width = if (selectedColor != null) {
-                        480.dp
+                        520.dp
                     } else {
                         300.dp
                     }
@@ -99,7 +127,6 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                             selectedColor = selectedColor,
                             onSelectionChange = { selectionUUID ->
                                 if (selectionUUID != null) {
-                                    // Find the gradient color by selectionUUID to ensure we have the correct one
                                     val gradientColor = deviceState.gradientData.find { it.selectionUUID == selectionUUID }
                                     if (gradientColor != null) {
                                         val index = deviceState.gradientData.indexOf(gradientColor)
@@ -170,7 +197,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                                 gateText?.let { gate ->
                                     if (gate in 0..200) {
                                         state.update {
-                                            it.copy(gate = gate / 200f) // Convert to float between 0.0 and 1.0
+                                            it.copy(gate = gate / 200f)
                                         }
                                     }
                                 }
@@ -178,14 +205,14 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                             modifier = Modifier
                                 .rightClickable {
                                     state.update {
-                                        it.copy(gate = 0.5f) // Reset gate to its original state
+                                        it.copy(gate = 0.5f)
                                     }
                                 },
                         )
                     }
                 }
 
-                if (selectedColor != null) {
+                if (selectedColor != null && colorPickerState != null) {
                     VerticalDivider()
 
                     Column(
@@ -196,41 +223,32 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
 
                         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
                     ) {
-                        key(selectedColor) {
-                            HsvColorPicker(
-                                controller = controller,
-                                onColorChanged = { color ->
-                                    if (color.fromUser) {
-                                        // Capture current selectedColor to avoid closure issues
-                                        val currentSelectedColor = selectedColor
-                                        state.update {
-                                            val list = it.gradientData.toMutableList()
-                                            val index = list.indexOfFirst { it.selectionUUID == currentSelectedColor }
-
-                                            if (index == -1) return@update it
-
-                                            list[index] = list[index].copy(
-                                                r = color.color.red,
-                                                g = color.color.green,
-                                                b = color.color.blue
-                                            )
-
-                                            return@update it.copy(
-                                                gradientData = list
-                                            )
-                                        }
-                                    }
-                                },
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            ColorPicker(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1 / 1f)
+                                    .weight(1f)
+                                    .aspectRatio(1f),
+                                state = colorPickerState
                             )
 
-                            BrightnessSlider(
-                                controller = controller,
-                                modifier = Modifier
-                                    .height(24.dp)
-                                    .fillMaxWidth()
+                            HuePickerBar(
+                                vertical = true,
+                                state = colorPickerState
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .height(32.dp)
+                                .fillMaxWidth()
+                        ) {
+                            HexColorEditor(
+                                state = colorPickerState
                             )
                         }
                     }
@@ -266,10 +284,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
 
         n.forEach { signal ->
             if (signal.color != Color.Black) {
-                // Create unique owner for this specific signal/button combination
                 val signalOwner = Pair(this, "${signal.x},${signal.y}")
 
-                // Cancel nur die Jobs für diesen spezifischen Button
                 Heaven.cancelJobs { job ->
                     job.owner is Pair<*, *> &&
                     job.owner.first == this &&
@@ -312,7 +328,7 @@ data class GradientChainDeviceState(
     ),
     val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
     val durationMs: Double = 0.0,
-    val gate: Float = 0.5f, // 100% = 0.5f, 200% = 1.0f
+    val gate: Float = 0.5f,
 ) : DeviceState() {
     @Serializable
     data class GradientColor(

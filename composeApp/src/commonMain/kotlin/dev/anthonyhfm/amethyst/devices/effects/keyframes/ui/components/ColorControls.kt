@@ -2,47 +2,51 @@ package dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.github.skydoves.colorpicker.compose.BrightnessSlider
-import com.github.skydoves.colorpicker.compose.HsvColorPicker
-import com.github.skydoves.colorpicker.compose.rememberColorPickerController
+import dev.anthonyhfm.amethyst.ui.components.ColorPicker
+import dev.anthonyhfm.amethyst.ui.components.HexColorEditor
+import dev.anthonyhfm.amethyst.ui.components.HuePickerBar
+import dev.anthonyhfm.amethyst.ui.components.rememberColorPickerState
 
 @Composable
 fun ColorControls(
     color: Color,
     onColorChange: (Color) -> Unit,
 ) {
-    val controller = rememberColorPickerController()
+    val state = rememberColorPickerState()
 
     LaunchedEffect(color) {
-        controller.selectByColor(color, fromUser = false)
+        state.setColor(color)
+    }
+
+    LaunchedEffect(state.color) {
+        onColorChange(state.color)
     }
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        HsvColorPicker(
-            controller = controller,
-            onColorChanged = { color ->
-                onColorChange(color.color)
-            },
+        ColorPicker(
+            state = state,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
         )
 
-        BrightnessSlider(
-            controller = controller,
+        HuePickerBar(
+            state = state,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(24.dp)
+        )
+
+        HexColorEditor(
+            state = state,
+            modifier = Modifier
+                .fillMaxWidth()
         )
     }
 }

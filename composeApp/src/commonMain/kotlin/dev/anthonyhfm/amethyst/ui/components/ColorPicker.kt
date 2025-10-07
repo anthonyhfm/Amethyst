@@ -217,7 +217,7 @@ fun HuePickerBar(
     fun updateHueFrom(pos: Offset, width: Int, height: Int) {
         if (width <= 0f || height <= 0f) return
         val ratio = if (vertical) (pos.y / height).coerceIn(0f, 1f) else (pos.x / width).coerceIn(0f, 1f)
-        currentState.setHue(ratio * 360f)
+        currentState.setHue((ratio * 360f))
     }
 
     BoxWithConstraints(
@@ -227,8 +227,8 @@ fun HuePickerBar(
         Box(
             modifier = Modifier
                 .offset(
-                    x = if (vertical) 0.dp else -12.dp + (state.hue / 360f) * (this.maxWidth - 12.dp),
-                    y = if (vertical) 0.dp + (state.hue / 360f) * (this.maxHeight - 12.dp) else 4.dp
+                    x = if (vertical) 0.dp else (state.hue / 360f) * (this.maxWidth - 12.dp),
+                    y = if (vertical) (state.hue / 360f) * (this.maxHeight - 12.dp) else 0.dp
                 )
                 .zIndex(1f)
                 .dropShadow(
