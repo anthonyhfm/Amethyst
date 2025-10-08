@@ -30,7 +30,7 @@ object GlobalSettings {
     var gradientSmoothness: Float
         get() = settings.getFloat("gradientSmoothness", 1f)
         set(value) {
-            settings.putFloat("framesPerSecond", value)
+            settings.putFloat("gradientSmoothness", value)
         }
 
     var enableDiscordRPC: Boolean
