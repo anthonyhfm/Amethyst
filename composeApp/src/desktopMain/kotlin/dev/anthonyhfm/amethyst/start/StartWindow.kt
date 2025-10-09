@@ -3,7 +3,7 @@ package dev.anthonyhfm.amethyst.start
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_linux
 import amethyst.composeapp.generated.resources.amethyst_windows
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,10 +20,10 @@ import androidx.compose.ui.window.rememberWindowState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatUtilityLaf
-import dev.anthonyhfm.amethyst.start.ui.AmethystWelcome
+import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
+import dev.anthonyhfm.amethyst.home.Home
+import dev.anthonyhfm.amethyst.home.ui.views.AbletonImportWizard
 import dev.anthonyhfm.amethyst.start.ui.LoadingScreen
-import dev.anthonyhfm.amethyst.start.ui.ProjectsView
-import dev.anthonyhfm.amethyst.ui.modifier.platformPaddingTop
 import org.jetbrains.compose.resources.painterResource
 import javax.swing.UIManager
 import kotlin.system.exitProcess
@@ -42,8 +42,8 @@ fun StartWindow(
         },
         title = "Amethyst",
         state = rememberWindowState(
-            width = 700.dp,
-            height = 450.dp,
+            width = 750.dp,
+            height = 550.dp,
             position = WindowPosition.Aligned(Alignment.Center)
         ),
         resizable = false,
@@ -67,18 +67,6 @@ fun StartWindow(
             window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
         }
 
-        if (showAbletonImportWizard) {
-            AbletonImportWizard(
-                viewModel.abletonSetPath.value, // pass full path so the wizard can read the file
-                onStartConversion = { customPalettePath ->
-                    viewModel.startAbletonConversion(customPalettePath)
-                },
-                onCancel = {
-                    viewModel.showAbletonImportWizard.value = false
-                }
-            )
-        }
-
         if (loadingMessage != null) {
             LoadingScreen(loadingMessage!!)
         }
@@ -90,28 +78,14 @@ fun StartWindow(
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                Row(
-                    modifier = Modifier
-                        .platformPaddingTop()
-                ) {
-                    AmethystWelcome(
-                        onClickGitHub = {
-                            viewModel.openGitHubWebsite()
-                        }
-                    )
+                Column {
+                    if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
+                        OSXTitleBar()
+                    }
 
-                    ProjectsView(
-                        onClickCreateProject = {
-                            viewModel.onClickCreateProject()
-                        },
-                        onClickOpenProject = {
-                            viewModel.onClickOpenProject()
-                        },
-                        onOpenRecentWorkspace = {
-                            viewModel.openProjectFile(it.path)
-                        },
-                        onRemoveProjectFromRecents = {
-                            viewModel.onRemoveProjectFromRecents(it)
+                    Home(
+                        onOpenWorkspace = {
+                            onOpenEditor()
                         }
                     )
                 }

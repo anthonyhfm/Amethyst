@@ -1,4 +1,4 @@
-package dev.anthonyhfm.amethyst.start
+package dev.anthonyhfm.amethyst.home.ui.views
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,12 +24,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
+@OptIn(DelicateCoroutinesApi::class)
 @Composable
 fun AbletonImportWizard(
-    abletonSetName: String,
-    onStartConversion: (customPalettePath: String) -> Unit,
+    path: String,
+    navigator: NavHostController,
+    onOpenWorkspace: () -> Unit,
     onCancel: () -> Unit
 ) {
     val viewModel = viewModel { AbletonImportWizardViewModel() }
@@ -55,7 +64,7 @@ fun AbletonImportWizard(
                         modifier = Modifier.padding(bottom = 6.dp, top = 16.dp)
                     )
                     Text(
-                        "Project: $abletonSetName",
+                        "Project: $path",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         modifier = Modifier.padding(bottom = 24.dp)
@@ -96,10 +105,10 @@ fun AbletonImportWizard(
                                         contentDescription = "Select file",
                                     )
                                     Text(
-                                            text = "Select",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            lineHeight = MaterialTheme.typography.titleSmall.fontSize,
-                                            modifier = Modifier.padding(start = 4.dp)
+                                        text = "Select",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        lineHeight = MaterialTheme.typography.titleSmall.fontSize,
+                                        modifier = Modifier.padding(start = 4.dp)
                                     )
                                 }
                             }
@@ -126,7 +135,14 @@ fun AbletonImportWizard(
                         }
                         Button(
                             onClick = {
-                                onStartConversion(viewModel.customPalettePath.value)
+                                navigator.navigate(HomeNavRoute.LoadingScreen("Translating your Ableton Live-Set"))
+
+                                GlobalScope.launch {
+                                    viewModel.startAbletonImport(path)
+
+                                    onOpenWorkspace()
+                                    cancel()
+                                }
                             },
                             modifier = Modifier.padding(start = 8.dp),
                         ) {

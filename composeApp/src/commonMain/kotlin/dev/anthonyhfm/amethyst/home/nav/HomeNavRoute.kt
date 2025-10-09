@@ -15,4 +15,14 @@ sealed interface HomeNavRoute {
 
     @Serializable
     data object About : HomeNavRoute
+
+    @Serializable
+    data class AbletonImportWizard(
+        val liveSetPath: String
+    ) : HomeNavRoute
+
+    @Serializable
+    data class LoadingScreen(
+        val text: String
+    ) : HomeNavRoute
 }

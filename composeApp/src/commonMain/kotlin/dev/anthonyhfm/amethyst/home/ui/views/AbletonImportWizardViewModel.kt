@@ -1,12 +1,19 @@
-package dev.anthonyhfm.amethyst.start
+package dev.anthonyhfm.amethyst.home.ui.views
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
+import io.github.vinceglb.filekit.readBytes
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -28,5 +35,11 @@ class AbletonImportWizardViewModel: ViewModel() {
                 customPalettePath.value = path
             }
         }
+    }
+
+    fun startAbletonImport(path: String) {
+        val workspace = AbletonConverter.convertToWorkspace(path, customPalettePath.value.takeIf { it.isNotEmpty() })
+
+        WorkspaceRepository.loadWorkspace(workspace)
     }
 }
