@@ -13,10 +13,10 @@ object GlobalSettings {
         get() {
             val jsonString = settings.getString("recentWorkspaces", "[]")
 
-            return Json.decodeFromString<List<RecentWorkspace>>(jsonString)
+            return Json.decodeFromString<List<RecentWorkspace>>(jsonString).distinctBy { it.path }
         }
         set(value) {
-            settings.putString("recentWorkspaces", Json.encodeToString(value))
+            settings.putString("recentWorkspaces", Json.encodeToString(value.distinctBy { it.path }))
         }
 
     var perforanceFPS: Int
