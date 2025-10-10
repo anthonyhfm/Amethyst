@@ -41,7 +41,9 @@ class RecentViewModel(
                         title = "Open Project File"
                     )
 
-                    if (file == null || !file.exists()) return@launch
+                    println("File: ${file}")
+
+                    if (file == null) return@launch
 
                     when (file.extension) {
                         "amproj" -> { // Native Amethyst Projects
