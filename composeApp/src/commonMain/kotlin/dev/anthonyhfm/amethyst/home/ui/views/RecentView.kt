@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -106,22 +107,6 @@ fun RecentView(
                 FloatingActionButtonMenuItem(
                     modifier = Modifier,
                     onClick = {
-                        viewModel.onEvent(Event.OnClickNewProject)
-
-                        showMenu = false
-                    },
-                    icon = {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "New Project"
-                        )
-                    },
-                    text = { Text("New Project") },
-                )
-
-                FloatingActionButtonMenuItem(
-                    modifier = Modifier,
-                    onClick = {
                         viewModel.onEvent(Event.OnClickOpenProject)
 
                         showMenu = false
@@ -133,6 +118,22 @@ fun RecentView(
                         )
                     },
                     text = { Text("Open Project") },
+                )
+
+                FloatingActionButtonMenuItem(
+                    modifier = Modifier,
+                    onClick = {
+                        viewModel.onEvent(Event.OnClickNewProject)
+
+                        showMenu = false
+                    },
+                    icon = {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "New Project"
+                        )
+                    },
+                    text = { Text("New Project") },
                 )
             }
         }
