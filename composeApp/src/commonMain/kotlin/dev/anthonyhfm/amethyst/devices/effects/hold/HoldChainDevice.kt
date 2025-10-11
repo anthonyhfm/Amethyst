@@ -153,6 +153,37 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                 else -> false
             }
 
+            val signalX = when (signal) {
+                is Signal.LED -> signal.x
+                is Signal.Midi -> signal.x
+                else -> null
+            }
+            val signalY = when (signal) {
+                is Signal.LED -> signal.y
+                is Signal.Midi -> signal.y
+                else -> null
+            }
+
+            val updateSchedule: (Double) -> Unit = { delayMs ->
+                if (signalX != null && signalY != null) {
+                    val signalOwner = Pair(this, "${signalX},${signalY}")
+
+                    Heaven.cancelJobs { job ->
+                        job.owner is Pair<*, *> &&
+                                job.owner.first == this &&
+                                job.owner.second == "${signalX},${signalY}"
+                    }
+
+                    Heaven.schedule(delayMs, signalOwner) {
+                        if (signal is Signal.LED) {
+                            signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
+                        } else if (signal is Signal.Midi) {
+                            signalExit?.invoke(listOf(signal.copy(velocity = 0)))
+                        }
+                    }
+                }
+            }
+
             if (down) {
                 if (state.value.onRelease) {
                     return@forEach
@@ -160,24 +191,15 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
 
                 signalExit?.invoke(listOf(signal))
 
-                if (state.value.infinite) {
-                    return@forEach;
+                if (!state.value.infinite) {
+                    updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
                 }
-
-                Heaven.schedule(state.value.delayMs.toDouble() * (state.value.gate * 2)) {
-                    if (signal is Signal.LED) {
-                        signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
-                    } else if (signal is Signal.Midi) {
-                        signalExit?.invoke(listOf(signal.copy(velocity = 0)))
-                    }
-                }
-            }
-            else {
+            } else {
                 if (!state.value.onRelease) {
                     return@forEach
                 }
 
-                Heaven.schedule(0.0){
+                Heaven.schedule(0.0) {
                     if (signal is Signal.LED) {
                         signalExit?.invoke(listOf(signal.copy(color = Color.White)))
                     } else if (signal is Signal.Midi) {
@@ -185,16 +207,8 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                     }
                 }
 
-                if (state.value.infinite) {
-                    return@forEach;
-                }
-
-                Heaven.schedule(state.value.delayMs.toDouble() * (state.value.gate * 2)) {
-                    if (signal is Signal.LED) {
-                        signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
-                    } else if (signal is Signal.Midi) {
-                        signalExit?.invoke(listOf(signal.copy(velocity = 0)))
-                    }
+                if (!state.value.infinite) {
+                    updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
                 }
             }
         }
