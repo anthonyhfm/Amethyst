@@ -191,9 +191,11 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
 
                 signalExit?.invoke(listOf(signal))
 
-                if (!state.value.infinite) {
-                    updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
+                if (state.value.infinite) {
+                    return@forEach
                 }
+
+                updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
             } else {
                 if (!state.value.onRelease) {
                     return@forEach
@@ -207,9 +209,11 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                     }
                 }
 
-                if (!state.value.infinite) {
-                    updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
+                if (state.value.infinite) {
+                    return@forEach
                 }
+
+                updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
             }
         }
     }
