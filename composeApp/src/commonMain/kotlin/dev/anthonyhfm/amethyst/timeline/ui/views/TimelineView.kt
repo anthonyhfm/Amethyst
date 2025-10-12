@@ -27,10 +27,7 @@ fun TimelineView(
 
     Row(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            .fillMaxSize(),
     ) {
         TrackListView(
             tracks = tracks

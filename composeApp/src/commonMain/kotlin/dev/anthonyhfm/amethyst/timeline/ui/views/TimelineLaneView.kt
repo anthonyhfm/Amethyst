@@ -67,11 +67,8 @@ fun TimelineLaneView(
 
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
             .fillMaxSize()
-            .border(1.dp, MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(12.dp)
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -112,8 +109,7 @@ fun PlayheadCursor(
     val playheadPixelPosition = (positionMs * zoomLevel).roundToInt()
     val scrollOffset = scrollState.value
 
-    // Calculate cursor position relative to the timeline content
-    val cursorXPosition = playheadPixelPosition - scrollOffset + 12 // 12dp for padding
+    val cursorXPosition = playheadPixelPosition - scrollOffset
 
     Box(
         modifier = Modifier
@@ -137,11 +133,9 @@ fun TimelineLane(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
             .fillMaxWidth()
-            .height(96.dp)
+            .height(140.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(8.dp)
             .fileDropTarget(
                 onHover = { isHovering, offset, files ->
                     // Optional: Handle hover state if needed

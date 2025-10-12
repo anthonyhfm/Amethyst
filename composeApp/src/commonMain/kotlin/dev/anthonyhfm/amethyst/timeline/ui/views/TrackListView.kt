@@ -32,9 +32,7 @@ fun TrackListView(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxHeight()
-            .border(1.dp, MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
-            .padding(12.dp),
+            .fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         tracks.forEachIndexed { index, track ->
@@ -60,9 +58,8 @@ fun TrackInfo(
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .width(160.dp)
-            .height(96.dp)
+            .width(200.dp)
+            .height(140.dp)
             .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(8.dp),
     ) {
