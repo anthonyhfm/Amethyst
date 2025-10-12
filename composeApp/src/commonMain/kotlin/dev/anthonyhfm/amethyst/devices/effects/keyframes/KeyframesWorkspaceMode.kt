@@ -22,7 +22,9 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Event
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.InfinityCheckbox
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPinchControl
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
@@ -37,7 +39,7 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
     lateinit var state: StateFlow<KeyframesChainDeviceContract.KeyframesChainDeviceState>
 
     var onVirtualDevicePress: ((x: Int, y: Int) -> Unit)? = null
-    var onEvent: ((KeyframesChainDeviceContract.Event) -> Unit)? = null
+    var onEvent: ((Event) -> Unit)? = null
     var modeWakeup: (() -> Unit)? = null
     var modeClose: (() -> Unit)? = null
 
@@ -68,6 +70,13 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     parent = parentDevice
                 )
 
+                KeyframesPinchControl(
+                    pinch = state.pinch,
+                    onPinchChange = { onEvent?.invoke(Event.OnChangePinch(it)) },
+                    bilateral = state.bilateralPinch,
+                    onToggleBilateral = { onEvent?.invoke(Event.OnTogglePinchBilateral) }
+                )
+
                 InfinityCheckbox(
                     checked = state.infinity,
                     onCheckedChange = {
@@ -89,12 +98,12 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
         if (event.type == KeyEventType.KeyDown) {
             when (event.key) {
                 Key.DirectionUp, Key.DirectionLeft -> {
-                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.currentFrameIndex - 1))
+                    onEvent?.invoke(Event.OnSelectFrame(state.value.currentFrameIndex - 1))
                     return true
                 }
 
                 Key.DirectionDown, Key.DirectionRight -> {
-                    onEvent?.invoke(KeyframesChainDeviceContract.Event.OnSelectFrame(state.value.currentFrameIndex + 1))
+                    onEvent?.invoke(Event.OnSelectFrame(state.value.currentFrameIndex + 1))
                     return true
                 }
 
@@ -126,7 +135,7 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                                 currentState.copy(currentFrameIndex = highest + selectedKeyframes.size)
                             }
                         } else {
-                            onEvent?.invoke(KeyframesChainDeviceContract.Event.OnDuplicateFrame())
+                            onEvent?.invoke(Event.OnDuplicateFrame())
                         }
                         return true
                     }
@@ -148,7 +157,7 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                             single = true
                         )
                     } else {
-                        onEvent?.invoke(KeyframesChainDeviceContract.Event.OnDeleteFrame(state.value.currentFrameIndex))
+                        onEvent?.invoke(Event.OnDeleteFrame(state.value.currentFrameIndex))
                     }
                     return true
                 }

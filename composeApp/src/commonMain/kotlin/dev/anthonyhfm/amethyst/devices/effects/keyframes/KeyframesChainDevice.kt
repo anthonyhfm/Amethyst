@@ -35,6 +35,8 @@ import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import kotlinx.coroutines.runBlocking
+import kotlin.math.pow
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
 
 class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
     override val state = MutableStateFlow(KeyframesChainDeviceState())
@@ -112,13 +114,11 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
                                         val index: Int = indexOfFirst { it.x == event.x && it.y == event.y }
                                         val selectedColor = Triple(state.selectedColor.first, state.selectedColor.second, state.selectedColor.third)
 
-                                        // Send to recently added colors
                                         WorkspaceRepository.addRecentColor(Triple(selectedColor.first, selectedColor.second, selectedColor.third))
 
                                         if (index != -1) {
                                             val entry = get(index)
                                             if (Triple(entry.r, entry.g, entry.b) == selectedColor) {
-                                                // same color -> set to black (off)
                                                 removeAt(index)
                                                 add(
                                                     KeyframesEntry(
@@ -140,7 +140,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
                                                         )
                                                     )
                                                 )
-                                            } else { // different color -> update
+                                            } else {
                                                 removeAt(index)
                                                 add(
                                                     KeyframesEntry(
@@ -168,32 +168,31 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
                                                 )
                                         }
                                         } else {
-                                            // Kein Eintrag vorhanden -> hinzufügen
-                                        add(
-                                                KeyframesEntry(
-                                                x = event.x,
-                                                y = event.y,
-                                                    r = selectedColor.first,
-                                                    g = selectedColor.second,
-                                                    b = selectedColor.third
-                                            )
-                                        )
-                                        Heaven.midiEnter(
-                                            listOf(
-                                                Signal.LED(
-                                                    origin = this,
+                                            add(
+                                                    KeyframesEntry(
                                                     x = event.x,
                                                     y = event.y,
-                                                    color = Color(
-                                                            red = selectedColor.first,
-                                                            green = selectedColor.second,
-                                                            blue = selectedColor.third
-                                                    ),
-                                                    layer = 0
+                                                        r = selectedColor.first,
+                                                        g = selectedColor.second,
+                                                        b = selectedColor.third
                                                 )
                                             )
-                                        )
-                                    }
+                                            Heaven.midiEnter(
+                                                listOf(
+                                                    Signal.LED(
+                                                        origin = this,
+                                                        x = event.x,
+                                                        y = event.y,
+                                                        color = Color(
+                                                                red = selectedColor.first,
+                                                                green = selectedColor.second,
+                                                                blue = selectedColor.third
+                                                        ),
+                                                        layer = 0
+                                                    )
+                                                )
+                                            )
+                                        }
                                     }
                                 )
                             )
@@ -325,7 +324,6 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
 
                 removeFrameInternal(event.frameIndex)
 
-                // Update selection to new last frame if we deleted the last frame
                 if (event.frameIndex == state.value.frames.size) {
                     val newFrameIndex = maxOf(0, state.value.frames.size - 1)
                     SelectionManager.select(
@@ -406,6 +404,17 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
                         infinity = event.checked
                     )
                 }
+            }
+
+            is Event.OnChangePinch -> {
+                val newPinch = event.pinch.coerceIn(-2f, 2f)
+                state.update { it.copy(pinch = newPinch) }
+                renderAnimation()
+            }
+
+            Event.OnTogglePinchBilateral -> {
+                state.update { it.copy(bilateralPinch = !it.bilateralPinch) }
+                renderAnimation()
             }
         }
     }
@@ -520,7 +529,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
             _internalUuid = UUID.randomUUID()
         )
 
-        val renderedAnimation = buildList {
+        val raw = buildList {
             frames.forEachIndexed { index, frame ->
                 val previousFrame = frames.getOrNull(index - 1)
                 val deltaMs = previousFrame?.timing?.toMsValue(bpm)?.times(frame.gate * 2)?.toInt() ?: 0
@@ -534,9 +543,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
 
                         val cleared = previousFrame.entries.filter { prev ->
                             frame.entries.none { it.x == prev.x && it.y == prev.y }
-                        }.map {
-                            it.toOffSignal()
-                        }
+                        }.map { it.toOffSignal() }
 
                         addAll(cleared)
                     }
@@ -546,7 +553,24 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
             }
         }
 
-        state.update { it.copy(renderedAnimation = renderedAnimation) }
+        val pinch = state.value.pinch.coerceIn(-2f, 2f)
+        val bilateral = state.value.bilateralPinch
+        val totalDuration = raw.lastOrNull()?.first ?: 0
+
+        val processed = if (totalDuration > 0 && (pinch != 0f || bilateral)) {
+            val totalD = totalDuration.toDouble()
+            raw.map { (time, signals) ->
+                val mapped = Pincher.applyPinch(time.toDouble(), totalD, pinch, bilateral).toInt()
+                mapped to signals
+            }.distinctBy { it.first }
+                .sortedBy { it.first }
+                .let { mappedList ->
+                    val withStart = if (mappedList.firstOrNull()?.first != 0) listOf(0 to mappedList.first().second) + mappedList else mappedList
+                    if (withStart.lastOrNull()?.first != totalDuration) withStart + (totalDuration to emptyList()) else withStart
+                }
+        } else raw
+
+        state.update { it.copy(renderedAnimation = processed) }
     }
 
     private fun KeyframesEntry.toSignal() = Signal.LED(

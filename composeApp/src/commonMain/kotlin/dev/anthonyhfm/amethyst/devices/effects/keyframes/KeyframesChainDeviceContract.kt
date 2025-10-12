@@ -28,6 +28,8 @@ sealed interface KeyframesChainDeviceContract {
             val from: Int,
             val to: Int
         ) : Event
+        data class OnChangePinch(val pinch: Float) : Event
+        data object OnTogglePinchBilateral : Event
 
         data object OnImportMidiFile : Event
     }
@@ -42,6 +44,8 @@ sealed interface KeyframesChainDeviceContract {
             )
         ),
         val infinity: Boolean = false,
+        val pinch: Float = 0f, // Range [-2,2]
+        val bilateralPinch: Boolean = false,
         @Transient
         val renderedAnimation: List<Pair<Int, List<Signal>>> = emptyList(),
     ) : DeviceState()
