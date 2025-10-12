@@ -68,7 +68,15 @@ class RecentViewModel(
             }
 
             is RecentViewContract.Event.OnClickNewProject -> {
+                WorkspaceRepository.loadWorkspace(
+                    SaveableWorkspaceData(
+                        launchpadDevices = listOf(
+                            SaveableWorkspaceData.SavableViewportLaunchpad(0f, 0f, SaveableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO)
+                        )
+                    )
+                )
 
+                triggerEffect(RecentViewContract.Effect.OpenWorkspace)
             }
 
             is RecentViewContract.Event.OpenProjectFromHistory -> {
