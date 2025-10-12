@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -19,6 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.dropShadow
@@ -31,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
@@ -103,9 +107,14 @@ fun PlayheadCursor(
     zoomLevel: Float,
     scrollState: ScrollState
 ) {
-    val playheadPixelPosition = (positionMs * zoomLevel).roundToInt()
-    val scrollOffsetPx = scrollState.value
-    val cursorXPosition = playheadPixelPosition - scrollOffsetPx
+    // Verwende derivedStateOf um nur bei relevanten Änderungen zu invalidieren
+    val cursorXPosition by remember(positionMs, zoomLevel, scrollState) {
+        derivedStateOf {
+            val playheadPx = positionMs * zoomLevel
+            val scroll = scrollState.value.toFloat()
+            (playheadPx - scroll).roundToInt()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -155,6 +164,11 @@ fun TimelineLane(
                 .width(contentWidth)
                 .height(140.dp)
         ) {
+            // Raster zuerst zeichnen
+            GridOverlay(
+                zoomLevel = zoomLevel,
+                contentWidth = contentWidth
+            )
             when (track) {
                 is AudioTimelineTrack -> {
                     track.entries.values.forEach { audioEntry ->
@@ -165,6 +179,62 @@ fun TimelineLane(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GridOverlay(
+    zoomLevel: Float,
+    contentWidth: androidx.compose.ui.unit.Dp,
+    laneHeight: androidx.compose.ui.unit.Dp = 140.dp
+) {
+    val density = LocalDensity.current
+    val contentWidthPx = with(density) { contentWidth.toPx() }
+    val laneHeightPx = with(density) { laneHeight.toPx() }
+
+    val isDark = true
+
+    val minSpacingPx = 48f
+    val candidates = longArrayOf(1,2,5,10,20,50,100,200,500,1000,2000,5000,10000,20000,60000)
+    val intervalMs = candidates.firstOrNull { it * zoomLevel >= minSpacingPx } ?: candidates.last()
+    val majorEvery = when (intervalMs) {
+        1L,2L,5L -> 10
+        10L,20L -> 5
+        50L -> 4
+        100L,200L,500L -> 5
+        1000L -> 5
+        2000L,5000L -> 6
+        else -> 2
+    }
+    val majorIntervalMs = intervalMs * majorEvery
+
+    // Deutlichere Linien: in Light Theme echtes Schwarz, in Dark Theme sehr helles Grau/Weiß
+    val baseColor = if (isDark) Color(0xFFEFEFEF) else Color.Black
+    val minorColor = baseColor.copy(alpha = if (isDark) 0.25f else 0.32f)
+    val majorColor = baseColor.copy(alpha = if (isDark) 0.55f else 0.65f)
+
+    Canvas(
+        modifier = Modifier
+            .width(contentWidth)
+            .height(laneHeight)
+            .zIndex(0f)
+    ) {
+        val strokeMinor = 1.1.dp.toPx()
+        val strokeMajor = 2.dp.toPx()
+        val totalDurationMs = (contentWidthPx / zoomLevel).toLong()
+        var t = 0L
+        while (t <= totalDurationMs) {
+            val x = t * zoomLevel
+            if (x > contentWidthPx + 1f) break
+            val isMajor = (t % majorIntervalMs == 0L)
+            drawLine(
+                color = if (isMajor) majorColor else minorColor,
+                start = Offset(x, 0f),
+                end = Offset(x, laneHeightPx),
+                strokeWidth = if (isMajor) strokeMajor else strokeMinor
+            )
+            t += intervalMs
         }
     }
 }
@@ -183,7 +253,10 @@ fun AudioClip(
             .offset { IntOffset(startOffsetPx, 0) }
             .height(140.dp)
             .width(widthDp)
-            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp)),
+            .background(
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                RoundedCornerShape(4.dp)
+            ),
         contentAlignment = Alignment.CenterStart
     ) {
         Box(
@@ -193,13 +266,14 @@ fun AudioClip(
             Text(
                 text = audioEntry.fileName.substringBeforeLast('.'),
                 modifier = Modifier
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    // ebenfalls transparenter, aber leicht dunkler für Lesbarkeit
+                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f))
                     .padding(4.dp)
                     .zIndex(1f),
                 style = MaterialTheme.typography.labelSmall.copy(
                     lineHeight = MaterialTheme.typography.labelSmall.fontSize,
                 ),
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -208,7 +282,7 @@ fun AudioClip(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(vertical = 4.dp),
-                waveColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                waveColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.55f),
                 signal = Signal.AudioSignal(
                     origin = null,
                     rawData = audioEntry.rawData,
