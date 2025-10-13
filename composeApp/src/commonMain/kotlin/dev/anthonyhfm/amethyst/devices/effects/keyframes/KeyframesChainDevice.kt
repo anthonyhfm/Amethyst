@@ -211,6 +211,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
                 if (event.frameIndex == state.value.frames.lastIndex + 1) {
                     onEvent(Event.OnAddFrame())
                     return
+                } else if (event.frameIndex == -1) {
+                    onEvent(Event.OnAddFrame(0))
+                    return
                 }
 
                 val keyframeItem = Selectable.KeyframeItem(
