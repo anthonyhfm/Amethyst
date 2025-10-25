@@ -41,15 +41,14 @@ class RecentViewModel(
                         title = "Open Project File"
                     )
 
-                    println("File: ${file}")
-
                     if (file == null) return@launch
 
                     when (file.extension) {
                         "amproj" -> { // Native Amethyst Projects
                             val workspace = AmethystProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(file.readBytes())
 
-
+                            WorkspaceRepository.loadWorkspace(workspace)
+                            triggerEffect(RecentViewContract.Effect.OpenWorkspace)
                         }
 
                         "als" -> { // Ableton Live-Sets
