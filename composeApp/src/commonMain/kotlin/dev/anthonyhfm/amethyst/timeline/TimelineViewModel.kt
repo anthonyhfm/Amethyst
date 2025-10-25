@@ -6,10 +6,14 @@ import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 class TimelineViewModel : ViewModel() {
@@ -27,6 +31,11 @@ class TimelineViewModel : ViewModel() {
 
     init {
         initializeDemoData()
+        viewModelScope.launch {
+            TimelineRepository.tracks.collect { repoTracks ->
+                _tracks.value = repoTracks
+            }
+        }
     }
 
     private fun initializeDemoData() {
@@ -44,10 +53,8 @@ class TimelineViewModel : ViewModel() {
                 val track = currentTracks[trackIndex] as AudioTimelineTrack
                 track.entries[audioEntry.startTimeMs] = audioEntry
 
-                // Force update the StateFlow to trigger recomposition
                 _tracks.value = currentTracks.toList()
 
-                // Also update the repository
                 TimelineRepository.tracks.value = currentTracks.toList()
             }
         }
@@ -60,10 +67,6 @@ class TimelineViewModel : ViewModel() {
                 val track = currentTracks[trackIndex] as AudioTimelineTrack
                 track.addFromFile(file, at)
 
-                // Add the file to the track
-
-                // Force update the StateFlow to trigger recomposition
-                // Create a new list with a new track instance to force StateFlow update
                 val newTrack = AudioTimelineTrack().apply {
                     entries.putAll(track.entries)
                 }
@@ -71,7 +74,6 @@ class TimelineViewModel : ViewModel() {
 
                 _tracks.value = currentTracks.toList()
 
-                // Also update the repository
                 TimelineRepository.tracks.value = currentTracks.toList()
 
                 println("ViewModel: StateFlow updated. Total tracks: ${_tracks.value.size}")
@@ -88,7 +90,15 @@ class TimelineViewModel : ViewModel() {
     }
 
     fun setZoomLevel(zoom: Float) {
-        _zoomLevel.value = zoom.coerceIn(0.01f, 10.0f)
+        val clamped = zoom.coerceIn(0.01f, 10.0f)
+        _zoomLevel.value = clamped
+        val updated = SelectionManager.selections.value.map { sel ->
+            if (sel is Selectable.TimelineTime) {
+                val snapped = GridUtils.snapToGrid(sel.timeMs, clamped)
+                if (snapped != sel.timeMs) Selectable.TimelineTime(trackIndex = sel.trackIndex, timeMs = snapped) else sel
+            } else sel
+        }
+        SelectionManager.selections.value = updated
     }
 
     fun zoomBy(factor: Float) {
@@ -123,4 +133,6 @@ class TimelineViewModel : ViewModel() {
     fun setPlayheadPosition(positionMs: Long) {
         TimelineRepository.setPlayheadPosition(positionMs)
     }
+
+    fun getSelectedTimelineTimeMs(): Long? = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTime>().firstOrNull()?.timeMs
 }

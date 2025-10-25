@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -43,7 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import io.github.vinceglb.filekit.PlatformFile
 import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
@@ -55,7 +53,10 @@ import io.github.vinceglb.filekit.extension
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sign
+import androidx.compose.foundation.gestures.detectTapGestures
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 
 @Composable
 fun TimelineLaneView(
@@ -133,21 +134,28 @@ fun TimelineLaneView(
                 }
             }
     ) {
+        val selections by SelectionManager.selections.collectAsState()
         Column(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             tracks.forEachIndexed { index, track ->
+                val laneSelectedTimeMs = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull { it.trackIndex == index }?.timeMs
                 TimelineLane(
                     track = track,
                     zoomLevel = zoomLevel,
                     contentWidth = contentWidth,
                     scrollState = scrollState,
+                    selectedTimeMs = laneSelectedTimeMs,
                     onDropInFile = { file ->
                         viewModel.addAudioFileToTrack(
                             trackIndex = index,
                             file = file,
                             at = playheadPositionMs
                         )
+                    },
+                    onSelectTime = { rawClickTimeMs ->
+                        val snapped = GridUtils.snapToGrid(rawClickTimeMs.coerceAtLeast(0), zoomLevel)
+                        SelectionManager.select(Selectable.TimelineTime(trackIndex = index, timeMs = snapped))
                     }
                 )
             }
@@ -200,7 +208,9 @@ fun TimelineLane(
     zoomLevel: Float,
     contentWidth: androidx.compose.ui.unit.Dp,
     scrollState: ScrollState,
-    onDropInFile: (file: PlatformFile) -> Unit = {}
+    selectedTimeMs: Long?,
+    onDropInFile: (file: PlatformFile) -> Unit = {},
+    onSelectTime: (Long) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -217,6 +227,12 @@ fun TimelineLane(
                 }
             )
             .horizontalScroll(scrollState)
+            .pointerInput(Unit) {
+                detectTapGestures { tapOffset ->
+                    val rawTimeMs = ((scrollState.value + tapOffset.x) / zoomLevel).toLong()
+                    onSelectTime(rawTimeMs)
+                }
+            }
     ) {
         Box(
             modifier = Modifier
@@ -237,6 +253,11 @@ fun TimelineLane(
                     }
                 }
             }
+            SelectionCursor(
+                selectedTimeMs = selectedTimeMs,
+                zoomLevel = zoomLevel,
+                scrollState = scrollState
+            )
         }
     }
 }
@@ -253,19 +274,9 @@ private fun GridOverlay(
 
     val isDark = isSystemInDarkTheme()
 
-    val minSpacingPx = 48f
-    val candidates = longArrayOf(1,2,5,10,20,50,100,200,500,1000,2000,5000,10000,20000,60000)
-    val intervalMs = candidates.firstOrNull { it * zoomLevel >= minSpacingPx } ?: candidates.last()
-    val majorEvery = when (intervalMs) {
-        1L,2L,5L -> 10
-        10L,20L -> 5
-        50L -> 4
-        100L,200L,500L -> 5
-        1000L -> 5
-        2000L,5000L -> 6
-        else -> 2
-    }
-    val majorIntervalMs = intervalMs * majorEvery
+    val intervals = GridUtils.compute(zoomLevel)
+    val intervalMs = intervals.intervalMs
+    val majorIntervalMs = intervals.majorIntervalMs
 
     val baseColor = if (isDark) Color(0xFFEFEFEF) else Color.Black
     val minorColor = baseColor.copy(alpha = if (isDark) 0.25f else 0.32f)
@@ -349,4 +360,32 @@ fun AudioClip(
             )
         }
     }
+}
+
+@Composable
+private fun SelectionCursor(
+    selectedTimeMs: Long?,
+    zoomLevel: Float,
+    scrollState: ScrollState,
+    laneHeight: androidx.compose.ui.unit.Dp = 140.dp
+) {
+    if (selectedTimeMs == null) return
+    val cursorXPosition by remember(selectedTimeMs, zoomLevel, scrollState) {
+        derivedStateOf {
+            val px = selectedTimeMs * zoomLevel
+            val scroll = scrollState.value.toFloat()
+            (px - scroll).roundToInt()
+        }
+    }
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(cursorXPosition, 0) }
+            .width(3.dp)
+            .height(laneHeight)
+            .background(
+                color = Color(0xff8f8fff),
+                shape = RoundedCornerShape(1.dp)
+            )
+            .zIndex(2f)
+    ) {}
 }
