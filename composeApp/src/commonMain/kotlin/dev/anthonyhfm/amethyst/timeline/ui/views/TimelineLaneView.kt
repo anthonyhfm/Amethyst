@@ -367,7 +367,11 @@ fun AudioClip(
             .height(120.dp)
             .width(widthDp)
             .background(backgroundColor, RoundedCornerShape(6.dp))
-            .border(1.5.dp, borderColor, RoundedCornerShape(6.dp))
+            .then(
+                other = if (isSelected)
+                    Modifier.border(1.5.dp, borderColor, RoundedCornerShape(6.dp))
+                else Modifier
+            )
             .zIndex(if (isSelected) 1f else 0f)
             .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
                 detectDragGestures(
@@ -431,6 +435,7 @@ private fun SelectionCursor(
     laneHeight: androidx.compose.ui.unit.Dp = 120.dp
 ) {
     if (selectedTimeMs == null) return
+
     val cursorXPosition by remember(selectedTimeMs, zoomLevel, scrollState) {
         derivedStateOf {
             val px = selectedTimeMs * zoomLevel
@@ -438,6 +443,7 @@ private fun SelectionCursor(
             (px - scroll).roundToInt()
         }
     }
+
     Box(
         modifier = Modifier
             .offset { IntOffset(cursorXPosition, 0) }
@@ -448,5 +454,5 @@ private fun SelectionCursor(
                 shape = RoundedCornerShape(1.dp)
             )
             .zIndex(2f)
-    ) {}
+    )
 }

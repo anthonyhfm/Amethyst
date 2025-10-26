@@ -35,7 +35,6 @@ object TimelineKeyHandler {
             }
         }
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.V) {
-            // Paste wird vollständig im ClipboardManager behandelt
             ClipboardManager.paste()
             return true
         }
