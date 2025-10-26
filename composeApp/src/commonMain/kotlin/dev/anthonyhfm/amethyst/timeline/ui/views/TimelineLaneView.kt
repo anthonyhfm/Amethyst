@@ -233,7 +233,7 @@ fun TimelineLane(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp)
+            .height(120.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .fileDropTarget(
                 onHover = { _: Boolean, _: Offset?, _: List<PlatformFile> -> },
@@ -255,7 +255,7 @@ fun TimelineLane(
         Box(
             modifier = Modifier
                 .width(contentWidth)
-                .height(140.dp)
+                .height(120.dp)
         ) {
             GridOverlay(
                 zoomLevel = zoomLevel,
@@ -289,7 +289,7 @@ fun TimelineLane(
 private fun GridOverlay(
     zoomLevel: Float,
     contentWidth: androidx.compose.ui.unit.Dp,
-    laneHeight: androidx.compose.ui.unit.Dp = 140.dp
+    laneHeight: androidx.compose.ui.unit.Dp = 120.dp
 ) {
     val density = LocalDensity.current
     val contentWidthPx = with(density) { contentWidth.toPx() }
@@ -364,7 +364,7 @@ fun AudioClip(
         modifier = Modifier
             .offset { IntOffset(startOffsetPx + dragOffsetPx.value.roundToInt(), 0) }
             .clip(RoundedCornerShape(6.dp))
-            .height(140.dp)
+            .height(120.dp)
             .width(widthDp)
             .background(backgroundColor, RoundedCornerShape(6.dp))
             .border(1.5.dp, borderColor, RoundedCornerShape(6.dp))
@@ -428,7 +428,7 @@ private fun SelectionCursor(
     selectedTimeMs: Long?,
     zoomLevel: Float,
     scrollState: ScrollState,
-    laneHeight: androidx.compose.ui.unit.Dp = 140.dp
+    laneHeight: androidx.compose.ui.unit.Dp = 120.dp
 ) {
     if (selectedTimeMs == null) return
     val cursorXPosition by remember(selectedTimeMs, zoomLevel, scrollState) {
@@ -444,7 +444,7 @@ private fun SelectionCursor(
             .width(3.dp)
             .height(laneHeight)
             .background(
-                color = Color(0xff8f8fff),
+                color = Color.White,
                 shape = RoundedCornerShape(1.dp)
             )
             .zIndex(2f)

@@ -54,15 +54,10 @@ fun TrackInfo(
         else -> "Track ${trackIndex + 1}"
     }
 
-    val entryCount = when (track) {
-        is AudioTimelineTrack -> track.entries.size
-        else -> 0
-    }
-
     Column(
         modifier = Modifier
             .width(200.dp)
-            .height(140.dp)
+            .height(120.dp)
             .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(8.dp),
     ) {
@@ -75,16 +70,6 @@ fun TrackInfo(
             modifier = Modifier
                 .padding(4.dp)
         )
-
-        if (entryCount > 0) {
-            Text(
-                text = "$entryCount clip${if (entryCount != 1) "s" else ""}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-            )
-        }
 
         Spacer(
             modifier = Modifier

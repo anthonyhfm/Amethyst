@@ -20,7 +20,6 @@ fun TimelineView(
     val scrollState = rememberScrollState()
     val tracks by viewModel.tracks.collectAsState()
 
-    // Set scroll state in ViewModel
     LaunchedEffect(scrollState) {
         viewModel.setScrollState(scrollState)
     }
