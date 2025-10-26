@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.timeline.ui.views
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -54,9 +56,11 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draw.clip
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.engine.heaven.mix
 
 @Composable
 fun TimelineLaneView(
@@ -140,12 +144,14 @@ fun TimelineLaneView(
         ) {
             tracks.forEachIndexed { index, track ->
                 val laneSelectedTimeMs = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull { it.trackIndex == index }?.timeMs
+                val laneSelectedEntries = selections.filterIsInstance<Selectable.TimelineEntryItem>().filter { it.trackIndex == index }
                 TimelineLane(
                     track = track,
                     zoomLevel = zoomLevel,
                     contentWidth = contentWidth,
                     scrollState = scrollState,
                     selectedTimeMs = laneSelectedTimeMs,
+                    selectedEntryStarts = laneSelectedEntries.map { it.entryStartMs }.toSet(),
                     onDropInFile = { file ->
                         viewModel.addAudioFileToTrack(
                             trackIndex = index,
@@ -156,6 +162,9 @@ fun TimelineLaneView(
                     onSelectTime = { rawClickTimeMs ->
                         val snapped = GridUtils.snapToGrid(rawClickTimeMs.coerceAtLeast(0), zoomLevel)
                         SelectionManager.select(Selectable.TimelineTime(trackIndex = index, timeMs = snapped))
+                    },
+                    onSelectEntry = { entryStart ->
+                        SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = index, entryStartMs = entryStart))
                     }
                 )
             }
@@ -209,8 +218,10 @@ fun TimelineLane(
     contentWidth: androidx.compose.ui.unit.Dp,
     scrollState: ScrollState,
     selectedTimeMs: Long?,
+    selectedEntryStarts: Set<Long> = emptySet(),
     onDropInFile: (file: PlatformFile) -> Unit = {},
-    onSelectTime: (Long) -> Unit = {}
+    onSelectTime: (Long) -> Unit = {},
+    onSelectEntry: (Long) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -246,9 +257,12 @@ fun TimelineLane(
             when (track) {
                 is AudioTimelineTrack -> {
                     track.entries.values.forEach { audioEntry ->
+                        val isSelectedEntry = audioEntry.startTimeMs in selectedEntryStarts
                         AudioClip(
                             audioEntry = audioEntry,
-                            zoomLevel = zoomLevel
+                            zoomLevel = zoomLevel,
+                            isSelected = isSelectedEntry,
+                            onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) }
                         )
                     }
                 }
@@ -310,46 +324,51 @@ private fun GridOverlay(
 @Composable
 fun AudioClip(
     audioEntry: AudioEntry,
-    zoomLevel: Float
+    zoomLevel: Float,
+    isSelected: Boolean,
+    onSelectEntry: () -> Unit
 ) {
     val density = LocalDensity.current
     val startOffsetPx = (audioEntry.startTimeMs * zoomLevel).roundToInt()
     val widthDp = with(density) { (audioEntry.durationMs * zoomLevel).toDp() }
+    val borderColor = if (isSelected) Color.White else Color(0xFF3C3CBA)
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF5656EF)
+    val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
 
-    Box(
+    Column(
         modifier = Modifier
             .offset { IntOffset(startOffsetPx, 0) }
+            .clip(RoundedCornerShape(6.dp))
             .height(140.dp)
             .width(widthDp)
-            .background(
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-                RoundedCornerShape(4.dp)
-            ),
-        contentAlignment = Alignment.CenterStart
+            .background(backgroundColor, RoundedCornerShape(6.dp))
+            .border(1.5.dp, borderColor, RoundedCornerShape(6.dp))
     ) {
+        Text(
+            text = audioEntry.fileName.substringBeforeLast('.'),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(borderColor)
+                .clickable { onSelectEntry() }
+                .padding(4.dp),
+            style = MaterialTheme.typography.labelSmall.copy(
+                lineHeight = MaterialTheme.typography.labelSmall.fontSize,
+            ),
+            color = if (isSelected) Color.Black else Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
         ) {
-            Text(
-                text = audioEntry.fileName.substringBeforeLast('.'),
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f))
-                    .padding(4.dp)
-                    .zIndex(1f),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    lineHeight = MaterialTheme.typography.labelSmall.fontSize,
-                ),
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
             WaveformView(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(vertical = 4.dp),
-                waveColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.55f),
+                waveColor = foregroundColor,
                 signal = Signal.AudioSignal(
                     origin = null,
                     rawData = audioEntry.rawData,
