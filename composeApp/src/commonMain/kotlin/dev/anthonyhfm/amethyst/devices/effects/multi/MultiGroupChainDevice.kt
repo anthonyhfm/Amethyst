@@ -1,7 +1,10 @@
 package dev.anthonyhfm.amethyst.devices.effects.multi
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -22,10 +25,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -90,8 +95,10 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.chain.ui.AnimatedInsertedDevice
 import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
+import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
 import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -376,9 +383,25 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
         val textValue = remember { mutableStateOf(TextFieldValue(group.name)) }
         val focusRequester = FocusRequester()
 
+        val pulseAlpha = remember { Animatable(0f) }
+
+        val endSlotIndex = group.chain.devices.value.size
+        val pulseEvents = remember(group.chain, endSlotIndex) {
+            SignalIndicatorManager.events(group.chain, endSlotIndex)
+        }
+        LaunchedEffect(pulseEvents) {
+            pulseEvents.collectLatest {
+                pulseAlpha.stop()
+                pulseAlpha.snapTo(1f)
+                pulseAlpha.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 600, easing = LinearEasing)
+                )
+            }
+        }
+
         LaunchedEffect(renameEnabled) {
             if (renameEnabled) {
-                // Sync text with current group name when starting rename and focus immediately
                 textValue.value = TextFieldValue(group.name)
                 focusRequester.requestFocus()
             } else {
@@ -393,7 +416,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
             }
         }
 
-        Box(
+        Row(
             modifier = Modifier
                 .draggableHandle()
                 .clip(RoundedCornerShape(2.dp))
@@ -425,13 +448,27 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                     style = MaterialTheme.typography.labelLarge,
                     lineHeight = MaterialTheme.typography.labelLarge.fontSize,
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
+                        .weight(1f)
+                        .align(Alignment.CenterVertically)
                         .padding(start = 6.dp),
                     color = when {
                         isSelectedInManager -> MaterialTheme.colorScheme.onPrimary
                         selected -> MaterialTheme.colorScheme.onTertiary
                         else -> MaterialTheme.colorScheme.onTertiaryContainer
                     }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .padding(end = 4.dp)
+                        .size(10.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
+                        .padding(2.dp)
+                        .background(
+                            MaterialTheme.colorScheme.secondary.copy(pulseAlpha.value),
+                            CircleShape
+                        )
                 )
             } else {
                 val customTextSelectionColors = TextSelectionColors(
@@ -447,7 +484,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                         modifier = Modifier
                             .focusRequester(focusRequester)
                             .onFocusSelectAll(textValue)
-                            .align(Alignment.CenterStart)
+                            .align(Alignment.CenterVertically)
                             .padding(start = 6.dp)
                             .onKeyEvent { ev ->
                                 if (ev.key == Key.Enter) {
@@ -455,13 +492,14 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                                     onRenameChange(false)
                                     return@onKeyEvent true
                                 }
+
                                 if (ev.key == Key.Escape) {
                                     onRenameChange(false)
                                     textValue.value = TextFieldValue(group.name)
                                     return@onKeyEvent true
                                 }
 
-                                false
+                                return@onKeyEvent false
                             },
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.None,
