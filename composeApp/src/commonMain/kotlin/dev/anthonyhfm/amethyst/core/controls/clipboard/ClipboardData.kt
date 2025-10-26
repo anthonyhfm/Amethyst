@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Frame
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 
 sealed interface ClipboardData {
     data class ChainDevice(
@@ -26,5 +27,9 @@ sealed interface ClipboardData {
 
     data class GroupChainItem(
         val groups: List<Group>
+    ) : ClipboardData
+
+    data class TimelineEntries(
+        val entries: List<AudioEntry>
     ) : ClipboardData
 }

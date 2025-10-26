@@ -11,6 +11,11 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 
 object ClipboardManager {
     private val _clipboardData: MutableStateFlow<ClipboardData?> = MutableStateFlow(null)
@@ -24,6 +29,23 @@ object ClipboardManager {
         if (data.isEmpty()) return
 
         when {
+            // Timeline Entries zuerst prüfen
+            data.any { it is Selectable.TimelineEntryItem } -> {
+                val selections = data.filterIsInstance<Selectable.TimelineEntryItem>()
+                val distinctTrackIndex = selections.map { it.trackIndex }.toSet()
+                if (distinctTrackIndex.size == 1) {
+                    val trackIndex = distinctTrackIndex.first()
+                    val track = TimelineRepository.tracks.value.getOrNull(trackIndex) as? AudioTimelineTrack
+                    val entries = selections.mapNotNull { sel -> track?.entries?.get(sel.entryStartMs) }
+                    if (entries.isNotEmpty()) {
+                        setClipboardData(ClipboardData.TimelineEntries(entries.sortedBy { it.startTimeMs }.map { it.copy() }))
+                        return
+                    }
+                } else {
+                    // Mehrere Tracks gleichzeitig: ignorieren oder später erweitern
+                }
+            }
+
             data.any { it is Selectable.ChainDevice } -> {
                 setClipboardData(
                     data = ClipboardData.ChainDevice(
@@ -84,7 +106,47 @@ object ClipboardManager {
     fun paste() {
         val mode = WorkspaceRepository.mode.value
 
-        when (clipboardData.value) {
+        when (val clip = clipboardData.value) {
+            is ClipboardData.TimelineEntries -> {
+                // Bestimme Anker (TimelineTime bevorzugt, sonst TimelineEntryItem, sonst 0)
+                val selections = SelectionManager.selections.value
+                val timeSel = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull()
+                val entrySel = selections.filterIsInstance<Selectable.TimelineEntryItem>().firstOrNull()
+                val anchorTrackIndex: Int
+                val anchorTimeMs: Long
+                if (timeSel != null) {
+                    anchorTrackIndex = timeSel.trackIndex
+                    anchorTimeMs = timeSel.timeMs
+                } else if (entrySel != null) {
+                    anchorTrackIndex = entrySel.trackIndex
+                    anchorTimeMs = entrySel.entryStartMs
+                } else {
+                    // Default: erster Track bei 0ms
+                    anchorTrackIndex = 0
+                    anchorTimeMs = 0L
+                }
+                val track = TimelineRepository.tracks.value.getOrNull(anchorTrackIndex) as? AudioTimelineTrack ?: return
+                val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+                val earliest = clip.entries.minBy { it.startTimeMs }.startTimeMs
+
+                clip.entries.sortedBy { it.startTimeMs }.forEach { original ->
+                    val offset = original.startTimeMs - earliest
+                    val newStart = anchorTimeMs + offset
+                    val newEntry = original.copy(startTimeMs = newStart)
+                    val resolved = resolveOverlapForPaste(track, newEntry, original.startTimeMs)
+                    if (resolved != null) {
+                        track.entries[resolved.startTimeMs] = resolved
+                    }
+                }
+                val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+                // State refresh
+                val current = TimelineRepository.tracks.value.toMutableList()
+                val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+                current[anchorTrackIndex] = newTrack
+                TimelineRepository.tracks.value = current.toList()
+                UndoManager.addAction(UndoableAction.TimelineChange(anchorTrackIndex, beforeEntries = before, afterEntries = after))
+            }
+
             is ClipboardData.ChainDevice -> {
                 val index: Int? = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>().maxOfOrNull { device ->
                     device.parent.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID } + 1
@@ -142,8 +204,110 @@ object ClipboardManager {
             }
 
             else -> {
-               println("You cannot copy this right now")
+                println("You cannot copy this right now")
             }
         }
+    }
+
+    // Vereinfachte Overlap-Logik für Paste (dupliziert von TimelineViewModel, leicht angepasst)
+    private fun resolveOverlapForPaste(track: AudioTimelineTrack, newEntry: AudioEntry, originStartMs: Long): AudioEntry? {
+        val direction = newEntry.startTimeMs - originStartMs
+        var adjustedNew = newEntry
+        val toRemove = mutableListOf<Long>()
+        val toReplace = mutableMapOf<Long, AudioEntry>()
+        val toAdd = mutableListOf<AudioEntry>()
+        val sorted = track.entries.values.sortedBy { it.startTimeMs }
+
+        fun cropEntryEnd(entry: AudioEntry, newEndMs: Long): AudioEntry? {
+            if (newEndMs <= entry.startTimeMs) return null
+            val newDuration = newEndMs - entry.startTimeMs
+            val raw = entry.rawData
+            val croppedData = if (raw != null && raw.isNotEmpty()) {
+                val bytesPerSample = (entry.bitDepth / 8) * entry.channels
+                val samplesPerMs = entry.sampleRate.toDouble() / 1000.0
+                val totalSamplesExact = newDuration * samplesPerMs
+                val totalSamples = kotlin.math.round(totalSamplesExact).toLong()
+                val totalBytes = (totalSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
+                raw.sliceArray(0 until totalBytes)
+            } else raw
+            return entry.copy(durationMs = newDuration, rawData = croppedData)
+        }
+        fun buildEntrySegment(original: AudioEntry, segStartMs: Long, segEndMs: Long): AudioEntry? {
+            if (segEndMs <= segStartMs) return null
+            val raw = original.rawData ?: return original.copy(startTimeMs = segStartMs, durationMs = segEndMs - segStartMs)
+            val bytesPerSample = (original.bitDepth / 8) * original.channels
+            val samplesPerMs = original.sampleRate.toDouble() / 1000.0
+            val startSamplesExact = (segStartMs - original.startTimeMs) * samplesPerMs
+            val endSamplesExact = (segEndMs - original.startTimeMs) * samplesPerMs
+            val startSamples = kotlin.math.round(startSamplesExact).toLong().coerceAtLeast(0)
+            val endSamples = kotlin.math.round(endSamplesExact).toLong().coerceAtLeast(startSamples)
+            val startByte = (startSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
+            val endByte = (endSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
+            if (startByte >= endByte) return null
+            val slice = raw.sliceArray(startByte until endByte)
+            return original.copy(startTimeMs = segStartMs, durationMs = segEndMs - segStartMs, rawData = slice)
+        }
+        fun splitEntry(original: AudioEntry, splitStartMs: Long, splitEndMs: Long): Pair<AudioEntry?, AudioEntry?> {
+            val left = if (original.startTimeMs < splitStartMs && original.endTimeMs > original.startTimeMs) {
+                buildEntrySegment(original, original.startTimeMs, splitStartMs)
+            } else null
+            val right = if (original.endTimeMs > splitEndMs && original.endTimeMs > splitEndMs) {
+                buildEntrySegment(original, splitEndMs, original.endTimeMs)
+            } else null
+            return left to right
+        }
+
+        if (direction >= 0) {
+            sorted.forEach { existing ->
+                val overlaps = existing.startTimeMs < adjustedNew.endTimeMs && existing.endTimeMs > adjustedNew.startTimeMs
+                if (!overlaps) return@forEach
+                val existingFullyInsideNew = existing.startTimeMs >= adjustedNew.startTimeMs && existing.endTimeMs <= adjustedNew.endTimeMs
+                val newFullyInsideExisting = existing.startTimeMs <= adjustedNew.startTimeMs && existing.endTimeMs >= adjustedNew.endTimeMs
+                val existingOverlapsAtStart = existing.startTimeMs < adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.startTimeMs && existing.endTimeMs <= adjustedNew.endTimeMs
+                val existingOverlapsAtEnd = existing.startTimeMs >= adjustedNew.startTimeMs && existing.startTimeMs < adjustedNew.endTimeMs && existing.endTimeMs > adjustedNew.endTimeMs
+                val existingSpansAcross = existing.startTimeMs < adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.endTimeMs
+                when {
+                    newFullyInsideExisting -> {
+                        val (left, right) = splitEntry(existing, adjustedNew.startTimeMs, adjustedNew.endTimeMs)
+                        toRemove.add(existing.startTimeMs)
+                        left?.let { toReplace[existing.startTimeMs] = it }
+                        right?.let { toAdd.add(it) }
+                    }
+                    existingFullyInsideNew -> toRemove.add(existing.startTimeMs)
+                    existingOverlapsAtStart -> cropEntryEnd(existing, adjustedNew.startTimeMs)?.let { toReplace[existing.startTimeMs] = it } ?: toRemove.add(existing.startTimeMs)
+                    existingOverlapsAtEnd -> {
+                        toRemove.add(existing.startTimeMs)
+                        buildEntrySegment(existing, adjustedNew.endTimeMs, existing.endTimeMs)?.let { toAdd.add(it) }
+                    }
+                    existingSpansAcross -> {
+                        val (left, right) = splitEntry(existing, adjustedNew.startTimeMs, adjustedNew.endTimeMs)
+                        toRemove.add(existing.startTimeMs)
+                        left?.let { toReplace[existing.startTimeMs] = it }
+                        right?.let { toAdd.add(it) }
+                    }
+                }
+            }
+        } else {
+            var earliestBlockingStart: Long? = null
+            sorted.forEach { existing ->
+                val overlaps = existing.startTimeMs < adjustedNew.endTimeMs && existing.endTimeMs > adjustedNew.startTimeMs
+                if (!overlaps) return@forEach
+                if (existing.startTimeMs <= adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.startTimeMs) return null
+                if (existing.startTimeMs <= adjustedNew.startTimeMs && existing.endTimeMs >= adjustedNew.endTimeMs) return null
+                if (existing.startTimeMs > adjustedNew.startTimeMs && existing.startTimeMs < adjustedNew.endTimeMs) {
+                    if (earliestBlockingStart == null || existing.startTimeMs < earliestBlockingStart!!) earliestBlockingStart = existing.startTimeMs
+                }
+            }
+            if (earliestBlockingStart != null) {
+                val newEndMs = earliestBlockingStart!!
+                if (newEndMs <= adjustedNew.startTimeMs) return null
+                val newDur = newEndMs - adjustedNew.startTimeMs
+                adjustedNew = adjustedNew.copy(durationMs = newDur, rawData = cropEntryEnd(adjustedNew, newEndMs)?.rawData)
+            }
+        }
+        toRemove.forEach { track.entries.remove(it) }
+        toReplace.forEach { (k, v) -> track.entries[k] = v }
+        toAdd.forEach { add -> track.entries[add.startTimeMs] = add }
+        return adjustedNew
     }
 }
