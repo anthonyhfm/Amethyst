@@ -26,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
@@ -62,6 +61,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import androidx.compose.foundation.gestures.detectDragGestures
 import kotlin.math.roundToLong
+import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 fun TimelineLaneView(
@@ -147,7 +147,6 @@ fun TimelineLaneView(
                 val laneSelectedTimeMs = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull { it.trackIndex == index }?.timeMs
                 val laneSelectedEntries = selections.filterIsInstance<Selectable.TimelineEntryItem>().filter { it.trackIndex == index }
                 TimelineLane(
-                    laneIndex = index,
                     track = track,
                     zoomLevel = zoomLevel,
                     contentWidth = contentWidth,
@@ -218,7 +217,6 @@ fun PlayheadCursor(
 
 @Composable
 fun TimelineLane(
-    laneIndex: Int,
     track: TimelineTrack<*>,
     zoomLevel: Float,
     contentWidth: androidx.compose.ui.unit.Dp,
@@ -279,7 +277,7 @@ fun TimelineLane(
             SelectionCursor(
                 selectedTimeMs = selectedTimeMs,
                 zoomLevel = zoomLevel,
-                scrollState = scrollState
+                laneHeight = 120.dp
             )
         }
     }
@@ -431,22 +429,17 @@ fun AudioClip(
 private fun SelectionCursor(
     selectedTimeMs: Long?,
     zoomLevel: Float,
-    scrollState: ScrollState,
     laneHeight: androidx.compose.ui.unit.Dp = 120.dp
 ) {
     if (selectedTimeMs == null) return
 
-    val cursorXPosition by remember(selectedTimeMs, zoomLevel, scrollState) {
-        derivedStateOf {
-            val px = selectedTimeMs * zoomLevel
-            val scroll = scrollState.value.toFloat()
-            (px - scroll).roundToInt()
-        }
+    val cursorXPositionPx by remember(selectedTimeMs, zoomLevel) {
+        derivedStateOf { selectedTimeMs * zoomLevel } // Float, keine Rundung
     }
 
     Box(
         modifier = Modifier
-            .offset { IntOffset(cursorXPosition, 0) }
+            .graphicsLayer { translationX = cursorXPositionPx }
             .width(3.dp)
             .height(laneHeight)
             .background(

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
+import dev.anthonyhfm.amethyst.timeline.ui.components.AddTrackButton
 
 @Composable
 fun TrackListView(
@@ -41,6 +42,8 @@ fun TrackListView(
         tracks.forEachIndexed { index, track ->
             TrackInfo(track = track, trackIndex = index)
         }
+
+        AddTrackButton()
     }
 }
 
