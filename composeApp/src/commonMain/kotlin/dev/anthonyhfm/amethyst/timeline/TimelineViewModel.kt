@@ -6,14 +6,13 @@ import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
-import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 class TimelineViewModel : ViewModel() {
@@ -60,32 +59,232 @@ class TimelineViewModel : ViewModel() {
         }
     }
 
-    fun addAudioFileToTrack(trackIndex: Int, file: PlatformFile, at: Long = 0) {
-        viewModelScope.launch {
-            val currentTracks = _tracks.value.toMutableList()
-            if (trackIndex < currentTracks.size && currentTracks[trackIndex] is AudioTimelineTrack) {
-                val track = currentTracks[trackIndex] as AudioTimelineTrack
-                track.addFromFile(file, at)
+    private fun snapToGrid(timeMs: Long, intervalMs: Long): Long {
+        if (intervalMs <= 0) return timeMs.coerceAtLeast(0L)
+        val q = timeMs.toDouble() / intervalMs.toDouble()
+        return (kotlin.math.round(q) * intervalMs).toLong().coerceAtLeast(0L)
+    }
 
-                val newTrack = AudioTimelineTrack().apply {
-                    entries.putAll(track.entries)
-                }
-                currentTracks[trackIndex] = newTrack
+    private fun cropEntryEnd(entry: AudioEntry, newEndMs: Long): AudioEntry? {
+        if (newEndMs <= entry.startTimeMs) return null
+        val newDuration = newEndMs - entry.startTimeMs
+        val raw = entry.rawData
+        val croppedData = if (raw != null && raw.isNotEmpty()) {
+            val bytesPerSample = (entry.bitDepth / 8) * entry.channels
+            val samplesPerMs = entry.sampleRate.toDouble() / 1000.0
+            val totalSamplesExact = newDuration * samplesPerMs
+            val totalSamples = kotlin.math.round(totalSamplesExact).toLong()
+            val totalBytes = (totalSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
+            raw.sliceArray(0 until totalBytes)
+        } else raw
+        return entry.copy(durationMs = newDuration, rawData = croppedData)
+    }
 
-                _tracks.value = currentTracks.toList()
+    private fun cropEntryEndInPlace(entry: AudioEntry, newEndMs: Long): AudioEntry? = cropEntryEnd(entry, newEndMs)
 
-                TimelineRepository.tracks.value = currentTracks.toList()
+    private fun cropNewEntryEnd(newEntry: AudioEntry, newEndMs: Long): AudioEntry? {
+        if (newEndMs <= newEntry.startTimeMs) return null
+        val newDuration = newEndMs - newEntry.startTimeMs
+        val raw = newEntry.rawData
+        val croppedData = if (raw != null && raw.isNotEmpty()) {
+            val bytesPerSample = (newEntry.bitDepth / 8) * newEntry.channels
+            val samplesPerMs = newEntry.sampleRate.toDouble() / 1000.0
+            val totalSamplesExact = newDuration * samplesPerMs
+            val totalSamples = kotlin.math.round(totalSamplesExact).toLong()
+            val totalBytes = (totalSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
+            raw.sliceArray(0 until totalBytes)
+        } else raw
+        return newEntry.copy(durationMs = newDuration, rawData = croppedData)
+    }
 
-                println("ViewModel: StateFlow updated. Total tracks: ${_tracks.value.size}")
-                _tracks.value.forEachIndexed { index, track ->
-                    if (track is AudioTimelineTrack) {
-                        println("ViewModel: Track $index has ${track.entries.size} entries")
+    private fun sliceAudio(entry: AudioEntry, startMs: Long, endMs: Long): ByteArray? {
+        val raw = entry.rawData ?: return null
+        val safeStart = startMs.coerceAtLeast(entry.startTimeMs)
+        val safeEnd = endMs.coerceAtMost(entry.endTimeMs)
+        if (safeEnd <= safeStart) return ByteArray(0)
+        val bytesPerSample = (entry.bitDepth / 8) * entry.channels
+        val samplesPerMs = entry.sampleRate.toDouble() / 1000.0
+        val startSamplesExact = (safeStart - entry.startTimeMs) * samplesPerMs
+        val endSamplesExact = (safeEnd - entry.startTimeMs) * samplesPerMs
+        val startSamples = kotlin.math.round(startSamplesExact).toLong().coerceAtLeast(0)
+        val endSamples = kotlin.math.round(endSamplesExact).toLong().coerceAtLeast(startSamples)
+        val startByte = (startSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
+        val endByte = (endSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
+        if (startByte >= endByte) return ByteArray(0)
+        return raw.sliceArray(startByte until endByte)
+    }
+
+    private fun buildEntrySegment(original: AudioEntry, segStartMs: Long, segEndMs: Long): AudioEntry? {
+        if (segEndMs <= segStartMs) return null
+        val data = sliceAudio(original, segStartMs, segEndMs)
+        return original.copy(
+            startTimeMs = segStartMs,
+            durationMs = segEndMs - segStartMs,
+            rawData = data
+        )
+    }
+
+    private fun splitEntry(original: AudioEntry, splitStartMs: Long, splitEndMs: Long): Pair<AudioEntry?, AudioEntry?> {
+        val left = if (original.startTimeMs < splitStartMs && original.endTimeMs > original.startTimeMs) {
+            buildEntrySegment(original, original.startTimeMs, splitStartMs)
+        } else null
+        val right = if (original.endTimeMs > splitEndMs && original.endTimeMs > splitEndMs) {
+            buildEntrySegment(original, splitEndMs, original.endTimeMs)
+        } else null
+        return left to right
+    }
+
+    private fun resolveOverlapAsymmetric(
+        track: AudioTimelineTrack,
+        newEntry: AudioEntry,
+        originStartMs: Long
+    ): AudioEntry? {
+        val direction = newEntry.startTimeMs - originStartMs
+        var adjustedNew = newEntry
+        val toRemove = mutableListOf<Long>()
+        val toReplace = mutableMapOf<Long, AudioEntry>()
+        val toAdd = mutableListOf<AudioEntry>()
+
+        val sorted = track.entries.values.sortedBy { it.startTimeMs }
+        if (direction >= 0) {
+            sorted.forEach { existing ->
+                val overlaps = existing.startTimeMs < adjustedNew.endTimeMs && existing.endTimeMs > adjustedNew.startTimeMs
+                if (!overlaps) return@forEach
+
+                val existingFullyInsideNew = existing.startTimeMs >= adjustedNew.startTimeMs && existing.endTimeMs <= adjustedNew.endTimeMs
+                val newFullyInsideExisting = existing.startTimeMs <= adjustedNew.startTimeMs && existing.endTimeMs >= adjustedNew.endTimeMs
+                val existingOverlapsAtStart = existing.startTimeMs < adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.startTimeMs && existing.endTimeMs <= adjustedNew.endTimeMs
+                val existingOverlapsAtEnd = existing.startTimeMs >= adjustedNew.startTimeMs && existing.startTimeMs < adjustedNew.endTimeMs && existing.endTimeMs > adjustedNew.endTimeMs
+                val existingSpansAcross = existing.startTimeMs < adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.endTimeMs
+
+                when {
+                    newFullyInsideExisting -> {
+                        val (left, right) = splitEntry(existing, adjustedNew.startTimeMs, adjustedNew.endTimeMs)
+
+                        toRemove.add(existing.startTimeMs)
+                        left?.let { toReplace[it.startTimeMs] = it }
+                        right?.let { toAdd.add(it) }
                     }
-                    track.entries.values.forEach { entry ->
-                        println("ViewModel: Entry duration: ${entry.durationMs}ms")
+
+                    existingFullyInsideNew -> {
+                        toRemove.add(existing.startTimeMs)
+                    }
+
+                    existingOverlapsAtStart -> {
+                        cropEntryEndInPlace(existing, adjustedNew.startTimeMs)?.let { toReplace[existing.startTimeMs] = it } ?: toRemove.add(existing.startTimeMs)
+                    }
+
+                    existingOverlapsAtEnd -> {
+                        // Existierender beginnt innerhalb des neuen und ragt über dessen Ende -> wir erzeugen einen Rest hinter dem neuen
+                        val tailStart = adjustedNew.endTimeMs
+                        val tailEnd = existing.endTimeMs
+                        // Entferne existierenden & füge Rest hinzu
+                        toRemove.add(existing.startTimeMs)
+                        buildEntrySegment(existing, tailStart, tailEnd)?.let { toAdd.add(it) }
+                    }
+
+                    existingSpansAcross -> {
+                        val (left, right) = splitEntry(existing, adjustedNew.startTimeMs, adjustedNew.endTimeMs)
+                        toRemove.add(existing.startTimeMs)
+                        left?.let { toReplace[it.startTimeMs] = it }
+                        right?.let { toAdd.add(it) }
                     }
                 }
             }
+        } else {
+            var earliestBlockingStart: Long? = null
+            val earlierClips = mutableListOf<AudioEntry>()
+            val laterClips = mutableListOf<AudioEntry>()
+
+            sorted.forEach { existing ->
+                val overlaps = existing.startTimeMs < adjustedNew.endTimeMs && existing.endTimeMs > adjustedNew.startTimeMs
+                if (!overlaps) return@forEach
+                if (existing.startTimeMs < originStartMs) {
+                    earlierClips.add(existing)
+                } else {
+                    laterClips.add(existing)
+                }
+            }
+
+            earlierClips.forEach { existing ->
+                val existingFullyInsideNew = existing.startTimeMs >= adjustedNew.startTimeMs && existing.endTimeMs <= adjustedNew.endTimeMs
+                val newFullyInsideExisting = existing.startTimeMs <= adjustedNew.startTimeMs && existing.endTimeMs >= adjustedNew.endTimeMs
+                val existingOverlapsAtStart = existing.startTimeMs < adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.startTimeMs && existing.endTimeMs <= adjustedNew.endTimeMs
+                val existingOverlapsAtEnd = existing.startTimeMs >= adjustedNew.startTimeMs && existing.startTimeMs < adjustedNew.endTimeMs && existing.endTimeMs > adjustedNew.endTimeMs
+                val existingSpansAcross = existing.startTimeMs < adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.endTimeMs
+                when {
+                    newFullyInsideExisting -> {
+                        val (left, right) = splitEntry(existing, adjustedNew.startTimeMs, adjustedNew.endTimeMs)
+                        toRemove.add(existing.startTimeMs)
+                        left?.let { toReplace[it.startTimeMs] = it }
+                        right?.let { toAdd.add(it) }
+                    }
+                    existingFullyInsideNew -> {
+                        toRemove.add(existing.startTimeMs)
+                    }
+                    existingOverlapsAtStart -> {
+                        cropEntryEndInPlace(existing, adjustedNew.startTimeMs)?.let { toReplace[existing.startTimeMs] = it } ?: toRemove.add(existing.startTimeMs)
+                    }
+                    existingOverlapsAtEnd -> {
+                        val tailStart = adjustedNew.endTimeMs
+                        val tailEnd = existing.endTimeMs
+                        toRemove.add(existing.startTimeMs)
+                        buildEntrySegment(existing, tailStart, tailEnd)?.let { toAdd.add(it) }
+                    }
+                    existingSpansAcross -> {
+                        val (left, right) = splitEntry(existing, adjustedNew.startTimeMs, adjustedNew.endTimeMs)
+                        toRemove.add(existing.startTimeMs)
+                        left?.let { toReplace[it.startTimeMs] = it }
+                        right?.let { toAdd.add(it) }
+                    }
+                }
+            }
+
+            for (existing in laterClips) {
+                if (existing.startTimeMs <= adjustedNew.startTimeMs && existing.endTimeMs > adjustedNew.startTimeMs) {
+                    return null
+                }
+
+                if (existing.startTimeMs <= adjustedNew.startTimeMs && existing.endTimeMs >= adjustedNew.endTimeMs) {
+                    return null
+                }
+
+                if (existing.startTimeMs > adjustedNew.startTimeMs && existing.startTimeMs < adjustedNew.endTimeMs) {
+                    if (earliestBlockingStart == null || existing.startTimeMs < earliestBlockingStart!!) {
+                        earliestBlockingStart = existing.startTimeMs
+                    }
+                }
+            }
+            if (earliestBlockingStart != null) {
+                cropNewEntryEnd(adjustedNew, earliestBlockingStart!!)?.let { adjustedNew = it } ?: return null
+            }
+        }
+
+        toRemove.forEach { track.entries.remove(it) }
+        toReplace.forEach { (k, v) -> track.entries[k] = v }
+        toAdd.forEach { add -> track.entries[add.startTimeMs] = add }
+        return adjustedNew
+    }
+
+    fun addAudioFileToTrack(trackIndex: Int, file: PlatformFile, at: Long = 0) {
+        viewModelScope.launch {
+            val currentTracks = _tracks.value.toMutableList()
+            val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return@launch
+            track.addFromFile(file, at)
+            val original = track.entries[at] ?: return@launch
+            val gridInterval = GridUtils.compute(_zoomLevel.value).intervalMs
+            val snappedStart = snapToGrid(original.startTimeMs, gridInterval)
+            val newEntry = if (snappedStart != original.startTimeMs) {
+                track.entries.remove(original.startTimeMs)
+                original.copy(startTimeMs = snappedStart)
+            } else original
+            val resolved = resolveOverlapAsymmetric(track, newEntry, originStartMs = original.startTimeMs) ?: return@launch
+            track.entries[resolved.startTimeMs] = resolved
+            val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+            currentTracks[trackIndex] = newTrack
+            _tracks.value = currentTracks.toList()
+            TimelineRepository.tracks.value = currentTracks.toList()
+            SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
         }
     }
 
@@ -118,21 +317,22 @@ class TimelineViewModel : ViewModel() {
         _scrollState.value = scrollState
     }
 
-    fun play() {
-        TimelineRepository.play()
+    fun moveAudioEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long) {
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
+        val entry = track.entries.remove(oldStartMs) ?: return
+        val gridInterval = GridUtils.compute(_zoomLevel.value).intervalMs
+        val snappedStart = snapToGrid(newStartMs, gridInterval)
+        val movedEntry = entry.copy(startTimeMs = snappedStart)
+        val resolved = resolveOverlapAsymmetric(track, movedEntry, originStartMs = oldStartMs) ?: run {
+            track.entries[oldStartMs] = entry
+            return
+        }
+        track.entries[resolved.startTimeMs] = resolved
+        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        currentTracks[trackIndex] = newTrack
+        _tracks.value = currentTracks.toList()
+        TimelineRepository.tracks.value = currentTracks.toList()
+        SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
     }
-
-    fun pause() {
-        TimelineRepository.pause()
-    }
-
-    fun stop() {
-        TimelineRepository.stop()
-    }
-
-    fun setPlayheadPosition(positionMs: Long) {
-        TimelineRepository.setPlayheadPosition(positionMs)
-    }
-
-    fun getSelectedTimelineTimeMs(): Long? = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTime>().firstOrNull()?.timeMs
 }

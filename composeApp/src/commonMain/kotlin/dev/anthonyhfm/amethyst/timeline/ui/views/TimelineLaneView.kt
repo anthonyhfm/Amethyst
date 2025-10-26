@@ -60,7 +60,8 @@ import androidx.compose.ui.draw.clip
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
-import dev.anthonyhfm.amethyst.core.engine.heaven.mix
+import androidx.compose.foundation.gestures.detectDragGestures
+import kotlin.math.roundToLong
 
 @Composable
 fun TimelineLaneView(
@@ -146,6 +147,7 @@ fun TimelineLaneView(
                 val laneSelectedTimeMs = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull { it.trackIndex == index }?.timeMs
                 val laneSelectedEntries = selections.filterIsInstance<Selectable.TimelineEntryItem>().filter { it.trackIndex == index }
                 TimelineLane(
+                    laneIndex = index,
                     track = track,
                     zoomLevel = zoomLevel,
                     contentWidth = contentWidth,
@@ -165,6 +167,9 @@ fun TimelineLaneView(
                     },
                     onSelectEntry = { entryStart ->
                         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = index, entryStartMs = entryStart))
+                    },
+                    onMoveEntry = { oldStart, newStart ->
+                        viewModel.moveAudioEntry(index, oldStart, newStart)
                     }
                 )
             }
@@ -213,6 +218,7 @@ fun PlayheadCursor(
 
 @Composable
 fun TimelineLane(
+    laneIndex: Int,
     track: TimelineTrack<*>,
     zoomLevel: Float,
     contentWidth: androidx.compose.ui.unit.Dp,
@@ -221,7 +227,8 @@ fun TimelineLane(
     selectedEntryStarts: Set<Long> = emptySet(),
     onDropInFile: (file: PlatformFile) -> Unit = {},
     onSelectTime: (Long) -> Unit = {},
-    onSelectEntry: (Long) -> Unit = {}
+    onSelectEntry: (Long) -> Unit = {},
+    onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> }
 ) {
     Box(
         modifier = Modifier
@@ -262,7 +269,9 @@ fun TimelineLane(
                             audioEntry = audioEntry,
                             zoomLevel = zoomLevel,
                             isSelected = isSelectedEntry,
-                            onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) }
+                            onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) },
+                            onMoveEntry = { newStart -> onMoveEntry(audioEntry.startTimeMs, newStart) },
+                            gridIntervalMs = GridUtils.compute(zoomLevel).intervalMs
                         )
                     }
                 }
@@ -326,7 +335,9 @@ fun AudioClip(
     audioEntry: AudioEntry,
     zoomLevel: Float,
     isSelected: Boolean,
-    onSelectEntry: () -> Unit
+    onSelectEntry: () -> Unit,
+    onMoveEntry: (newStartMs: Long) -> Unit,
+    gridIntervalMs: Long
 ) {
     val density = LocalDensity.current
     val startOffsetPx = (audioEntry.startTimeMs * zoomLevel).roundToInt()
@@ -335,14 +346,45 @@ fun AudioClip(
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF5656EF)
     val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
 
+    val dragOffsetPx = remember { androidx.compose.runtime.mutableStateOf(0f) }
+    val previewStartMs by remember(dragOffsetPx.value, zoomLevel) {
+        derivedStateOf {
+            val rawDeltaMs = (dragOffsetPx.value / zoomLevel)
+            val candidate = (audioEntry.startTimeMs + rawDeltaMs.roundToLong()).coerceAtLeast(0L)
+
+            val snapped = if (gridIntervalMs > 0) {
+                val q = candidate.toDouble() / gridIntervalMs.toDouble()
+                (kotlin.math.round(q) * gridIntervalMs).toLong()
+            } else candidate
+            snapped
+        }
+    }
+
     Column(
         modifier = Modifier
-            .offset { IntOffset(startOffsetPx, 0) }
+            .offset { IntOffset(startOffsetPx + dragOffsetPx.value.roundToInt(), 0) }
             .clip(RoundedCornerShape(6.dp))
             .height(140.dp)
             .width(widthDp)
             .background(backgroundColor, RoundedCornerShape(6.dp))
             .border(1.5.dp, borderColor, RoundedCornerShape(6.dp))
+            .zIndex(if (isSelected) 1f else 0f)
+            .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                detectDragGestures(
+                    onDragStart = { onSelectEntry() },
+                    onDragEnd = {
+                        if (previewStartMs != audioEntry.startTimeMs) {
+                            onMoveEntry(previewStartMs)
+                        }
+                        dragOffsetPx.value = 0f
+                    },
+                    onDragCancel = { dragOffsetPx.value = 0f },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffsetPx.value += dragAmount.x
+                    }
+                )
+            }
     ) {
         Text(
             text = audioEntry.fileName.substringBeforeLast('.'),
