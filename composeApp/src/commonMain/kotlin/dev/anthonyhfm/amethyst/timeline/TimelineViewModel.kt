@@ -9,6 +9,8 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -175,11 +177,10 @@ class TimelineViewModel : ViewModel() {
                     }
 
                     existingOverlapsAtEnd -> {
-                        // Existierender beginnt innerhalb des neuen und ragt über dessen Ende -> wir erzeugen einen Rest hinter dem neuen
                         val tailStart = adjustedNew.endTimeMs
                         val tailEnd = existing.endTimeMs
-                        // Entferne existierenden & füge Rest hinzu
                         toRemove.add(existing.startTimeMs)
+
                         buildEntrySegment(existing, tailStart, tailEnd)?.let { toAdd.add(it) }
                     }
 
@@ -250,13 +251,13 @@ class TimelineViewModel : ViewModel() {
                 }
 
                 if (existing.startTimeMs > adjustedNew.startTimeMs && existing.startTimeMs < adjustedNew.endTimeMs) {
-                    if (earliestBlockingStart == null || existing.startTimeMs < earliestBlockingStart!!) {
+                    if (earliestBlockingStart == null || existing.startTimeMs < earliestBlockingStart) {
                         earliestBlockingStart = existing.startTimeMs
                     }
                 }
             }
             if (earliestBlockingStart != null) {
-                cropNewEntryEnd(adjustedNew, earliestBlockingStart!!)?.let { adjustedNew = it } ?: return null
+                cropNewEntryEnd(adjustedNew, earliestBlockingStart)?.let { adjustedNew = it } ?: return null
             }
         }
 
@@ -266,10 +267,14 @@ class TimelineViewModel : ViewModel() {
         return adjustedNew
     }
 
+    private fun snapshotAudioEntries(track: AudioTimelineTrack): List<AudioEntry> =
+        track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+
     fun addAudioFileToTrack(trackIndex: Int, file: PlatformFile, at: Long = 0) {
         viewModelScope.launch {
             val currentTracks = _tracks.value.toMutableList()
             val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return@launch
+            val before = snapshotAudioEntries(track)
             track.addFromFile(file, at)
             val original = track.entries[at] ?: return@launch
             val gridInterval = GridUtils.compute(_zoomLevel.value).intervalMs
@@ -280,11 +285,13 @@ class TimelineViewModel : ViewModel() {
             } else original
             val resolved = resolveOverlapAsymmetric(track, newEntry, originStartMs = original.startTimeMs) ?: return@launch
             track.entries[resolved.startTimeMs] = resolved
+            val after = snapshotAudioEntries(track)
             val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
             currentTracks[trackIndex] = newTrack
             _tracks.value = currentTracks.toList()
             TimelineRepository.tracks.value = currentTracks.toList()
             SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
+            UndoManager.addAction(UndoableAction.TimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
         }
     }
 
@@ -320,6 +327,7 @@ class TimelineViewModel : ViewModel() {
     fun moveAudioEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long) {
         val currentTracks = _tracks.value.toMutableList()
         val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
+        val before = snapshotAudioEntries(track)
         val entry = track.entries.remove(oldStartMs) ?: return
         val gridInterval = GridUtils.compute(_zoomLevel.value).intervalMs
         val snappedStart = snapToGrid(newStartMs, gridInterval)
@@ -329,10 +337,21 @@ class TimelineViewModel : ViewModel() {
             return
         }
         track.entries[resolved.startTimeMs] = resolved
+        val after = snapshotAudioEntries(track)
         val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
         currentTracks[trackIndex] = newTrack
         _tracks.value = currentTracks.toList()
         TimelineRepository.tracks.value = currentTracks.toList()
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
+        UndoManager.addAction(UndoableAction.TimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
+    }
+
+    fun deleteAudioEntry(trackIndex: Int, entryStartMs: Long) {
+        val track = _tracks.value.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
+        val original = track.entries.remove(entryStartMs) ?: return
+        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        val current = _tracks.value.toMutableList(); current[trackIndex] = newTrack
+        _tracks.value = current.toList(); TimelineRepository.tracks.value = current.toList()
+        UndoManager.addAction(UndoableAction.TimelineClipDeletion(trackIndex, deleted = original))
     }
 }

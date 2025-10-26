@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.core.controls.undo
 
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 
 object UndoManager {
     private val undoStack: MutableList<UndoableAction> = mutableListOf()
@@ -74,14 +75,12 @@ object UndoManager {
                 }
 
                 is UndoableAction.KeyframePaste -> {
-                    // Remove pasted frames in reverse order to maintain correct indices
                     action.pastedFrames.sortedByDescending { it.frameIndex }.forEach { pasteInfo ->
                         action.device.removeFrameInternal(pasteInfo.frameIndex)
                     }
                     redoStack.add(action)
                 }
 
-                // Group-related undo actions
                 is UndoableAction.GroupCreation -> {
                     action.device.removeGroupInternal(action.groupIndex)
                     redoStack.add(action)
@@ -121,8 +120,12 @@ object UndoManager {
                     }
                     redoStack.add(action)
                 }
+                is UndoableAction.TimelineChange -> {
+                    TimelineRepository.setTrackEntries(action.trackIndex, action.beforeEntries)
 
-                // MultiGroupChainDevice undo actions
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.MultiGroupCreation -> {
                     action.device.removeGroupInternal(action.groupIndex)
                     redoStack.add(action)
@@ -143,6 +146,37 @@ object UndoManager {
                 is UndoableAction.MultiGroupPaste -> {
                     action.pastedGroups.sortedByDescending { it.groupIndex }.forEach { pasteInfo ->
                         action.device.removeGroupInternal(pasteInfo.groupIndex)
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.TimelineClipTrim -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex) as? dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+                    track?.let {
+                        it.entries.remove(action.trimmed.startTimeMs)
+                        it.entries[action.original.startTimeMs] = action.original
+
+                        TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
+                    }
+                    redoStack.add(action)
+                }
+                is UndoableAction.TimelineClipSplit -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex) as? dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+                    track?.let {
+                        action.left?.let { seg -> it.entries.remove(seg.startTimeMs) }
+                        action.right?.let { seg -> it.entries.remove(seg.startTimeMs) }
+
+                        it.entries[action.original.startTimeMs] = action.original
+                        TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.TimelineClipDeletion -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex) as? dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+                    track?.let {
+                        it.entries[action.deleted.startTimeMs] = action.deleted
+                        TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
                     }
                     redoStack.add(action)
                 }
@@ -206,14 +240,12 @@ object UndoManager {
                 }
 
                 is UndoableAction.KeyframePaste -> {
-                    // Re-paste frames in original order
                     action.pastedFrames.forEach { pasteInfo ->
                         action.device.addFrameInternal(pasteInfo.frameIndex, pasteInfo.frame)
                     }
                     undoStack.add(action)
                 }
 
-                // Group-related redo actions
                 is UndoableAction.GroupCreation -> {
                     action.device.addGroupInternal(action.groupIndex, action.group)
                     undoStack.add(action)
@@ -243,7 +275,6 @@ object UndoManager {
                     undoStack.add(action)
                 }
 
-                // MultiGroupChainDevice redo actions
                 is UndoableAction.MultiGroupCreation -> {
                     action.device.addGroupInternal(action.groupIndex, action.group)
                     undoStack.add(action)
@@ -275,6 +306,39 @@ object UndoManager {
                 is UndoableAction.MultiGroupPaste -> {
                     action.pastedGroups.forEach { pasteInfo ->
                         action.device.addGroupInternal(pasteInfo.groupIndex, pasteInfo.group)
+                    }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.TimelineChange -> {
+                    TimelineRepository.setTrackEntries(action.trackIndex, action.afterEntries)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.TimelineClipTrim -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex) as? dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+                    track?.let {
+                        it.entries.remove(action.original.startTimeMs)
+                        it.entries[action.trimmed.startTimeMs] = action.trimmed
+                        TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
+                    }
+                    undoStack.add(action)
+                }
+                is UndoableAction.TimelineClipSplit -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex) as? dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+                    track?.let {
+                        it.entries.remove(action.original.startTimeMs)
+                        action.left?.let { seg -> it.entries[seg.startTimeMs] = seg }
+                        action.right?.let { seg -> it.entries[seg.startTimeMs] = seg }
+                        TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
+                    }
+                    undoStack.add(action)
+                }
+                is UndoableAction.TimelineClipDeletion -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex) as? dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+                    track?.let {
+                        it.entries.remove(action.deleted.startTimeMs)
+                        TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
                     }
                     undoStack.add(action)
                 }

@@ -110,7 +110,6 @@ object TimelineRepository {
             shouldStop
         }
 
-        // Start neue passende Entries
         allEntries.forEach { entry ->
             val shouldPlay = currentPosition >= entry.startTimeMs &&
                 currentPosition < entry.endTimeMs &&
@@ -121,5 +120,16 @@ object TimelineRepository {
                 println("Timeline: Started ${entry.fileName} at ${currentPosition}ms (entry starts at ${entry.startTimeMs}ms)")
             }
         }
+    }
+
+    fun setTrackEntries(trackIndex: Int, audioEntries: List<AudioEntry>) {
+        val current = tracks.value.toMutableList()
+        val track = current.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
+        track.entries.clear()
+        audioEntries.sortedBy { it.startTimeMs }.forEach { e -> track.entries[e.startTimeMs] = e }
+
+        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        current[trackIndex] = newTrack
+        tracks.value = current.toList()
     }
 }

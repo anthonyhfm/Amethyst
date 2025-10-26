@@ -148,4 +148,28 @@ sealed interface UndoableAction {
         val device: MultiGroupChainDevice,
         val pastedGroups: List<GroupPasteInfo>
     ) : UndoableAction
+
+    data class TimelineChange(
+        val trackIndex: Int,
+        val beforeEntries: List<dev.anthonyhfm.amethyst.timeline.data.AudioEntry>,
+        val afterEntries: List<dev.anthonyhfm.amethyst.timeline.data.AudioEntry>
+    ) : UndoableAction
+
+    data class TimelineClipTrim(
+        val trackIndex: Int,
+        val original: dev.anthonyhfm.amethyst.timeline.data.AudioEntry,
+        val trimmed: dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+    ) : UndoableAction
+
+    data class TimelineClipSplit(
+        val trackIndex: Int,
+        val original: dev.anthonyhfm.amethyst.timeline.data.AudioEntry,
+        val left: dev.anthonyhfm.amethyst.timeline.data.AudioEntry?,
+        val right: dev.anthonyhfm.amethyst.timeline.data.AudioEntry?
+    ) : UndoableAction
+
+    data class TimelineClipDeletion(
+        val trackIndex: Int,
+        val deleted: dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+    ) : UndoableAction
 }

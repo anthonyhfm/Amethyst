@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.timeline.utils
 
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
@@ -78,5 +80,14 @@ object TimelineClipUtils {
         val newTrack = AudioTimelineTrack().apply { entries.putAll(audioTrack.entries) }
         currentTracks[trackIndex] = newTrack
         TimelineRepository.tracks.value = currentTracks.toList()
+        // Undo Action hinzufügen
+        UndoManager.addAction(
+            UndoableAction.TimelineClipSplit(
+                trackIndex = trackIndex,
+                original = original,
+                left = first,
+                right = second
+            )
+        )
     }
 }
