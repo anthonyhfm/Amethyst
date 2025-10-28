@@ -33,7 +33,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -54,14 +53,18 @@ import io.github.vinceglb.filekit.extension
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
-import androidx.compose.foundation.gestures.detectDragGestures
-import kotlin.math.roundToLong
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
 fun TimelineLaneView(
@@ -103,10 +106,10 @@ fun TimelineLaneView(
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.type == PointerEventType.Scroll) {
-                            val alt = event.keyboardModifiers.isMetaPressed
+                            val altOrMeta = event.keyboardModifiers.isMetaPressed
                             val change = event.changes.firstOrNull()
                             val deltaY = change?.scrollDelta?.y ?: 0f
-                            if (alt && deltaY != 0f) {
+                            if (altOrMeta && deltaY != 0f) {
                                 accumulatedDeltaY += deltaY
                                 val normalizedTotal = (accumulatedDeltaY / 220f).coerceIn(-1f, 1f)
                                 if (abs(normalizedTotal) >= 0.015f) {
@@ -130,10 +133,27 @@ fun TimelineLaneView(
 
                                     accumulatedDeltaY *= 0.25f
                                 }
-                                event.changes.forEach { pointer -> pointer.consume() }
-                            } else if (!alt && accumulatedDeltaY != 0f) {
+                                event.changes.forEach { it.consume() }
+                            } else if (!altOrMeta && accumulatedDeltaY != 0f) {
                                 accumulatedDeltaY = 0f
                             }
+                        }
+                    }
+                }
+            }
+            .pointerInput(zoomLevel) {
+                detectTransformGestures { centroid, _, gestureZoom, _ ->
+                    if (gestureZoom != 1f) {
+                        val currentZoom = viewModel.zoomLevel.value
+                        val rawNewZoom = currentZoom * gestureZoom
+                        val smoothedZoom = currentZoom + (rawNewZoom - currentZoom) * 0.5f
+                        val newZoom = smoothedZoom.coerceIn(0.0025f, dynamicMaxZoom)
+                        val cursorX = centroid.x
+                        val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value + cursorX) / currentZoom else 0f
+                        if (newZoom != currentZoom) {
+                            viewModel.setZoomLevel(newZoom)
+                            val targetScroll = (timeAtCursorMs * newZoom - cursorX).coerceAtLeast(0f)
+                            scope.launch { scrollState.scrollTo(targetScroll.toInt()) }
                         }
                     }
                 }
@@ -161,7 +181,7 @@ fun TimelineLaneView(
                         )
                     },
                     onSelectTime = { rawClickTimeMs ->
-                        val snapped = GridUtils.snapToGrid(rawClickTimeMs.coerceAtLeast(0), zoomLevel)
+                        val snapped = GridUtils.snapToGrid(rawClickTimeMs.coerceAtLeast(0), zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value)
                         SelectionManager.select(Selectable.TimelineTime(trackIndex = index, timeMs = snapped))
                     },
                     onSelectEntry = { entryStart ->
@@ -228,6 +248,9 @@ fun TimelineLane(
     onSelectEntry: (Long) -> Unit = {},
     onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> }
 ) {
+    val bpm by WorkspaceRepository.bpm.collectAsState()
+    val gridType by WorkspaceRepository.gridType.collectAsState()
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -243,10 +266,22 @@ fun TimelineLane(
                 }
             )
             .horizontalScroll(scrollState)
-            .pointerInput(Unit) {
+            .pointerInput(zoomLevel, bpm, gridType) {
                 detectTapGestures { tapOffset ->
-                    val rawTimeMs = ((scrollState.value + tapOffset.x) / zoomLevel).toLong()
-                    onSelectTime(rawTimeMs)
+                    val currentZoom = zoomLevel // immer aktueller Wert nach Neustart der Coroutine
+                    val currentBpm = WorkspaceRepository.bpm.value
+                    val currentGridType = WorkspaceRepository.gridType.value
+                    val intervals = GridUtils.computeWithGridType(currentZoom, currentBpm, currentGridType)
+                    val gridIntervalMs = intervals.intervalMs
+
+                    val rawPx = scrollState.value.toDouble() + tapOffset.x.toDouble()
+                    val rawTimeMsDouble = if (currentZoom > 0f) rawPx / currentZoom.toDouble() else 0.0
+                    val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
+                    val gridPxSpacing = gridIntervalMs * currentZoom
+                    val shouldSnap = gridIntervalMs > 0 && gridPxSpacing >= 6f
+                    val snapped = if (shouldSnap) GridUtils.snapToGrid(rawTimeMs, currentZoom, currentBpm, currentGridType) else rawTimeMs
+                    println("[TimelineLane] click(pxPerMs) tapX=${tapOffset.x} scroll=${scrollState.value} zoom=$currentZoom rawMs=$rawTimeMs snappedMs=$snapped gridIntMs=$gridIntervalMs gridPxSpacing=$gridPxSpacing diffMs=${snapped - rawTimeMs}")
+                    onSelectTime(snapped)
                 }
             }
     ) {
@@ -257,26 +292,33 @@ fun TimelineLane(
         ) {
             GridOverlay(
                 zoomLevel = zoomLevel,
-                contentWidth = contentWidth
+                contentWidth = contentWidth,
+                bpm = bpm,
+                gridType = gridType
             )
             when (track) {
                 is AudioTimelineTrack -> {
-                    track.entries.values.forEach { audioEntry ->
-                        val isSelectedEntry = audioEntry.startTimeMs in selectedEntryStarts
-                        AudioClip(
-                            audioEntry = audioEntry,
-                            zoomLevel = zoomLevel,
-                            isSelected = isSelectedEntry,
-                            onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) },
-                            onMoveEntry = { newStart -> onMoveEntry(audioEntry.startTimeMs, newStart) },
-                            gridIntervalMs = GridUtils.compute(zoomLevel).intervalMs
-                        )
-                    }
+                    track.entries.values
+                        .sortedBy { it.startTimeMs }
+                        .forEach { audioEntry ->
+                            androidx.compose.runtime.key(audioEntry.startTimeMs) {
+                                val isSelectedEntry = audioEntry.startTimeMs in selectedEntryStarts
+                                AudioClip(
+                                    audioEntry = audioEntry,
+                                    zoomLevel = zoomLevel,
+                                    isSelected = isSelectedEntry,
+                                    onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) },
+                                    onMoveEntry = { newStart -> onMoveEntry(audioEntry.startTimeMs, newStart) },
+                                    gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs
+                                )
+                            }
+                        }
                 }
             }
             SelectionCursor(
                 selectedTimeMs = selectedTimeMs,
                 zoomLevel = zoomLevel,
+                scrollState = scrollState,
                 laneHeight = 120.dp
             )
         }
@@ -287,6 +329,8 @@ fun TimelineLane(
 private fun GridOverlay(
     zoomLevel: Float,
     contentWidth: androidx.compose.ui.unit.Dp,
+    bpm: Double,
+    gridType: GridUtils.GridType,
     laneHeight: androidx.compose.ui.unit.Dp = 120.dp
 ) {
     val density = LocalDensity.current
@@ -295,7 +339,7 @@ private fun GridOverlay(
 
     val isDark = isSystemInDarkTheme()
 
-    val intervals = GridUtils.compute(zoomLevel)
+    val intervals = GridUtils.computeWithGridType(zoomLevel, bpm, gridType)
     val intervalMs = intervals.intervalMs
     val majorIntervalMs = intervals.majorIntervalMs
 
@@ -344,17 +388,17 @@ fun AudioClip(
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF5656EF)
     val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
 
-    val dragOffsetPx = remember { androidx.compose.runtime.mutableStateOf(0f) }
-    val previewStartMs by remember(dragOffsetPx.value, zoomLevel) {
+    val dragOffsetPx = remember(audioEntry.startTimeMs) { mutableStateOf(0f) }
+    var snapEnabled by remember { mutableStateOf(true) }
+    val previewStartMs by remember(dragOffsetPx.value, zoomLevel, snapEnabled) {
         derivedStateOf {
-            val rawDeltaMs = (dragOffsetPx.value / zoomLevel)
-            val candidate = (audioEntry.startTimeMs + rawDeltaMs.roundToLong()).coerceAtLeast(0L)
-
-            val snapped = if (gridIntervalMs > 0) {
-                val q = candidate.toDouble() / gridIntervalMs.toDouble()
+            val rawDeltaMsDouble = dragOffsetPx.value / zoomLevel
+            val candidateMsDouble = audioEntry.startTimeMs.toDouble() + rawDeltaMsDouble
+            val nonNegativeCandidate = candidateMsDouble.coerceAtLeast(0.0)
+            if (snapEnabled && gridIntervalMs > 0) {
+                val q = nonNegativeCandidate / gridIntervalMs.toDouble()
                 (kotlin.math.round(q) * gridIntervalMs).toLong()
-            } else candidate
-            snapped
+            } else kotlin.math.round(nonNegativeCandidate).toLong()
         }
     }
 
@@ -371,22 +415,6 @@ fun AudioClip(
                 else Modifier
             )
             .zIndex(if (isSelected) 1f else 0f)
-            .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
-                detectDragGestures(
-                    onDragStart = { onSelectEntry() },
-                    onDragEnd = {
-                        if (previewStartMs != audioEntry.startTimeMs) {
-                            onMoveEntry(previewStartMs)
-                        }
-                        dragOffsetPx.value = 0f
-                    },
-                    onDragCancel = { dragOffsetPx.value = 0f },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        dragOffsetPx.value += dragAmount.x
-                    }
-                )
-            }
     ) {
         Text(
             text = audioEntry.fileName.substringBeforeLast('.'),
@@ -394,6 +422,24 @@ fun AudioClip(
                 .fillMaxWidth()
                 .background(borderColor)
                 .clickable { onSelectEntry() }
+                .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                    detectDragGestures(
+                        onDragStart = { onSelectEntry() },
+                        onDragEnd = {
+                            if (previewStartMs != audioEntry.startTimeMs) {
+                                onMoveEntry(previewStartMs)
+                            }
+                            dragOffsetPx.value = 0f
+                            snapEnabled = true
+                        },
+                        onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+
+                            dragOffsetPx.value += dragAmount.x
+                        }
+                    )
+                }
                 .padding(4.dp),
             style = MaterialTheme.typography.labelSmall.copy(
                 lineHeight = MaterialTheme.typography.labelSmall.fontSize,
@@ -419,7 +465,7 @@ fun AudioClip(
                     bitDepth = audioEntry.bitDepth,
                     channels = audioEntry.channels,
                     sampleRate = audioEntry.sampleRate,
-                )
+                ),
             )
         }
     }
@@ -429,23 +475,19 @@ fun AudioClip(
 private fun SelectionCursor(
     selectedTimeMs: Long?,
     zoomLevel: Float,
+    scrollState: ScrollState,
     laneHeight: androidx.compose.ui.unit.Dp = 120.dp
 ) {
     if (selectedTimeMs == null) return
-
-    val cursorXPositionPx by remember(selectedTimeMs, zoomLevel) {
-        derivedStateOf { selectedTimeMs * zoomLevel } // Float, keine Rundung
+    val cursorXPositionPx by remember(selectedTimeMs, zoomLevel, scrollState) {
+        derivedStateOf { selectedTimeMs * zoomLevel - scrollState.value }
     }
-
     Box(
         modifier = Modifier
-            .graphicsLayer { translationX = cursorXPositionPx }
+            .offset { IntOffset(cursorXPositionPx.roundToInt(), 0) }
             .width(3.dp)
             .height(laneHeight)
-            .background(
-                color = Color.White,
-                shape = RoundedCornerShape(1.dp)
-            )
+            .background(color = Color.White, shape = RoundedCornerShape(1.dp))
             .zIndex(2f)
     )
 }

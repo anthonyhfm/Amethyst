@@ -1,13 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -15,11 +11,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.max
 import kotlin.math.min
 
 @Composable
@@ -28,16 +22,21 @@ fun WaveformView(
     modifier: Modifier = Modifier,
     waveColor: Color = Color.White,
     onSeek: ((Float) -> Unit)? = null,
+    zoomLevel: Float? = null,
 ) {
     val wave = waveColor
     val baseline = waveColor.copy(alpha = 0.6f)
 
     val bucketWidthPx = 2f
+    val MAX_BUCKETS = 3000
 
     val samples: FloatArray = remember(signal.rawData, signal.bitDepth, signal.channels) {
         val bytes = signal.rawData ?: return@remember FloatArray(0)
         pcmToMonoFloats(bytes, signal.bitDepth, signal.channels)
     }
+
+    // Cache für amplitude envelopes nach BucketCount
+    val envelopeCache = remember { mutableMapOf<Int, FloatArray>() }
 
     Box(
         modifier = modifier
@@ -70,8 +69,17 @@ fun WaveformView(
 
             if (samples.isEmpty() || w <= 1f) return@Canvas
 
-            val bucketCount = max(1, (w / bucketWidthPx).toInt())
-            val amps = envelope(samples, bucketCount)
+            // Berechne Bucket-Anzahl (abhängig von Breite und optional Zoom)
+            val rawBucketCount = (w / bucketWidthPx).toInt().coerceAtLeast(1)
+            val zoomFactor = zoomLevel?.coerceAtLeast(0.0001f) ?: 1f
+            val adjustedBuckets = (rawBucketCount * zoomFactor).toInt().coerceAtLeast(1)
+            val bucketCount = adjustedBuckets.coerceAtMost(MAX_BUCKETS)
+
+            val amps = envelopeCache.getOrPut(bucketCount) {
+                envelope(samples, bucketCount)
+            }
+
+            if (amps.size != bucketCount) return@Canvas
 
             val path = Path().apply {
                 moveTo(0f, centerY)

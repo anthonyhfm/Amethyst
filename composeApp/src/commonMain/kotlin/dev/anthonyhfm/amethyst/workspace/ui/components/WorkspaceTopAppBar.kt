@@ -7,15 +7,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.TooltipBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,8 +19,8 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.ui.components.TimelinePlaybackControls
+import dev.anthonyhfm.amethyst.timeline.ui.components.TimelineGridPicker
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +55,7 @@ fun WorkspaceTopAppBar(
 
         if (mode is WorkspaceContract.WorkspaceMode.Timeline) {
             TimelinePlaybackControls()
+            TimelineGridPicker()
         }
 
         BPMChanger()

@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
@@ -37,6 +38,27 @@ class TimelineViewModel : ViewModel() {
                 _tracks.value = repoTracks
             }
         }
+        // Neue Listener für GridType und BPM -> Selektion neu ausrichten
+        viewModelScope.launch {
+            WorkspaceRepository.gridType.collect { resnapTimelineSelections() }
+        }
+        viewModelScope.launch {
+            WorkspaceRepository.bpm.collect { resnapTimelineSelections() }
+        }
+    }
+
+    // Resnap Funktion für TimelineTime Selektionen
+    private fun resnapTimelineSelections() {
+        val bpm = WorkspaceRepository.bpm.value
+        val gridType = WorkspaceRepository.gridType.value
+        val zoom = _zoomLevel.value
+        val updated = SelectionManager.selections.value.map { sel ->
+            if (sel is Selectable.TimelineTime) {
+                val snapped = GridUtils.snapToGrid(sel.timeMs, zoom, bpm, gridType)
+                if (snapped != sel.timeMs) Selectable.TimelineTime(trackIndex = sel.trackIndex, timeMs = snapped) else sel
+            } else sel
+        }
+        SelectionManager.selections.value = updated
     }
 
     private fun initializeDemoData() {
@@ -277,7 +299,10 @@ class TimelineViewModel : ViewModel() {
             val before = snapshotAudioEntries(track)
             track.addFromFile(file, at)
             val original = track.entries[at] ?: return@launch
-            val gridInterval = GridUtils.compute(_zoomLevel.value).intervalMs
+            val bpm = WorkspaceRepository.bpm.value
+            val gridType = WorkspaceRepository.gridType.value
+            val intervals = GridUtils.computeWithGridType(_zoomLevel.value, bpm, gridType)
+            val gridInterval = intervals.intervalMs
             val snappedStart = snapToGrid(original.startTimeMs, gridInterval)
             val newEntry = if (snappedStart != original.startTimeMs) {
                 track.entries.remove(original.startTimeMs)
@@ -298,9 +323,12 @@ class TimelineViewModel : ViewModel() {
     fun setZoomLevel(zoom: Float) {
         val clamped = zoom.coerceIn(0.01f, 10.0f)
         _zoomLevel.value = clamped
+        // Verwende BPM & GridType für neues Snap
+        val bpm = WorkspaceRepository.bpm.value
+        val gridType = WorkspaceRepository.gridType.value
         val updated = SelectionManager.selections.value.map { sel ->
             if (sel is Selectable.TimelineTime) {
-                val snapped = GridUtils.snapToGrid(sel.timeMs, clamped)
+                val snapped = GridUtils.snapToGrid(sel.timeMs, clamped, bpm, gridType)
                 if (snapped != sel.timeMs) Selectable.TimelineTime(trackIndex = sel.trackIndex, timeMs = snapped) else sel
             } else sel
         }
@@ -329,10 +357,16 @@ class TimelineViewModel : ViewModel() {
         val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
         val before = snapshotAudioEntries(track)
         val entry = track.entries.remove(oldStartMs) ?: return
-        val gridInterval = GridUtils.compute(_zoomLevel.value).intervalMs
-        val snappedStart = snapToGrid(newStartMs, gridInterval)
+        val bpm = WorkspaceRepository.bpm.value
+        val gridType = WorkspaceRepository.gridType.value
+        val intervals = GridUtils.computeWithGridType(_zoomLevel.value, bpm, gridType)
+        val gridInterval = intervals.intervalMs
+        val isAlreadySnapped = gridInterval > 0 && newStartMs % gridInterval == 0L
+        val snappedStart = if (isAlreadySnapped) newStartMs else snapToGrid(newStartMs, gridInterval)
+        println("[TimelineViewModel] moveAudioEntry: old=$oldStartMs requested=$newStartMs snapped=$snappedStart gridInterval=$gridInterval alreadySnapped=$isAlreadySnapped")
         val movedEntry = entry.copy(startTimeMs = snappedStart)
         val resolved = resolveOverlapAsymmetric(track, movedEntry, originStartMs = oldStartMs) ?: run {
+            println("[TimelineViewModel] moveAudioEntry: overlap resolution failed, restoring original")
             track.entries[oldStartMs] = entry
             return
         }

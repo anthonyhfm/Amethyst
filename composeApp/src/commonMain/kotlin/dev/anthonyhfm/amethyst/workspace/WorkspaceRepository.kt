@@ -22,6 +22,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +63,9 @@ object WorkspaceRepository {
     // Keep track of the previous mode
     private var previousMode: WorkspaceContract.WorkspaceMode = WorkspaceContract.WorkspaceMode.Layout()
 
+    private val _gridType = MutableStateFlow<GridUtils.GridType>(GridUtils.GridType.Flexible.Medium)
+    val gridType: StateFlow<GridUtils.GridType> = _gridType.asStateFlow()
+
     init {
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
@@ -93,6 +97,8 @@ object WorkspaceRepository {
             bpm
         }
     }
+
+    fun setGridType(type: GridUtils.GridType) { _gridType.update { type } }
 
     fun setMacroValue(index: Int, macro: Macro) {
         if (index < 0 || index >= _macros.value.size) {
