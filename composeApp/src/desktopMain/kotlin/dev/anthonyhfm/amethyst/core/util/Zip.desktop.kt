@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.core.util
 
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.absoluteFile
 import java.io.File
 import java.io.FileInputStream
 import java.util.zip.GZIPInputStream
@@ -7,9 +9,9 @@ import java.util.zip.ZipInputStream
 
 actual object Zip {
     actual fun getEntries(
-        file: String,
+        file: PlatformFile,
     ): List<ZipEntry> {
-        val file: FileInputStream = File(file).let {
+        val file: FileInputStream = file.file.let {
             if (!it.exists() || !it.isFile) {
                 return emptyList()
             }
@@ -26,6 +28,7 @@ actual object Zip {
             entries.add(
                 ZipEntry(
                     path = entry.name,
+                    data = zipFile.readBytes(),
                     isDirectory = entry.isDirectory,
                 )
             )
@@ -35,31 +38,6 @@ actual object Zip {
         zipFile.close()
 
         return entries
-    }
-
-    actual fun getInputStream(zipPath: String, file: String): ByteArray {
-        val _file = File(zipPath).let {
-            if (!it.exists() || !it.isFile) {
-                return ByteArray(0)
-            }
-
-            return@let it.inputStream()
-        }
-
-        val zipFile = ZipInputStream(_file)
-
-        var entry = zipFile.nextEntry
-        while (entry != null) {
-            if (entry.name == file) {
-                val bytes = zipFile.readBytes()
-                zipFile.close()
-                return bytes
-            }
-            entry = zipFile.nextEntry
-        }
-
-        zipFile.close()
-        return ByteArray(0)
     }
 
     actual fun decode(file: String): ByteArray {

@@ -10,6 +10,10 @@ import kotlinx.coroutines.runBlocking
 
 object ApolloConverter : AmethystConverter {
     // Accept the optional extra parameter but ignore it for Apollo format
+    override fun convertZipToWorkspace(file: PlatformFile): SaveableWorkspaceData {
+        TODO("Not implemented yet")
+    }
+
     override fun convertToWorkspace(path: String, palettePath: String?): SaveableWorkspaceData {
         val file = PlatformFile(path)
 

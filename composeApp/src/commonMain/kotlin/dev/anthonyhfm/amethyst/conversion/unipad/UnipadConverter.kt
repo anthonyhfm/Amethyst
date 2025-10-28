@@ -13,36 +13,41 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SaveableWorkspaceData
+import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.runBlocking
 
 object UnipadConverter : AmethystConverter {
-    // Accept extra parameter but ignore it for Unipad
-    override fun convertToWorkspace(path: String, palettePath: String?): SaveableWorkspaceData {
-        val entries = Zip.getEntries(path)
+    val entries: MutableMap<String, ZipEntry> = mutableMapOf()
 
-        if (!entries.contains(ZipEntry("Info")) && !entries.contains(ZipEntry("info"))) {
-            throw IllegalArgumentException("Invalid Unipad file: Missing 'Info' entry")
-        }
+    override fun convertZipToWorkspace(file: PlatformFile): SaveableWorkspaceData {
+        entries.clear()
+        entries.putAll(
+            from = Zip.getEntries(file)
+                .associateBy {
+                    it.path
+                }
+                .toMutableMap()
+        )
 
-        val infomap: Map<String, String> = Zip.getInputStream(path, if (entries.contains(ZipEntry("Info"))) "Info" else "info")
-            .decodeToString()
-            .trim()
-            .split("\n")
-            .map { it.trim() }.associate {
+        val infoKey = entries.keys.first { it.endsWith("Info") || it.endsWith("info") }
+        val infoMap: Map<String, String> = entries[infoKey]?.data
+            ?.decodeToString()
+            ?.trim()
+            ?.split("\n")
+            ?.map { it.trim() }?.associate {
                 it.split("=")
                     .let { (key, value) -> key to value }
-            }
+            } ?: emptyMap()
 
-        // Load audio clips using the new AudioDecoder system
         val clipMap = runBlocking {
-            KeySound.loadAllAudioClips(path)
+            KeySound.loadAllAudioClips()
         }
 
         return SaveableWorkspaceData(
-            title = infomap["title"] ?: "Untitled Workspace",
-            author = infomap["producerName"] ?: "Unknown",
-            lights = createLightsChain(path, infomap["chain"]?.toInt() ?: 1),
-            sampling = createAudioChain(path, infomap["chain"]?.toInt() ?: 1, clipMap),
+            title = infoMap["title"] ?: "Untitled Workspace",
+            author = infoMap["producerName"] ?: "Unknown",
+            lights = createLightsChain(infoMap["chain"]?.toInt() ?: 1),
+            sampling = createAudioChain(infoMap["chain"]?.toInt() ?: 1, clipMap),
             launchpadDevices = listOf(
                 SaveableWorkspaceData.SavableViewportLaunchpad(
                     positionX = 0f,
@@ -53,8 +58,13 @@ object UnipadConverter : AmethystConverter {
         )
     }
 
-    private fun createAudioChain(path: String, pages: Int, clipMap: Map<String, DecodedAudioClip>): StateChain {
-        val keySound = Zip.getInputStream(path, if (Zip.getEntries(path).contains(ZipEntry("KeySound"))) "KeySound" else "keySound")
+    // still accept old function
+    override fun convertToWorkspace(path: String, palettePath: String?): SaveableWorkspaceData {
+        return convertZipToWorkspace(PlatformFile(path))
+    }
+
+    private fun createAudioChain(pages: Int, clipMap: Map<String, DecodedAudioClip>): StateChain {
+        val keySound = entries.filter { it.key.startsWith("KeySound") }.values.firstOrNull()?.data ?: return StateChain()
 
         return StateChain(
             devices = listOf(
@@ -76,8 +86,8 @@ object UnipadConverter : AmethystConverter {
         )
     }
 
-    private fun createLightsChain(path: String, pages: Int): StateChain {
-        val entries = Zip.getEntries(path).filter { it.path.startsWith("keyLED/") }
+    private fun createLightsChain(pages: Int): StateChain {
+        val entries = entries.filter { it.key.startsWith("keyLED/") }
 
         return StateChain(
             devices = listOf(
@@ -86,9 +96,8 @@ object UnipadConverter : AmethystConverter {
                         Group(
                             name = "Page ${index + 1}",
                             stateChain = KeyLED.createChain(
-                                path,
                                 page = index,
-                                entries = entries.filter { it.path.startsWith("keyLED/${index + 1}") }.map { it.path }
+                                entries = entries.filter { it.key.startsWith("keyLED/${index + 1}") }.map { it.key }
                             )
                         )
                     }.plus(

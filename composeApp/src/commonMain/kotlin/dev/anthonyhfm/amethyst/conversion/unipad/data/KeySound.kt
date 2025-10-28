@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.unipad.data
 
+import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
@@ -46,20 +47,16 @@ data class DecodedAudioClip(
 }
 
 object KeySound {
-    suspend fun loadAllAudioClips(zipFile: String): Map<String, DecodedAudioClip> = withContext(Dispatchers.IO) {
-        val entries = Zip.getEntries(zipFile).filter {
-            (it.path.startsWith("Sounds/") || it.path.startsWith("sounds/")) && !it.isDirectory
-        }
-
+    suspend fun loadAllAudioClips(): Map<String, DecodedAudioClip> = withContext(Dispatchers.IO) {
         val clipMap = mutableMapOf<String, DecodedAudioClip>()
 
         // Process audio files in parallel
-        val jobs = entries.map { entry ->
+        val jobs = UnipadConverter.entries.values.map { entry ->
             async(Dispatchers.Default) {
                 val clipName = entry.path.removePrefix("Sounds/").removePrefix("sounds/").trim()
 
                 try {
-                    val audioData = Zip.getInputStream(zipFile, entry.path)
+                    val audioData = entry.data
                     val audioSignal = AudioDecoder.decodeAudioData(audioData, clipName)
 
                     if (audioSignal != null) {

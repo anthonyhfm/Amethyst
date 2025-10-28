@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -284,18 +284,17 @@ fun TimelineLane(
                     onSelectTime(snapped)
                 }
             }
+            .timelineGridOverlay(
+                zoomLevel = zoomLevel,
+                bpm = bpm,
+                gridType = gridType
+            )
     ) {
         Box(
             modifier = Modifier
                 .width(contentWidth)
                 .height(120.dp)
         ) {
-            GridOverlay(
-                zoomLevel = zoomLevel,
-                contentWidth = contentWidth,
-                bpm = bpm,
-                gridType = gridType
-            )
             when (track) {
                 is AudioTimelineTrack -> {
                     track.entries.values
@@ -315,46 +314,37 @@ fun TimelineLane(
                         }
                 }
             }
-            SelectionCursor(
-                selectedTimeMs = selectedTimeMs,
-                zoomLevel = zoomLevel,
-                scrollState = scrollState,
-                laneHeight = 120.dp
-            )
         }
+
+        SelectionCursor(
+            selectedTimeMs = selectedTimeMs,
+            zoomLevel = zoomLevel,
+            scrollState = scrollState,
+            laneHeight = 120.dp
+        )
     }
 }
 
 @Composable
-private fun GridOverlay(
+private fun Modifier.timelineGridOverlay(
     zoomLevel: Float,
-    contentWidth: androidx.compose.ui.unit.Dp,
     bpm: Double,
-    gridType: GridUtils.GridType,
-    laneHeight: androidx.compose.ui.unit.Dp = 120.dp
-) {
-    val density = LocalDensity.current
-    val contentWidthPx = with(density) { contentWidth.toPx() }
-    val laneHeightPx = with(density) { laneHeight.toPx() }
+    gridType: GridUtils.GridType
+): Modifier {
+    return this.drawWithContent {
+        drawContent()
+        if (zoomLevel <= 0f) return@drawWithContent
+        val intervals = GridUtils.computeWithGridType(zoomLevel, bpm, gridType)
+        val intervalMs = intervals.intervalMs
+        val majorIntervalMs = intervals.majorIntervalMs
+        if (intervalMs <= 0L) return@drawWithContent
+        val pxPerGrid = intervalMs * zoomLevel
+        if (pxPerGrid < 4f) return@drawWithContent
 
-    val isDark = isSystemInDarkTheme()
-
-    val intervals = GridUtils.computeWithGridType(zoomLevel, bpm, gridType)
-    val intervalMs = intervals.intervalMs
-    val majorIntervalMs = intervals.majorIntervalMs
-
-    val baseColor = if (isDark) Color(0xFFEFEFEF) else Color.Black
-    val minorColor = baseColor.copy(alpha = if (isDark) 0.25f else 0.32f)
-    val majorColor = baseColor.copy(alpha = if (isDark) 0.55f else 0.65f)
-
-    Canvas(
-        modifier = Modifier
-            .width(contentWidth)
-            .height(laneHeight)
-            .zIndex(0f)
-    ) {
-        val strokeMinor = 1.1.dp.toPx()
-        val strokeMajor = 2.dp.toPx()
+        val baseColor = Color(0xFF101010)
+        val minorColor = baseColor.copy(alpha = 0.30f)
+        val majorColor = baseColor.copy(alpha = 0.60f)
+        val contentWidthPx = size.width
         val totalDurationMs = (contentWidthPx / zoomLevel).toLong()
         var t = 0L
         while (t <= totalDurationMs) {
@@ -364,8 +354,8 @@ private fun GridOverlay(
             drawLine(
                 color = if (isMajor) majorColor else minorColor,
                 start = Offset(x, 0f),
-                end = Offset(x, laneHeightPx),
-                strokeWidth = if (isMajor) strokeMajor else strokeMinor
+                end = Offset(x, size.height),
+                strokeWidth = 1.dp.toPx()
             )
             t += intervalMs
         }
@@ -381,6 +371,9 @@ fun AudioClip(
     onMoveEntry: (newStartMs: Long) -> Unit,
     gridIntervalMs: Long
 ) {
+    val bpm by WorkspaceRepository.bpm.collectAsState()
+    val gridType by WorkspaceRepository.gridType.collectAsState()
+
     val density = LocalDensity.current
     val startOffsetPx = (audioEntry.startTimeMs * zoomLevel).roundToInt()
     val widthDp = with(density) { (audioEntry.durationMs * zoomLevel).toDp() }
@@ -420,7 +413,7 @@ fun AudioClip(
             text = audioEntry.fileName.substringBeforeLast('.'),
             modifier = Modifier
                 .fillMaxWidth()
-                .background(borderColor)
+                .background(borderColor.copy(alpha = 0.65f))
                 .clickable { onSelectEntry() }
                 .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
                     detectDragGestures(
@@ -453,6 +446,11 @@ fun AudioClip(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .timelineGridOverlay(
+                    zoomLevel = zoomLevel,
+                    bpm = bpm,
+                    gridType = gridType
+                )
         ) {
             WaveformView(
                 modifier = Modifier

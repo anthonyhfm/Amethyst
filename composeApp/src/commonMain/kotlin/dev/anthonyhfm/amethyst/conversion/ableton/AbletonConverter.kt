@@ -49,6 +49,10 @@ object AbletonConverter : AmethystConverter {
     var audioMap: Map<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState> = emptyMap()
         private set
 
+    override fun convertZipToWorkspace(file: PlatformFile): SaveableWorkspaceData {
+        TODO("Not implemented yet")
+    }
+
     override fun convertToWorkspace(path: String, palettePath: String?): SaveableWorkspaceData {
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
 

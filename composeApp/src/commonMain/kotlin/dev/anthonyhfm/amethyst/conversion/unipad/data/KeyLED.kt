@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.unipad.data
 
 import androidx.compose.ui.graphics.Color
+import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
@@ -148,7 +149,7 @@ object KeyLED {
         )
     }
 
-    fun createChain(zipFile: String, page: Int, entries: List<String>): StateChain {
+    fun createChain(page: Int, entries: List<String>): StateChain {
         val groups = mutableListOf<Group>()
 
         entries.filter { // Single Animation
@@ -157,7 +158,7 @@ object KeyLED {
             val x = entry.split(" ")[2].toInt()
             val y = entry.split(" ")[1].toInt()
 
-            val keyLED = Zip.getInputStream(zipFile, entry)
+            val keyLED = UnipadConverter.entries[entry]?.data ?: return@forEachIndexed
 
             groups.add(
                 Group(
@@ -202,7 +203,7 @@ object KeyLED {
                                         name = it.split(" ")[4].trim(),
                                         stateChain = StateChain(
                                             devices = listOf(
-                                                convertToKeyframes(Zip.getInputStream(zipFile, it))
+                                                convertToKeyframes(UnipadConverter.entries[it]?.data ?: return@forEachIndexed)
                                             )
                                         )
                                     )
