@@ -40,16 +40,32 @@ actual object Zip {
         return entries
     }
 
-    actual fun decode(file: String): ByteArray {
-        val _file = File(file).let {
+    actual fun getPaths(file: PlatformFile): List<String> {
+        val file: FileInputStream = file.file.let {
             if (!it.exists() || !it.isFile) {
-                return ByteArray(0)
+                return emptyList()
             }
 
             return@let it.inputStream()
         }
 
-        val zipFile = GZIPInputStream(_file)
+        val zipFile = ZipInputStream(file)
+
+        val entries = mutableListOf<String>()
+
+        var entry = zipFile.nextEntry
+        while (entry != null) {
+            entries.add(entry.name)
+            entry = zipFile.nextEntry
+        }
+
+        zipFile.close()
+
+        return entries
+    }
+
+    actual fun decode(data: ByteArray): ByteArray {
+        val zipFile = GZIPInputStream(data.inputStream())
 
         return zipFile.readAllBytes()
     }

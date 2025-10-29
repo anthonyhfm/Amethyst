@@ -10,7 +10,11 @@ import io.github.vinceglb.filekit.path
 
 object FileRef {
     fun resolveFileReference(refXml: XmlElement): String {
-        val projectPath = AbletonConverter.file!!.parent()!!.path
+        val projectPath = if (AbletonConverter.isZip) {
+            AbletonConverter.zipStartPath
+        } else {
+            AbletonConverter.file!!.parent()!!.path
+        }
 
         val relativePathType: Int = refXml.querySelector("RelativePathType")[0].attributes["Value"]?.toInt() ?: -1
         

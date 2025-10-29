@@ -38,7 +38,13 @@ class AbletonImportWizardViewModel: ViewModel() {
     }
 
     fun startAbletonImport(path: String) {
-        val workspace = AbletonConverter.convertToWorkspace(path, customPalettePath.value.takeIf { it.isNotEmpty() })
+        val workspace = if (path.lowercase().endsWith(".zip")) {
+            val file = PlatformFile(path)
+
+            AbletonConverter.convertZipToWorkspace(file)
+        } else {
+            AbletonConverter.convertToWorkspace(path, customPalettePath.value.takeIf { it.isNotEmpty() })
+        }
 
         WorkspaceRepository.loadWorkspace(workspace)
     }

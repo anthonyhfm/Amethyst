@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.nameWithoutExtension
@@ -44,8 +45,12 @@ class MxDeviceMidiEffectAdapter(
             if (it != null) {
                 return@let it
             } else {
-                val maxFile = PlatformFile(path)
-                val hash = maxFile.getFileHash()
+                val hash: String = if (AbletonConverter.isZip) {
+                    AbletonConverter.zipEntries[path]?.data?.toFileHash() ?: ""
+                } else {
+                    val maxFile = PlatformFile(path)
+                    maxFile.getFileHash()
+                }
 
                 fileHashMap[path] = hash
 

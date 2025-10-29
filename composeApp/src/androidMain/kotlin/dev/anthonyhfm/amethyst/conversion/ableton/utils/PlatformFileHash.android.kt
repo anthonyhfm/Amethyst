@@ -19,3 +19,7 @@ actual fun PlatformFile.getFileHash(): String {
 
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
+
+actual fun ByteArray.toFileHash(): String {
+    TODO("Not yet implemented")
+}

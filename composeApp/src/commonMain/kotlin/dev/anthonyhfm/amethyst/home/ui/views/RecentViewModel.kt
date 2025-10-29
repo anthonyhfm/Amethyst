@@ -7,6 +7,9 @@ import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.BaseViewModel
 import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.Zip
+import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
+import dev.anthonyhfm.amethyst.core.util.determineFormat
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -20,6 +23,7 @@ import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.extension
 import io.github.vinceglb.filekit.path
 import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.size
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -51,10 +55,14 @@ class RecentViewModel(
 
                     when (file.extension) {
                         "amproj" -> { // Native Amethyst Projects
-                            val workspace = AmethystProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(file.readBytes())
+                            navigator.navigate(HomeNavRoute.LoadingScreen("Loading Project"))
 
-                            WorkspaceRepository.loadWorkspace(workspace)
-                            triggerEffect(RecentViewContract.Effect.OpenWorkspace)
+                            GlobalScope.launch {
+                                val workspace = AmethystProtoBuf.decodeFromByteArray<SaveableWorkspaceData>(file.readBytes())
+
+                                WorkspaceRepository.loadWorkspace(workspace)
+                                triggerEffect(RecentViewContract.Effect.OpenWorkspace)
+                            }
                         }
 
                         "als" -> { // Ableton Live-Sets
@@ -65,14 +73,28 @@ class RecentViewModel(
 
                         }
 
-                        "zip" -> { // Most likely UniPad, but could be another zipped project
-                            navigator.navigate(HomeNavRoute.LoadingScreen("Translating your UniPad Project"))
+                        "zip" -> {
+                            val format = Zip.determineFormat(file)
 
-                            GlobalScope.launch {
-                                val workspace = UnipadConverter.convertZipToWorkspace(file)
+                            when (format) {
+                                ZippedProjectFormat.ABLETON -> {
+                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.absolutePath()))
+                                }
 
-                                WorkspaceRepository.loadWorkspace(workspace)
-                                triggerEffect(RecentViewContract.Effect.OpenWorkspace)
+                                ZippedProjectFormat.ABLETON_APOLLO -> {
+                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.absolutePath()))
+                                }
+
+                                ZippedProjectFormat.UNIPAD -> {
+                                    navigator.navigate(HomeNavRoute.LoadingScreen("Translating your UniPad Project"))
+
+                                    GlobalScope.launch {
+                                        val workspace = UnipadConverter.convertZipToWorkspace(file)
+
+                                        WorkspaceRepository.loadWorkspace(workspace)
+                                        triggerEffect(RecentViewContract.Effect.OpenWorkspace)
+                                    }
+                                }
                             }
                         }
                     }

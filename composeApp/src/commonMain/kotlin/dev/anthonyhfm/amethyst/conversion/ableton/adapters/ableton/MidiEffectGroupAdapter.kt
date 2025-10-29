@@ -12,6 +12,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.MultiAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
@@ -140,8 +141,13 @@ class MidiEffectGroupAdapter(
                                     if (patchSlot?.localQuerySelector("FileRef")?.isEmpty() == true) return@let null
 
                                     val path = FileRef.resolveFileReference(patchSlot?.localQuerySelector("FileRef")?.first() ?: return@let null)
-                                    val file = PlatformFile(path)
-                                    val hash = file.getFileHash()
+                                    val hash: String = if (AbletonConverter.isZip) {
+                                        AbletonConverter.zipEntries[path]?.data?.toFileHash() ?: ""
+                                    } else {
+                                        val file = PlatformFile(path)
+                                        file.getFileHash()
+                                    }
+
                                     hash
                                 }
                                 val outbreakMultiHashMatches = MULTI_HASHES.contains(potentialMultiDeviceHash)

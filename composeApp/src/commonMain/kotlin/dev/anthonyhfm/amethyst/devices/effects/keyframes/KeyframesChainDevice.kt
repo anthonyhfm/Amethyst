@@ -37,6 +37,7 @@ import io.github.vinceglb.filekit.dialogs.openFilePicker
 import kotlinx.coroutines.runBlocking
 import kotlin.math.pow
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
+import io.github.vinceglb.filekit.readBytes
 
 class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
     override val state = MutableStateFlow(KeyframesChainDeviceState())
@@ -390,13 +391,17 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>() {
 
                     if (file == null) return@runBlocking
 
-                    val data = MidiFileImporter.loadFile(
-                        file = file,
-                        bpm = WorkspaceRepository.bpm.value
-                    )
+                    try {
+                        val data = MidiFileImporter.loadData(
+                            data = file.readBytes(),
+                            bpm = WorkspaceRepository.bpm.value
+                        )
 
-                    this@KeyframesChainDevice.state.update {
-                        data
+                        this@KeyframesChainDevice.state.update {
+                            data
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
             }

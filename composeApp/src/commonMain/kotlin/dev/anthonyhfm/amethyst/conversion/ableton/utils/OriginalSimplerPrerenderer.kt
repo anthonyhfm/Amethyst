@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
@@ -37,23 +38,36 @@ class OriginalSimplerPrerenderer {
 
     private suspend fun decodeAudio(data: OriginalSimplerAdapter.OriginalSimplerData): ClipChainDeviceState =
         withContext(Dispatchers.IO) {
-            val audioFile = PlatformFile(data.filePath)
+            val audioFileBytes = if (AbletonConverter.isZip) {
+                val fileBytes = AbletonConverter.zipEntries[data.filePath]?.data
 
-            if (!audioFile.exists() || !audioFile.isRegularFile()) {
-                println("Error with decoding OriginalSimpler $data")
-                return@withContext ClipChainDeviceState()
+                if (fileBytes == null) {
+                    println("Error with decoding OriginalSimpler $data")
+                    return@withContext ClipChainDeviceState()
+                }
+
+                fileBytes
+            } else {
+                val audioFile = PlatformFile(data.filePath)
+
+                if (!audioFile.exists() || !audioFile.isRegularFile()) {
+                    println("Error with decoding OriginalSimpler $data")
+                    return@withContext ClipChainDeviceState()
+                }
+
+                audioFile.readBytes()
             }
 
             val audioSignal = AudioDecoder.decodeAudioData(
-                audioData = audioFile.readBytes(), // siehe Fix 3 unten
-                fileName = audioFile.name,
+                audioData = audioFileBytes, // siehe Fix 3 unten
+                fileName = data.filePath,
                 sampleStart = data.sampleStart.takeIf { it > 0 },
                 sampleEnd = data.sampleEnd.takeIf { it > 0 }
             )
 
             audioSignal?.let {
                 ClipChainDeviceState(
-                    fileName = audioFile.name,
+                    fileName = data.filePath,
                     rawData = it.rawData,
                     sampleRate = it.sampleRate,
                     channels = it.channels,

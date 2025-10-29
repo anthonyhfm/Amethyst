@@ -17,19 +17,12 @@ import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
-    fun loadFile(
-        file: PlatformFile,
+    fun loadData(
+        data: ByteArray,
         bpm: Double = 120.0,
         palette: Array<Triple<Int, Int, Int>> = Palettes.novation,
         xyOffset: IntOffset = IntOffset.Zero
     ): KeyframesChainDeviceContract.KeyframesChainDeviceState {
-        val data = try {
-            runBlocking { file.readBytes() }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return KeyframesChainDeviceContract.KeyframesChainDeviceState()
-        }
-
         var offset = 0
 
         fun bytesRemaining(): Int = data.size - offset
