@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.PageSwitcherAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator1Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.nev.WormholeAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DelayAdapter
@@ -118,6 +119,10 @@ class MxDeviceMidiEffectAdapter(
 
                 "d8c48c67824319295bb5bf7abda47f27" -> {
                     return Resonator2Adapter(readDataBlob(blob.text!!), xml).toDeviceStates()
+                }
+
+                "4bd554ebb0ee0536dee1ab7a9875fc20" -> {
+                    return Resonator1Adapter(readDataBlob(blob.text!!), xml).toDeviceStates()
                 }
 
                 "2491c3c841b70b7c9765db8e4defdfff",
