@@ -5,12 +5,11 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.PageSwitcherAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator1Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator3Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.nev.WormholeAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DelayAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsMixerAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.FlipAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.InfinityAdapter
@@ -115,6 +114,14 @@ class MxDeviceMidiEffectAdapter(
                     )
 
                     return emptyList()
+                }
+
+                "6257e885f06b1c1fb6258b1066497244" -> { // Resonator 3.0.0
+                    return Resonator3Adapter(false, readDataBlob(blob.text!!), xml).toDeviceStates()
+                }
+
+                "72bbd3837984d7eb1a881116c5ab5fe6" -> { // Resonator 3.0.1
+                    return Resonator3Adapter(true, readDataBlob(blob.text!!), xml).toDeviceStates()
                 }
 
                 "d8c48c67824319295bb5bf7abda47f27" -> {
