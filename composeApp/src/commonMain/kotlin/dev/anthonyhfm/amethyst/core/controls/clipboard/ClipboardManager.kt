@@ -148,27 +148,48 @@ object ClipboardManager {
             }
 
             is ClipboardData.ChainDevice -> {
-                val index: Int? = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>().maxOfOrNull { device ->
-                    device.parent.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID } + 1
-                }
+                val clipData = clipboardData.value as ClipboardData.ChainDevice
+                val selectedChainDevices = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>()
+                val parentChain = selectedChainDevices.firstOrNull()?.parent
 
-                if (mode is WorkspaceContract.WorkspaceMode.LightsChain) {
-                    if ((clipboardData.value as ClipboardData.ChainDevice).type != ClipboardData.ChainDevice.ChainType.Lights) return
+                if (parentChain != null) {
+                    val indices = selectedChainDevices.filter { it.parent == parentChain }.map { sel ->
+                        sel.parent.devices.value.indexOfFirst { it.selectionUUID == sel.device.selectionUUID }
+                    }.filter { it >= 0 }
+                    val baseIndex = (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
 
-                    (clipboardData.value as ClipboardData.ChainDevice).states.forEach {
-                        WorkspaceRepository.lightsChain.add(
-                            device = StateChain.unpackDevice(it),
-                            atIndex = index
+                    val modeIsLights = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain
+                    val modeIsSampling = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain
+                    if ((modeIsLights && clipData.type != ClipboardData.ChainDevice.ChainType.Lights) ||
+                        (modeIsSampling && clipData.type != ClipboardData.ChainDevice.ChainType.Sampling)) {
+                        return
+                    }
+
+                    clipData.states.forEachIndexed { offset, state ->
+                        parentChain.add(
+                            device = StateChain.unpackDevice(state),
+                            atIndex = baseIndex + offset
                         )
                     }
-                } else if (mode is WorkspaceContract.WorkspaceMode.SamplingChain) {
-                    if ((clipboardData.value as ClipboardData.ChainDevice).type != ClipboardData.ChainDevice.ChainType.Sampling) return
-
-                    (clipboardData.value as ClipboardData.ChainDevice).states.forEach {
-                        WorkspaceRepository.samplingChain.add(
-                            device = StateChain.unpackDevice(it),
-                            atIndex = index
-                        )
+                } else {
+                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
+                        if (clipData.type != ClipboardData.ChainDevice.ChainType.Lights) return
+                        val baseIndex = WorkspaceRepository.lightsChain.devices.value.size
+                        clipData.states.forEachIndexed { offset, state ->
+                            WorkspaceRepository.lightsChain.add(
+                                device = StateChain.unpackDevice(state),
+                                atIndex = baseIndex + offset
+                            )
+                        }
+                    } else if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                        if (clipData.type != ClipboardData.ChainDevice.ChainType.Sampling) return
+                        val baseIndex = WorkspaceRepository.samplingChain.devices.value.size
+                        clipData.states.forEachIndexed { offset, state ->
+                            WorkspaceRepository.samplingChain.add(
+                                device = StateChain.unpackDevice(state),
+                                atIndex = baseIndex + offset
+                            )
+                        }
                     }
                 }
             }
