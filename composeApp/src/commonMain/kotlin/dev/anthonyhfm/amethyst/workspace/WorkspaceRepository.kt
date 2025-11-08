@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.data.settings.RecentColorRGB
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 
 object WorkspaceRepository {
     val deviceRefresh: MutableSharedFlow<Unit> = MutableSharedFlow()
@@ -76,14 +78,24 @@ object WorkspaceRepository {
         }
     }
 
-    fun switchMode(mode: WorkspaceContract.WorkspaceMode) {
-        if (_mode.value.selectable) {
-            previousMode = _mode.value
+    fun switchMode(mode: WorkspaceContract.WorkspaceMode, undoable: Boolean = true) {
+        val current = _mode.value
+        if (current == mode) return
+
+        if (undoable) {
+            UndoManager.addAction(
+                UndoableAction.WorkspaceModeChange(
+                    beforeMode = current,
+                    afterMode = mode
+                )
+            )
         }
 
-        _mode.update {
-            mode
+        if (undoable && current.selectable) {
+            previousMode = current
         }
+
+        _mode.update { mode }
     }
 
     fun switchToPreviousMode() {

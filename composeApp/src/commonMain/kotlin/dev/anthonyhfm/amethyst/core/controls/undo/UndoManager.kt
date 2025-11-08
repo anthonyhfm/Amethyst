@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.controls.undo
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 object UndoManager {
     private val undoStack: MutableList<UndoableAction> = mutableListOf()
@@ -18,6 +19,11 @@ object UndoManager {
             val action = undoStack.removeAt(undoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.WorkspaceModeChange -> {
+                    WorkspaceRepository.switchMode(action.beforeMode, undoable = false)
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.ChainDeviceCreation -> {
                     val deviceIndex = action.parent.devices.value.indexOfFirst {
                         it.selectionUUID == action.device.selectionUUID
@@ -198,6 +204,11 @@ object UndoManager {
             val action = redoStack.removeAt(redoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.WorkspaceModeChange -> {
+                    WorkspaceRepository.switchMode(action.afterMode, undoable = false)
+                    undoStack.add(action)
+                }
+
                 is UndoableAction.ChainDeviceCreation -> {
                     action.parent.add(action.device, atIndex = action.creationIndex, fromUser = false)
                     undoStack.add(action)

@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
 sealed interface UndoableAction {
     data class ChainDeviceCreation(
@@ -181,5 +182,10 @@ sealed interface UndoableAction {
         val device: GenericChainDevice<State>,
         val beforeState: State,
         val afterState: State
+    ) : UndoableAction
+
+    data class WorkspaceModeChange(
+        val beforeMode: WorkspaceContract.WorkspaceMode,
+        val afterMode: WorkspaceContract.WorkspaceMode
     ) : UndoableAction
 }
