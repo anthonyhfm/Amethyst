@@ -3,8 +3,8 @@ package dev.anthonyhfm.amethyst.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,8 +36,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -45,38 +43,40 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.ui.modifier.gesturesDisabled
-import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import kotlin.math.roundToInt
 
 @Composable
 fun <T> StepDial(
     steps: List<T>,
     value: T,
+    onStartValueChange: (T) -> Unit = { },
     onValueChange: (T) -> Unit,
+    onFinishValueChange: (T) -> Unit,
     containerColor: Color = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp),
     dialColor: Color = MaterialTheme.colorScheme.tertiary,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    var dialValue by remember { mutableStateOf(0f) }
-    var displayValue by remember { mutableStateOf(0f) }
-    var dragLock: Boolean by remember { mutableStateOf(false) }
-
-    LaunchedEffect(value) {
-        if (dragLock) return@LaunchedEffect
-
-        dialValue = steps.indexOf(value).toFloat() / (steps.size - 1)
+    var selectedIndex by remember {
+        mutableStateOf(steps.indexOf(value).coerceAtLeast(0))
+    }
+    var dialProgress by remember {
+        mutableStateOf(run {
+            val idx = steps.indexOf(value).coerceAtLeast(0)
+            val safeSize = (steps.size - 1).coerceAtLeast(1)
+            if (steps.size <= 1) 0f else idx.toFloat() / safeSize.toFloat()
+        })
     }
 
-    LaunchedEffect(dialValue) {
-        val newValue = (dialValue * (steps.size - 1)).roundToInt()
-        val newDisplayValue = newValue / (steps.size - 1).toFloat()
+    LaunchedEffect(value, steps) {
+        val idx = steps.indexOf(value).coerceAtLeast(0)
+        selectedIndex = idx
+        val safeSize = (steps.size - 1).coerceAtLeast(1)
+        dialProgress = if (steps.size <= 1) 0f else idx.toFloat() / safeSize.toFloat()
+    }
 
-        if (displayValue != newDisplayValue) {
-            displayValue = newDisplayValue
-        }
-
-        onValueChange(steps[newValue])
+    LaunchedEffect(selectedIndex) {
+        onValueChange(steps[selectedIndex])
     }
 
     Box(
@@ -86,16 +86,24 @@ fun <T> StepDial(
             .clip(CircleShape)
             .size(52.dp)
             .pointerInput(Unit) {
-                detectVerticalDragGestures(
+                detectDragGestures(
                     onDragStart = {
-                        dragLock = true
+                        onStartValueChange(steps[selectedIndex])
+                    },
+                    onDrag = { _, offset ->
+                        val safeSize = (steps.size - 1).coerceAtLeast(1)
+                        dialProgress = (dialProgress + (offset.y * -1) * 0.005f)
+                            .coerceIn(0f, 1f)
+                        val newIndex = if (steps.size <= 1) 0 else ((dialProgress * safeSize).roundToInt())
+                            .coerceIn(0, steps.size - 1)
+                        if (newIndex != selectedIndex) {
+                            selectedIndex = newIndex
+                        }
                     },
                     onDragEnd = {
-                        dragLock = false
+                        onFinishValueChange(steps[selectedIndex])
                     }
-                ) { input, offset ->
-                    dialValue = (dialValue + (offset * -1) * 0.005f).coerceIn(0f, 1f)
-                }
+                )
             }
             .background(containerColor)
             .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(48.dp), CircleShape)
@@ -115,10 +123,13 @@ fun <T> StepDial(
                 useCenter = true
             )
 
+            val safeSize = (steps.size - 1).coerceAtLeast(1)
+            val displayProgress = if (steps.size <= 1) 1f else selectedIndex / safeSize.toFloat()
+
             drawArc(
                 color = dialColor,
                 startAngle = arcStart,
-                sweepAngle = arcSweep * displayValue,
+                sweepAngle = arcSweep * displayProgress,
                 useCenter = true
             )
 
@@ -138,6 +149,8 @@ fun <T> StepTextDial(
     steps: List<T>,
     value: T,
     onValueChange: (T) -> Unit,
+    onStartValueChange: (T) -> Unit = { },
+    onFinishValueChange: (T) -> Unit = { },
     onResolveTextValue: (String) -> Unit,
     containerColor: Color = MaterialTheme.colorScheme.surfaceColorAtElevation(32.dp),
     dialColor: Color = MaterialTheme.colorScheme.tertiary,
@@ -181,9 +194,11 @@ fun <T> StepTextDial(
             value = value,
             containerColor = containerColor,
             dialColor = dialColor,
+            onStartValueChange = onStartValueChange,
             onValueChange = {
                 onValueChange(it)
             },
+            onFinishValueChange = onFinishValueChange,
             enabled = enabled
         )
 
@@ -218,7 +233,8 @@ fun <T> StepTextDial(
                     },
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
                     autoCorrectEnabled = false,
                     keyboardType = KeyboardType.Unspecified,
                     imeAction = ImeAction.Done
