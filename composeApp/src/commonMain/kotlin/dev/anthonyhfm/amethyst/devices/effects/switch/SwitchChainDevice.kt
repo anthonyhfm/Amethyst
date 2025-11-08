@@ -53,6 +53,7 @@ class SwitchChainDevice : GenericChainDevice<SwitchChainDeviceState>() {
             ) {
                 if (macros.isNotEmpty()) {
                     if (macros.size > 1) {
+                        var beforeMacro = deviceState.copy().macro
                         StepTextDial(
                             headline = "Macro",
                             value = deviceState.macro,
@@ -68,6 +69,15 @@ class SwitchChainDevice : GenericChainDevice<SwitchChainDeviceState>() {
                                         }
                                     }
                                 }
+                            },
+                            onStartValueChange = {
+                                beforeMacro = it
+                            },
+                            onFinishValueChange = {
+                                pushStateChange(
+                                    before = state.value.copy(macro = beforeMacro),
+                                    after = state.value
+                                )
                             },
                             onValueChange = { value ->
                                 state.update {
@@ -88,6 +98,7 @@ class SwitchChainDevice : GenericChainDevice<SwitchChainDeviceState>() {
                         }
                     }
 
+                    var beforeValue = deviceState.copy().value
                     StepTextDial(
                         headline = "Value",
                         value = deviceState.value,
@@ -108,6 +119,15 @@ class SwitchChainDevice : GenericChainDevice<SwitchChainDeviceState>() {
                             state.update {
                                 it.copy(value = value)
                             }
+                        },
+                        onStartValueChange = {
+                            beforeValue = it
+                        },
+                        onFinishValueChange = {
+                            pushStateChange(
+                                before = state.value.copy(value = beforeValue),
+                                after = state.value
+                            )
                         }
                     )
                 } else {

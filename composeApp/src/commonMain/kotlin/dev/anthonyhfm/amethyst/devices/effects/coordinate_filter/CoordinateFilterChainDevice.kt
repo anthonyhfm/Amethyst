@@ -91,6 +91,8 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
 
         val isAlreadyFiltered = state.value.filters.contains(coordinatePair)
 
+        val stateBefore = state.value
+
         state.update { currentState ->
             if (isAlreadyFiltered) {
                 currentState.copy(
@@ -102,6 +104,8 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
                 )
             }
         }
+
+        pushStateChange(stateBefore, state.value)
 
         Heaven.midiEnter(
             listOf(

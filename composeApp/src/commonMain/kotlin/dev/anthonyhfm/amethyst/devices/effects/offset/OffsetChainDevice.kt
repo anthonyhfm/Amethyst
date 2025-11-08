@@ -127,33 +127,34 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
             Row {
                 IconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetX = it.offsetX - 1,
-                                offsetY = it.offsetY + 1
-                            )
-                        }
+                        val updatedState = state.value.copy(
+                            offsetX = state.value.offsetX - 1,
+                            offsetY = state.value.offsetY + 1
+                        )
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.NorthWest, null) }
 
                 FilledIconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetY = it.offsetY + 1
-                            )
-                        }
+                        val updatedState = state.value.copy(offsetY = state.value.offsetY + 1)
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.North, null) }
 
                 IconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetX = it.offsetX + 1,
-                                offsetY = it.offsetY + 1
-                            )
-                        }
+                        val updatedState = state.value.copy(
+                            offsetX = state.value.offsetX + 1,
+                            offsetY = state.value.offsetY + 1
+                        )
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.NorthEast, null) }
             }
@@ -165,54 +166,59 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
             ) {
                 FilledIconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetX = it.offsetX - 1,
-                            )
-                        }
+                        val updatedState = state.value.copy(
+                            offsetX = state.value.offsetX - 1,
+                        )
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.West, null) }
 
                 FilledIconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetX = it.offsetX + 1,
-                            )
-                        }
+                        val updatedState = state.value.copy(
+                            offsetX = state.value.offsetX + 1,
+                        )
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.East, null) }
             }
             Row {
                 IconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetX = it.offsetX - 1,
-                                offsetY = it.offsetY - 1
-                            )
-                        }
+                        val updatedState = state.value.copy(
+                            offsetX = state.value.offsetX - 1,
+                            offsetY = state.value.offsetY - 1
+                        )
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.SouthWest, null) }
 
                 FilledIconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetY = it.offsetY - 1
-                            )
-                        }
+                        val updatedState = state.value.copy(
+                            offsetY = state.value.offsetY - 1
+                        )
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.South, null) }
 
                 IconButton(
                     onClick = {
-                        state.update {
-                            it.copy(
-                                offsetX = it.offsetX + 1,
-                                offsetY = it.offsetY - 1
-                            )
-                        }
+                        val updatedState = state.value.copy(
+                            offsetX = state.value.offsetX + 1,
+                            offsetY = state.value.offsetY - 1
+                        )
+
+                        pushStateChange(state.value, updatedState)
+                        state.update { updatedState }
                     }
                 ) { Icon(Icons.Default.SouthEast, null) }
             }

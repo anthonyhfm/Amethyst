@@ -46,9 +46,12 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
                         .width(100.dp),
                     selected = deviceState.mode == FlipChainDeviceState.FlipMode.HORIZONTAL,
                     onClick = {
+                        val before = state.value
                         state.update {
                             it.copy(mode = FlipChainDeviceState.FlipMode.HORIZONTAL)
                         }
+
+                        pushStateChange(before, state.value)
                     },
                     label = {
                         Text(
@@ -65,9 +68,12 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
                         .width(100.dp),
                     selected = deviceState.mode == FlipChainDeviceState.FlipMode.VERTICAL,
                     onClick = {
+                        val before = state.value
                         state.update {
                             it.copy(mode = FlipChainDeviceState.FlipMode.VERTICAL)
                         }
+
+                        pushStateChange(before, state.value)
                     },
                     label = {
                         Text(
@@ -85,9 +91,12 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
                     Checkbox(
                         checked = deviceState.bypass,
                         onCheckedChange = { checked ->
+                            val before = state.value
                             state.update {
                                 it.copy(bypass = checked)
                             }
+
+                            pushStateChange(before, state.value)
                         },
                     )
 

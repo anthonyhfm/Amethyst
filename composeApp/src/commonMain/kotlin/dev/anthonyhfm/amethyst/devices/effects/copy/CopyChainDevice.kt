@@ -112,7 +112,10 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>() {
                         CopyChainDeviceState.CopyType.entries.forEach { type ->
                             MenuItem(
                                 onClick = {
-                                    state.value = state.value.copy(type = type)
+                                    val before = state.value
+                                    val after = before.copy(type = type)
+                                    pushStateChange(before, after)
+                                    state.update { it.copy(type = type) }
                                     openTypePicker = false
                                 },
                                 content = {
@@ -162,7 +165,10 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>() {
                             CopyChainDeviceState.IsolationType.entries.forEach { type ->
                                 MenuItem(
                                     onClick = {
-                                        state.value = state.value.copy(isolate = type)
+                                        val before = state.value
+                                        val after = before.copy(isolate = type)
+                                        pushStateChange(before, after)
+                                        state.update { it.copy(isolate = type) }
                                         openIsolationPicker = false
                                     },
                                     content = {
@@ -188,9 +194,13 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>() {
 
                         horizontalArrangement = Arrangement.SpaceAround,
                     ) {
+                        var beforeRate: Pair<Timing, Long> = Pair(deviceState.timing, deviceState.delayMs)
                         TimeDial(
                             headline = "Rate",
                             timing = deviceState.timing,
+                            onStartValueChange = { t, ms ->
+                                beforeRate = Pair(t, ms)
+                            },
                             onSelectTiming = { timing, msValue ->
                                 state.update {
                                     it.copy(
@@ -198,13 +208,23 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>() {
                                         delayMs = msValue
                                     )
                                 }
+                            },
+                            onFinishValueChange = { t, ms ->
+                                pushStateChange(
+                                    before = state.value.copy(timing = beforeRate.first, delayMs = beforeRate.second),
+                                    after = state.value.copy(timing = t, delayMs = ms)
+                                )
                             }
                         )
 
+                        var beforeGate = deviceState.gate
                         TextDial(
                             headline = "Gate",
                             text = "${(deviceState.gate * 200).toInt()}%",
                             value = deviceState.gate,
+                            onStartValueChange = { v ->
+                                beforeGate = v
+                            },
                             onValueChange = { value ->
                                 state.update {
                                     it.copy(gate = value)
@@ -215,17 +235,27 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>() {
 
                                 gateText?.let { gate ->
                                     if (gate in 0..200) {
+                                        val before = state.value
                                         state.update {
                                             it.copy(gate = gate / 200f) // Convert to float between 0.0 and 1.0
                                         }
+                                        pushStateChange(before, state.value)
                                     }
                                 }
                             },
+                            onFinishValueChange = { v ->
+                                pushStateChange(
+                                    before = state.value.copy(gate = beforeGate),
+                                    after = state.value.copy(gate = v)
+                                )
+                            },
                             modifier = Modifier
                                 .rightClickable {
+                                    val before = state.value
                                     state.update {
                                         it.copy(gate = 0.5f) // Reset gate to its original state
                                     }
+                                    pushStateChange(before, state.value)
                                 },
                         )
                     }
@@ -239,28 +269,22 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>() {
                             index = index,
                             offset = offset,
                             onChangeOffset = { newOffset ->
-                                state.update {
-                                    it.copy(
-                                        offsets = it.offsets.mapIndexed { i, pair ->
-                                            if (i == index) {
-                                                newOffset
-                                            } else {
-                                                pair
-                                            }
-                                        }
-                                    )
-                                }
+                                val before = state.value
+                                val after = before.copy(
+                                    offsets = before.offsets.mapIndexed { i, pair -> if (i == index) newOffset else pair }
+                                )
+                                pushStateChange(before, after)
+                                state.update { after }
                             }
                         )
                     }
 
                     AddOffsetButton(
                         onClick = {
-                            state.update {
-                                it.copy(
-                                    offsets = it.offsets + Pair(0, 0) // Add a new offset with default values
-                                )
-                            }
+                            val before = state.value
+                            val after = before.copy(offsets = before.offsets + Pair(0, 0))
+                            pushStateChange(before, after)
+                            state.update { after }
                         }
                     )
                 }
@@ -403,11 +427,12 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>() {
 
             FilledIconButton(
                 onClick = {
-                    state.update {
-                        it.copy(
-                            offsets = it.offsets.filterIndexed { i, _ -> i != index }
-                        )
-                    }
+                    val before = state.value
+                    val after = before.copy(
+                        offsets = before.offsets.filterIndexed { i, _ -> i != index }
+                    )
+                    pushStateChange(before, after)
+                    state.update { after }
                 },
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)

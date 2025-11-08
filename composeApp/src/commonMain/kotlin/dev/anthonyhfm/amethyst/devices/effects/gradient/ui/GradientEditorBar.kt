@@ -35,12 +35,19 @@ import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 @Composable
 fun GradientEditorBar(
     selectedColor: String?,
-    onSelectionChange: (String?) -> Unit, // Changed from (Int?) -> Unit to (String?) -> Unit
+    onSelectionChange: (String?) -> Unit,
     colors: List<GradientChainDeviceState.GradientColor>,
     onGradientDataEmit: (List<GradientChainDeviceState.GradientColor>) -> Unit,
     onAddGradientPoint: (position: Float) -> Unit,
+    onGradientDragStart: () -> Unit,
+    onGradientDragFinish: () -> Unit,
 ) {
     val density = LocalDensity.current
+
+    // Positions getrennt von Device-State für flüssiges Dragging
+    val positionStates = remember(colors.map { it.selectionUUID }) {
+        colors.associate { it.selectionUUID to mutableStateOf(it.position) }
+    }
 
     Box(
         modifier = Modifier
@@ -50,6 +57,7 @@ fun GradientEditorBar(
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth()
         ) {
+            // Canvas nutzt live Positionswerte
             Canvas(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
@@ -61,11 +69,14 @@ fun GradientEditorBar(
                         onAddGradientPoint(clampedPosition)
                     }
             ) {
+                val colorStops = colors.map { c ->
+                    val p = positionStates[c.selectionUUID]?.value ?: c.position
+                    p to Color(c.r, c.g, c.b)
+                }.sortedBy { it.first }
+
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colorStops = colors.sortedBy { it.position }
-                            .map { it.position to Color(it.r, it.g, it.b) }
-                            .toTypedArray(),
+                        colorStops = colorStops.toTypedArray(),
                         startX = 0f,
                         endX = size.width
                     ),
@@ -73,23 +84,20 @@ fun GradientEditorBar(
                 )
             }
 
-            colors.forEachIndexed { index, color ->
-                var pos: Float by remember { mutableStateOf(color.position) }
+            colors.forEach { color ->
+                var pos by positionStates.getValue(color.selectionUUID)
 
-                LaunchedEffect(pos) {
-                    onGradientDataEmit(
-                        colors.mapIndexed { i, it ->
-                            if (i == index) it.copy(position = pos) else it
-                        }
-                    )
+                // Externe Positionsänderungen (Undo/Redo) zurückspielen
+                LaunchedEffect(color.position) {
+                    if (color.position != pos) {
+                        pos = color.position
+                    }
                 }
 
                 Box(
                     modifier = Modifier
                         .offset(x = -6.dp, y = -5.dp)
-                        .offset(
-                            x = maxWidth * pos
-                        )
+                        .offset(x = maxWidth * pos)
                         .scale(if (selectedColor == color.selectionUUID) 1.1f else 1f)
                         .shadow(
                             elevation = if (selectedColor == color.selectionUUID) 16.dp else 6.dp,
@@ -113,13 +121,31 @@ fun GradientEditorBar(
                         }
                         .pointerInput(Unit) {
                             detectDragGestures(
+                                onDragStart = {
+                                    onGradientDragStart()
+                                },
                                 onDrag = { input, offset ->
                                     input.consume()
-
                                     val pct = (offset.x / density.density).dp / maxWidth
                                     val newPos = (pos + pct).coerceIn(0f, 1f)
-
                                     pos = newPos
+                                },
+                                onDragEnd = {
+                                    // Commit aller Positionen einmalig
+                                    val committed = colors.map { c ->
+                                        val p = positionStates[c.selectionUUID]?.value ?: c.position
+                                        c.copy(position = p)
+                                    }
+                                    onGradientDataEmit(committed)
+                                    onGradientDragFinish()
+                                },
+                                onDragCancel = {
+                                    val committed = colors.map { c ->
+                                        val p = positionStates[c.selectionUUID]?.value ?: c.position
+                                        c.copy(position = p)
+                                    }
+                                    onGradientDataEmit(committed)
+                                    onGradientDragFinish()
                                 }
                             )
                         }

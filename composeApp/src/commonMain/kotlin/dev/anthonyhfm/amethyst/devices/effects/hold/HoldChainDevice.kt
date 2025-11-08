@@ -1,7 +1,9 @@
 package dev.anthonyhfm.amethyst.devices.effects.hold
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -19,6 +21,7 @@ import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -53,10 +56,17 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                         ),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     ) {
+                        var beforeHold = deviceState.copy().let { (t, ms) ->
+                            Pair(t, ms)
+                        }
+
                         TimeDial(
                             headline = "Hold",
                             text = if (deviceState.infinite) "Infinite" else null,
                             timing = deviceState.timing,
+                            onStartValueChange = { t, ms ->
+                                beforeHold = Pair(t, ms)
+                            },
                             onSelectTiming = { timing, msValue ->
                                 state.update {
                                     it.copy(
@@ -65,13 +75,26 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                                     )
                                 }
                             },
+                            onFinishValueChange = { t, ms ->
+                                pushStateChange(
+                                    before = state.value.copy(
+                                        timing = beforeHold.first,
+                                        delayMs = beforeHold.second
+                                    ),
+                                    after = state.value
+                                )
+                            },
                             enabled = !deviceState.infinite
                         )
 
+                        var beforeGate = deviceState.copy().gate
                         TextDial(
                             headline = "Gate",
                             text = if (!deviceState.infinite) "${(deviceState.gate * 200).toInt()}%" else "Disabled",
                             value = deviceState.gate,
+                            onStartValueChange = {
+                                beforeGate = it
+                            },
                             onValueChange = { value ->
                                 state.update {
                                     it.copy(gate = value)
@@ -88,8 +111,19 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                                     }
                                 }
                             },
+                            onFinishValueChange = {
+                                pushStateChange(
+                                    before = state.value.copy(gate = beforeGate),
+                                    after = state.value
+                                )
+                            },
                             modifier = Modifier
                                 .rightClickable {
+                                    pushStateChange(
+                                        before = state.value,
+                                        after = state.value.copy(gate = 0.5f)
+                                    )
+
                                     state.update {
                                         it.copy(gate = 0.5f) // Reset gate to its original state
                                     }
@@ -106,16 +140,21 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.offset(y = 6.dp)
                         ) {
-                            androidx.compose.material3.Checkbox(
+                            Checkbox(
                                 checked = deviceState.onRelease,
                                 onCheckedChange = { checked ->
+                                    pushStateChange(
+                                        before = deviceState,
+                                        after = deviceState.copy(onRelease = checked)
+                                    )
+
                                     state.update {
                                         it.copy(onRelease = checked)
                                     }
                                 },
                             )
 
-                            androidx.compose.material3.Text(
+                            Text(
                                 text = "On Release",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
@@ -124,16 +163,21 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>() {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            androidx.compose.material3.Checkbox(
+                            Checkbox(
                                 checked = deviceState.infinite,
                                 onCheckedChange = { checked ->
+                                    pushStateChange(
+                                        before = deviceState,
+                                        after = deviceState.copy(infinite = checked)
+                                    )
+
                                     state.update {
                                         it.copy(infinite = checked)
                                     }
                                 },
                             )
 
-                            androidx.compose.material3.Text(
+                            Text(
                                 text = "Infinite",
                                 style = MaterialTheme.typography.bodyMedium,
                             )

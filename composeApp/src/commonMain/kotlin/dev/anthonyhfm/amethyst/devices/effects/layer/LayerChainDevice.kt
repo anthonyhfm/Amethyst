@@ -40,6 +40,8 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
 
                 contentAlignment = Alignment.Center
             ) {
+                var beforeLayer = deviceState.copy().layer
+
                 StepTextDial(
                     headline = "Layer",
                     value = deviceState.layer,
@@ -55,6 +57,15 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                                 }
                             }
                         }
+                    },
+                    onStartValueChange = {
+                        beforeLayer = deviceState.copy().layer
+                    },
+                    onFinishValueChange = {
+                        pushStateChange(
+                            before = state.value.copy(layer = beforeLayer),
+                            after = state.value.copy(layer = it)
+                        )
                     },
                     onValueChange = { value ->
                         state.update {

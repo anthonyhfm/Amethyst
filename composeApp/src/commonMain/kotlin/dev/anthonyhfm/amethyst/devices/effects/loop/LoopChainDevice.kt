@@ -65,20 +65,30 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>() {
                     Column (
                         Modifier.offset(x = 2.dp)
                     ){
+                        var beforeRepeat = deviceState.repeat
                         StepTextDial(
                             headline = "Repeat",
                             text = if (deviceState.onHold) "Unused" else "${deviceState.repeat}",
                             steps = IntArray(128) { it + 1 }.toList(),
                             value = deviceState.repeat,
+                            onStartValueChange = { v ->
+                                beforeRepeat = v
+                            },
+                            onFinishValueChange = { v ->
+                                pushStateChange(
+                                    before = state.value.copy(repeat = beforeRepeat),
+                                    after = state.value.copy(repeat = v)
+                                )
+                            },
                             onResolveTextValue = {
                                 if (!deviceState.onHold) {
                                     val repeatText = it.trim().toIntOrNull()
 
                                     repeatText?.let { repeat ->
                                         if (repeat in 1..128) {
-                                            state.update {
-                                                it.copy(repeat = repeat)
-                                            }
+                                            val before = state.value
+                                            state.update { it.copy(repeat = repeat) }
+                                            pushStateChange(before, state.value)
                                         }
                                     }
                                 }
@@ -104,9 +114,9 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>() {
                             Checkbox(
                                 checked = deviceState.onHold,
                                 onCheckedChange = { checked ->
-                                    state.update {
-                                        it.copy(onHold = checked)
-                                    }
+                                    val before = state.value
+                                    state.update { it.copy(onHold = checked) }
+                                    pushStateChange(before, state.value)
                                 },
                             )
 
@@ -127,43 +137,67 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>() {
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
+                    var beforeTiming: Pair<Timing, Long> = Pair(deviceState.timing, deviceState.timing.toMsValue(WorkspaceRepository.bpm.value))
                     TimeDial(
                         headline = "Delay",
                         timing = deviceState.timing,
-                        onSelectTiming = { timing, msValue ->
+                        onStartValueChange = { t, ms ->
+                            beforeTiming = Pair(t, ms)
+                        },
+                        onSelectTiming = { timing, _ ->
                             state.update {
                                 it.copy(
                                     timing = timing,
                                 )
                             }
+                        },
+                        onFinishValueChange = { t, _ ->
+                            pushStateChange(
+                                before = state.value.copy(timing = beforeTiming.first),
+                                after = state.value.copy(timing = t)
+                            )
                         }
                     )
 
+                    var beforeGate = deviceState.gate
                     TextDial(
                         headline = "Gate",
                         text = "${(deviceState.gate * 200).toInt()}%",
                         value = deviceState.gate,
+                        onStartValueChange = { v ->
+                            beforeGate = v
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(gate = value)
                             }
+                        },
+                        onFinishValueChange = { v ->
+                            pushStateChange(
+                                before = state.value.copy(gate = beforeGate),
+                                after = state.value.copy(gate = v)
+                            )
                         },
                         onResolveTextValue = {
                             val gateText = it.removeSuffix("%").trim().toIntOrNull()
 
                             gateText?.let { gate ->
                                 if (gate in 0..200) {
+                                    val before = state.value
                                     state.update {
                                         it.copy(gate = gate / 200f) // Convert to float between 0.0 and 1.0
                                     }
+                                    pushStateChange(before, state.value)
                                 }
                             }
                         },
                         modifier = Modifier
                             .rightClickable {
+                                val before = state.value
                                 state.update {
                                     it.copy(gate = 0.5f) // Reset gate to its original state
                                 }
+                                pushStateChange(before, state.value)
                             },
                     )
                 }
@@ -178,13 +212,13 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>() {
             val down: Boolean = when (signal) {
                 is Signal.LED -> signal.color != Color.Black
                 is Signal.Midi -> signal.velocity != 0
-                else -> return
+                else -> return@forEach
             }
 
             val coords: Pair<Int, Int> = when (signal) {
                 is Signal.LED -> Pair(signal.x, signal.y)
                 is Signal.Midi -> Pair(signal.x, signal.y)
-                else -> return
+                else -> return@forEach
             }
 
             if (down) {

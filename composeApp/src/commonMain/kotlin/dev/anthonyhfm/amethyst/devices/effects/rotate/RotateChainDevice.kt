@@ -46,6 +46,8 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                         .width(100.dp),
                     selected = deviceState.mode == RotateChainDeviceState.RotateMode.DEGREES_90,
                     onClick = {
+                        pushStateChange(deviceState, state.value.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_90))
+
                         state.update {
                             it.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_90)
                         }
@@ -65,6 +67,8 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                         .width(100.dp),
                     selected = deviceState.mode == RotateChainDeviceState.RotateMode.DEGREES_180,
                     onClick = {
+                        pushStateChange(deviceState, state.value.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_180))
+
                         state.update {
                             it.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_180)
                         }
@@ -84,6 +88,8 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                         .width(100.dp),
                     selected = deviceState.mode == RotateChainDeviceState.RotateMode.DEGREES_270,
                     onClick = {
+                        pushStateChange(deviceState, state.value.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_270))
+
                         state.update {
                             it.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_270)
                         }
@@ -104,6 +110,8 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                     Checkbox(
                         checked = deviceState.bypass,
                         onCheckedChange = { checked ->
+                            pushStateChange(deviceState, state.value.copy(bypass = checked))
+
                             state.update {
                                 it.copy(bypass = checked)
                             }

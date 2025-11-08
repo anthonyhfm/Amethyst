@@ -40,11 +40,15 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
 
                 contentAlignment = Alignment.Center
             ) {
+                var beforeLayer = deviceState.copy().layer
                 StepTextDial(
                     headline = "Layer Filter",
                     value = deviceState.layer,
                     steps = IntArray(41) { -20 + it }.toList(),
                     text = "${deviceState.layer}",
+                    onStartValueChange = {
+                        beforeLayer = it
+                    },
                     onResolveTextValue = {
                         val layerText = it.trim().toIntOrNull()
 
@@ -60,6 +64,12 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
                         state.update {
                             it.copy(layer = value)
                         }
+                    },
+                    onFinishValueChange = {
+                        pushStateChange(
+                            before = state.value.copy(layer = beforeLayer),
+                            after = state.value
+                        )
                     }
                 )
             }

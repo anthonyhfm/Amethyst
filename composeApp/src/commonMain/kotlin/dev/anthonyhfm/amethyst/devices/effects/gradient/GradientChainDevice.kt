@@ -78,6 +78,9 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
             }
         }
 
+        // Track color changes for undo
+        var beforeColorGradientSnapshot: List<GradientChainDeviceState.GradientColor>? = null
+
         LaunchedEffect(colorPickerState?.color) {
             val cp = colorPickerState ?: return@LaunchedEffect
             val grad = selectedGradientColor ?: return@LaunchedEffect
@@ -88,6 +91,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                 kotlin.math.abs(newColor.blue - grad.b) < eps) {
                 return@LaunchedEffect
             }
+            // Nur State aktualisieren ohne Undo während der Interaktion
             state.update { old ->
                 val list = old.gradientData.toMutableList()
                 val index = list.indexOfFirst { it.selectionUUID == grad.selectionUUID }
@@ -123,6 +127,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                     verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 ) {
                     key(deviceState.gradientData.size) {
+                        var beforeGradientData: List<GradientChainDeviceState.GradientColor>? = null
                         GradientEditorBar(
                             selectedColor = selectedColor,
                             onSelectionChange = { selectionUUID ->
@@ -138,13 +143,11 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                             },
                             colors = deviceState.gradientData,
                             onGradientDataEmit = { data ->
-                                state.update {
-                                    it.copy(
-                                        gradientData = data
-                                    )
-                                }
+                                // Während Drag kein Undo pushen, nur State aktualisieren
+                                state.update { it.copy(gradientData = data) }
                             },
                             onAddGradientPoint = { position ->
+                                val before = state.value
                                 val newColor = GradientChainDeviceState.GradientColor(
                                     r = 1.0f,
                                     g = 1.0f,
@@ -159,6 +162,26 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                                         gradientData = updatedColors
                                     )
                                 }
+                                pushStateChange(before, state.value)
+                            },
+                            onGradientDragStart = {
+                                // Merke Zustand vor Drag
+                                beforeGradientData = state.value.gradientData.map { it.copy() }
+                            },
+                            onGradientDragFinish = {
+                                val before = beforeGradientData
+                                if (before != null) {
+                                    val after = state.value.gradientData
+                                    // Prüfe Positionsänderungen
+                                    val positionsChanged = before.map { it.selectionUUID to it.position } != after.map { it.selectionUUID to it.position }
+                                    if (positionsChanged) {
+                                        pushStateChange(
+                                            before = state.value.copy(gradientData = before),
+                                            after = state.value
+                                        )
+                                    }
+                                }
+                                beforeGradientData = null
                             }
                         )
                     }
@@ -169,9 +192,13 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
 
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
+                        var beforeTiming: Pair<Timing, Long> = Pair(deviceState.timing, deviceState.timing.toMsValue(WorkspaceRepository.bpm.value))
                         TimeDial(
                             headline = "Duration",
                             timing = deviceState.timing,
+                            onStartValueChange = { t, ms ->
+                                beforeTiming = Pair(t, ms)
+                            },
                             onSelectTiming = { timing, msValue ->
                                 state.update {
                                     it.copy(
@@ -179,34 +206,54 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                                         durationMs = msValue.toDouble()
                                     )
                                 }
+                            },
+                            onFinishValueChange = { t, ms ->
+                                pushStateChange(
+                                    before = state.value.copy(timing = beforeTiming.first, durationMs = beforeTiming.first.toMsValue(WorkspaceRepository.bpm.value).toDouble()),
+                                    after = state.value.copy(timing = t, durationMs = ms.toDouble())
+                                )
                             }
                         )
 
+                        var beforeGate = deviceState.gate
                         TextDial(
                             headline = "Gate",
                             text = "${(deviceState.gate * 200).toInt()}%",
                             value = deviceState.gate,
+                            onStartValueChange = { v ->
+                                beforeGate = v
+                            },
                             onValueChange = { value ->
                                 state.update {
                                     it.copy(gate = value)
                                 }
+                            },
+                            onFinishValueChange = { v ->
+                                pushStateChange(
+                                    before = state.value.copy(gate = beforeGate),
+                                    after = state.value.copy(gate = v)
+                                )
                             },
                             onResolveTextValue = {
                                 val gateText = it.removeSuffix("%").trim().toIntOrNull()
 
                                 gateText?.let { gate ->
                                     if (gate in 0..200) {
+                                        val before = state.value
                                         state.update {
                                             it.copy(gate = gate / 200f)
                                         }
+                                        pushStateChange(before, state.value)
                                     }
                                 }
                             },
                             modifier = Modifier
                                 .rightClickable {
+                                    val before = state.value
                                     state.update {
                                         it.copy(gate = 0.5f)
                                     }
+                                    pushStateChange(before, state.value)
                                 },
                         )
                     }
@@ -233,12 +280,44 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1f),
-                                state = colorPickerState
+                                state = colorPickerState,
+                                onSelectionStart = {
+                                    beforeColorGradientSnapshot = state.value.gradientData.map { it.copy() }
+                                },
+                                onSelectionFinish = { c ->
+                                    val grad = selectedGradientColor
+                                    val beforeSnapshot = beforeColorGradientSnapshot
+                                    if (grad != null && beforeSnapshot != null) {
+                                        val before = state.value.copy(gradientData = beforeSnapshot)
+                                        val afterItem = state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
+                                        val changed = afterItem?.let { it.r != c.red || it.g != c.green || it.b != c.blue } ?: false
+                                        if (changed) {
+                                            pushStateChange(before, state.value)
+                                        }
+                                    }
+                                    beforeColorGradientSnapshot = null
+                                }
                             )
 
                             HuePickerBar(
                                 vertical = true,
-                                state = colorPickerState
+                                state = colorPickerState,
+                                onSelectionStart = {
+                                    beforeColorGradientSnapshot = state.value.gradientData.map { it.copy() }
+                                },
+                                onSelectionFinish = { c ->
+                                    val grad = selectedGradientColor
+                                    val beforeSnapshot = beforeColorGradientSnapshot
+                                    if (grad != null && beforeSnapshot != null) {
+                                        val before = state.value.copy(gradientData = beforeSnapshot)
+                                        val afterItem = state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
+                                        val changed = afterItem?.let { it.r != c.red || it.g != c.green || it.b != c.blue } ?: false
+                                        if (changed) {
+                                            pushStateChange(before, state.value)
+                                        }
+                                    }
+                                    beforeColorGradientSnapshot = null
+                                }
                             )
                         }
 
@@ -288,8 +367,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>() {
 
                 Heaven.cancelJobs { job ->
                     job.owner is Pair<*, *> &&
-                    job.owner.first == this &&
-                    job.owner.second == "${signal.x},${signal.y}"
+                            job.owner.first == this &&
+                            job.owner.second == "${signal.x},${signal.y}"
                 }
 
                 for (step in 0..gradientSteps) {

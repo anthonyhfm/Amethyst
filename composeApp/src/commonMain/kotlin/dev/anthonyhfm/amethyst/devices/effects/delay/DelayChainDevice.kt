@@ -40,44 +40,69 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>() {
             Column(
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
+                var beforeDelay = deviceState.copy().let { (t, ms, _) ->
+                    Pair(t, ms)
+                }
+
                 TimeDial(
                     headline = "Delay",
                     timing = deviceState.timing,
                     onSelectTiming = { timing, msValue ->
                         state.update {
-                            it.copy(
+                            it.copy(timing = timing, delayMs = msValue)
+                        }
+                    },
+                    onStartValueChange = { t, ms ->
+                        beforeDelay = Pair(t, ms)
+                    },
+                    onFinishValueChange = { timing, msValue ->
+                        pushStateChange(
+                            before = state.value.copy(
+                                timing = beforeDelay.first,
+                                delayMs = beforeDelay.second
+                            ),
+                            after = state.value.copy(
                                 timing = timing,
                                 delayMs = msValue
                             )
-                        }
+                        )
                     }
                 )
 
+                var beforeGateDrag = deviceState.copy().gate
                 TextDial(
                     headline = "Gate",
                     text = "${(deviceState.gate * 200).toInt()}%",
                     value = deviceState.gate,
+                    onStartValueChange = {
+                        beforeGateDrag = deviceState.gate
+                    },
                     onValueChange = { value ->
                         state.update {
                             it.copy(gate = value)
                         }
+                    },
+                    onFinishValueChange = {
+                        pushStateChange(state.value.copy(gate = beforeGateDrag), state.value.copy(gate = it))
                     },
                     onResolveTextValue = {
                         val gateText = it.removeSuffix("%").trim().toIntOrNull()
 
                         gateText?.let { gate ->
                             if (gate in 0..200) {
-                                state.update {
-                                    it.copy(gate = gate / 200f) // Convert to float between 0.0 and 1.0
-                                }
+                                val before = state.value
+                                val after = before.copy(gate = gate / 200f)
+                                state.value = after
+                                pushStateChange(before, after)
                             }
                         }
                     },
                     modifier = Modifier
                         .rightClickable {
-                            state.update {
-                                it.copy(gate = 0.5f) // Reset gate to its original state
-                            }
+                            val before = state.value
+                            val after = before.copy(gate = 0.5f)
+                            state.value = after
+                            pushStateChange(before, after)
                         },
                 )
             }

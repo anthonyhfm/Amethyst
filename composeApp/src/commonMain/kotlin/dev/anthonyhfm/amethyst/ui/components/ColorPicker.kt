@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -36,7 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -123,6 +121,8 @@ fun rememberColorPickerState(initialColor: Color = Color.Red): ColorPickerState 
 fun ColorPicker(
     modifier: Modifier = Modifier,
     state: ColorPickerState,
+    onSelectionStart: () -> Unit = {},
+    onSelectionFinish: (Color) -> Unit = {},
 ) {
     val currentState by rememberUpdatedState(state)
     val paddingDp = 4.dp
@@ -172,10 +172,14 @@ fun ColorPicker(
                 .pointerInput(Unit) { // Drag
                     detectDragGestures(
                         onDragStart = { offset ->
+                            onSelectionStart()
                             updateFromPosition(offset.x, offset.y, size.width, size.height)
                         },
                         onDrag = { change, _ ->
                             updateFromPosition(change.position.x, change.position.y, size.width, size.height)
+                        },
+                        onDragEnd = {
+                            onSelectionFinish(state.color)
                         }
                     )
                 }
@@ -210,6 +214,8 @@ fun HuePickerBar(
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
     state: ColorPickerState,
+    onSelectionStart: () -> Unit = {},
+    onSelectionFinish: (Color) -> Unit = {},
 ) {
     var componentSize by remember { mutableStateOf(IntSize.Zero) }
     val currentState by rememberUpdatedState(state)
@@ -259,12 +265,22 @@ fun HuePickerBar(
                 .background(Color.Black)
                 .pointerInput(vertical) { // Drag
                     detectDragGestures(
-                        onDragStart = { offset -> updateHueFrom(offset, size.width, size.height) },
-                        onDrag = { change, _ -> updateHueFrom(change.position, size.width, size.height) }
+                        onDragStart = { offset ->
+                            onSelectionStart()
+                            updateHueFrom(offset, size.width, size.height)
+                        },
+                        onDrag = { change, _ -> updateHueFrom(change.position, size.width, size.height) },
+                        onDragEnd = {
+                            onSelectionFinish(state.color)
+                        }
                     )
                 }
                 .pointerInput(vertical) { // Tap
-                    detectTapGestures { offset -> updateHueFrom(offset, size.width, size.height) }
+                    detectTapGestures { offset ->
+                        onSelectionStart()
+                        updateHueFrom(offset, size.width, size.height)
+                        onSelectionFinish(state.color)
+                    }
                 }
         ) {
             drawRect(

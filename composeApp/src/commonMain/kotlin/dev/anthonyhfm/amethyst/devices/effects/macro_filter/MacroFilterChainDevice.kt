@@ -51,11 +51,15 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
             ) {
                 if (macros.isNotEmpty()) {
                     if (macros.size > 1) {
+                        var beforeMacro = deviceState.copy().macro
                         StepTextDial(
                             headline = "Macro",
                             value = deviceState.macro,
                             steps = IntArray(macros.size) { it }.toList(),
                             text = "${deviceState.macro + 1}",
+                            onStartValueChange = {
+                                beforeMacro = it
+                            },
                             onResolveTextValue = {
                                 val macroText = it.trim().toIntOrNull()
 
@@ -66,6 +70,9 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
                                         }
                                     }
                                 }
+                            },
+                            onFinishValueChange = {
+                                pushStateChange(state.value.copy(macro = beforeMacro), state.value)
                             },
                             onValueChange = { value ->
                                 state.update {
@@ -86,11 +93,15 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
                         }
                     }
 
+                    var beforeValue = deviceState.copy().value
                     StepTextDial(
                         headline = "Value",
                         value = deviceState.value,
                         steps = IntArray(128) { it }.toList(),
                         text = deviceState.value.toString(),
+                        onStartValueChange = {
+                            beforeValue = it
+                        },
                         onResolveTextValue = {
                             val valueText = it.trim().toIntOrNull()
 
@@ -106,6 +117,9 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
                             state.update {
                                 it.copy(value = value)
                             }
+                        },
+                        onFinishValueChange = {
+                            pushStateChange(state.value.copy(value = beforeValue), state.value)
                         }
                     )
                 } else {

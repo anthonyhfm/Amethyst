@@ -62,14 +62,39 @@ class ColorChainDevice : LEDChainDevice<ColorChainDeviceState>() {
 
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    var colorBefore by remember { mutableStateOf(Color.White) }
+
+                    LaunchedEffect(Unit) {
+                        colorBefore = colorPickerState.color
+                    }
+
                     ColorPicker(
                         modifier = Modifier,
-                        state = colorPickerState
+                        state = colorPickerState,
+                        onSelectionStart = {
+                            colorBefore = colorPickerState.color
+                        },
+                        onSelectionFinish = {
+                            pushStateChange(
+                                before = ColorChainDeviceState(colorBefore.red, colorBefore.green, colorBefore.blue),
+                                after = ColorChainDeviceState(it.red, it.green, it.blue)
+                            )
+                        }
                     )
 
                     HuePickerBar(
                         vertical = true,
-                        state = colorPickerState
+                        state = colorPickerState,
+                        onSelectionStart = {
+                            colorBefore = colorPickerState.color
+                        },
+                        onSelectionFinish = { _ ->
+                            val after = colorPickerState.color
+                            pushStateChange(
+                                before = ColorChainDeviceState(colorBefore.red, colorBefore.green, colorBefore.blue),
+                                after = ColorChainDeviceState(after.red, after.green, after.blue)
+                            )
+                        }
                     )
                 }
 
