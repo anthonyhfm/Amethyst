@@ -23,6 +23,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Event
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Frame
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.InfinityCheckbox
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPinchControl
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
@@ -145,6 +146,11 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
                     if (selectedKeyframes.isNotEmpty()) {
                         val frameIndices = selectedKeyframes.map { it.frameIndex }
+
+                        if (frameIndices[0] == 0 && (parentDevice?.state?.value?.frames?.size ?: 0) - 1 == frameIndices.last()) {
+                            val newFrame = Frame(timing = state.value.frames[state.value.currentFrameIndex].timing)
+                            parentDevice?.addFrameInternal(frameIndices.last() + 1, newFrame)
+                        }
 
                         parentDevice?.removeFrames(frameIndices)
 
