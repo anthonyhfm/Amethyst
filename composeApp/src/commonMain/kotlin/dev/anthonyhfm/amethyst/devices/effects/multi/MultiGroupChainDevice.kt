@@ -347,7 +347,6 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                         }
                     )
                 }
-                }
             }
 
             item {
