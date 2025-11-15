@@ -334,9 +334,10 @@ private fun NoteBox(
                 width = with(density) { baseWidthPx.coerceAtLeast(10f).toDp() },
                 height = 40.dp
             )
-            .background(
-                if (isSelected) Color(0xFFFFAA00) else Color(note.led.red, note.led.green, note.led.blue)
-            )
+            .background(Color(note.led.red, note.led.green, note.led.blue))
+            .border(2.dp, MaterialTheme.colorScheme.onSurface)
+            .padding(2.dp)
+            .border(2.dp, MaterialTheme.colorScheme.surfaceDim)
             .pointerInput(note) {
                 detectDragGestures(
                     onDragStart = { onSelect() },
