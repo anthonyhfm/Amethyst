@@ -105,14 +105,15 @@ private fun PianoRollEditor(
     val totalPitches = launchpadCount * 100 // 100 pitches per launchpad
     
     // Piano roll settings
-    val noteHeight = 16f // Height of each note row in pixels
-    val gridWidth = 50f // Width of one beat in pixels
+    val noteHeight = 20f // Height of each note row in pixels
+    val pixelsPerBeat = 80f // Width of one beat in pixels
     val beatsPerBar = 4
+    val totalBars = 50 // Number of bars to show
     val canvasHeight = totalPitches * noteHeight
-    val canvasWidth = 10000f // Very wide for scrolling
+    val canvasWidth = totalBars * beatsPerBar * pixelsPerBeat // Total width
     
     var selectedNote by remember { mutableStateOf<MidiNote?>(null) }
-    var isDragging by remember { mutableStateOf(false) }
+    var notesState by remember { mutableStateOf(entry.notes) }
     
     Box(
         modifier = Modifier
@@ -132,13 +133,15 @@ private fun PianoRollEditor(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .background(Color(0xFF1A1A1A))
                     .horizontalScroll(horizontalScroll)
                     .verticalScroll(verticalScroll)
             ) {
                 // Background grid
                 Box(
                     modifier = Modifier
-                        .size(width = canvasWidth.dp, height = canvasHeight.dp)
+                        .width(canvasWidth.dp)
+                        .height(canvasHeight.dp)
                         .drawBehind {
                             val darkBackground = Color(0xFF1A1A1A)
                             val lightRow = Color(0xFF242424)
@@ -146,60 +149,57 @@ private fun PianoRollEditor(
                             val beatLine = Color(0xFF444444)
                             val barLine = Color(0xFF555555)
                             
-                            // Draw row backgrounds
+                            val widthPx = canvasWidth
+                            val heightPx = canvasHeight
+                            
+                            // Draw row backgrounds for all pitches
                             for (pitch in 0 until totalPitches) {
                                 val y = pitch * noteHeight
                                 val isWhiteKey = pitch % 12 in listOf(0, 2, 4, 5, 7, 9, 11)
                                 drawRect(
                                     color = if (isWhiteKey) darkBackground else lightRow,
                                     topLeft = Offset(0f, y),
-                                    size = Size(size.width, noteHeight)
+                                    size = Size(widthPx, noteHeight)
                                 )
                             }
                             
-                            // Draw horizontal grid lines
+                            // Draw horizontal grid lines (for each pitch)
                             for (pitch in 0..totalPitches) {
                                 val y = pitch * noteHeight
                                 drawLine(
                                     color = gridLine,
                                     start = Offset(0f, y),
-                                    end = Offset(size.width, y),
+                                    end = Offset(widthPx, y),
                                     strokeWidth = 1f
                                 )
                             }
                             
-                            // Draw vertical grid lines
-                            var x = 0f
-                            var beatIndex = 0
-                            while (x < size.width) {
-                                val isBarLine = beatIndex % beatsPerBar == 0
-                                val isBeatLine = !isBarLine
-                                
-                                drawLine(
-                                    color = when {
-                                        isBarLine -> barLine
-                                        isBeatLine -> beatLine
-                                        else -> gridLine
-                                    },
-                                    start = Offset(x, 0f),
-                                    end = Offset(x, size.height),
-                                    strokeWidth = if (isBarLine) 2f else 1f
-                                )
-                                
-                                x += gridWidth
-                                beatIndex++
+                            // Draw vertical grid lines (beats and bars)
+                            for (bar in 0..totalBars) {
+                                for (beat in 0 until beatsPerBar) {
+                                    val x = (bar * beatsPerBar + beat) * pixelsPerBeat
+                                    val isBarLine = beat == 0
+                                    
+                                    drawLine(
+                                        color = if (isBarLine) barLine else beatLine,
+                                        start = Offset(x, 0f),
+                                        end = Offset(x, heightPx),
+                                        strokeWidth = if (isBarLine) 2f else 1f
+                                    )
+                                }
                             }
                         }
-                        .pointerInput(Unit) {
+                        .pointerInput(entry, onNoteAdd) {
                             detectTapGestures { offset ->
                                 val pitch = totalPitches - 1 - (offset.y / noteHeight).toInt()
-                                val timeMs = (offset.x / gridWidth * 500).toLong() // 500ms per beat
+                                val beatTime = offset.x / pixelsPerBeat
+                                val timeMs = (beatTime * 500).toLong() // 500ms per beat
                                 
                                 // Check if clicked on existing note
-                                val clickedNote = entry.notes.firstOrNull { note ->
+                                val clickedNote = notesState.firstOrNull { note ->
                                     val noteY = (totalPitches - 1 - note.pitch) * noteHeight
-                                    val noteX = (note.startTimeMs / 500f) * gridWidth
-                                    val noteWidth = (note.durationMs / 500f) * gridWidth
+                                    val noteX = (note.startTimeMs / 500f) * pixelsPerBeat
+                                    val noteWidth = (note.durationMs / 500f) * pixelsPerBeat
                                     
                                     offset.x >= noteX && offset.x <= noteX + noteWidth &&
                                     offset.y >= noteY && offset.y <= noteY + noteHeight
@@ -213,59 +213,30 @@ private fun PianoRollEditor(
                                     val newNote = MidiNote(
                                         pitch = pitch.coerceIn(0, totalPitches - 1),
                                         velocity = 100,
-                                        startTimeMs = timeMs,
+                                        startTimeMs = timeMs.coerceAtLeast(0),
                                         durationMs = defaultDuration
                                     )
                                     onNoteAdd?.invoke(newNote)
+                                    notesState = notesState + newNote
                                     selectedNote = newNote
                                 }
                             }
                         }
                 ) {
                     // Draw notes
-                    entry.notes.forEach { note ->
+                    notesState.forEach { note ->
                         if (note.pitch in 0 until totalPitches) {
-                            val noteY = (totalPitches - 1 - note.pitch) * noteHeight
-                            val noteX = (note.startTimeMs / 500f) * gridWidth
-                            val noteWidth = (note.durationMs / 500f) * gridWidth
-                            val isSelected = note == selectedNote
-                            
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = noteX.dp, y = noteY.dp)
-                                    .size(width = noteWidth.dp, height = noteHeight.dp)
-                                    .background(
-                                        if (isSelected) 
-                                            Color(0xFFFFAA00)
-                                        else 
-                                            Color(0xFFFF6B35)
-                                    )
-                                    .pointerInput(note) {
-                                        detectDragGestures(
-                                            onDragStart = {
-                                                selectedNote = note
-                                                isDragging = true
-                                            },
-                                            onDragEnd = {
-                                                isDragging = false
-                                            }
-                                        ) { change, dragAmount ->
-                                            change.consume()
-                                            
-                                            // Calculate new position
-                                            val newX = noteX + dragAmount.x
-                                            val newY = noteY + dragAmount.y
-                                            
-                                            val newTimeMs = ((newX / gridWidth) * 500).toLong().coerceAtLeast(0)
-                                            val newPitch = (totalPitches - 1 - (newY / noteHeight).toInt()).coerceIn(0, totalPitches - 1)
-                                            
-                                            val updatedNote = note.copy(
-                                                startTimeMs = newTimeMs,
-                                                pitch = newPitch
-                                            )
-                                            onNoteUpdate?.invoke(note, updatedNote)
-                                        }
-                                    }
+                            NoteBox(
+                                note = note,
+                                totalPitches = totalPitches,
+                                noteHeight = noteHeight,
+                                pixelsPerBeat = pixelsPerBeat,
+                                isSelected = note == selectedNote,
+                                onSelect = { selectedNote = note },
+                                onUpdate = { oldNote, newNote ->
+                                    onNoteUpdate?.invoke(oldNote, newNote)
+                                    notesState = notesState.map { if (it == oldNote) newNote else it }
+                                }
                             )
                         }
                     }
@@ -276,46 +247,104 @@ private fun PianoRollEditor(
 }
 
 @Composable
+private fun NoteBox(
+    note: MidiNote,
+    totalPitches: Int,
+    noteHeight: Float,
+    pixelsPerBeat: Float,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onUpdate: (MidiNote, MidiNote) -> Unit
+) {
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    
+    val noteY = (totalPitches - 1 - note.pitch) * noteHeight
+    val noteX = (note.startTimeMs / 500f) * pixelsPerBeat
+    val noteWidth = (note.durationMs / 500f) * pixelsPerBeat
+    
+    Box(
+        modifier = Modifier
+            .offset(x = (noteX + dragOffset.x).dp, y = (noteY + dragOffset.y).dp)
+            .size(width = noteWidth.coerceAtLeast(10f).dp, height = (noteHeight - 2f).dp)
+            .background(
+                if (isSelected) 
+                    Color(0xFFFFAA00)
+                else 
+                    Color(0xFFFF6B35)
+            )
+            .pointerInput(note) {
+                detectDragGestures(
+                    onDragStart = {
+                        onSelect()
+                    },
+                    onDragEnd = {
+                        // Apply the drag offset to create updated note
+                        if (dragOffset != Offset.Zero) {
+                            val newTimeMs = ((noteX + dragOffset.x) / pixelsPerBeat * 500).toLong().coerceAtLeast(0)
+                            val newPitch = (totalPitches - 1 - ((noteY + dragOffset.y) / noteHeight).toInt()).coerceIn(0, totalPitches - 1)
+                            
+                            val updatedNote = note.copy(
+                                startTimeMs = newTimeMs,
+                                pitch = newPitch
+                            )
+                            onUpdate(note, updatedNote)
+                        }
+                        dragOffset = Offset.Zero
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffset += dragAmount
+                    }
+                )
+            }
+    )
+}
+
+@Composable
 private fun PianoKeysColumn(
     totalPitches: Int,
     noteHeight: Float,
     verticalScroll: ScrollState
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .width(80.dp)
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(Color(0xFF2A2A2A))
             .verticalScroll(verticalScroll, enabled = false) // Sync with main scroll
     ) {
-        for (pitch in (totalPitches - 1) downTo 0) {
-            val noteInOctave = pitch % 12
-            val isBlackKey = noteInOctave in listOf(1, 3, 6, 8, 10)
-            val noteNames = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
-            val octave = pitch / 12
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(noteHeight.dp)
-                    .background(
-                        if (isBlackKey) 
-                            Color(0xFF2A2A2A) 
-                        else 
-                            Color(0xFF3A3A3A)
-                    )
-                    .drawBehind {
-                        // Draw border
-                        drawLine(
-                            color = Color(0xFF1A1A1A),
-                            start = Offset(0f, size.height),
-                            end = Offset(size.width, size.height),
-                            strokeWidth = 1f
+        Column(
+            modifier = Modifier
+                .width(80.dp)
+                .height((totalPitches * noteHeight).dp)
+        ) {
+            for (pitch in (totalPitches - 1) downTo 0) {
+                val noteInOctave = pitch % 12
+                val isBlackKey = noteInOctave in listOf(1, 3, 6, 8, 10)
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(noteHeight.dp)
+                        .background(
+                            if (isBlackKey) 
+                                Color(0xFF1A1A1A) 
+                            else 
+                                Color(0xFF2A2A2A)
                         )
-                    },
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                // Note label would go here
+                        .drawBehind {
+                            // Draw border
+                            drawLine(
+                                color = Color(0xFF0A0A0A),
+                                start = Offset(0f, size.height),
+                                end = Offset(size.width, size.height),
+                                strokeWidth = 1f
+                            )
+                        },
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    // Note labels could go here if needed
+                }
             }
         }
     }
