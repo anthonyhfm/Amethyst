@@ -13,6 +13,7 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.utils.MidiImporter
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -549,30 +550,107 @@ class TimelineViewModel : ViewModel() {
     }
 
     /**
-     * Handle double-click on lights track to create a new MIDI clip
+     * Handle double-click on lights track to create a new MIDI clip or open existing one
      */
     fun onDoubleClickLightsTrack(trackIndex: Int, timeMs: Long) {
         val track = _tracks.value.getOrNull(trackIndex) as? LightsTimelineTrack ?: return
         
-        // Create a new empty MIDI entry at the double-click position
-        val defaultDuration = 4000L // 4 seconds default
-        val newEntry = MidiEntry(
-            startTimeMs = timeMs,
-            durationMs = defaultDuration,
-            notes = emptyList(),
-            name = "Lights Clip"
-        )
+        // Check if there's an existing entry at this time
+        val existingEntry = track.entries.values.firstOrNull { entry ->
+            timeMs >= entry.startTimeMs && timeMs < entry.endTimeMs
+        }
         
-        track.addEntry(newEntry)
+        if (existingEntry != null) {
+            // Open Piano Roll for existing entry
+            openPianoRollForEntry(trackIndex, existingEntry)
+        } else {
+            // Create a new empty MIDI entry at the double-click position
+            val defaultDuration = 4000L // 4 seconds default
+            val newEntry = MidiEntry(
+                startTimeMs = timeMs,
+                durationMs = defaultDuration,
+                notes = emptyList(),
+                name = "Lights Clip"
+            )
+            
+            track.addEntry(newEntry)
+            
+            val currentTracks = _tracks.value.toMutableList()
+            val newTrack = LightsTimelineTrack().apply { entries.putAll(track.entries) }
+            currentTracks[trackIndex] = newTrack
+            _tracks.value = currentTracks.toList()
+            TimelineRepository.tracks.value = currentTracks.toList()
+            
+            SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newEntry.startTimeMs))
+            
+            println("Created new lights clip at ${timeMs}ms on track $trackIndex")
+            
+            // Open Piano Roll for the new entry
+            openPianoRollForEntry(trackIndex, newEntry)
+        }
+    }
+
+    /**
+     * Open Piano Roll workspace mode for editing a MIDI entry
+     */
+    private fun openPianoRollForEntry(trackIndex: Int, entry: MidiEntry) {
+        val pianoRollMode = PianoRollWorkspaceMode()
+        pianoRollMode.currentEntry = entry
+        pianoRollMode.trackIndex = trackIndex
+        pianoRollMode.entryStartMs = entry.startTimeMs
         
+        pianoRollMode.onNoteAdd = { note ->
+            addMidiNote(trackIndex, entry.startTimeMs, note)
+        }
+        
+        pianoRollMode.onNoteUpdate = { oldNote, newNote ->
+            updateMidiNote(trackIndex, entry.startTimeMs, oldNote, newNote)
+        }
+        
+        pianoRollMode.onNoteDelete = { note ->
+            deleteMidiNote(trackIndex, entry.startTimeMs, note)
+        }
+        
+        pianoRollMode.modeClose = {
+            // Return to previous mode
+            WorkspaceRepository.switchMode(WorkspaceContract.WorkspaceMode.Timeline())
+        }
+        
+        WorkspaceRepository.switchMode(pianoRollMode)
+        println("Opened Piano Roll for entry at ${entry.startTimeMs}ms on track $trackIndex")
+    }
+
+    /**
+     * Move a MIDI entry to a new position
+     */
+    fun moveMidiEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long) {
         val currentTracks = _tracks.value.toMutableList()
-        val newTrack = LightsTimelineTrack().apply { entries.putAll(track.entries) }
+        val track = currentTracks.getOrNull(trackIndex)
+        
+        if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+        
+        val midiTrack = track as TimelineTrack<MidiEntry>
+        val entry = midiTrack.entries.remove(oldStartMs) ?: return
+        
+        val bpm = WorkspaceRepository.bpm.value
+        val gridType = WorkspaceRepository.gridType.value
+        val intervals = GridUtils.computeWithGridType(_zoomLevel.value, bpm, gridType)
+        val gridInterval = intervals.intervalMs
+        val snappedStart = snapToGrid(newStartMs, gridInterval)
+        
+        val movedEntry = entry.copy(startTimeMs = snappedStart)
+        midiTrack.entries[snappedStart] = movedEntry
+        
+        // Update track
+        val newTrack = if (track is MidiTimelineTrack) {
+            MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+        } else {
+            LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+        }
         currentTracks[trackIndex] = newTrack
         _tracks.value = currentTracks.toList()
         TimelineRepository.tracks.value = currentTracks.toList()
         
-        SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newEntry.startTimeMs))
-        
-        println("Created new lights clip at ${timeMs}ms on track $trackIndex")
+        SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = snappedStart))
     }
 }

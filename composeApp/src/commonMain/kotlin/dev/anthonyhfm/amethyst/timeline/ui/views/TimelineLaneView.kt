@@ -194,7 +194,10 @@ fun TimelineLaneView(
                         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = index, entryStartMs = entryStart))
                     },
                     onMoveEntry = { oldStart, newStart ->
-                        viewModel.moveAudioEntry(index, oldStart, newStart)
+                        when (track) {
+                            is AudioTimelineTrack -> viewModel.moveAudioEntry(index, oldStart, newStart)
+                            is MidiTimelineTrack, is LightsTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
+                        }
                     },
                     onDoubleClickLane = { timeMs -> onDoubleClickLightsLane(index, timeMs) }
                 )
@@ -348,7 +351,12 @@ fun TimelineLane(
                                     onSelectEntry = { onSelectEntry(midiEntry.startTimeMs) },
                                     onMoveEntry = { newStart -> onMoveEntry(midiEntry.startTimeMs, newStart) },
                                     gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
-                                    isLightsTrack = track is LightsTimelineTrack
+                                    isLightsTrack = track is LightsTimelineTrack,
+                                    onDoubleClick = {
+                                        if (track is LightsTimelineTrack) {
+                                            onDoubleClickLane(midiEntry.startTimeMs)
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -546,7 +554,8 @@ fun MidiClip(
     onSelectEntry: () -> Unit,
     onMoveEntry: (newStartMs: Long) -> Unit,
     gridIntervalMs: Long,
-    isLightsTrack: Boolean = false
+    isLightsTrack: Boolean = false,
+    onDoubleClick: () -> Unit = {}
 ) {
     val bpm by WorkspaceRepository.bpm.collectAsState()
     val gridType by WorkspaceRepository.gridType.collectAsState()
@@ -582,7 +591,12 @@ fun MidiClip(
             .clip(RoundedCornerShape(4.dp))
             .background(backgroundColor)
             .border(2.dp, borderColor, RoundedCornerShape(4.dp))
-            .clickable { onSelectEntry() }
+            .pointerInput(midiEntry.startTimeMs) {
+                detectTapGestures(
+                    onTap = { onSelectEntry() },
+                    onDoubleTap = { onDoubleClick() }
+                )
+            }
     ) {
         Column(
             modifier = Modifier
