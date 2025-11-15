@@ -75,37 +75,18 @@ fun FramePreviewButton(
     Dropdown(
         isOpen = showRightClickMenu,
         menu = dropDownMenu {
-            item("duplicate", "Duplicate") {
-                icon(Icons.Default.ControlPointDuplicate)
-            }
-
-            item("delete", "Delete") {
-                icon(Icons.Default.Delete)
-                enabled(totalFrames > 1)
-            }
-
             item("addKeyframe", "Add Keyframe") {
                 icon(Icons.Default.Add)
             }
 
-            horizontalDivider()
-
-            item("markStart", "Mark as Start") {
-                icon(Icons.Default.PlayArrow)
-                enabled(!isFirstFrame)
+            item("duplicate", "Duplicate") {
+                icon(Icons.Default.ControlPointDuplicate)
             }
 
-            item("markEnd", "Mark as End") {
-                icon(Icons.Default.Stop)
-                enabled(!isLastFrame)
-            }
-
-            horizontalDivider()
-            
             item("copy", "Copy") {
                 icon(Icons.Default.ContentCopy)
             }
-            
+
             if (hasFramesInClipboard) {
                 item("paste", "Paste") {
                     icon(Icons.Default.ContentCopy)
@@ -114,8 +95,8 @@ fun FramePreviewButton(
 
             horizontalDivider()
 
-            item("properties", "Properties") {
-                icon(Icons.Default.Info)
+            item("delete", "Delete") {
+                icon(Icons.Default.Delete)
             }
         },
         offset = rightClickMenuOffset,
@@ -131,16 +112,6 @@ fun FramePreviewButton(
                 }
                 "addKeyframe" -> {
                     onEvent(KeyframesChainDeviceContract.Event.OnAddFrame(index + 1))
-                }
-                "markStart" -> {
-                    if (!isFirstFrame && parent != null) {
-                        onEvent(KeyframesChainDeviceContract.Event.OnChangeFramePosition(index, 0))
-                    }
-                }
-                "markEnd" -> {
-                    if (!isLastFrame && parent != null) {
-                        onEvent(KeyframesChainDeviceContract.Event.OnChangeFramePosition(index, totalFrames - 1))
-                    }
                 }
                 "copy" -> {
                     if (parent != null) {
@@ -159,10 +130,6 @@ fun FramePreviewButton(
                         val framesToPaste = (clipboard as ClipboardData.Keyframe).frames
                         parent.pasteFrames(framesToPaste, index + 1)
                     }
-                }
-                "properties" -> {
-                    // Show properties dialog (to be implemented)
-                    println("Show properties for frame $index")
                 }
             }
             showRightClickMenu = false
