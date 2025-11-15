@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -377,5 +380,103 @@ class TimelineViewModel : ViewModel() {
         val current = _tracks.value.toMutableList(); current[trackIndex] = newTrack
         _tracks.value = current.toList(); TimelineRepository.tracks.value = current.toList()
         UndoManager.addAction(UndoableAction.TimelineClipDeletion(trackIndex, deleted = original))
+    }
+
+    // ========== MIDI Track Operations ==========
+
+    /**
+     * Add a MIDI track to the timeline
+     */
+    fun addMidiTrack() {
+        viewModelScope.launch {
+            val newTrack = MidiTimelineTrack()
+            val currentTracks = _tracks.value.toMutableList()
+            currentTracks.add(newTrack)
+            _tracks.value = currentTracks.toList()
+            TimelineRepository.addTrack(newTrack)
+        }
+    }
+
+    /**
+     * Add a MIDI entry to a track
+     */
+    fun addMidiEntry(trackIndex: Int, entry: MidiEntry) {
+        viewModelScope.launch {
+            val currentTracks = _tracks.value.toMutableList()
+            val track = currentTracks.getOrNull(trackIndex) as? MidiTimelineTrack ?: return@launch
+            
+            track.addEntry(entry)
+            
+            // Update tracks
+            val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+            currentTracks[trackIndex] = newTrack
+            _tracks.value = currentTracks.toList()
+            TimelineRepository.tracks.value = currentTracks.toList()
+            
+            SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entry.startTimeMs))
+        }
+    }
+
+    /**
+     * Add a MIDI note to an entry
+     */
+    fun addMidiNote(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        
+        val entry = track.entries[entryStartMs]
+        if (entry != null) {
+            // Add note to existing entry
+            val updatedEntry = entry.copy(notes = entry.notes + note)
+            track.entries[entryStartMs] = updatedEntry
+            
+            // Update timeline
+            val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+            currentTracks[trackIndex] = newTrack
+            _tracks.value = currentTracks.toList()
+            TimelineRepository.tracks.value = currentTracks.toList()
+        }
+    }
+
+    /**
+     * Update a MIDI note in an entry
+     */
+    fun updateMidiNote(trackIndex: Int, entryStartMs: Long, oldNote: MidiNote, newNote: MidiNote) {
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        
+        track.updateNote(entryStartMs, oldNote, newNote)
+        
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        currentTracks[trackIndex] = newTrack
+        _tracks.value = currentTracks.toList()
+        TimelineRepository.tracks.value = currentTracks.toList()
+    }
+
+    /**
+     * Delete a MIDI note from an entry
+     */
+    fun deleteMidiNote(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        
+        track.removeNote(entryStartMs, note)
+        
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        currentTracks[trackIndex] = newTrack
+        _tracks.value = currentTracks.toList()
+        TimelineRepository.tracks.value = currentTracks.toList()
+    }
+
+    /**
+     * Delete a MIDI entry
+     */
+    fun deleteMidiEntry(trackIndex: Int, entryStartMs: Long) {
+        val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        val original = track.entries.remove(entryStartMs) ?: return
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        val current = _tracks.value.toMutableList(); current[trackIndex] = newTrack
+        _tracks.value = current.toList(); TimelineRepository.tracks.value = current.toList()
+        // Note: UndoableAction would need to be extended to support MIDI entries
     }
 }

@@ -2,6 +2,8 @@ package dev.anthonyhfm.amethyst.timeline
 
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,13 +30,16 @@ object TimelineRepository {
     private val playbackScope = CoroutineScope(Dispatchers.Main)
 
     private val activeEntries = mutableSetOf<AudioEntry>()
+    private val activeMidiEntries = mutableSetOf<MidiEntry>()
 
     // Basis für Zeitberechnung (wird nur bei Play & Seek aktualisiert)
     private var baselineMark: TimeMark? = null
     private var baselinePlayheadMs: Long = 0L
 
     private var sortedAudioEntries: List<AudioEntry> = emptyList()
+    private var sortedMidiEntries: List<MidiEntry> = emptyList()
     private var nextStartIndex: Int = 0
+    private var nextMidiStartIndex: Int = 0
     private var lastPlayheadMs: Long = 0L
 
     private fun rebuildSortedEntries() {
@@ -43,7 +48,13 @@ object TimelineRepository {
             .flatMap { it.entries.values }
             .sortedBy { it.startTimeMs }
 
+        sortedMidiEntries = tracks.value
+            .filterIsInstance<MidiTimelineTrack>()
+            .flatMap { it.entries.values }
+            .sortedBy { it.startTimeMs }
+
         nextStartIndex = binarySearchFirst(sortedAudioEntries) { it.startTimeMs >= _playheadPositionMs.value }
+        nextMidiStartIndex = binarySearchFirst(sortedMidiEntries) { it.startTimeMs >= _playheadPositionMs.value }
     }
 
     private inline fun <T> binarySearchFirst(list: List<T>, predicate: (T) -> Boolean): Int {
@@ -67,9 +78,11 @@ object TimelineRepository {
         baselineMark = TimeSource.Monotonic.markNow()
         rebuildSortedEntries()
         nextStartIndex = binarySearchFirst(sortedAudioEntries) { it.startTimeMs >= baselinePlayheadMs }
+        nextMidiStartIndex = binarySearchFirst(sortedMidiEntries) { it.startTimeMs >= baselinePlayheadMs }
         lastPlayheadMs = baselinePlayheadMs
 
         activeEntries.forEach { it.stop() }; activeEntries.clear()
+        activeMidiEntries.forEach { it.stop() }; activeMidiEntries.clear()
 
         sortedAudioEntries.forEach { entry ->
             if (baselinePlayheadMs >= entry.startTimeMs && baselinePlayheadMs < entry.endTimeMs) {
@@ -77,6 +90,14 @@ object TimelineRepository {
                 activeEntries.add(entry)
             }
         }
+        
+        sortedMidiEntries.forEach { entry ->
+            if (baselinePlayheadMs >= entry.startTimeMs && baselinePlayheadMs < entry.endTimeMs) {
+                entry.start(startAt = baselinePlayheadMs)
+                activeMidiEntries.add(entry)
+            }
+        }
+        
         startPlayback()
     }
 
@@ -86,6 +107,8 @@ object TimelineRepository {
         stopPlayback()
         activeEntries.forEach { it.stop() }
         activeEntries.clear()
+        activeMidiEntries.forEach { it.stop() }
+        activeMidiEntries.clear()
     }
 
     fun stop() {
@@ -93,6 +116,7 @@ object TimelineRepository {
         _playheadPositionMs.value = 0L
         lastPlayheadMs = 0L
         nextStartIndex = 0
+        nextMidiStartIndex = 0
     }
 
     fun setPlayheadPosition(positionMs: Long) {
@@ -103,20 +127,32 @@ object TimelineRepository {
             baselineMark = TimeSource.Monotonic.markNow()
             // Beim Seek während Playback: alle aktiven stoppen + neu bestücken
             activeEntries.forEach { it.stop() }; activeEntries.clear()
+            activeMidiEntries.forEach { it.stop() }; activeMidiEntries.clear()
             lastPlayheadMs = coerced
             rebuildSortedEntries()
             nextStartIndex = binarySearchFirst(sortedAudioEntries) { it.startTimeMs >= coerced }
+            nextMidiStartIndex = binarySearchFirst(sortedMidiEntries) { it.startTimeMs >= coerced }
             sortedAudioEntries.forEach { entry ->
                 if (coerced >= entry.startTimeMs && coerced < entry.endTimeMs) {
                     entry.start(startAt = coerced)
                     activeEntries.add(entry)
                 }
             }
+            sortedMidiEntries.forEach { entry ->
+                if (coerced >= entry.startTimeMs && coerced < entry.endTimeMs) {
+                    entry.start(startAt = coerced)
+                    activeMidiEntries.add(entry)
+                }
+            }
         } else {
             // Im Pausenmodus nur aktive Menge aktualisieren (keine Wiedergabe, aber Konsistenz)
             activeEntries.clear()
+            activeMidiEntries.clear()
             sortedAudioEntries.forEach { entry ->
                 if (coerced >= entry.startTimeMs && coerced < entry.endTimeMs) activeEntries.add(entry)
+            }
+            sortedMidiEntries.forEach { entry ->
+                if (coerced >= entry.startTimeMs && coerced < entry.endTimeMs) activeMidiEntries.add(entry)
             }
         }
     }
@@ -151,6 +187,20 @@ object TimelineRepository {
                 }
                 nextStartIndex++
             }
+            
+            // Start MIDI entries
+            while (nextMidiStartIndex < sortedMidiEntries.size && sortedMidiEntries[nextMidiStartIndex].startTimeMs <= currentMs) {
+                val entry = sortedMidiEntries[nextMidiStartIndex]
+                if (entry.startTimeMs >= lastPlayheadMs && entry.startTimeMs <= currentMs) {
+                    if (!activeMidiEntries.contains(entry) && currentMs < entry.endTimeMs) {
+                        entry.start(startAt = currentMs)
+                        activeMidiEntries.add(entry)
+                        println("TimelineInc: Started MIDI ${entry.name} at ${currentMs}ms")
+                    }
+                }
+                nextMidiStartIndex++
+            }
+            
             // Stoppe Einträge deren Ende überschritten wurde
             val iterator = activeEntries.iterator()
             while (iterator.hasNext()) {
@@ -159,13 +209,32 @@ object TimelineRepository {
                     e.stop(); iterator.remove(); println("TimelineInc: Stopped ${e.fileName} @${currentMs}ms")
                 }
             }
+            
+            // Stop MIDI entries that have ended
+            val midiIterator = activeMidiEntries.iterator()
+            while (midiIterator.hasNext()) {
+                val e = midiIterator.next()
+                if (currentMs >= e.endTimeMs || currentMs < e.startTimeMs) {
+                    e.stop(); midiIterator.remove(); println("TimelineInc: Stopped MIDI ${e.name} @${currentMs}ms")
+                } else {
+                    // Process MIDI notes at current time
+                    e.processAtTime(currentMs)
+                }
+            }
         } else {
             // Rückwärts (Scrub rückwärts): Rebuild aktive Menge
             activeEntries.forEach { it.stop() }; activeEntries.clear()
+            activeMidiEntries.forEach { it.stop() }; activeMidiEntries.clear()
             nextStartIndex = binarySearchFirst(sortedAudioEntries) { it.startTimeMs >= currentMs }
+            nextMidiStartIndex = binarySearchFirst(sortedMidiEntries) { it.startTimeMs >= currentMs }
             sortedAudioEntries.forEach { e ->
                 if (currentMs >= e.startTimeMs && currentMs < e.endTimeMs) {
                     e.start(startAt = currentMs); activeEntries.add(e)
+                }
+            }
+            sortedMidiEntries.forEach { e ->
+                if (currentMs >= e.startTimeMs && currentMs < e.endTimeMs) {
+                    e.start(startAt = currentMs); activeMidiEntries.add(e)
                 }
             }
         }
