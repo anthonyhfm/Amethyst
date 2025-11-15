@@ -1,17 +1,19 @@
 package dev.anthonyhfm.amethyst.timeline
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,7 +29,6 @@ import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.roundToInt
 
 class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
@@ -55,14 +56,27 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
         ) {
-            // Left panel (400dp wide) - User will fill this
-            Box(
+            // Left panel (300dp wide) - Styled like KeyframesWorkspaceMode panels
+            Column(
                 modifier = Modifier
-                    .width(400.dp)
+                    .width(300.dp)
                     .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Panel content placeholder - user will implement
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    // Content will be added by user
+                }
             }
 
             // Main Piano Roll Area
@@ -104,8 +118,8 @@ private fun PianoRollEditor(
     val launchpadCount = launchpads.size.coerceAtLeast(1)
     val totalPitches = launchpadCount * 100 // 100 pitches per launchpad
     
-    // Piano roll settings
-    val noteHeight = 20f // Height of each note row in pixels
+    // Piano roll settings - doubled from before to make grid twice as wide
+    val noteHeight = 40f // Doubled from 20dp - height of each note row in pixels
     val pixelsPerBeat = 80f // Width of one beat in pixels
     val beatsPerBar = 4
     val totalBars = 50 // Number of bars to show
@@ -121,7 +135,7 @@ private fun PianoRollEditor(
             .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            // Piano Keys Column (left side)
+            // Piano Keys Column (left side) - wider to match grid
             PianoKeysColumn(
                 totalPitches = totalPitches,
                 noteHeight = noteHeight,
@@ -193,7 +207,10 @@ private fun PianoRollEditor(
                             detectTapGestures { offset ->
                                 val pitch = totalPitches - 1 - (offset.y / noteHeight).toInt()
                                 val beatTime = offset.x / pixelsPerBeat
-                                val timeMs = (beatTime * 500).toLong() // 500ms per beat
+                                
+                                // Snap to grid - round to nearest 1/4 beat
+                                val snappedBeatTime = (beatTime * 4).roundToInt() / 4f
+                                val timeMs = (snappedBeatTime * 500).toLong() // 500ms per beat
                                 
                                 // Check if clicked on existing note
                                 val clickedNote = notesState.firstOrNull { note ->
@@ -208,13 +225,15 @@ private fun PianoRollEditor(
                                 if (clickedNote != null) {
                                     selectedNote = clickedNote
                                 } else {
-                                    // Create new note
+                                    // Create new note with grid snapping
                                     val defaultDuration = 500L // One beat
-                                    val newNote = MidiNote(
+                                    val newNote = MidiNote.withColor(
                                         pitch = pitch.coerceIn(0, totalPitches - 1),
-                                        velocity = 100,
+                                        color = Color(0xFFFF6B35), // Orange color
                                         startTimeMs = timeMs.coerceAtLeast(0),
-                                        durationMs = defaultDuration
+                                        durationMs = defaultDuration,
+                                        x = pitch % 10,
+                                        y = pitch / 10
                                     )
                                     onNoteAdd?.invoke(newNote)
                                     notesState = notesState + newNote
@@ -265,12 +284,12 @@ private fun NoteBox(
     Box(
         modifier = Modifier
             .offset(x = (noteX + dragOffset.x).dp, y = (noteY + dragOffset.y).dp)
-            .size(width = noteWidth.coerceAtLeast(10f).dp, height = (noteHeight - 2f).dp)
+            .size(width = noteWidth.coerceAtLeast(10f).dp, height = (noteHeight - 4f).dp)
             .background(
                 if (isSelected) 
                     Color(0xFFFFAA00)
                 else 
-                    Color(0xFFFF6B35)
+                    note.led.color // Use the LED color from Signal.LED
             )
             .pointerInput(note) {
                 detectDragGestures(
@@ -278,14 +297,25 @@ private fun NoteBox(
                         onSelect()
                     },
                     onDragEnd = {
-                        // Apply the drag offset to create updated note
+                        // Apply the drag offset to create updated note with grid snapping
                         if (dragOffset != Offset.Zero) {
-                            val newTimeMs = ((noteX + dragOffset.x) / pixelsPerBeat * 500).toLong().coerceAtLeast(0)
-                            val newPitch = (totalPitches - 1 - ((noteY + dragOffset.y) / noteHeight).toInt()).coerceIn(0, totalPitches - 1)
+                            val newX = noteX + dragOffset.x
+                            val newY = noteY + dragOffset.y
+                            
+                            // Snap to grid - 1/4 beat precision
+                            val beatTime = newX / pixelsPerBeat
+                            val snappedBeatTime = (beatTime * 4).roundToInt() / 4f
+                            val newTimeMs = (snappedBeatTime * 500).toLong().coerceAtLeast(0)
+                            
+                            val newPitch = (totalPitches - 1 - (newY / noteHeight).toInt()).coerceIn(0, totalPitches - 1)
                             
                             val updatedNote = note.copy(
                                 startTimeMs = newTimeMs,
-                                pitch = newPitch
+                                pitch = newPitch,
+                                led = note.led.copy(
+                                    x = newPitch % 10,
+                                    y = newPitch / 10
+                                )
                             )
                             onUpdate(note, updatedNote)
                         }
@@ -308,14 +338,14 @@ private fun PianoKeysColumn(
 ) {
     Box(
         modifier = Modifier
-            .width(80.dp)
+            .width(160.dp) // Doubled from 80dp to match wider grid
             .fillMaxHeight()
             .background(Color(0xFF2A2A2A))
             .verticalScroll(verticalScroll, enabled = false) // Sync with main scroll
     ) {
         Column(
             modifier = Modifier
-                .width(80.dp)
+                .width(160.dp)
                 .height((totalPitches * noteHeight).dp)
         ) {
             for (pitch in (totalPitches - 1) downTo 0) {

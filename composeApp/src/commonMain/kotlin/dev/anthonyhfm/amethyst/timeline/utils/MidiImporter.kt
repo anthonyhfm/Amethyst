@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline.utils
 
+import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import io.github.vinceglb.filekit.PlatformFile
@@ -157,12 +158,18 @@ object MidiImporter {
                                 val (startTime, noteVelocity) = noteStart
                                 val duration = timeMs - startTime
                                 if (duration > 0) {
+                                    // Convert velocity to color intensity
+                                    val intensity = (noteVelocity / 127f).coerceIn(0f, 1f)
+                                    val color = Color(intensity, intensity * 0.4f, 0f) // Orange-ish
+                                    
                                     notes.add(
-                                        MidiNote(
+                                        MidiNote.withColor(
                                             pitch = pitch,
-                                            velocity = noteVelocity,
+                                            color = color,
                                             startTimeMs = startTime,
-                                            durationMs = duration
+                                            durationMs = duration,
+                                            x = pitch % 10,
+                                            y = pitch / 10
                                         )
                                     )
                                 }
@@ -216,12 +223,17 @@ object MidiImporter {
         for ((pitch, noteStart) in activeNotes) {
             val (startTime, velocity) = noteStart
             // Use a default duration for unclosed notes
+            val intensity = (velocity / 127f).coerceIn(0f, 1f)
+            val color = Color(intensity, intensity * 0.4f, 0f)
+            
             notes.add(
-                MidiNote(
+                MidiNote.withColor(
                     pitch = pitch,
-                    velocity = velocity,
+                    color = color,
                     startTimeMs = startTime,
-                    durationMs = 500 // Default 500ms
+                    durationMs = 500, // Default 500ms
+                    x = pitch % 10,
+                    y = pitch / 10
                 )
             )
         }

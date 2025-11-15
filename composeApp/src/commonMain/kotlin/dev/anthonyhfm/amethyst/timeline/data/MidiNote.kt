@@ -1,28 +1,57 @@
 package dev.anthonyhfm.amethyst.timeline.data
 
+import androidx.compose.ui.graphics.Color
+import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlinx.serialization.Serializable
 
 /**
- * Represents a single MIDI note with pitch, velocity, and timing information.
+ * Represents a single LED note for light shows on launchpad devices.
  * 
- * @property pitch MIDI note number (0-127), where 60 is middle C
- * @property velocity Note velocity (0-127), representing how hard the note is played
+ * @property pitch Note position (0-127), for launchpad: x + y*10 within 0-99 range per device
+ * @property led LED signal containing color, position, layer, and blending mode
  * @property startTimeMs Start time of the note in milliseconds relative to the track
  * @property durationMs Duration of the note in milliseconds
  */
 @Serializable
 data class MidiNote(
     val pitch: Int,
-    val velocity: Int,
+    val led: Signal.LED,
     val startTimeMs: Long,
     val durationMs: Long
 ) {
     init {
-        require(pitch in 0..127) { "MIDI pitch must be between 0 and 127, got $pitch (note: launchpad uses 0-99)" }
-        require(velocity in 0..127) { "MIDI velocity must be between 0 and 127, got $velocity" }
+        require(pitch in 0..127) { "Note pitch must be between 0 and 127, got $pitch (note: launchpad uses 0-99 per device)" }
         require(startTimeMs >= 0) { "Start time must be non-negative, got $startTimeMs" }
         require(durationMs > 0) { "Duration must be positive, got $durationMs" }
     }
     
     val endTimeMs: Long get() = startTimeMs + durationMs
+    
+    companion object {
+        /**
+         * Creates a MidiNote with a simple color (for backwards compatibility and ease of use)
+         */
+        fun withColor(
+            pitch: Int,
+            color: Color,
+            startTimeMs: Long,
+            durationMs: Long,
+            x: Int = pitch % 10,
+            y: Int = pitch / 10,
+            layer: Int = 0,
+            blendingMode: Signal.LED.BlendingMode = Signal.LED.BlendingMode.Normal
+        ) = MidiNote(
+            pitch = pitch,
+            led = Signal.LED(
+                origin = null,
+                x = x,
+                y = y,
+                color = color,
+                layer = layer,
+                blendingMode = blendingMode
+            ),
+            startTimeMs = startTimeMs,
+            durationMs = durationMs
+        )
+    }
 }
