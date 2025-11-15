@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.timeline.utils
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 
 /**
