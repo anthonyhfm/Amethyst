@@ -768,28 +768,13 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
     }
 
     fun copyGroup(group: Group) {
-        ClipboardManager.setClipboardData(
-            ClipboardData.GroupChainItem(
-                groups = listOf(group)
-            )
-        )
+        // Use ClipboardManager.copy() with the current selection
+        ClipboardManager.copy(SelectionManager.selections.value)
     }
 
     fun pasteGroup(index: Int) {
-        val clipboard = ClipboardManager.clipboardData.value
-        if (clipboard is ClipboardData.GroupChainItem) {
-            clipboard.groups.forEach { groupToPaste ->
-                createGroup(index)
-
-                state.update {
-                    it.copy(
-                        groups = it.groups.toMutableList().apply {
-                            this[index] = this[index].copy(name = groupToPaste.name)
-                        }
-                    )
-                }
-            }
-        }
+        // Use ClipboardManager.paste() which handles everything
+        ClipboardManager.paste()
     }
 
     fun renameGroup(index: Int, newName: String) {
