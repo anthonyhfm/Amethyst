@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
@@ -65,7 +66,7 @@ class TimelineViewModel : ViewModel() {
     }
 
     private fun initializeDemoData() {
-        _tracks.value = listOf(AudioTimelineTrack())
+        _tracks.value = listOf(AudioTimelineTrack(), LightsTimelineTrack())
 
         _tracks.value.forEach { track ->
             TimelineRepository.addTrack(track)
@@ -384,6 +385,32 @@ class TimelineViewModel : ViewModel() {
     }
 
     // ========== MIDI Track Operations ==========
+
+    /**
+     * Add an audio track to the timeline
+     */
+    fun addAudioTrack() {
+        viewModelScope.launch {
+            val newTrack = AudioTimelineTrack()
+            val currentTracks = _tracks.value.toMutableList()
+            currentTracks.add(newTrack)
+            _tracks.value = currentTracks.toList()
+            TimelineRepository.addTrack(newTrack)
+        }
+    }
+
+    /**
+     * Add a lights track to the timeline
+     */
+    fun addLightsTrack() {
+        viewModelScope.launch {
+            val newTrack = LightsTimelineTrack()
+            val currentTracks = _tracks.value.toMutableList()
+            currentTracks.add(newTrack)
+            _tracks.value = currentTracks.toList()
+            TimelineRepository.addTrack(newTrack)
+        }
+    }
 
     /**
      * Add a MIDI track to the timeline

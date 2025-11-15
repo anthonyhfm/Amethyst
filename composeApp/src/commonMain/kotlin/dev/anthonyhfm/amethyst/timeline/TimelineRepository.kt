@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.timeline
 
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
@@ -49,8 +50,8 @@ object TimelineRepository {
             .sortedBy { it.startTimeMs }
 
         sortedMidiEntries = tracks.value
-            .filterIsInstance<MidiTimelineTrack>()
-            .flatMap { it.entries.values }
+            .filter { it is MidiTimelineTrack || it is LightsTimelineTrack }
+            .flatMap { (it as TimelineTrack<MidiEntry>).entries.values }
             .sortedBy { it.startTimeMs }
 
         nextStartIndex = binarySearchFirst(sortedAudioEntries) { it.startTimeMs >= _playheadPositionMs.value }

@@ -46,6 +46,7 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
@@ -83,6 +84,7 @@ fun TimelineLaneView(
     val maxDurationMs = tracks.maxOfOrNull { track ->
         when (track) {
             is AudioTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
+            is MidiTimelineTrack, is LightsTimelineTrack -> (track as TimelineTrack<MidiEntry>).entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
             else -> 0L
         }
     } ?: 0L
@@ -318,8 +320,8 @@ fun TimelineLane(
                             }
                         }
                 }
-                is MidiTimelineTrack -> {
-                    track.entries.values
+                is MidiTimelineTrack, is LightsTimelineTrack -> {
+                    (track as TimelineTrack<MidiEntry>).entries.values
                         .sortedBy { it.startTimeMs }
                         .forEach { midiEntry ->
                             androidx.compose.runtime.key(midiEntry.startTimeMs) {
@@ -330,7 +332,8 @@ fun TimelineLane(
                                     isSelected = isSelectedEntry,
                                     onSelectEntry = { onSelectEntry(midiEntry.startTimeMs) },
                                     onMoveEntry = { newStart -> onMoveEntry(midiEntry.startTimeMs, newStart) },
-                                    gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs
+                                    gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
+                                    isLightsTrack = track is LightsTimelineTrack
                                 )
                             }
                         }
@@ -527,7 +530,8 @@ fun MidiClip(
     isSelected: Boolean,
     onSelectEntry: () -> Unit,
     onMoveEntry: (newStartMs: Long) -> Unit,
-    gridIntervalMs: Long
+    gridIntervalMs: Long,
+    isLightsTrack: Boolean = false
 ) {
     val bpm by WorkspaceRepository.bpm.collectAsState()
     val gridType by WorkspaceRepository.gridType.collectAsState()
@@ -535,9 +539,9 @@ fun MidiClip(
     val density = LocalDensity.current
     val startOffsetPx = (midiEntry.startTimeMs * zoomLevel).roundToInt()
     val widthDp = with(density) { (midiEntry.durationMs * zoomLevel).toDp() }
-    val borderColor = if (isSelected) Color.White else Color(0xFFBA3C8C)
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.tertiary else Color(0xFFEF5698)
-    val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onTertiary else Color.White
+    val borderColor = if (isSelected) Color.White else if (isLightsTrack) Color(0xFFD4AF37) else Color(0xFFBA3C8C)
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.tertiary else if (isLightsTrack) Color(0xFFFFD700) else Color(0xFFEF5698)
+    val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onTertiary else if (isLightsTrack) Color.Black else Color.White
 
     val dragOffsetPx = remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
     var snapEnabled by remember { mutableStateOf(true) }
