@@ -332,7 +332,7 @@ private fun NoteBox(
             )
             .size(
                 width = with(density) { baseWidthPx.coerceAtLeast(10f).toDp() },
-                height = with(density) { metrics.noteRenderHeightPx.toDp() }
+                height = 40.dp
             )
             .background(
                 if (isSelected) Color(0xFFFFAA00) else Color(note.led.red, note.led.green, note.led.blue)
