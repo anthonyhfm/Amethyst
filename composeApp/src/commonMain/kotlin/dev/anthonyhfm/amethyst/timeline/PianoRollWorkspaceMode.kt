@@ -25,12 +25,47 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import kotlin.math.roundToInt
+
+private const val MS_PER_BEAT: Long = 500L
+private const val SNAP_DIVISIONS: Int = 4 // Viertel Beats
+
+private class PianoRollMetrics(
+    val totalPitches: Int,
+    val noteHeightDp: Dp,
+    val pixelsPerBeatDp: Dp,
+    private val density: Density
+) {
+    // PX Cache
+    val noteHeightPx: Float = with(density) { noteHeightDp.toPx() }
+    val pixelsPerBeatPx: Float = with(density) { pixelsPerBeatDp.toPx() }
+    val noteRenderHeightPx: Float = noteHeightPx - 4f // visuelle Höhe der Note
+
+    fun pitchToYPx(pitch: Int): Float = (totalPitches - 1 - pitch) * noteHeightPx
+    fun yPxToPitch(y: Float): Int = (totalPitches - 1 - (y / noteHeightPx).toInt()).coerceIn(0, totalPitches - 1)
+
+    fun timeMsToXPx(startTimeMs: Long): Float = (startTimeMs / MS_PER_BEAT.toFloat()) * pixelsPerBeatPx
+    fun durationMsToWidthPx(durationMs: Long): Float = (durationMs / MS_PER_BEAT.toFloat()) * pixelsPerBeatPx
+
+    fun xPxToTimeMs(x: Float): Long {
+        val beatTime = x / pixelsPerBeatPx
+        val snappedBeatTime = (beatTime * SNAP_DIVISIONS).roundToInt() / SNAP_DIVISIONS.toFloat()
+        return (snappedBeatTime * MS_PER_BEAT).toLong().coerceAtLeast(0L)
+    }
+
+    fun xPxToBeatStartTimeMs(x: Float): Long {
+        val beatIndex = (x / pixelsPerBeatPx).toInt().coerceAtLeast(0)
+        return beatIndex * MS_PER_BEAT
+    }
+}
 
 class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     override val displayName: String = "Piano Roll"
@@ -114,22 +149,26 @@ private fun PianoRollEditor(
 ) {
     val horizontalScroll = rememberScrollState()
     val verticalScroll = rememberScrollState()
-    
-    // Calculate total pitch range based on launchpad count
+    val density = LocalDensity.current
+
     val launchpadCount = launchpads.size.coerceAtLeast(1)
-    val totalPitches = launchpadCount * 100 // 100 pitches per launchpad
-    
-    // Piano roll settings - doubled from before to make grid twice as wide
-    val noteHeight = 40f // Doubled from 20dp - height of each note row in pixels
-    val pixelsPerBeat = 80f // Width of one beat in pixels
+    val totalPitches = launchpadCount * 100
+
+    val noteHeightDp: Dp = 40.dp
+    val pixelsPerBeatDp: Dp = 80.dp
     val beatsPerBar = 4
-    val totalBars = 50 // Number of bars to show
-    val canvasHeight = totalPitches * noteHeight
-    val canvasWidth = totalBars * beatsPerBar * pixelsPerBeat // Total width
-    
+    val totalBars = 50
+
+    val metrics = remember(totalPitches, density) {
+        PianoRollMetrics(totalPitches, noteHeightDp, pixelsPerBeatDp, density)
+    }
+
+    val canvasHeightDp = noteHeightDp * totalPitches
+    val canvasWidthDp = pixelsPerBeatDp * beatsPerBar * totalBars
+
     var selectedNote by remember { mutableStateOf<MidiNote?>(null) }
     var notesState by remember { mutableStateOf(entry.notes) }
-    
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -139,10 +178,10 @@ private fun PianoRollEditor(
             // Piano Keys Column (left side) - wider to match grid
             PianoKeysColumn(
                 totalPitches = totalPitches,
-                noteHeight = noteHeight,
+                noteHeight = noteHeightDp,
                 verticalScroll = verticalScroll
             )
-            
+
             // Main Grid Area with Notes
             Box(
                 modifier = Modifier
@@ -152,35 +191,33 @@ private fun PianoRollEditor(
                     .horizontalScroll(horizontalScroll)
                     .verticalScroll(verticalScroll)
             ) {
-                // Background grid
                 Box(
                     modifier = Modifier
-                        .width(canvasWidth.dp)
-                        .height(canvasHeight.dp)
+                        .width(canvasWidthDp)
+                        .height(canvasHeightDp)
                         .drawBehind {
+                            val widthPx = size.width
+                            val heightPx = size.height
+
                             val darkBackground = Color(0xFF1A1A1A)
                             val lightRow = Color(0xFF242424)
                             val gridLine = Color(0xFF333333)
                             val beatLine = Color(0xFF444444)
                             val barLine = Color(0xFF555555)
-                            
-                            val widthPx = canvasWidth
-                            val heightPx = canvasHeight
-                            
-                            // Draw row backgrounds for all pitches
+
                             for (pitch in 0 until totalPitches) {
-                                val y = pitch * noteHeight
+                                val y = pitch * metrics.noteHeightPx
                                 val isWhiteKey = pitch % 12 in listOf(0, 2, 4, 5, 7, 9, 11)
                                 drawRect(
                                     color = if (isWhiteKey) darkBackground else lightRow,
                                     topLeft = Offset(0f, y),
-                                    size = Size(widthPx, noteHeight)
+                                    size = Size(widthPx, metrics.noteHeightPx)
                                 )
                             }
-                            
-                            // Draw horizontal grid lines (for each pitch)
+
+                            // Horizontale Linien
                             for (pitch in 0..totalPitches) {
-                                val y = pitch * noteHeight
+                                val y = pitch * metrics.noteHeightPx
                                 drawLine(
                                     color = gridLine,
                                     start = Offset(0f, y),
@@ -188,13 +225,12 @@ private fun PianoRollEditor(
                                     strokeWidth = 1f
                                 )
                             }
-                            
-                            // Draw vertical grid lines (beats and bars)
+
+                            // Vertikale Beat-/Bar-Linien
                             for (bar in 0..totalBars) {
                                 for (beat in 0 until beatsPerBar) {
-                                    val x = (bar * beatsPerBar + beat) * pixelsPerBeat
+                                    val x = (bar * beatsPerBar + beat) * metrics.pixelsPerBeatPx
                                     val isBarLine = beat == 0
-                                    
                                     drawLine(
                                         color = if (isBarLine) barLine else beatLine,
                                         start = Offset(x, 0f),
@@ -205,49 +241,56 @@ private fun PianoRollEditor(
                             }
                         }
                         .pointerInput(entry, onNoteAdd) {
-                            detectTapGestures { offset ->
-                                val pitch = totalPitches - 1 - (offset.y / noteHeight).toInt()
-                                val beatTime = offset.x / pixelsPerBeat
-                                
-                                // Snap to grid - round to nearest 1/4 beat
-                                val snappedBeatTime = (beatTime * 4).roundToInt() / 4f
-                                val timeMs = (snappedBeatTime * 500).toLong() // 500ms per beat
-                                
-                                // Check if clicked on existing note
-                                val clickedNote = notesState.firstOrNull { note ->
-                                    val noteY = (totalPitches - 1 - note.pitch) * noteHeight
-                                    val noteX = (note.startTimeMs / 500f) * pixelsPerBeat
-                                    val noteWidth = (note.durationMs / 500f) * pixelsPerBeat
-                                    
-                                    offset.x >= noteX && offset.x <= noteX + noteWidth &&
-                                    offset.y >= noteY && offset.y <= noteY + noteHeight
+                            detectTapGestures(
+                                onTap = { offset ->
+                                    // Nur Auswahl bei einfachem Klick
+                                    val clickedNote = notesState.firstOrNull { note ->
+                                        val noteYPx = metrics.pitchToYPx(note.pitch)
+                                        val noteXPx = metrics.timeMsToXPx(note.startTimeMs)
+                                        val noteWidthPx = metrics.durationMsToWidthPx(note.durationMs)
+                                        offset.x >= noteXPx && offset.x <= noteXPx + noteWidthPx &&
+                                                offset.y >= noteYPx && offset.y <= noteYPx + metrics.noteRenderHeightPx
+                                    }
+                                    if (clickedNote != null) {
+                                        selectedNote = clickedNote
+                                    }
+                                },
+                                onDoubleTap = { offset ->
+                                    // Note nur bei Double Click erstellen, exakt im Grid (Beat + Pitch-Zeile)
+                                    val pitch = metrics.yPxToPitch(offset.y)
+                                    val timeMs = metrics.xPxToBeatStartTimeMs(offset.x)
+
+                                    // Prüfen ob bestehende Note getroffen wurde -> dann nur auswählen
+                                    val clickedNote = notesState.firstOrNull { note ->
+                                        val noteYPx = metrics.pitchToYPx(note.pitch)
+                                        val noteXPx = metrics.timeMsToXPx(note.startTimeMs)
+                                        val noteWidthPx = metrics.durationMsToWidthPx(note.durationMs)
+                                        offset.x >= noteXPx && offset.x <= noteXPx + noteWidthPx &&
+                                                offset.y >= noteYPx && offset.y <= noteYPx + metrics.noteRenderHeightPx
+                                    }
+                                    if (clickedNote != null) {
+                                        selectedNote = clickedNote
+                                    } else {
+                                        val newNote = MidiNote.withColor(
+                                            pitch = pitch,
+                                            color = Color(0xFFFF6B35),
+                                            startTimeMs = timeMs,
+                                            durationMs = MS_PER_BEAT // exakt eine Beat-Zelle
+                                        )
+                                        onNoteAdd?.invoke(newNote)
+                                        notesState = notesState + newNote
+                                        selectedNote = newNote
+                                    }
                                 }
-                                
-                                if (clickedNote != null) {
-                                    selectedNote = clickedNote
-                                } else {
-                                    val defaultDuration = 500L // One beat
-                                    val newNote = MidiNote.withColor(
-                                        pitch = pitch.coerceIn(0, totalPitches - 1),
-                                        color = Color(0xFFFF6B35),
-                                        startTimeMs = timeMs.coerceAtLeast(0),
-                                        durationMs = defaultDuration,
-                                    )
-                                    onNoteAdd?.invoke(newNote)
-                                    notesState = notesState + newNote
-                                    selectedNote = newNote
-                                }
-                            }
+                            )
                         }
                 ) {
-                    // Draw notes
+                    // Notes zeichnen
                     notesState.forEach { note ->
                         if (note.pitch in 0 until totalPitches) {
                             NoteBox(
                                 note = note,
-                                totalPitches = totalPitches,
-                                noteHeight = noteHeight,
-                                pixelsPerBeat = pixelsPerBeat,
+                                metrics = metrics,
                                 isSelected = note == selectedNote,
                                 onSelect = { selectedNote = note },
                                 onUpdate = { oldNote, newNote ->
@@ -266,53 +309,49 @@ private fun PianoRollEditor(
 @Composable
 private fun NoteBox(
     note: MidiNote,
-    totalPitches: Int,
-    noteHeight: Float,
-    pixelsPerBeat: Float,
+    metrics: PianoRollMetrics,
     isSelected: Boolean,
     onSelect: () -> Unit,
     onUpdate: (MidiNote, MidiNote) -> Unit
 ) {
+    val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    
-    val noteY = (totalPitches - 1 - note.pitch) * noteHeight
-    val noteX = (note.startTimeMs / 500f) * pixelsPerBeat
-    val noteWidth = (note.durationMs / 500f) * pixelsPerBeat
-    
+
+    val baseY = metrics.pitchToYPx(note.pitch)
+    val baseX = metrics.timeMsToXPx(note.startTimeMs)
+    val baseWidthPx = metrics.durationMsToWidthPx(note.durationMs)
+
+    val currentX = baseX + dragOffset.x
+    val currentY = baseY + dragOffset.y
+
     Box(
         modifier = Modifier
-            .offset(x = (noteX + dragOffset.x).dp, y = (noteY + dragOffset.y).dp)
-            .size(width = noteWidth.coerceAtLeast(10f).dp, height = (noteHeight - 4f).dp)
+            .offset(
+                x = with(density) { currentX.toDp() },
+                y = with(density) { currentY.toDp() }
+            )
+            .size(
+                width = with(density) { baseWidthPx.coerceAtLeast(10f).toDp() },
+                height = with(density) { metrics.noteRenderHeightPx.toDp() }
+            )
             .background(
-                if (isSelected) 
-                    Color(0xFFFFAA00)
-                else 
-                    Color(note.led.red, note.led.green, note.led.blue) // Use the LED color from Signal.LED
+                if (isSelected) Color(0xFFFFAA00) else Color(note.led.red, note.led.green, note.led.blue)
             )
             .pointerInput(note) {
                 detectDragGestures(
-                    onDragStart = {
-                        onSelect()
-                    },
+                    onDragStart = { onSelect() },
                     onDragEnd = {
-                        // Apply the drag offset to create updated note with grid snapping
                         if (dragOffset != Offset.Zero) {
-                            val newX = noteX + dragOffset.x
-                            val newY = noteY + dragOffset.y
-                            
-                            // Snap to grid - 1/4 beat precision
-                            val beatTime = newX / pixelsPerBeat
-                            val snappedBeatTime = (beatTime * 4).roundToInt() / 4f
-                            val newTimeMs = (snappedBeatTime * 500).toLong().coerceAtLeast(0)
-                            
-                            val newPitch = (totalPitches - 1 - (newY / noteHeight).toInt()).coerceIn(0, totalPitches - 1)
-                            
+                            val newX = baseX + dragOffset.x
+                            val newY = baseY + dragOffset.y
+
+                            val newTimeMs = metrics.xPxToTimeMs(newX)
+                            val newPitch = metrics.yPxToPitch(newY)
+
                             val updatedNote = note.copy(
                                 startTimeMs = newTimeMs,
                                 pitch = newPitch,
-                                led = note.led.copy(
-                                    index = newPitch
-                                )
+                                led = note.led.copy(index = newPitch)
                             )
                             onUpdate(note, updatedNote)
                         }
@@ -330,37 +369,31 @@ private fun NoteBox(
 @Composable
 private fun PianoKeysColumn(
     totalPitches: Int,
-    noteHeight: Float,
+    noteHeight: Dp,
     verticalScroll: ScrollState
 ) {
     Box(
         modifier = Modifier
-            .width(160.dp) // Doubled from 80dp to match wider grid
+            .width(120.dp)
             .fillMaxHeight()
             .background(Color(0xFF2A2A2A))
-            .verticalScroll(verticalScroll, enabled = false) // Sync with main scroll
+            .verticalScroll(verticalScroll, enabled = false)
     ) {
         Column(
             modifier = Modifier
-                .width(160.dp)
-                .height((totalPitches * noteHeight).dp)
+                .width(120.dp)
+                .height((noteHeight * totalPitches))
         ) {
             for (pitch in (totalPitches - 1) downTo 0) {
                 val noteInOctave = pitch % 12
                 val isBlackKey = noteInOctave in listOf(1, 3, 6, 8, 10)
-                
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(noteHeight.dp)
-                        .background(
-                            if (isBlackKey) 
-                                Color(0xFF1A1A1A) 
-                            else 
-                                Color(0xFF2A2A2A)
-                        )
+                        .height(noteHeight)
+                        .background(if (isBlackKey) MaterialTheme.colorScheme.surfaceDim else MaterialTheme.colorScheme.onSurface)
                         .drawBehind {
-                            // Draw border
                             drawLine(
                                 color = Color(0xFF0A0A0A),
                                 start = Offset(0f, size.height),
@@ -370,7 +403,7 @@ private fun PianoKeysColumn(
                         },
                     contentAlignment = Alignment.CenterEnd
                 ) {
-                    // Note labels could go here if needed
+
                 }
             }
         }
