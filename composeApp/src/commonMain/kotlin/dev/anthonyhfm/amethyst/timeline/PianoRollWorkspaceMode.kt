@@ -40,6 +40,8 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val MS_PER_BEAT: Long = 500L
@@ -88,6 +90,9 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     var onNoteDelete: ((MidiNote) -> Unit)? = null
     var modeClose: (() -> Unit)? = null
 
+    // Multi-Selection State
+    var multiSelectModifierDown by mutableStateOf(false)
+
     @Composable
     fun ModeContent(paddingValues: PaddingValues) {
         val entry = currentEntry ?: return
@@ -126,6 +131,9 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
             PianoRollEditor(
                 entry = entry,
                 launchpads = launchpads,
+                trackIndex = trackIndex,
+                entryStartMs = entryStartMs,
+                multiSelectModifierDown = multiSelectModifierDown,
                 onNoteAdd = onNoteAdd,
                 onNoteUpdate = onNoteUpdate,
                 onNoteDelete = onNoteDelete
@@ -134,11 +142,32 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        // Explizite Erkennung von Modifier-Tasten
+        if (event.type == KeyEventType.KeyDown) {
+            when (event.key) {
+                Key.CtrlLeft, Key.CtrlRight, Key.MetaLeft, Key.MetaRight -> multiSelectModifierDown = true
+            }
+        } else if (event.type == KeyEventType.KeyUp) {
+            when (event.key) {
+                Key.CtrlLeft, Key.CtrlRight, Key.MetaLeft, Key.MetaRight -> multiSelectModifierDown = false
+            }
+        }
+
         if (event.type == KeyEventType.KeyDown) {
             when (event.key) {
                 Key.Escape -> {
-                    modeClose?.invoke()
-                    return true
+                    modeClose?.invoke(); return true
+                }
+                Key.Delete, Key.Backspace -> {
+                    val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
+                        .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                    if (selected.isNotEmpty()) {
+                        selected.forEach { sel ->
+                            onNoteDelete?.invoke(sel.note)
+                            currentEntry = currentEntry?.copy(notes = currentEntry?.notes?.filter { it != sel.note } ?: emptyList())
+                        }
+                        SelectionManager.clear(); return true
+                    }
                 }
             }
         }
@@ -150,6 +179,9 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 private fun PianoRollEditor(
     entry: MidiEntry,
     launchpads: List<*>,
+    trackIndex: Int,
+    entryStartMs: Long,
+    multiSelectModifierDown: Boolean,
     onNoteAdd: ((MidiNote) -> Unit)?,
     onNoteUpdate: ((MidiNote, MidiNote) -> Unit)?,
     onNoteDelete: ((MidiNote) -> Unit)?
@@ -175,6 +207,10 @@ private fun PianoRollEditor(
 
     var notesState by remember { mutableStateOf(entry.notes) }
     val selections by SelectionManager.selections.collectAsState()
+
+    // Marquee Auswahl Zustand
+    var marqueeStart by remember { mutableStateOf<Offset?>(null) }
+    var marqueeCurrent by remember { mutableStateOf<Offset?>(null) }
 
     Box(
         modifier = Modifier
@@ -260,13 +296,13 @@ private fun PianoRollEditor(
                                     if (clickedNote != null) {
                                         SelectionManager.select(
                                             Selectable.PianoRollNote(
-                                                trackIndex = (launchpads.size - 1), // Annahme: trackIndex außerhalb Editor, hier Dummy wenn nicht gesetzt
-                                                entryStartMs = entry.startTimeMs,
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
                                                 note = clickedNote
                                             ),
-                                            single = true
+                                            single = !multiSelectModifierDown
                                         )
-                                    } else {
+                                    } else if (!multiSelectModifierDown) {
                                         SelectionManager.clear()
                                     }
                                 },
@@ -283,11 +319,11 @@ private fun PianoRollEditor(
                                     if (clickedNote != null) {
                                         SelectionManager.select(
                                             Selectable.PianoRollNote(
-                                                trackIndex = (launchpads.size - 1),
-                                                entryStartMs = entry.startTimeMs,
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
                                                 note = clickedNote
                                             ),
-                                            single = true
+                                            single = !multiSelectModifierDown
                                         )
                                     } else {
                                         val newNote = MidiNote.withColor(
@@ -300,20 +336,71 @@ private fun PianoRollEditor(
                                         notesState = notesState + newNote
                                         SelectionManager.select(
                                             Selectable.PianoRollNote(
-                                                trackIndex = (launchpads.size - 1),
-                                                entryStartMs = entry.startTimeMs,
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
                                                 note = newNote
                                             ),
-                                            single = true
+                                            single = !multiSelectModifierDown
                                         )
                                     }
                                 }
                             )
                         }
+                        .pointerInput(notesState, multiSelectModifierDown) {
+                            // Marquee Drag Auswahl auf leerem Bereich
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    marqueeStart = offset
+                                    marqueeCurrent = offset
+                                    if (!multiSelectModifierDown) {
+                                        SelectionManager.clear()
+                                    }
+                                },
+                                onDragEnd = {
+                                    val start = marqueeStart
+                                    val end = marqueeCurrent
+                                    if (start != null && end != null) {
+                                        val left = min(start.x, end.x)
+                                        val right = max(start.x, end.x)
+                                        val top = min(start.y, end.y)
+                                        val bottom = max(start.y, end.y)
+                                        notesState.forEach { note ->
+                                            val noteYPx = metrics.pitchToYPx(note.pitch)
+                                            val noteXPx = metrics.timeMsToXPx(note.startTimeMs)
+                                            val noteWidthPx = metrics.durationMsToWidthPx(note.durationMs)
+                                            val noteHeightPx = metrics.noteRenderHeightPx
+                                            val overlaps = noteXPx < right && noteXPx + noteWidthPx > left &&
+                                                noteYPx < bottom && noteYPx + noteHeightPx > top
+                                            if (overlaps) {
+                                                SelectionManager.select(
+                                                    Selectable.PianoRollNote(
+                                                        trackIndex = trackIndex,
+                                                        entryStartMs = entryStartMs,
+                                                        note = note
+                                                    ),
+                                                    single = false
+                                                )
+                                            }
+                                        }
+                                    }
+                                    marqueeStart = null
+                                    marqueeCurrent = null
+                                },
+                                onDragCancel = {
+                                    marqueeStart = null
+                                    marqueeCurrent = null
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    marqueeCurrent = marqueeCurrent?.let { it + dragAmount }
+                                }
+                            )
+                        }
                 ) {
+                    // Notes Rendering
                     notesState.forEach { note ->
                         if (note.pitch in 0 until totalPitches) {
-                            val isSelected = selections.filterIsInstance<Selectable.PianoRollNote>().any { it.note == note && it.entryStartMs == entry.startTimeMs }
+                            val isSelected = selections.filterIsInstance<Selectable.PianoRollNote>().any { it.note == note && it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
                             NoteBox(
                                 note = note,
                                 metrics = metrics,
@@ -321,26 +408,44 @@ private fun PianoRollEditor(
                                 onSelect = {
                                     SelectionManager.select(
                                         Selectable.PianoRollNote(
-                                            trackIndex = (launchpads.size - 1),
-                                            entryStartMs = entry.startTimeMs,
+                                            trackIndex = trackIndex,
+                                            entryStartMs = entryStartMs,
                                             note = note
                                         ),
-                                        single = true
+                                        single = !multiSelectModifierDown
                                     )
                                 },
                                 onUpdate = { oldNote, newNote ->
                                     onNoteUpdate?.invoke(oldNote, newNote)
                                     notesState = notesState.map { if (it == oldNote) newNote else it }
-                                    // Auswahl auf aktualisierte Note übertragen
                                     SelectionManager.select(
                                         Selectable.PianoRollNote(
-                                            trackIndex = (launchpads.size - 1),
-                                            entryStartMs = entry.startTimeMs,
+                                            trackIndex = trackIndex,
+                                            entryStartMs = entryStartMs,
                                             note = newNote
                                         ),
-                                        single = true
+                                        single = !multiSelectModifierDown
                                     )
                                 }
+                            )
+                        }
+                    }
+
+                    // Marquee Overlay
+                    val start = marqueeStart
+                    val current = marqueeCurrent
+                    if (start != null && current != null) {
+                        val left = min(start.x, current.x)
+                        val top = min(start.y, current.y)
+                        val width = kotlin.math.abs(current.x - start.x)
+                        val height = kotlin.math.abs(current.y - start.y)
+                        with(LocalDensity.current) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = left.toDp(), y = top.toDp())
+                                    .size(width.toDp(), height.toDp())
+                                    .border(1.dp, MaterialTheme.colorScheme.primary)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                             )
                         }
                     }
