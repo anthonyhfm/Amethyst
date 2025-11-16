@@ -24,6 +24,8 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -32,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import kotlin.math.roundToInt
 
@@ -374,6 +378,7 @@ private fun NoteBox(
                 .align(Alignment.CenterStart)
                 .width(8.dp)
                 .fillMaxHeight()
+                .pointerHoverIcon(PointerIcon.ResizeLeft)
                 .pointerInput(note) {
                     detectDragGestures(
                         onDragStart = { onSelect() },
@@ -405,6 +410,7 @@ private fun NoteBox(
                 .align(Alignment.CenterEnd)
                 .width(8.dp)
                 .fillMaxHeight()
+                .pointerHoverIcon(PointerIcon.ResizeRight)
                 .pointerInput(note) {
                     detectDragGestures(
                         onDragStart = { onSelect() },
