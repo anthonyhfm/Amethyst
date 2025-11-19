@@ -59,10 +59,18 @@ class TimelineViewModel : ViewModel() {
         val gridType = WorkspaceRepository.gridType.value
         val zoom = _zoomLevel.value
         val updated = SelectionManager.selections.value.map { sel ->
-            if (sel is Selectable.TimelineTime) {
-                val snapped = GridUtils.snapToGrid(sel.timeMs, zoom, bpm, gridType)
-                if (snapped != sel.timeMs) Selectable.TimelineTime(trackIndex = sel.trackIndex, timeMs = snapped) else sel
-            } else sel
+            when (sel) {
+                is Selectable.TimelineTime -> {
+                    val snapped = GridUtils.snapToGrid(sel.timeMs, zoom, bpm, gridType)
+                    if (snapped != sel.timeMs) Selectable.TimelineTime(trackIndex = sel.trackIndex, timeMs = snapped) else sel
+                }
+                is Selectable.TimelineRange -> {
+                    val newStart = GridUtils.snapToGrid(sel.startMs, zoom, bpm, gridType)
+                    val newEnd = GridUtils.snapToGrid(sel.endMs, zoom, bpm, gridType).coerceAtLeast(newStart)
+                    if (newStart != sel.startMs || newEnd != sel.endMs) Selectable.TimelineRange(trackIndex = sel.trackIndex, startMs = newStart, endMs = newEnd) else sel
+                }
+                else -> sel
+            }
         }
         SelectionManager.selections.value = updated
     }
