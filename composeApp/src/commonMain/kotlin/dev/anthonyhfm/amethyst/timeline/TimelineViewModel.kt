@@ -607,9 +607,28 @@ class TimelineViewModel : ViewModel() {
         pianoRollMode.currentEntry = entry
         pianoRollMode.trackIndex = trackIndex
         pianoRollMode.entryStartMs = entry.startTimeMs
-        
+        pianoRollMode.onNoteAdd = { note ->
+            addNoteToPianoRoll(trackIndex, entry.startTimeMs, note)
+        }
+        pianoRollMode.onNoteUpdate = { old, new ->
+            updateNoteInPianoRoll(trackIndex, entry.startTimeMs, old, new)
+        }
+        pianoRollMode.onNoteDelete = { note ->
+            deleteNoteFromPianoRoll(trackIndex, entry.startTimeMs, note)
+        }
+        pianoRollMode.modeClose = { WorkspaceRepository.switchToPreviousMode() }
         WorkspaceRepository.switchMode(pianoRollMode)
         println("Opened Piano Roll for entry at ${entry.startTimeMs}ms on track $trackIndex")
+    }
+
+    private fun addNoteToPianoRoll(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
+        addMidiNoteLive(trackIndex, entryStartMs, note)
+    }
+    private fun updateNoteInPianoRoll(trackIndex: Int, entryStartMs: Long, old: MidiNote, new: MidiNote) {
+        updateMidiNoteLive(trackIndex, entryStartMs, old, new)
+    }
+    private fun deleteNoteFromPianoRoll(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
+        deleteMidiNoteLive(trackIndex, entryStartMs, note)
     }
 
     /**
@@ -674,5 +693,51 @@ class TimelineViewModel : ViewModel() {
         TimelineRepository.tracks.value = currentTracks.toList()
         
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newStartMs))
+    }
+
+    private fun updateMidiEntry(trackIndex: Int, entryStartMs: Long, transform: (MidiEntry) -> MidiEntry) {
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex)
+        val isMidi = track is MidiTimelineTrack || track is LightsTimelineTrack
+        if (!isMidi) return
+        val midiTrack = track as TimelineTrack<MidiEntry>
+        val entry = midiTrack.entries[entryStartMs] ?: return
+        val updated = transform(entry)
+        midiTrack.entries[entryStartMs] = updated
+        // Adjust duration if notes extend beyond clip
+        val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.durationMs
+        val newDuration = maxEnd.coerceAtLeast(updated.durationMs)
+        if (newDuration != updated.durationMs) {
+            midiTrack.entries[entryStartMs] = updated.copy(durationMs = newDuration)
+        }
+        val newTrackInstance = when (track) {
+            is MidiTimelineTrack -> MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+            is LightsTimelineTrack -> LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+            else -> return
+        }
+        currentTracks[trackIndex] = newTrackInstance
+        _tracks.value = currentTracks.toList(); TimelineRepository.tracks.value = currentTracks.toList()
+        // Update Piano Roll mode entry if open
+        val mode = WorkspaceRepository.mode.value
+        if (mode is PianoRollWorkspaceMode && mode.trackIndex == trackIndex && mode.entryStartMs == entryStartMs) {
+            mode.currentEntry = newTrackInstance.entries[entryStartMs]
+        }
+    }
+
+    fun updateMidiEntryNotes(trackIndex: Int, entryStartMs: Long, newNotes: List<MidiNote>) {
+        updateMidiEntry(trackIndex, entryStartMs) { it.copy(notes = newNotes) }
+    }
+
+    // Override addMidiNote to reuse logic
+    fun addMidiNoteLive(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
+        updateMidiEntry(trackIndex, entryStartMs) { it.copy(notes = it.notes + note) }
+    }
+
+    fun updateMidiNoteLive(trackIndex: Int, entryStartMs: Long, oldNote: MidiNote, newNote: MidiNote) {
+        updateMidiEntry(trackIndex, entryStartMs) { it.copy(notes = it.notes.map { n -> if (n == oldNote) newNote else n }) }
+    }
+
+    fun deleteMidiNoteLive(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
+        updateMidiEntry(trackIndex, entryStartMs) { it.copy(notes = it.notes.filter { n -> n != note }) }
     }
 }

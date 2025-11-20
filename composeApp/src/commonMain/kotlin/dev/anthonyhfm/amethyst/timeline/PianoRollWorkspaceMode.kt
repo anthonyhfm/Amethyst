@@ -81,7 +81,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     override val selectable: Boolean = false
     override val claimInputs: Boolean = true
 
-    var currentEntry: MidiEntry? = null
+    var currentEntry by mutableStateOf<MidiEntry?>(null)
     var trackIndex: Int = -1
     var entryStartMs: Long = 0L
     
@@ -206,6 +206,9 @@ private fun PianoRollEditor(
     val canvasWidthDp = pixelsPerBeatDp * beatsPerBar * totalBars
 
     var notesState by remember { mutableStateOf(entry.notes) }
+
+    LaunchedEffect(entry) { notesState = entry.notes }
+
     val selections by SelectionManager.selections.collectAsState()
 
     // Marquee Auswahl Zustand

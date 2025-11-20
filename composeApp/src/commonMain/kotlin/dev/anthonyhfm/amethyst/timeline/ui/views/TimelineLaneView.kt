@@ -677,6 +677,7 @@ private fun SelectionCursor(
     }
     Box(
         modifier = Modifier
+            .offset(x = -1.5.dp)
             .offset { IntOffset(cursorXPositionPx.roundToInt(), 0) }
             .width(3.dp)
             .height(laneHeight)
@@ -770,7 +771,6 @@ fun MidiClip(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .clickable { onSelectEntry() }
                 .padding(4.dp)
                 .drawWithContent {
                     drawContent()
