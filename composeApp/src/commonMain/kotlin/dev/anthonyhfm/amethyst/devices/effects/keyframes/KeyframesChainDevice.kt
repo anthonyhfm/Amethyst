@@ -699,8 +699,5 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     override fun onChoke() {
         // Cancel all scheduled Heaven tasks owned by this device
         Heaven.cancelJobsForOwner(this)
-        
-        // Clear any rendered signals by clearing the Heaven display
-        Heaven.clear()
     }
 }
