@@ -95,5 +95,8 @@ interface WorkspaceContract {
                 return TimelineKeyHandler.handleKeyInput(event)
             }
         }
+        
+        // Note: PianoRollWorkspaceMode is defined in timeline package
+        // as it needs special handling similar to KeyframesWorkspaceMode
     }
 }

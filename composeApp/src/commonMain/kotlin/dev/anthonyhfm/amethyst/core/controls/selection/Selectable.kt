@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.timeline.data.MidiNote // hinzugefügt für PianoRollNote
 
 interface Selectable {
     val selectionUUID: String
@@ -47,6 +48,20 @@ interface Selectable {
     data class TimelineEntryItem(
         val trackIndex: Int,
         val entryStartMs: Long,
+        override val selectionUUID: String = UUID.randomUUID()
+    ) : Selectable
+
+    data class PianoRollNote(
+        val trackIndex: Int,
+        val entryStartMs: Long,
+        val note: MidiNote,
+        override val selectionUUID: String = UUID.randomUUID()
+    ) : Selectable
+
+    data class TimelineRange(
+        val trackIndex: Int,
+        val startMs: Long,
+        val endMs: Long,
         override val selectionUUID: String = UUID.randomUUID()
     ) : Selectable
 }

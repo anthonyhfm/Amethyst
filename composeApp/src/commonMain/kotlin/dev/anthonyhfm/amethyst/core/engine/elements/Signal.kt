@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.core.engine.elements
 
 import androidx.compose.ui.graphics.Color
+import kotlinx.serialization.Serializable
 
 sealed interface Signal {
     val origin: Any?

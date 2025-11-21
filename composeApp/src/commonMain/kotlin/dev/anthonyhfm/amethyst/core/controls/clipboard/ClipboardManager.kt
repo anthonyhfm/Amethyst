@@ -14,6 +14,10 @@ import kotlinx.coroutines.flow.update
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 
@@ -35,11 +39,28 @@ object ClipboardManager {
                 val distinctTrackIndex = selections.map { it.trackIndex }.toSet()
                 if (distinctTrackIndex.size == 1) {
                     val trackIndex = distinctTrackIndex.first()
-                    val track = TimelineRepository.tracks.value.getOrNull(trackIndex) as? AudioTimelineTrack
-                    val entries = selections.mapNotNull { sel -> track?.entries?.get(sel.entryStartMs) }
-                    if (entries.isNotEmpty()) {
-                        setClipboardData(ClipboardData.TimelineEntries(entries.sortedBy { it.startTimeMs }.map { it.copy() }))
-                        return
+                    val track = TimelineRepository.tracks.value.getOrNull(trackIndex)
+                    
+                    // Handle Audio entries
+                    if (track is AudioTimelineTrack) {
+                        val entries = selections.mapNotNull { sel -> track.entries[sel.entryStartMs] }
+                        if (entries.isNotEmpty()) {
+                            setClipboardData(ClipboardData.TimelineEntries(entries.sortedBy { it.startTimeMs }.map { it.copy() }))
+                            return
+                        }
+                    }
+                    
+                    // Handle MIDI/Lights entries
+                    if (track is MidiTimelineTrack || track is LightsTimelineTrack) {
+                        val midiTrack = track as TimelineTrack<MidiEntry>
+                        val entries = selections.mapNotNull { sel -> midiTrack.entries[sel.entryStartMs] }
+                        if (entries.isNotEmpty()) {
+                            setClipboardData(ClipboardData.MidiEntries(
+                                entries = entries.sortedBy { it.startTimeMs }.map { it.copy() },
+                                isLightsTrack = track is LightsTimelineTrack
+                            ))
+                            return
+                        }
                     }
                 } else {
                     // Mehrere Tracks gleichzeitig: ignorieren oder später erweitern
@@ -145,6 +166,48 @@ object ClipboardManager {
                 current[anchorTrackIndex] = newTrack
                 TimelineRepository.tracks.value = current.toList()
                 UndoManager.addAction(UndoableAction.TimelineChange(anchorTrackIndex, beforeEntries = before, afterEntries = after))
+            }
+
+            is ClipboardData.MidiEntries -> {
+                // Paste MIDI entries
+                val selections = SelectionManager.selections.value
+                val timeSel = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull()
+                val entrySel = selections.filterIsInstance<Selectable.TimelineEntryItem>().firstOrNull()
+                val anchorTrackIndex: Int
+                val anchorTimeMs: Long
+                if (timeSel != null) {
+                    anchorTrackIndex = timeSel.trackIndex
+                    anchorTimeMs = timeSel.timeMs
+                } else if (entrySel != null) {
+                    anchorTrackIndex = entrySel.trackIndex
+                    anchorTimeMs = entrySel.entryStartMs
+                } else {
+                    anchorTrackIndex = 0
+                    anchorTimeMs = 0L
+                }
+                
+                val track = TimelineRepository.tracks.value.getOrNull(anchorTrackIndex)
+                if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+                
+                val midiTrack = track as TimelineTrack<MidiEntry>
+                val earliest = clip.entries.minBy { it.startTimeMs }.startTimeMs
+
+                clip.entries.sortedBy { it.startTimeMs }.forEach { original ->
+                    val offset = original.startTimeMs - earliest
+                    val newStart = anchorTimeMs + offset
+                    val newEntry = original.copy(startTimeMs = newStart)
+                    midiTrack.entries[newStart] = newEntry
+                }
+                
+                // State refresh
+                val current = TimelineRepository.tracks.value.toMutableList()
+                val newTrack = if (track is MidiTimelineTrack) {
+                    MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+                } else {
+                    LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+                }
+                current[anchorTrackIndex] = newTrack
+                TimelineRepository.tracks.value = current.toList()
             }
 
             is ClipboardData.ChainDevice -> {

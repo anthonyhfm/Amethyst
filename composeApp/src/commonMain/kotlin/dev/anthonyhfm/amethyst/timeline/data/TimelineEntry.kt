@@ -131,6 +131,86 @@ data class AudioEntry(
 }
 
 @Serializable
+data class MidiEntry(
+    override val startTimeMs: Long,
+    override val durationMs: Long,
+    val notes: List<MidiNote> = emptyList(),
+    val name: String = "MIDI Clip"
+) : TimelineEntry {
+    private val activeNotes = mutableMapOf<Int, Long>() // pitch to note-on timestamp
+
+    override fun start(startAt: Long?) {
+        val actualStartTime = startAt ?: startTimeMs
+        val offsetMs = if (startAt != null && startAt > startTimeMs) {
+            startAt - startTimeMs
+        } else {
+            0L
+        }
+
+        // Find notes that should be playing at the start time
+        notes.forEach { note ->
+            val noteStartInClip = note.startTimeMs
+            val noteEndInClip = note.startTimeMs + note.durationMs
+            
+            if (offsetMs >= noteStartInClip && offsetMs < noteEndInClip) {
+                // Note should already be playing
+                // sendNoteOn(note.pitch, note.velocity)
+                println("MIDI Note ON at ${actualStartTime} ms (offset ${offsetMs} ms): pitch=${note.pitch}")
+                activeNotes[note.pitch] = actualStartTime
+            }
+        }
+        
+        println("Started MIDI entry: $name at ${actualStartTime}ms with offset ${offsetMs}ms - ${notes.size} notes")
+    }
+
+    override fun stop() {
+        // Send note-off for all active notes
+        activeNotes.keys.forEach { pitch ->
+            sendNoteOff(pitch)
+        }
+        activeNotes.clear()
+        println("Stopped MIDI entry: $name")
+    }
+
+    /**
+     * Process MIDI notes at a given playback position
+     */
+    fun processAtTime(currentTimeMs: Long) {
+        val clipOffsetMs = currentTimeMs - startTimeMs
+        if (clipOffsetMs < 0 || clipOffsetMs >= durationMs) return
+
+        notes.forEach { note ->
+            val noteStart = note.startTimeMs
+            val noteEnd = note.startTimeMs + note.durationMs
+
+            if (clipOffsetMs >= noteStart && clipOffsetMs < noteEnd) {
+                // Note should be on
+                if (!activeNotes.containsKey(note.pitch)) {
+                    // sendNoteOn(note.pitch, note.velocity)
+
+                    println("MIDI Note ON at $currentTimeMs ms: pitch=${note.pitch}")
+                    activeNotes[note.pitch] = currentTimeMs
+                }
+            } else if (activeNotes.containsKey(note.pitch)) {
+                // Note should be off
+                sendNoteOff(note.pitch)
+                activeNotes.remove(note.pitch)
+            }
+        }
+    }
+
+    private fun sendNoteOn(pitch: Int, velocity: Int) {
+        // TODO: Integrate with MIDI output system
+        println("MIDI Note ON: pitch=$pitch, velocity=$velocity")
+    }
+
+    private fun sendNoteOff(pitch: Int) {
+        // TODO: Integrate with MIDI output system
+        println("MIDI Note OFF: pitch=$pitch")
+    }
+}
+
+@Serializable
 data class LightEntry(
     override val startTimeMs: Long,
     override val durationMs: Long,

@@ -26,9 +26,18 @@ fun TimelineView(
             .fillMaxSize(),
     ) {
         TrackListView(
-            tracks = tracks
+            tracks = tracks,
+            onAddLightsTrack = { viewModel.addLightsTrack() },
+            onAddAudioTrack = { viewModel.addAudioTrack() }
         )
 
-        TimelineLaneView(viewModel, scrollState, selectionViewportRelative = true)
+        TimelineLaneView(
+            viewModel = viewModel,
+            scrollState = scrollState,
+            selectionViewportRelative = true,
+            onDoubleClickLightsLane = { trackIndex, timeMs ->
+                viewModel.onDoubleClickLightsTrack(trackIndex, timeMs)
+            }
+        )
     }
 }

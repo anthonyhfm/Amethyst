@@ -46,6 +46,9 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import io.github.vinceglb.filekit.extension
@@ -63,13 +66,15 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
 fun TimelineLaneView(
     viewModel: TimelineViewModel,
     scrollState: ScrollState,
-    selectionViewportRelative: Boolean = false
+    selectionViewportRelative: Boolean = false,
+    onDoubleClickLightsLane: (trackIndex: Int, timeMs: Long) -> Unit = { _, _ -> }
 ) {
     val tracks by viewModel.tracks.collectAsState()
     val zoomLevel by viewModel.zoomLevel.collectAsState()
@@ -81,6 +86,8 @@ fun TimelineLaneView(
     val maxDurationMs = tracks.maxOfOrNull { track ->
         when (track) {
             is AudioTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
+            is MidiTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
+            is LightsTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
             else -> 0L
         }
     } ?: 0L
@@ -189,8 +196,12 @@ fun TimelineLaneView(
                         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = index, entryStartMs = entryStart))
                     },
                     onMoveEntry = { oldStart, newStart ->
-                        viewModel.moveAudioEntry(index, oldStart, newStart)
-                    }
+                        when (track) {
+                            is AudioTimelineTrack -> viewModel.moveAudioEntry(index, oldStart, newStart)
+                            is MidiTimelineTrack, is LightsTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
+                        }
+                    },
+                    onDoubleClickLane = { timeMs -> onDoubleClickLightsLane(index, timeMs) }
                 )
             }
         }
@@ -248,16 +259,33 @@ fun TimelineLane(
     onDropInFile: (file: PlatformFile) -> Unit = {},
     onSelectTime: (Long) -> Unit = {},
     onSelectEntry: (Long) -> Unit = {},
-    onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> }
+    onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> },
+    onDoubleClickLane: (Long) -> Unit = {}
 ) {
     val bpm by WorkspaceRepository.bpm.collectAsState()
     val gridType by WorkspaceRepository.gridType.collectAsState()
+
+    var rangeStartMs by remember(track, zoomLevel) { mutableStateOf<Long?>(null) }
+    var rangeEndMs by remember(track, zoomLevel) { mutableStateOf<Long?>(null) }
+    var rangeActive by remember { mutableStateOf(false) }
+
+    val selections by SelectionManager.selections.collectAsState()
+    val selectedRange = selections.filterIsInstance<Selectable.TimelineRange>().firstOrNull { it.trackIndex == trackIndexOf(track) }
+
+    val headerHeightPx = with(LocalDensity.current) { 24.dp.toPx() }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(120.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .timelineGridOverlay(
+                zoomLevel = zoomLevel,
+                bpm = bpm,
+                gridType = gridType,
+                drawBehind = true,
+                scrollOffsetPx = scrollState.value.toFloat()
+            )
             .fileDropTarget(
                 onHover = { _: Boolean, _: Offset?, _: List<PlatformFile> -> },
                 onDrop = { files: List<PlatformFile> ->
@@ -268,31 +296,141 @@ fun TimelineLane(
                 }
             )
             .horizontalScroll(scrollState)
-            .pointerInput(zoomLevel, bpm, gridType) {
-                detectTapGestures { tapOffset ->
-                    val currentZoom = zoomLevel
-                    val currentBpm = WorkspaceRepository.bpm.value
-                    val currentGridType = WorkspaceRepository.gridType.value
-                    val intervals = GridUtils.computeWithGridType(currentZoom, currentBpm, currentGridType)
-                    val gridIntervalMs = intervals.intervalMs
+            .pointerInput(track, zoomLevel, bpm, gridType) {
+                var lastClickTime = 0L
+                var lastClickPos: Offset? = null
+                val doubleThresholdMs = 250L
+                val moveTolerancePx = 20f
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Press) {
+                            val change = event.changes.firstOrNull() ?: continue
+                            val pos = change.position
+                            val time = change.uptimeMillis
 
-                    val rawPx = scrollState.value.toDouble() + tapOffset.x.toDouble()
-                    val rawTimeMsDouble = if (currentZoom > 0f) rawPx / currentZoom.toDouble() else 0.0
-                    val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
-                    val gridPxSpacing = gridIntervalMs * currentZoom
-                    val snapThresholdPx = (gridPxSpacing * 0.40f).coerceAtLeast(6f)
-                    val shouldSnap = gridIntervalMs > 0 && gridPxSpacing >= 6f
-                    val snapped = if (shouldSnap) GridUtils.snapToGridWithThreshold(rawTimeMs, currentZoom, currentBpm, currentGridType, thresholdPx = snapThresholdPx) else rawTimeMs
-                    println("[TimelineLane] click(pxPerMs) tapX=${tapOffset.x} scroll=${scrollState.value} zoom=$currentZoom rawMs=$rawTimeMs snappedMs=$snapped gridIntMs=$gridIntervalMs gridPxSpacing=$gridPxSpacing diffMs=${snapped - rawTimeMs} thresholdPx=$snapThresholdPx")
-                    onSelectTime(snapped)
+                            val headerHit = findHeaderEntryHit(track, pos.x, pos.y, zoomLevel, scrollState.value.toFloat(), headerHeightPx)
+                            if (headerHit != null) {
+                                onSelectEntry(headerHit)
+                                lastClickTime = 0L
+                                lastClickPos = null
+                                change.consume(); continue
+                            }
+
+                            val isLights = track is LightsTimelineTrack
+                            val snappedMs = computeSnappedTime(pos.x, scrollState, zoomLevel, bpm, gridType)
+                            val isDouble = isLights && lastClickTime != 0L &&
+                                (time - lastClickTime) in 1..doubleThresholdMs &&
+                                lastClickPos?.let { prev ->
+                                    val dx = pos.x - prev.x
+                                    val dy = pos.y - prev.y
+                                    (dx * dx + dy * dy) <= moveTolerancePx * moveTolerancePx
+                                } ?: false
+                            if (isDouble) {
+                                onDoubleClickLane(snappedMs)
+                                lastClickTime = 0L
+                                lastClickPos = null
+                            } else {
+                                onSelectTime(snappedMs)
+                                if (isLights) {
+                                    lastClickTime = time
+                                    lastClickPos = pos
+                                } else {
+                                    lastClickTime = 0L
+                                    lastClickPos = null
+                                }
+                            }
+                            change.consume()
+                        }
+                    }
                 }
             }
-            .timelineGridOverlay(
-                zoomLevel = zoomLevel,
-                bpm = bpm,
-                gridType = gridType
-            )
+            .pointerInput(track, zoomLevel, bpm, gridType) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val headerHit = findHeaderEntryHit(track, offset.x, offset.y, zoomLevel, scrollState.value.toFloat(), headerHeightPx)
+                        if (headerHit != null) {
+                            onSelectEntry(headerHit)
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                            return@detectDragGestures
+                        }
+                        val startMsRawStrict = computeStrictGridTime(offset.x, scrollState, zoomLevel, bpm, gridType)
+                        if (!isPointInsideAnyEntry(track, startMsRawStrict)) {
+                            rangeStartMs = startMsRawStrict
+                            rangeEndMs = startMsRawStrict
+                            rangeActive = true
+                        } else {
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                        }
+                    },
+                    onDrag = { change, _ ->
+                        if (rangeActive && rangeStartMs != null) {
+                            val currentStrict = computeStrictGridTime(change.position.x, scrollState, zoomLevel, bpm, gridType)
+                            if (currentStrict != rangeEndMs) rangeEndMs = currentStrict
+                        }
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                            val start = rangeStartMs!!.coerceAtLeast(0L)
+                            val end = rangeEndMs!!.coerceAtLeast(0L)
+                            val normalizedStart = min(start, end)
+                            val normalizedEnd = maxOf(start, end)
+                            if (normalizedEnd > normalizedStart) {
+                                SelectionManager.select(
+                                    Selectable.TimelineRange(
+                                        trackIndex = trackIndexOf(track),
+                                        startMs = normalizedStart,
+                                        endMs = normalizedEnd
+                                    )
+                                )
+                            } else {
+                                SelectionManager.select(
+                                    Selectable.TimelineTime(
+                                        trackIndex = trackIndexOf(track),
+                                        timeMs = normalizedStart
+                                    )
+                                )
+                            }
+                        }
+                        rangeActive = false
+                    },
+                    onDragCancel = {
+                        rangeActive = false
+                        rangeStartMs = null
+                        rangeEndMs = null
+                    }
+                )
+            }
     ) {
+        val overlayStart = when {
+            rangeActive && rangeStartMs != null && rangeEndMs != null -> min(rangeStartMs!!, rangeEndMs!!)
+            selectedRange != null -> selectedRange.startMs
+            else -> null
+        }
+        val overlayEnd = when {
+            rangeActive && rangeStartMs != null && rangeEndMs != null -> maxOf(rangeStartMs!!, rangeEndMs!!)
+            selectedRange != null -> selectedRange.endMs
+            else -> null
+        }
+        if (overlayStart != null && overlayEnd != null && overlayEnd > overlayStart) {
+            val startPx = overlayStart * zoomLevel - scrollState.value
+            val widthPx = (overlayEnd - overlayStart) * zoomLevel
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(startPx.roundToInt(), 0) }
+                    .width(with(LocalDensity.current) { widthPx.toDp() })
+                    .height(120.dp)
+                    .background(Color(0x5533AAFF))
+                    .border(1.dp, Color(0xFF3399FF), RoundedCornerShape(2.dp))
+                    .zIndex(0.5f)
+            ) {}
+        }
+
         Box(
             modifier = Modifier
                 .width(contentWidth)
@@ -316,6 +454,44 @@ fun TimelineLane(
                             }
                         }
                 }
+                is MidiTimelineTrack -> {
+                    track.entries.values
+                        .sortedBy { it.startTimeMs }
+                        .forEach { midiEntry ->
+                            androidx.compose.runtime.key(midiEntry.startTimeMs) {
+                                val isSelectedEntry = midiEntry.startTimeMs in selectedEntryStarts
+                                MidiClip(
+                                    midiEntry = midiEntry,
+                                    zoomLevel = zoomLevel,
+                                    isSelected = isSelectedEntry,
+                                    onSelectEntry = { onSelectEntry(midiEntry.startTimeMs) },
+                                    onMoveEntry = { newStart -> onMoveEntry(midiEntry.startTimeMs, newStart) },
+                                    gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
+                                    isLightsTrack = false,
+                                    onDoubleClick = {}
+                                )
+                            }
+                        }
+                }
+                is LightsTimelineTrack -> {
+                    track.entries.values
+                        .sortedBy { it.startTimeMs }
+                        .forEach { midiEntry ->
+                            androidx.compose.runtime.key(midiEntry.startTimeMs) {
+                                val isSelectedEntry = midiEntry.startTimeMs in selectedEntryStarts
+                                MidiClip(
+                                    midiEntry = midiEntry,
+                                    zoomLevel = zoomLevel,
+                                    isSelected = isSelectedEntry,
+                                    onSelectEntry = { onSelectEntry(midiEntry.startTimeMs) },
+                                    onMoveEntry = { newStart -> onMoveEntry(midiEntry.startTimeMs, newStart) },
+                                    gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
+                                    isLightsTrack = true,
+                                    onDoubleClick = { onDoubleClickLane(midiEntry.startTimeMs) }
+                                )
+                            }
+                        }
+                }
             }
         }
 
@@ -333,35 +509,51 @@ fun TimelineLane(
 private fun Modifier.timelineGridOverlay(
     zoomLevel: Float,
     bpm: Double,
-    gridType: GridUtils.GridType
+    gridType: GridUtils.GridType,
+    drawBehind: Boolean = false,
+    ignoreTopPx: Float = 0f,
+    scrollOffsetPx: Float = 0f
 ): Modifier {
+    val baseLineColor = Color(0xFF000000)
+    val minorColor = baseLineColor.copy(alpha = 0.55f)
+    val majorColor = baseLineColor.copy(alpha = 0.80f)
     return this.drawWithContent {
-        drawContent()
-        if (zoomLevel <= 0f) return@drawWithContent
+        if (zoomLevel <= 0f) {
+            drawContent(); return@drawWithContent
+        }
         val intervals = GridUtils.computeWithGridType(zoomLevel, bpm, gridType)
         val intervalMs = intervals.intervalMs
         val majorIntervalMs = intervals.majorIntervalMs
-        if (intervalMs <= 0L) return@drawWithContent
+        if (intervalMs <= 0L) { drawContent(); return@drawWithContent }
         val pxPerGrid = intervalMs * zoomLevel
-        if (pxPerGrid < 4f) return@drawWithContent
+        if (pxPerGrid < 4f) { drawContent(); return@drawWithContent }
 
-        val baseColor = Color(0xFF101010)
-        val minorColor = baseColor.copy(alpha = 0.30f)
-        val majorColor = baseColor.copy(alpha = 0.60f)
-        val contentWidthPx = size.width
-        val totalDurationMs = (contentWidthPx / zoomLevel).toLong()
-        var t = 0L
-        while (t <= totalDurationMs) {
-            val x = t * zoomLevel
-            if (x > contentWidthPx + 1f) break
-            val isMajor = (t % majorIntervalMs == 0L)
-            drawLine(
-                color = if (isMajor) majorColor else minorColor,
-                start = Offset(x, 0f),
-                end = Offset(x, size.height),
-                strokeWidth = 1.dp.toPx()
-            )
-            t += intervalMs
+        fun drawGridLines() {
+            val viewportWidthPx = size.width
+            val startTimeMsInclusive = (scrollOffsetPx / zoomLevel).toLong().coerceAtLeast(0L)
+
+            val firstGridTimeMs = (startTimeMsInclusive / intervalMs) * intervalMs
+            val endTimeMsExclusive = ((scrollOffsetPx + viewportWidthPx) / zoomLevel).toLong().coerceAtLeast(firstGridTimeMs)
+            var t = firstGridTimeMs
+            while (t <= endTimeMsExclusive + intervalMs) {
+                val x = t * zoomLevel - scrollOffsetPx
+                if (x > viewportWidthPx + 1f) break
+                if (x >= -1f) {
+                    val isMajor = (t % majorIntervalMs == 0L)
+                    drawLine(
+                        color = if (isMajor) majorColor else minorColor,
+                        start = Offset(x, ignoreTopPx),
+                        end = Offset(x, size.height),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+                t += intervalMs
+            }
+        }
+        if (drawBehind) {
+            drawGridLines(); drawContent()
+        } else {
+            drawContent(); drawGridLines()
         }
     }
 }
@@ -375,9 +567,6 @@ fun AudioClip(
     onMoveEntry: (newStartMs: Long) -> Unit,
     gridIntervalMs: Long
 ) {
-    val bpm by WorkspaceRepository.bpm.collectAsState()
-    val gridType by WorkspaceRepository.gridType.collectAsState()
-
     val density = LocalDensity.current
     val startOffsetPx = (audioEntry.startTimeMs * zoomLevel).roundToInt()
     val widthDp = with(density) { (audioEntry.durationMs * zoomLevel).toDp() }
@@ -406,7 +595,7 @@ fun AudioClip(
             .clip(RoundedCornerShape(6.dp))
             .height(120.dp)
             .width(widthDp)
-            .background(backgroundColor, RoundedCornerShape(6.dp))
+            .background(backgroundColor.copy(alpha = if (isSelected) 0.96f else 0.90f), RoundedCornerShape(6.dp))
             .then(
                 other = if (isSelected)
                     Modifier.border(1.5.dp, borderColor, RoundedCornerShape(6.dp))
@@ -418,7 +607,7 @@ fun AudioClip(
             text = audioEntry.fileName.substringBeforeLast('.'),
             modifier = Modifier
                 .fillMaxWidth()
-                .background(borderColor.copy(alpha = 0.65f))
+                .background(borderColor)
                 .clickable { onSelectEntry() }
                 .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
                     detectDragGestures(
@@ -451,11 +640,6 @@ fun AudioClip(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .timelineGridOverlay(
-                    zoomLevel = zoomLevel,
-                    bpm = bpm,
-                    gridType = gridType
-                )
         ) {
             WaveformView(
                 modifier = Modifier
@@ -493,10 +677,210 @@ private fun SelectionCursor(
     }
     Box(
         modifier = Modifier
+            .offset(x = -1.5.dp)
             .offset { IntOffset(cursorXPositionPx.roundToInt(), 0) }
             .width(3.dp)
             .height(laneHeight)
             .background(color = Color.White, shape = RoundedCornerShape(1.dp))
             .zIndex(2f)
     )
+}
+
+@Composable
+fun MidiClip(
+    midiEntry: MidiEntry,
+    zoomLevel: Float,
+    isSelected: Boolean,
+    onSelectEntry: () -> Unit,
+    onMoveEntry: (newStartMs: Long) -> Unit,
+    gridIntervalMs: Long,
+    isLightsTrack: Boolean = false,
+    onDoubleClick: () -> Unit = {}
+) {
+    val density = LocalDensity.current
+    val startOffsetPx = (midiEntry.startTimeMs * zoomLevel).roundToInt()
+    val widthDp = with(density) { (midiEntry.durationMs * zoomLevel).toDp() }
+    val borderColor = if (isSelected) Color.White else if (isLightsTrack) Color(0xFFD4AF37) else Color(0xFFBA3C8C)
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.tertiary else if (isLightsTrack) Color(0xFFFFD700) else Color(0xFFEF5698)
+    val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onTertiary else if (isLightsTrack) Color.Black else Color.White
+
+    val dragOffsetPx = remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
+    var snapEnabled by remember { mutableStateOf(true) }
+    val previewStartMs by remember(dragOffsetPx.value, zoomLevel, snapEnabled) {
+        derivedStateOf {
+            val rawDeltaMsDouble = dragOffsetPx.value / zoomLevel
+            val candidateMsDouble = midiEntry.startTimeMs.toDouble() + rawDeltaMsDouble
+            val nonNegativeCandidate = candidateMsDouble.coerceAtLeast(0.0)
+            if (snapEnabled && gridIntervalMs > 0) {
+                val gridPxSpacing = gridIntervalMs * zoomLevel
+                val thresholdPx = (gridPxSpacing * 0.35f).coerceAtLeast(5f)
+                GridUtils.snapToGridWithThreshold(nonNegativeCandidate.roundToLong(), zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value, thresholdPx)
+            } else kotlin.math.round(nonNegativeCandidate).toLong()
+        }
+    }
+    val finalOffsetPx = startOffsetPx + dragOffsetPx.value.roundToInt()
+
+    val clipHeight = 120.dp
+    val headerHeight = 20.dp
+
+    Column(
+        modifier = Modifier
+            .offset { IntOffset(finalOffsetPx, 0) }
+            .width(widthDp)
+            .height(clipHeight)
+            .clip(RoundedCornerShape(6.dp))
+            .background(backgroundColor.copy(alpha = if (isSelected) 0.96f else 0.90f), RoundedCornerShape(6.dp))
+            .then(
+                if (isSelected) Modifier.border(1.5.dp, borderColor, RoundedCornerShape(6.dp)) else Modifier.border(1.dp, borderColor.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+            )
+            .zIndex(if (isSelected) 1f else 0f)
+    ) {
+        Text(
+            text = midiEntry.name,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(headerHeight)
+                .background(borderColor, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                .clickable { onSelectEntry() }
+                .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                    detectDragGestures(
+                        onDragStart = { onSelectEntry() },
+                        onDragEnd = {
+                            if (previewStartMs != midiEntry.startTimeMs) {
+                                onMoveEntry(previewStartMs)
+                            }
+                            dragOffsetPx.value = 0f
+                            snapEnabled = true
+                        },
+                        onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetPx.value += dragAmount.x
+                        }
+                    )
+                }
+                .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleClick() }) }
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall.copy(lineHeight = MaterialTheme.typography.labelSmall.fontSize),
+            color = foregroundColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(4.dp)
+                .drawWithContent {
+                    drawContent()
+                    if (zoomLevel <= 0f) return@drawWithContent
+                    val contentHeightPx = size.height
+                    val noteBarMinHeightPx = 4f
+                    val noteBarMaxHeightPx = 14f
+                    midiEntry.notes.forEach { note ->
+                        val overlapStart = maxOf(note.startTimeMs, midiEntry.startTimeMs)
+                        val overlapEnd = minOf(note.endTimeMs, midiEntry.endTimeMs)
+                        if (overlapEnd <= overlapStart) return@forEach
+                        val relStartMs = overlapStart - midiEntry.startTimeMs
+                        val relDurationMs = overlapEnd - overlapStart
+                        val x = relStartMs * zoomLevel
+                        val w = relDurationMs * zoomLevel
+                        if (w < 0.5f) return@forEach
+                        val pitchRatio = (note.pitch.coerceIn(0, 127)) / 127f
+                        val y = (1f - pitchRatio) * (contentHeightPx - noteBarMaxHeightPx)
+                        val barHeightPx = noteBarMinHeightPx + (noteBarMaxHeightPx - noteBarMinHeightPx) * 0.55f
+                        val noteColor = Color(note.led.red, note.led.green, note.led.blue)
+                        drawRect(
+                            color = noteColor.copy(alpha = 0.60f),
+                            topLeft = Offset(x, y),
+                            size = androidx.compose.ui.geometry.Size(w, barHeightPx)
+                        )
+                        drawRect(
+                            color = noteColor.copy(alpha = 0.92f),
+                            topLeft = Offset(x, y),
+                            size = androidx.compose.ui.geometry.Size(w, barHeightPx),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.0f)
+                        )
+                    }
+                }
+        ) {
+            Text(
+                text = "${midiEntry.notes.size} notes",
+                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart).background(backgroundColor.copy(alpha = 0.35f)).padding(horizontal = 4.dp, vertical = 2.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize * 0.75f),
+                color = foregroundColor.copy(alpha = 0.9f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+private fun trackIndexOf(track: TimelineTrack<*>): Int {
+    return TimelineRepository.tracks.value.indexOf(track)
+}
+
+private fun isPointInsideAnyEntry(track: TimelineTrack<*>, timeMs: Long): Boolean {
+    return when (track) {
+        is AudioTimelineTrack -> track.entries.values.any { timeMs in it.startTimeMs..(it.startTimeMs + it.durationMs) }
+        is MidiTimelineTrack -> track.entries.values.any { timeMs in it.startTimeMs..it.endTimeMs }
+        is LightsTimelineTrack -> track.entries.values.any { timeMs in it.startTimeMs..it.endTimeMs }
+        else -> false
+    }
+}
+
+private fun computeSnappedTime(x: Float, scrollState: ScrollState, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
+    val rawPx = scrollState.value.toDouble() + x.toDouble()
+    val rawTimeMsDouble = if (zoomLevel > 0f) rawPx / zoomLevel.toDouble() else 0.0
+    val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
+    val intervals = GridUtils.computeWithGridType(zoomLevel, bpm, gridType)
+    val gridIntervalMs = intervals.intervalMs
+    val gridPxSpacing = gridIntervalMs * zoomLevel
+    val snapThresholdPx = (gridPxSpacing * 0.40f).coerceAtLeast(6f)
+    val shouldSnap = gridIntervalMs > 0 && gridPxSpacing >= 6f
+    return if (shouldSnap) GridUtils.snapToGridWithThreshold(rawTimeMs, zoomLevel, bpm, gridType, thresholdPx = snapThresholdPx) else rawTimeMs
+}
+
+private fun computeStrictGridTime(x: Float, scrollState: ScrollState, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
+    val rawPx = scrollState.value.toDouble() + x.toDouble()
+    val rawTimeMsDouble = if (zoomLevel > 0f) rawPx / zoomLevel.toDouble() else 0.0
+    val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
+
+    return GridUtils.snapToGrid(rawTimeMs, zoomLevel, bpm, gridType)
+}
+
+private fun findHeaderEntryHit(
+    track: TimelineTrack<*>,
+    x: Float,
+    y: Float,
+    zoom: Float,
+    scrollPx: Float,
+    headerHeightPx: Float
+): Long? {
+    if (y > headerHeightPx) return null
+    return when (track) {
+        is AudioTimelineTrack -> {
+            track.entries.values.firstOrNull { entry ->
+                val left = entry.startTimeMs * zoom - scrollPx
+                val right = left + entry.durationMs * zoom
+                x in left..right
+            }?.startTimeMs
+        }
+        is MidiTimelineTrack -> {
+            track.entries.values.firstOrNull { entry ->
+                val left = entry.startTimeMs * zoom - scrollPx
+                val right = left + entry.durationMs * zoom
+                x in left..right
+            }?.startTimeMs
+        }
+        is LightsTimelineTrack -> {
+            track.entries.values.firstOrNull { entry ->
+                val left = entry.startTimeMs * zoom - scrollPx
+                val right = left + entry.durationMs * zoom
+                x in left..right
+            }?.startTimeMs
+        }
+        else -> null
+    }
 }

@@ -24,7 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.Timeline
+import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
@@ -134,6 +136,10 @@ fun Workspace() {
 
             if (state.mode is KeyframesWorkspaceMode) {
                 (state.mode as KeyframesWorkspaceMode).ModeContent(paddingValues)
+            }
+
+            if (state.mode is PianoRollWorkspaceMode) {
+                (state.mode as PianoRollWorkspaceMode).ModeContent(paddingValues)
             }
         }
     }

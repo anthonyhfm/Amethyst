@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Frame
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 
 sealed interface ClipboardData {
     data class ChainDevice(
@@ -31,5 +32,10 @@ sealed interface ClipboardData {
 
     data class TimelineEntries(
         val entries: List<AudioEntry>
+    ) : ClipboardData
+
+    data class MidiEntries(
+        val entries: List<MidiEntry>,
+        val isLightsTrack: Boolean
     ) : ClipboardData
 }
