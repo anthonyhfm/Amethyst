@@ -100,7 +100,6 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
-        val thisDevice = this
 
         Row(
             modifier = Modifier
@@ -130,8 +129,8 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
                                 }
                                 // Update channel registration
                                 if (oldChannel != channel) {
-                                    unregisterDevice(thisDevice, oldChannel)
-                                    chokeDevicesByChannel.getOrPut(channel) { mutableListOf() }.add(thisDevice)
+                                    unregisterDevice(this@ChokeChainDevice, oldChannel)
+                                    chokeDevicesByChannel.getOrPut(channel) { mutableListOf() }.add(this@ChokeChainDevice)
                                 }
                             }
                         }
@@ -143,8 +142,8 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
                         }
                         // Update channel registration
                         if (oldChannel != value) {
-                            unregisterDevice(thisDevice, oldChannel)
-                            chokeDevicesByChannel.getOrPut(value) { mutableListOf() }.add(thisDevice)
+                            unregisterDevice(this@ChokeChainDevice, oldChannel)
+                            chokeDevicesByChannel.getOrPut(value) { mutableListOf() }.add(this@ChokeChainDevice)
                         }
                     }
                 )
