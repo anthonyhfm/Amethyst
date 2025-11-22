@@ -7,3 +7,6 @@ actual val PointerIcon.Companion.ResizeLeft: PointerIcon
 
 actual val PointerIcon.Companion.ResizeRight: PointerIcon
     get() = PointerIcon.Default
+
+actual val PointerIcon.Companion.VerticalDrag: PointerIcon
+    get() = PointerIcon.Hand

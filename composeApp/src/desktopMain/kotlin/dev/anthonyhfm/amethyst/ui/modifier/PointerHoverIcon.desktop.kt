@@ -8,3 +8,6 @@ actual val PointerIcon.Companion.ResizeLeft: PointerIcon
 
 actual val PointerIcon.Companion.ResizeRight: PointerIcon
     get() = PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR))
+
+actual val PointerIcon.Companion.VerticalDrag: PointerIcon
+    get() = PointerIcon(Cursor(Cursor.S_RESIZE_CURSOR))

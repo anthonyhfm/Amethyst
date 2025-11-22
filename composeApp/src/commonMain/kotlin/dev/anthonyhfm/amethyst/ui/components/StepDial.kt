@@ -36,12 +36,15 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.ui.modifier.VerticalDrag
 import dev.anthonyhfm.amethyst.ui.modifier.gesturesDisabled
 import kotlin.math.roundToInt
 
@@ -85,6 +88,7 @@ fun <T> StepDial(
             .alpha(if (!enabled) 0.4f else 1f)
             .clip(CircleShape)
             .size(52.dp)
+            .pointerHoverIcon(PointerIcon.VerticalDrag)
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {

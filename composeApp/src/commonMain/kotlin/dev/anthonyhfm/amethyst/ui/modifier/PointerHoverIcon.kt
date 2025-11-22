@@ -8,3 +8,4 @@ import androidx.compose.ui.input.pointer.PointerIcon
 
 expect val PointerIcon.Companion.ResizeLeft: PointerIcon
 expect val PointerIcon.Companion.ResizeRight: PointerIcon
+expect val PointerIcon.Companion.VerticalDrag: PointerIcon

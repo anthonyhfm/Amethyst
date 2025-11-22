@@ -7,3 +7,6 @@ actual val PointerIcon.Companion.ResizeLeft: PointerIcon
 
 actual val PointerIcon.Companion.ResizeRight: PointerIcon
     get() = PointerIcon(android.view.PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW)
+
+actual val PointerIcon.Companion.VerticalDrag: PointerIcon
+    get() = PointerIcon(android.view.PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW)
