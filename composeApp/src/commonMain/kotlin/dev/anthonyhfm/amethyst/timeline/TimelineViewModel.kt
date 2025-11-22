@@ -346,11 +346,13 @@ class TimelineViewModel : ViewModel() {
     }
 
     fun msToPixels(timeMs: Long): Float {
-        return timeMs * _zoomLevel.value
+        // Use Double precision for better accuracy
+        return (timeMs.toDouble() * _zoomLevel.value.toDouble()).toFloat()
     }
 
     fun pixelsToMs(pixels: Float): Long {
-        return (pixels / _zoomLevel.value).toLong()
+        // Use Double precision for better accuracy
+        return (pixels.toDouble() / _zoomLevel.value.toDouble()).toLong()
     }
 
     fun setScrollState(scrollState: ScrollState) {
