@@ -130,11 +130,13 @@ fun TimelineLaneView(
                                     val newZoom = smoothedZoom.coerceIn(0.0025f, dynamicMaxZoom)
 
                                     val cursorX = change?.position?.x ?: 0f
-                                    val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value + cursorX) / currentZoom else 0f
+                                    // Use Double precision for better accuracy
+                                    val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value.toDouble() + cursorX.toDouble()) / currentZoom.toDouble() else 0.0
 
                                     if (newZoom != currentZoom) {
                                         viewModel.setZoomLevel(newZoom)
-                                        val targetScroll = (timeAtCursorMs * newZoom - cursorX).coerceAtLeast(0f)
+                                        // Use Double precision for scroll calculation
+                                        val targetScroll = (timeAtCursorMs * newZoom.toDouble() - cursorX.toDouble()).coerceAtLeast(0.0)
                                         scope.launch { scrollState.scrollTo(targetScroll.toInt()) }
                                     }
 
@@ -156,10 +158,12 @@ fun TimelineLaneView(
                         val smoothedZoom = currentZoom + (rawNewZoom - currentZoom) * 0.5f
                         val newZoom = smoothedZoom.coerceIn(0.0025f, dynamicMaxZoom)
                         val cursorX = centroid.x
-                        val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value + cursorX) / currentZoom else 0f
+                        // Use Double precision for better accuracy
+                        val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value.toDouble() + cursorX.toDouble()) / currentZoom.toDouble() else 0.0
                         if (newZoom != currentZoom) {
                             viewModel.setZoomLevel(newZoom)
-                            val targetScroll = (timeAtCursorMs * newZoom - cursorX).coerceAtLeast(0f)
+                            // Use Double precision for scroll calculation
+                            val targetScroll = (timeAtCursorMs * newZoom.toDouble() - cursorX.toDouble()).coerceAtLeast(0.0)
                             scope.launch { scrollState.scrollTo(targetScroll.toInt()) }
                         }
                     }
@@ -220,11 +224,13 @@ fun PlayheadCursor(
     zoomLevel: Float,
     scrollState: ScrollState
 ) {
-    val cursorXPosition by remember(positionMs, zoomLevel, scrollState) {
+    // Include scrollState.value in remember keys for proper tracking
+    val cursorXPosition by remember(positionMs, zoomLevel, scrollState.value) {
         derivedStateOf {
-            val playheadPx = positionMs * zoomLevel
-            val scroll = scrollState.value.toFloat()
-            (playheadPx - scroll).roundToInt()
+            // Use Double precision for better accuracy
+            val playheadPx = positionMs.toDouble() * zoomLevel.toDouble()
+            val scroll = scrollState.value.toDouble()
+            (playheadPx - scroll).toFloat().roundToInt()
         }
     }
 
@@ -418,8 +424,9 @@ fun TimelineLane(
             else -> null
         }
         if (overlayStart != null && overlayEnd != null && overlayEnd > overlayStart) {
-            val startPx = overlayStart * zoomLevel - scrollState.value
-            val widthPx = (overlayEnd - overlayStart) * zoomLevel
+            // Use Double precision for better accuracy
+            val startPx = (overlayStart.toDouble() * zoomLevel.toDouble() - scrollState.value.toDouble()).toFloat()
+            val widthPx = ((overlayEnd - overlayStart).toDouble() * zoomLevel.toDouble()).toFloat()
             Box(
                 modifier = Modifier
                     .offset { IntOffset(startPx.roundToInt(), 0) }
@@ -530,13 +537,22 @@ private fun Modifier.timelineGridOverlay(
 
         fun drawGridLines() {
             val viewportWidthPx = size.width
-            val startTimeMsInclusive = (scrollOffsetPx / zoomLevel).toLong().coerceAtLeast(0L)
+            // Use Double precision for better accuracy
+            val startTimeMsInclusive = (scrollOffsetPx / zoomLevel.toDouble()).toLong().coerceAtLeast(0L)
 
-            val firstGridTimeMs = (startTimeMsInclusive / intervalMs) * intervalMs
-            val endTimeMsExclusive = ((scrollOffsetPx + viewportWidthPx) / zoomLevel).toLong().coerceAtLeast(firstGridTimeMs)
+            // Improved first grid calculation with proper rounding
+            val firstGridTimeMs = if (startTimeMsInclusive == 0L) {
+                0L
+            } else {
+                ((startTimeMsInclusive / intervalMs) * intervalMs).coerceAtLeast(0L)
+            }
+            
+            val endTimeMsExclusive = ((scrollOffsetPx + viewportWidthPx) / zoomLevel.toDouble()).toLong().coerceAtLeast(firstGridTimeMs)
             var t = firstGridTimeMs
+            
+            // Draw grid lines with sub-pixel precision
             while (t <= endTimeMsExclusive + intervalMs) {
-                val x = t * zoomLevel - scrollOffsetPx
+                val x = (t.toDouble() * zoomLevel.toDouble() - scrollOffsetPx.toDouble()).toFloat()
                 if (x > viewportWidthPx + 1f) break
                 if (x >= -1f) {
                     val isMajor = (t % majorIntervalMs == 0L)
@@ -568,8 +584,9 @@ fun AudioClip(
     gridIntervalMs: Long
 ) {
     val density = LocalDensity.current
-    val startOffsetPx = (audioEntry.startTimeMs * zoomLevel).roundToInt()
-    val widthDp = with(density) { (audioEntry.durationMs * zoomLevel).toDp() }
+    // Use Double precision for better accuracy in positioning
+    val startOffsetPx = (audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
+    val widthDp = with(density) { (audioEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().toDp() }
     val borderColor = if (isSelected) Color.White else Color(0xFF3C3CBA)
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF5656EF)
     val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
@@ -668,11 +685,11 @@ private fun SelectionCursor(
 ) {
     if (selectedTimeMs == null) return
 
-    val scrollX = scrollState.value
-    val cursorXPositionPx by remember(selectedTimeMs, zoomLevel, viewportRelative) {
+    // Include scrollState.value in the remember keys to properly track scroll changes
+    val cursorXPositionPx by remember(selectedTimeMs, zoomLevel, viewportRelative, scrollState.value) {
         derivedStateOf {
             val raw = selectedTimeMs * zoomLevel
-            if (viewportRelative) raw - scrollX else raw
+            if (viewportRelative) raw - scrollState.value else raw
         }
     }
     Box(
@@ -698,8 +715,9 @@ fun MidiClip(
     onDoubleClick: () -> Unit = {}
 ) {
     val density = LocalDensity.current
-    val startOffsetPx = (midiEntry.startTimeMs * zoomLevel).roundToInt()
-    val widthDp = with(density) { (midiEntry.durationMs * zoomLevel).toDp() }
+    // Use Double precision for better accuracy in positioning
+    val startOffsetPx = (midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
+    val widthDp = with(density) { (midiEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().toDp() }
     val borderColor = if (isSelected) Color.White else if (isLightsTrack) Color(0xFFD4AF37) else Color(0xFFBA3C8C)
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.tertiary else if (isLightsTrack) Color(0xFFFFD700) else Color(0xFFEF5698)
     val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onTertiary else if (isLightsTrack) Color.Black else Color.White
@@ -831,6 +849,7 @@ private fun isPointInsideAnyEntry(track: TimelineTrack<*>, timeMs: Long): Boolea
 }
 
 private fun computeSnappedTime(x: Float, scrollState: ScrollState, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
+    // Use Double precision for better accuracy
     val rawPx = scrollState.value.toDouble() + x.toDouble()
     val rawTimeMsDouble = if (zoomLevel > 0f) rawPx / zoomLevel.toDouble() else 0.0
     val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
@@ -843,6 +862,7 @@ private fun computeSnappedTime(x: Float, scrollState: ScrollState, zoomLevel: Fl
 }
 
 private fun computeStrictGridTime(x: Float, scrollState: ScrollState, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
+    // Use Double precision for better accuracy
     val rawPx = scrollState.value.toDouble() + x.toDouble()
     val rawTimeMsDouble = if (zoomLevel > 0f) rawPx / zoomLevel.toDouble() else 0.0
     val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
@@ -862,23 +882,24 @@ private fun findHeaderEntryHit(
     return when (track) {
         is AudioTimelineTrack -> {
             track.entries.values.firstOrNull { entry ->
-                val left = entry.startTimeMs * zoom - scrollPx
-                val right = left + entry.durationMs * zoom
-                x in left..right
+                // Use Double precision for better accuracy
+                val left = entry.startTimeMs.toDouble() * zoom.toDouble() - scrollPx.toDouble()
+                val right = left + entry.durationMs.toDouble() * zoom.toDouble()
+                x.toDouble() in left..right
             }?.startTimeMs
         }
         is MidiTimelineTrack -> {
             track.entries.values.firstOrNull { entry ->
-                val left = entry.startTimeMs * zoom - scrollPx
-                val right = left + entry.durationMs * zoom
-                x in left..right
+                val left = entry.startTimeMs.toDouble() * zoom.toDouble() - scrollPx.toDouble()
+                val right = left + entry.durationMs.toDouble() * zoom.toDouble()
+                x.toDouble() in left..right
             }?.startTimeMs
         }
         is LightsTimelineTrack -> {
             track.entries.values.firstOrNull { entry ->
-                val left = entry.startTimeMs * zoom - scrollPx
-                val right = left + entry.durationMs * zoom
-                x in left..right
+                val left = entry.startTimeMs.toDouble() * zoom.toDouble() - scrollPx.toDouble()
+                val right = left + entry.durationMs.toDouble() * zoom.toDouble()
+                x.toDouble() in left..right
             }?.startTimeMs
         }
         else -> null
