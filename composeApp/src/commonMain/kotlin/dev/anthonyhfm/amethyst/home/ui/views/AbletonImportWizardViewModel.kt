@@ -3,6 +3,9 @@ package dev.anthonyhfm.amethyst.home.ui.views
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
+import dev.anthonyhfm.amethyst.core.util.FileHelper
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -40,7 +43,11 @@ class AbletonImportWizardViewModel: ViewModel() {
 
     fun startAbletonImport(path: String) {
         val workspace = if (path.lowercase().endsWith(".zip")) {
-            val file = PlatformFile(path)
+            val file = if (platform is Platform.Android || platform is Platform.iOS) {
+                FileHelper.indexedFiles[path] ?: return
+            } else {
+                PlatformFile(path)
+            }
 
             AbletonConverter.convertZipToWorkspace(file)
         } else {

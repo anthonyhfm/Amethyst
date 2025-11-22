@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.BaseViewModel
+import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
@@ -76,16 +77,22 @@ class RecentViewModel(
                         "zip" -> {
                             val format = Zip.determineFormat(file)
 
+                            if (platform is Platform.Android || platform is Platform.iOS) {
+                                FileHelper.indexedFiles[file.path] = file
+                            }
+
                             when (format) {
                                 ZippedProjectFormat.ABLETON -> {
-                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.absolutePath()))
+                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.path))
                                 }
 
                                 ZippedProjectFormat.ABLETON_APOLLO -> {
-                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.absolutePath()))
+                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.path))
                                 }
 
                                 ZippedProjectFormat.UNIPAD -> {
+                                    FileHelper.clearCache()
+
                                     navigator.navigate(HomeNavRoute.LoadingScreen("Translating your UniPad Project"))
 
                                     GlobalScope.launch {

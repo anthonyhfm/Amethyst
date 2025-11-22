@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
+import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
@@ -65,10 +66,6 @@ object AbletonConverter : AmethystConverter {
         zipEntries.clear()
         val e = Zip.getEntries(file)
 
-        e.forEach {
-            println("File in zip: ${it.path}")
-        }
-
         zipStartPath = e.map { it.path }
             .first { it.endsWith(".als") }
             .substringBeforeLast("/")
@@ -89,6 +86,7 @@ object AbletonConverter : AmethystConverter {
         return runLiveConversion(abletonXml).also {
             isZip = false
             zipEntries.clear()
+            FileHelper.clearCache()
         }
     }
 
