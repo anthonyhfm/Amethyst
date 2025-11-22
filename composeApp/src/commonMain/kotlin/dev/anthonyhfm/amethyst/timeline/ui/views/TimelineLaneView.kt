@@ -80,8 +80,12 @@ fun TimelineLaneView(
     val zoomLevel by viewModel.zoomLevel.collectAsState()
     val playheadPositionMs by viewModel.playheadPositionMs.collectAsState()
 
+    // Timeline canvas constraints
     val MAX_CANVAS_PX = 130_000f
     val MIN_TIMELINE_PX = 12_000f
+    val TIMELINE_PADDING_PX = 1000.0
+    val MIN_ZOOM_LEVEL = 0.0025f
+    val MAX_ZOOM_LEVEL = 5f
 
     val maxDurationMs = tracks.maxOfOrNull { track ->
         when (track) {
@@ -93,16 +97,21 @@ fun TimelineLaneView(
     } ?: 0L
 
     // Use Double precision for better accuracy
-    val desiredWidthPx = (maxDurationMs.toDouble() * zoomLevel.toDouble() + 1000.0).toFloat().coerceAtLeast(MIN_TIMELINE_PX)
+    val desiredWidthPx = (maxDurationMs.toDouble() * zoomLevel.toDouble() + TIMELINE_PADDING_PX).toFloat().coerceAtLeast(MIN_TIMELINE_PX)
     val contentWidthPx = desiredWidthPx.coerceAtMost(MAX_CANVAS_PX)
 
     val dynamicMaxZoom = if (maxDurationMs > 0) {
-        min(5f, ((MAX_CANVAS_PX - 1000f) / maxDurationMs.toFloat()).coerceAtLeast(0.0025f))
-    } else 5f
+        min(MAX_ZOOM_LEVEL, ((MAX_CANVAS_PX - TIMELINE_PADDING_PX.toFloat()) / maxDurationMs.toFloat()).coerceAtLeast(MIN_ZOOM_LEVEL))
+    } else MAX_ZOOM_LEVEL
 
     val contentWidth = with(LocalDensity.current) { contentWidthPx.toDp() }
 
     val scope = rememberCoroutineScope()
+
+    // Zoom interaction constants
+    val ZOOM_SCROLL_SENSITIVITY = 0.55f
+    val ZOOM_SCROLL_LERP_WEIGHT = 0.6f
+    val ZOOM_GESTURE_LERP_WEIGHT = 0.5f
 
     Box(
         modifier = Modifier
@@ -122,13 +131,11 @@ fun TimelineLaneView(
                                 val normalizedTotal = (accumulatedDeltaY / 220f).coerceIn(-1f, 1f)
                                 if (abs(normalizedTotal) >= 0.015f) {
                                     val currentZoom = viewModel.zoomLevel.value
-                                    val baseSensitivity = 0.55f
-                                    val deltaFactor = -normalizedTotal * baseSensitivity
+                                    val deltaFactor = -normalizedTotal * ZOOM_SCROLL_SENSITIVITY
                                     val targetScale = (1f + deltaFactor).coerceAtLeast(0.1f)
-                                    val lerpWeight = 0.6f
                                     val rawNewZoom = currentZoom * targetScale
-                                    val smoothedZoom = currentZoom + (rawNewZoom - currentZoom) * lerpWeight
-                                    val newZoom = smoothedZoom.coerceIn(0.0025f, dynamicMaxZoom)
+                                    val smoothedZoom = currentZoom + (rawNewZoom - currentZoom) * ZOOM_SCROLL_LERP_WEIGHT
+                                    val newZoom = smoothedZoom.coerceIn(MIN_ZOOM_LEVEL, dynamicMaxZoom)
 
                                     val cursorX = change?.position?.x ?: 0f
                                     // Use Double precision for better accuracy
@@ -156,8 +163,8 @@ fun TimelineLaneView(
                     if (gestureZoom != 1f) {
                         val currentZoom = viewModel.zoomLevel.value
                         val rawNewZoom = currentZoom * gestureZoom
-                        val smoothedZoom = currentZoom + (rawNewZoom - currentZoom) * 0.5f
-                        val newZoom = smoothedZoom.coerceIn(0.0025f, dynamicMaxZoom)
+                        val smoothedZoom = currentZoom + (rawNewZoom - currentZoom) * ZOOM_GESTURE_LERP_WEIGHT
+                        val newZoom = smoothedZoom.coerceIn(MIN_ZOOM_LEVEL, dynamicMaxZoom)
                         val cursorX = centroid.x
                         // Use Double precision for better accuracy
                         val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value.toDouble() + cursorX.toDouble()) / currentZoom.toDouble() else 0.0
