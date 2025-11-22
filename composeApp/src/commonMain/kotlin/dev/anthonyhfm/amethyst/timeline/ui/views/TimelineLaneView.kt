@@ -80,7 +80,6 @@ fun TimelineLaneView(
     val zoomLevel by viewModel.zoomLevel.collectAsState()
     val playheadPositionMs by viewModel.playheadPositionMs.collectAsState()
 
-    // Timeline canvas constraints
     val MAX_CANVAS_PX = 130_000f
     val MIN_TIMELINE_PX = 12_000f
     val TIMELINE_PADDING_PX = 1000f
@@ -96,7 +95,6 @@ fun TimelineLaneView(
         }
     } ?: 0L
 
-    // Use Double precision for better accuracy in the calculation
     val desiredWidthPx = (maxDurationMs.toDouble() * zoomLevel.toDouble() + TIMELINE_PADDING_PX.toDouble()).coerceAtLeast(MIN_TIMELINE_PX.toDouble()).toFloat()
     val contentWidthPx = desiredWidthPx.coerceAtMost(MAX_CANVAS_PX)
 
@@ -108,7 +106,6 @@ fun TimelineLaneView(
 
     val scope = rememberCoroutineScope()
 
-    // Zoom interaction constants
     val ZOOM_SCROLL_SENSITIVITY = 0.55f
     val ZOOM_SCROLL_LERP_WEIGHT = 0.6f
     val ZOOM_GESTURE_LERP_WEIGHT = 0.5f
@@ -138,12 +135,11 @@ fun TimelineLaneView(
                                     val newZoom = smoothedZoom.coerceIn(MIN_ZOOM_LEVEL, dynamicMaxZoom)
 
                                     val cursorX = change?.position?.x ?: 0f
-                                    // Use Double precision for better accuracy
+
                                     val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value.toDouble() + cursorX.toDouble()) / currentZoom.toDouble() else 0.0
 
                                     if (newZoom != currentZoom) {
                                         viewModel.setZoomLevel(newZoom)
-                                        // Use Double precision for scroll calculation
                                         val targetScroll = (timeAtCursorMs * newZoom.toDouble() - cursorX.toDouble()).coerceAtLeast(0.0)
                                         scope.launch { scrollState.scrollTo(targetScroll.toInt()) }
                                     }
@@ -166,11 +162,11 @@ fun TimelineLaneView(
                         val smoothedZoom = currentZoom + (rawNewZoom - currentZoom) * ZOOM_GESTURE_LERP_WEIGHT
                         val newZoom = smoothedZoom.coerceIn(MIN_ZOOM_LEVEL, dynamicMaxZoom)
                         val cursorX = centroid.x
-                        // Use Double precision for better accuracy
+
                         val timeAtCursorMs = if (currentZoom > 0f) (scrollState.value.toDouble() + cursorX.toDouble()) / currentZoom.toDouble() else 0.0
                         if (newZoom != currentZoom) {
                             viewModel.setZoomLevel(newZoom)
-                            // Use Double precision for scroll calculation
+
                             val targetScroll = (timeAtCursorMs * newZoom.toDouble() - cursorX.toDouble()).coerceAtLeast(0.0)
                             scope.launch { scrollState.scrollTo(targetScroll.toInt()) }
                         }
@@ -232,10 +228,8 @@ fun PlayheadCursor(
     zoomLevel: Float,
     scrollState: ScrollState
 ) {
-    // Include scrollState.value in remember keys for proper tracking
     val cursorXPosition by remember(positionMs, zoomLevel, scrollState.value) {
         derivedStateOf {
-            // Use Double precision for better accuracy
             val playheadPx = positionMs.toDouble() * zoomLevel.toDouble()
             val scroll = scrollState.value.toDouble()
             (playheadPx - scroll).toFloat().roundToInt()
@@ -332,7 +326,7 @@ fun TimelineLane(
                             }
 
                             val isLights = track is LightsTimelineTrack
-                            val snappedMs = computeSnappedTime(pos.x, scrollState, zoomLevel, bpm, gridType)
+                            val snappedMs = computeSnappedTime(pos.x, zoomLevel, bpm, gridType)
                             val isDouble = isLights && lastClickTime != 0L &&
                                 (time - lastClickTime) in 1..doubleThresholdMs &&
                                 lastClickPos?.let { prev ->
@@ -432,9 +426,9 @@ fun TimelineLane(
             else -> null
         }
         if (overlayStart != null && overlayEnd != null && overlayEnd > overlayStart) {
-            // Use Double precision for better accuracy
             val startPx = (overlayStart.toDouble() * zoomLevel.toDouble() - scrollState.value.toDouble()).toFloat()
             val widthPx = ((overlayEnd - overlayStart).toDouble() * zoomLevel.toDouble()).toFloat()
+
             Box(
                 modifier = Modifier
                     .offset { IntOffset(startPx.roundToInt(), 0) }
@@ -545,10 +539,8 @@ private fun Modifier.timelineGridOverlay(
 
         fun drawGridLines() {
             val viewportWidthPx = size.width
-            // Use Double precision for better accuracy
             val startTimeMsInclusive = (scrollOffsetPx / zoomLevel.toDouble()).toLong().coerceAtLeast(0L)
 
-            // Improved first grid calculation with proper rounding
             val firstGridTimeMs = if (startTimeMsInclusive == 0L) {
                 0L
             } else {
@@ -558,7 +550,6 @@ private fun Modifier.timelineGridOverlay(
             val endTimeMsExclusive = ((scrollOffsetPx + viewportWidthPx) / zoomLevel.toDouble()).toLong().coerceAtLeast(firstGridTimeMs)
             var t = firstGridTimeMs
             
-            // Draw grid lines with sub-pixel precision
             while (t <= endTimeMsExclusive + intervalMs) {
                 val x = (t.toDouble() * zoomLevel.toDouble() - scrollOffsetPx.toDouble()).toFloat()
                 if (x > viewportWidthPx + 1f) break
@@ -592,7 +583,7 @@ fun AudioClip(
     gridIntervalMs: Long
 ) {
     val density = LocalDensity.current
-    // Use Double precision for better accuracy in positioning
+
     val startOffsetPx = (audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
     val widthDp = with(density) { (audioEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().toDp() }
     val borderColor = if (isSelected) Color.White else Color(0xFF3C3CBA)
@@ -719,7 +710,7 @@ fun MidiClip(
     onDoubleClick: () -> Unit = {}
 ) {
     val density = LocalDensity.current
-    // Use Double precision for better accuracy in positioning
+
     val startOffsetPx = (midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
     val widthDp = with(density) { (midiEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().toDp() }
     val borderColor = if (isSelected) Color.White else if (isLightsTrack) Color(0xFFD4AF37) else Color(0xFFBA3C8C)
@@ -852,9 +843,8 @@ private fun isPointInsideAnyEntry(track: TimelineTrack<*>, timeMs: Long): Boolea
     }
 }
 
-private fun computeSnappedTime(x: Float, scrollState: ScrollState, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
-    // Use Double precision for better accuracy
-    val rawPx = scrollState.value.toDouble() + x.toDouble()
+private fun computeSnappedTime(x: Float, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
+    val rawPx = x.toDouble()
     val rawTimeMsDouble = if (zoomLevel > 0f) rawPx / zoomLevel.toDouble() else 0.0
     val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
     val intervals = GridUtils.computeWithGridType(zoomLevel, bpm, gridType)
@@ -866,7 +856,6 @@ private fun computeSnappedTime(x: Float, scrollState: ScrollState, zoomLevel: Fl
 }
 
 private fun computeStrictGridTime(x: Float, scrollState: ScrollState, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
-    // Use Double precision for better accuracy
     val rawPx = scrollState.value.toDouble() + x.toDouble()
     val rawTimeMsDouble = if (zoomLevel > 0f) rawPx / zoomLevel.toDouble() else 0.0
     val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
@@ -886,7 +875,6 @@ private fun findHeaderEntryHit(
     return when (track) {
         is AudioTimelineTrack -> {
             track.entries.values.firstOrNull { entry ->
-                // Use Double precision for better accuracy
                 val left = entry.startTimeMs.toDouble() * zoom.toDouble() - scrollPx.toDouble()
                 val right = left + entry.durationMs.toDouble() * zoom.toDouble()
                 x.toDouble() in left..right
