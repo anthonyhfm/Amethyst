@@ -693,12 +693,8 @@ private fun SelectionCursor(
 ) {
     if (selectedTimeMs == null) return
 
-    // Include scrollState.value in the remember keys to properly track scroll changes
     val cursorXPositionPx by remember(selectedTimeMs, zoomLevel, viewportRelative, scrollState.value) {
-        derivedStateOf {
-            val raw = selectedTimeMs * zoomLevel
-            if (viewportRelative) raw - scrollState.value else raw
-        }
+        derivedStateOf { selectedTimeMs * zoomLevel }
     }
     Box(
         modifier = Modifier
