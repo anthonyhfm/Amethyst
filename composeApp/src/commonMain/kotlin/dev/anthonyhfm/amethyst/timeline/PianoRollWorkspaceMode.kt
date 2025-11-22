@@ -27,8 +27,10 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -39,6 +41,8 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import kotlin.math.max
 import kotlin.math.min
@@ -275,23 +279,6 @@ private fun PianoRollEditor(
                         }
                     }
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    val resLabel = when (gridResolution) {
-                        GridResolution.Quarter -> "Grid 1/4"
-                        GridResolution.Eighth -> "Grid 1/8"
-                        GridResolution.Sixteenth -> "Grid 1/16"
-                    }
-                    Text(resLabel, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
                 Box(
                     modifier = Modifier
                         .width(canvasWidthDp)
@@ -539,6 +526,7 @@ private fun NoteBox(
                 .align(Alignment.CenterStart)
                 .width(6.dp)
                 .fillMaxHeight()
+                .pointerHoverIcon(PointerIcon.ResizeLeft)
                 .pointerInput(note) {
                     detectDragGestures(
                         onDragStart = { onSelect() },
@@ -571,6 +559,7 @@ private fun NoteBox(
                 .align(Alignment.CenterEnd)
                 .width(6.dp)
                 .fillMaxHeight()
+                .pointerHoverIcon(PointerIcon.ResizeRight)
                 .pointerInput(note) {
                     detectDragGestures(
                         onDragStart = { onSelect() },
@@ -604,7 +593,7 @@ private fun PianoKeysColumn(
 ) {
     Box(
         modifier = Modifier
-            .width(120.dp)
+            .width(100.dp)
             .fillMaxHeight()
             .background(Color(0xFF2A2A2A))
             .verticalScroll(verticalScroll, enabled = false)
