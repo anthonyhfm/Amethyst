@@ -92,11 +92,12 @@ fun TimelineLaneView(
         }
     } ?: 0L
 
-    val desiredWidthPx = (maxDurationMs * zoomLevel + 1000).coerceAtLeast(MIN_TIMELINE_PX)
+    // Use Double precision for better accuracy
+    val desiredWidthPx = (maxDurationMs.toDouble() * zoomLevel.toDouble() + 1000.0).toFloat().coerceAtLeast(MIN_TIMELINE_PX)
     val contentWidthPx = desiredWidthPx.coerceAtMost(MAX_CANVAS_PX)
 
     val dynamicMaxZoom = if (maxDurationMs > 0) {
-        min(5f, (MAX_CANVAS_PX - 1000f) / maxDurationMs.toFloat())
+        min(5f, ((MAX_CANVAS_PX - 1000f) / maxDurationMs.toFloat()).coerceAtLeast(0.0025f))
     } else 5f
 
     val contentWidth = with(LocalDensity.current) { contentWidthPx.toDp() }
