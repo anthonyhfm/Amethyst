@@ -87,9 +87,17 @@ fun WorkspaceViewport(
             }
             .pointerInput(Unit) {
                 detectTransformGestures(
-                    onGesture = { centroid, _, zoom, _ ->
-                        val zoomDelta = (zoom - 1f) * 0.1f
-                        onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, centroid))
+                    panZoomLock = false,
+                    onGesture = { centroid, pan, gestureZoom, _ ->
+                        if (pan != Offset.Zero) {
+                            onEvent(WorkspaceContract.Event.OnPanViewport(pan))
+                        }
+
+                        if (gestureZoom != 1f) {
+                            val zoomDelta = (gestureZoom - 1f)
+
+                            onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, centroid))
+                        }
                     }
                 )
             }
@@ -110,13 +118,6 @@ fun WorkspaceViewport(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput("pan") {
-                    detectDragGestures(
-                        onDrag = { _, offset ->
-                            onEvent(WorkspaceContract.Event.OnPanViewport(offset))
-                        }
-                    )
-                }
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
@@ -274,11 +275,9 @@ fun WorkspaceViewport(
         }
 
         val originSizeDp = 48.dp
-        // center pixel of grid (0,0) in viewport coordinates
         val centerPxX = viewportState.offset.x
         val centerPxY = viewportState.offset.y
 
-        // Convert dp -> px using the same density used for grid (computed earlier)
         val originSizePx = (originSizeDp.value * density)
         val offsetX = (centerPxX - originSizePx / 2f).roundToInt()
         val offsetY = (centerPxY - originSizePx / 2f).roundToInt()
