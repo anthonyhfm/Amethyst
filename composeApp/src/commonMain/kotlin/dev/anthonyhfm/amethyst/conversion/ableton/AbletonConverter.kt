@@ -102,7 +102,7 @@ object AbletonConverter : AmethystConverter {
         if (palettePath == null) {
             palette = Palettes.novation
         } else {
-            val paletteFile = PlatformFile(palettePath ?: "")
+            val paletteFile = PlatformFile(palettePath)
             runBlocking {
                 val content = paletteFile.readString()
                 palette = PaletteFileParser.parsePaletteFileContent(content)
@@ -267,6 +267,8 @@ object AbletonConverter : AmethystConverter {
         } else {
             (layout as AbletonLayout.Single).audioTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
         }
+
+        audioRenderer.clearCache()
 
         audioMap = mapOf()
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
