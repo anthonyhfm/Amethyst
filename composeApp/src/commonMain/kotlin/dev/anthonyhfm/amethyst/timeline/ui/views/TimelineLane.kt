@@ -64,6 +64,7 @@ fun TimelineLane(
     onSelectTime: (Long) -> Unit = {},
     onSelectEntry: (Long) -> Unit = {},
     onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> },
+    onResizeEntry: (oldStart: Long, newStart: Long, newDuration: Long) -> Unit = { _, _, _ -> },
     onDoubleClickLane: (Long) -> Unit = {}
 ) {
     val bpm by WorkspaceRepository.bpm.collectAsState()
@@ -274,6 +275,7 @@ fun TimelineLane(
                                 isSelected = isSelectedEntry,
                                 onSelectEntry = { onSelectEntry(midiEntry.startTimeMs) },
                                 onMoveEntry = { newStart -> onMoveEntry(midiEntry.startTimeMs, newStart) },
+                                onResizeEntry = { oldStart, newStart, newDuration -> onResizeEntry(oldStart, newStart, newDuration) },
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
                                 isLightsTrack = false,
                                 onDoubleClick = {}
@@ -291,6 +293,7 @@ fun TimelineLane(
                                 isSelected = isSelectedEntry,
                                 onSelectEntry = { onSelectEntry(midiEntry.startTimeMs) },
                                 onMoveEntry = { newStart -> onMoveEntry(midiEntry.startTimeMs, newStart) },
+                                onResizeEntry = { oldStart, newStart, newDuration -> onResizeEntry(oldStart, newStart, newDuration) },
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
                                 isLightsTrack = true,
                                 onDoubleClick = { onDoubleClickLane(midiEntry.startTimeMs) }

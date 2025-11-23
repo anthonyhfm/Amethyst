@@ -160,6 +160,12 @@ fun TimelineLaneView(
                             is MidiTimelineTrack, is LightsTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
                         }
                     },
+                    onResizeEntry = { oldStart, newStart, newDuration ->
+                        when (track) {
+                            is MidiTimelineTrack, is LightsTimelineTrack -> viewModel.resizeMidiEntry(index, oldStart, newStart, newDuration)
+                            else -> { /* ignore for audio for now */ }
+                        }
+                    },
                     onDoubleClickLane = { timeMs -> onDoubleClickLightsLane(index, timeMs) }
                 )
             }

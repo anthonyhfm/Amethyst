@@ -742,4 +742,45 @@ class TimelineViewModel : ViewModel() {
     fun deleteMidiNoteLive(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
         updateMidiEntry(trackIndex, entryStartMs) { it.copy(notes = it.notes.filter { n -> n != note }) }
     }
+
+    fun resizeMidiEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long, newDurationMs: Long) {
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex)
+        if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+        val timelineTrack = track as TimelineTrack<MidiEntry>
+        val entry = timelineTrack.entries[oldStartMs] ?: return
+
+        val clampedDuration = newDurationMs.coerceAtLeast(50L)
+        val startChanged = newStartMs != oldStartMs
+
+        val movedNotes = if (startChanged) {
+            val delta = newStartMs - oldStartMs
+            entry.notes.map { n -> n.copy(startTimeMs = (n.startTimeMs + delta).coerceAtLeast(0L)) }
+        } else entry.notes
+
+        if (startChanged) timelineTrack.entries.remove(oldStartMs)
+        val updated = entry.copy(startTimeMs = newStartMs, durationMs = clampedDuration, notes = movedNotes)
+        timelineTrack.entries[newStartMs] = updated
+
+        val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.endTimeMs
+        val finalDuration = maxEnd - updated.startTimeMs
+        if (finalDuration > updated.durationMs) {
+            timelineTrack.entries[newStartMs] = updated.copy(durationMs = finalDuration)
+        }
+
+        val newTrackInstance = when (track) {
+            is MidiTimelineTrack -> MidiTimelineTrack().apply { entries.putAll(timelineTrack.entries) }
+            is LightsTimelineTrack -> LightsTimelineTrack().apply { entries.putAll(timelineTrack.entries) }
+            else -> return
+        }
+        currentTracks[trackIndex] = newTrackInstance
+        _tracks.value = currentTracks.toList(); TimelineRepository.tracks.value = currentTracks.toList()
+        SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newStartMs))
+
+        val mode = WorkspaceRepository.mode.value
+        if (mode is PianoRollWorkspaceMode && mode.trackIndex == trackIndex && mode.entryStartMs == oldStartMs) {
+            mode.entryStartMs = newStartMs
+            mode.currentEntry = newTrackInstance.entries[newStartMs]
+        }
+    }
 }
