@@ -38,8 +38,13 @@ class Resonator3Adapter(
             if (isUpdatedVersion) {
                 decodeFromString<Resonator301Data>(blob.decodeToString())
             } else {
-                println(blob.decodeToString())
-                decodeFromString<Resonator3Data>(blob.decodeToString())
+                try {
+                    decodeFromString<Resonator3Data>(blob.decodeToString())
+                } catch (ex: Exception) {
+                    println(blob.decodeToString())
+
+                    return emptyList()
+                }
             }
         }
 
