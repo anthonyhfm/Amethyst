@@ -4,8 +4,10 @@ import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.core.util.Palettes
+import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
@@ -307,7 +309,7 @@ object MidiFileImporter {
                 }
             }
 
-            val speedFactor = 0.96
+            val speedFactor = if (platform is Platform.iOS) 1.0 else 0.96
             if (speedFactor != 1.0 && frames.isNotEmpty()) {
                 val durMs = frames.map { f ->
                     when (val t = f.timing) {
