@@ -23,6 +23,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -177,6 +180,45 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
         if (event.type == KeyEventType.KeyDown) {
             when (event.key) {
                 Key.Escape -> { modeClose?.invoke(); return true }
+
+                Key.D -> {
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
+                            .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+
+                        if (selected.isNotEmpty()) {
+                            val currentEntry = currentEntry ?: return false
+
+                            val latestEndTime = selected.maxOf { it.note.endTimeMs }
+
+                            val earliestStartTime = selected.minOf { it.note.startTimeMs }
+                            val offset = latestEndTime - earliestStartTime
+
+                            val duplicates = selected.map { sel ->
+                                sel.note.copy(
+                                    startTimeMs = (sel.note.startTimeMs + offset).coerceAtMost(currentEntry.durationMs - sel.note.durationMs)
+                                )
+                            }
+
+                            duplicates.forEach { duplicate ->
+                                onNoteAdd?.invoke(duplicate)
+                            }
+
+                            this.currentEntry = currentEntry.copy(notes = currentEntry.notes + duplicates)
+
+                            SelectionManager.clear()
+                            duplicates.forEach { duplicate ->
+                                SelectionManager.select(
+                                    Selectable.PianoRollNote(trackIndex, entryStartMs, duplicate),
+                                    single = false
+                                )
+                            }
+
+                            return true
+                        }
+                    }
+                }
+
                 Key.Delete, Key.Backspace -> {
                     val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
                         .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
