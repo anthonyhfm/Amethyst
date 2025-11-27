@@ -53,6 +53,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
         private const val VOLUME_MAX_DB = 24f
         private const val VOLUME_RANGE_DB = VOLUME_MAX_DB - VOLUME_MIN_DB
         private const val MAX_FADE_MS = 1000f
+        private const val SIGN_EXTEND_24BIT = -0x1000000
     }
 
     @Composable
@@ -337,6 +338,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
         // Calculate fade in/out in frames
         val fadeInFrames = ((fadeInMs / 1000f) * sampleRate).toInt().coerceAtMost(totalFrames)
         val fadeOutFrames = ((fadeOutMs / 1000f) * sampleRate).toInt().coerceAtMost(totalFrames)
+        val fadeOutStartFrame = totalFrames - fadeOutFrames
         
         // Calculate volume gain (dB to linear)
         val volumeGain = kotlin.math.pow(10.0, (volumeDb / 20.0)).toFloat()
@@ -351,7 +353,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
             }
             
             // Apply fade out
-            if (frame >= totalFrames - fadeOutFrames && fadeOutFrames > 0) {
+            if (frame >= fadeOutStartFrame && fadeOutFrames > 0) {
                 val fadeOutGain = (totalFrames - frame).toFloat() / fadeOutFrames.toFloat()
                 gain *= fadeOutGain
             }
@@ -380,7 +382,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                         val b1 = data[offset + 1].toInt() and 0xFF
                         val b2 = data[offset + 2].toInt() and 0xFF
                         var sample = b0 or (b1 shl 8) or (b2 shl 16)
-                        if ((sample and 0x800000) != 0) sample = sample or -0x1000000
+                        if ((sample and 0x800000) != 0) sample = sample or SIGN_EXTEND_24BIT
                         val amplified = (sample * gain).toInt().coerceIn(-8388608, 8388607)
                         data[offset] = (amplified and 0xFF).toByte()
                         data[offset + 1] = ((amplified shr 8) and 0xFF).toByte()
