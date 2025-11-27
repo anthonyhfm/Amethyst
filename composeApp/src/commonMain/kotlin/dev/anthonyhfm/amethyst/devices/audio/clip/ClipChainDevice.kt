@@ -47,6 +47,13 @@ import kotlinx.serialization.Serializable
 
 class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
     override val state = MutableStateFlow(ClipChainDeviceState())
+    
+    companion object {
+        private const val VOLUME_MIN_DB = -24f
+        private const val VOLUME_MAX_DB = 24f
+        private const val VOLUME_RANGE_DB = VOLUME_MAX_DB - VOLUME_MIN_DB
+        private const val MAX_FADE_MS = 1000f
+    }
 
     @Composable
     override fun Content() {
@@ -117,25 +124,25 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                 TextDial(
                     headline = "Fade In",
                     text = "${deviceState.fadeInMs.toInt()} ms",
-                    value = deviceState.fadeInMs / 1000f,
+                    value = deviceState.fadeInMs / MAX_FADE_MS,
                     onStartValueChange = { v ->
-                        beforeFadeIn = v * 1000f
+                        beforeFadeIn = v * MAX_FADE_MS
                     },
                     onValueChange = { value ->
                         state.update {
-                            it.copy(fadeInMs = (value * 1000f).coerceIn(0f, 1000f))
+                            it.copy(fadeInMs = (value * MAX_FADE_MS).coerceIn(0f, MAX_FADE_MS))
                         }
                     },
                     onFinishValueChange = { v ->
                         pushStateChange(
                             before = state.value.copy(fadeInMs = beforeFadeIn),
-                            after = state.value.copy(fadeInMs = (v * 1000f).coerceIn(0f, 1000f))
+                            after = state.value.copy(fadeInMs = (v * MAX_FADE_MS).coerceIn(0f, MAX_FADE_MS))
                         )
                     },
                     onResolveTextValue = { text ->
                         val msText = text.removeSuffix("ms").trim().toIntOrNull()
                         msText?.let { ms ->
-                            if (ms in 0..1000) {
+                            if (ms in 0..MAX_FADE_MS.toInt()) {
                                 val before = state.value
                                 state.update {
                                     it.copy(fadeInMs = ms.toFloat())
@@ -150,25 +157,25 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                 TextDial(
                     headline = "Fade Out",
                     text = "${deviceState.fadeOutMs.toInt()} ms",
-                    value = deviceState.fadeOutMs / 1000f,
+                    value = deviceState.fadeOutMs / MAX_FADE_MS,
                     onStartValueChange = { v ->
-                        beforeFadeOut = v * 1000f
+                        beforeFadeOut = v * MAX_FADE_MS
                     },
                     onValueChange = { value ->
                         state.update {
-                            it.copy(fadeOutMs = (value * 1000f).coerceIn(0f, 1000f))
+                            it.copy(fadeOutMs = (value * MAX_FADE_MS).coerceIn(0f, MAX_FADE_MS))
                         }
                     },
                     onFinishValueChange = { v ->
                         pushStateChange(
                             before = state.value.copy(fadeOutMs = beforeFadeOut),
-                            after = state.value.copy(fadeOutMs = (v * 1000f).coerceIn(0f, 1000f))
+                            after = state.value.copy(fadeOutMs = (v * MAX_FADE_MS).coerceIn(0f, MAX_FADE_MS))
                         )
                     },
                     onResolveTextValue = { text ->
                         val msText = text.removeSuffix("ms").trim().toIntOrNull()
                         msText?.let { ms ->
-                            if (ms in 0..1000) {
+                            if (ms in 0..MAX_FADE_MS.toInt()) {
                                 val before = state.value
                                 state.update {
                                     it.copy(fadeOutMs = ms.toFloat())
@@ -183,25 +190,25 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                 TextDial(
                     headline = "Volume",
                     text = "${if (deviceState.volumeDb >= 0) "+" else ""}${String.format("%.1f", deviceState.volumeDb)} dB",
-                    value = (deviceState.volumeDb + 24f) / 48f,
+                    value = (deviceState.volumeDb - VOLUME_MIN_DB) / VOLUME_RANGE_DB,
                     onStartValueChange = { v ->
-                        beforeVolume = (v * 48f) - 24f
+                        beforeVolume = (v * VOLUME_RANGE_DB) + VOLUME_MIN_DB
                     },
                     onValueChange = { value ->
                         state.update {
-                            it.copy(volumeDb = ((value * 48f) - 24f).coerceIn(-24f, 24f))
+                            it.copy(volumeDb = ((value * VOLUME_RANGE_DB) + VOLUME_MIN_DB).coerceIn(VOLUME_MIN_DB, VOLUME_MAX_DB))
                         }
                     },
                     onFinishValueChange = { v ->
                         pushStateChange(
                             before = state.value.copy(volumeDb = beforeVolume),
-                            after = state.value.copy(volumeDb = ((v * 48f) - 24f).coerceIn(-24f, 24f))
+                            after = state.value.copy(volumeDb = ((v * VOLUME_RANGE_DB) + VOLUME_MIN_DB).coerceIn(VOLUME_MIN_DB, VOLUME_MAX_DB))
                         )
                     },
                     onResolveTextValue = { text ->
                         val dbText = text.replace("dB", "").replace("+", "").trim().toFloatOrNull()
                         dbText?.let { db ->
-                            if (db in -24f..24f) {
+                            if (db in VOLUME_MIN_DB..VOLUME_MAX_DB) {
                                 val before = state.value
                                 state.update {
                                     it.copy(volumeDb = db)
@@ -363,7 +370,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                     16 -> {
                         val lo = data[offset].toInt() and 0xFF
                         val hi = data[offset + 1].toInt() shl 8
-                        val sample = (lo or hi).toShort().toInt()
+                        val sample = (hi or lo).toShort().toInt()
                         val amplified = (sample * gain).toInt().coerceIn(-32768, 32767)
                         data[offset] = (amplified and 0xFF).toByte()
                         data[offset + 1] = ((amplified shr 8) and 0xFF).toByte()
