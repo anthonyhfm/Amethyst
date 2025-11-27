@@ -137,76 +137,96 @@ data class MidiEntry(
     val notes: List<MidiNote> = emptyList(),
     val name: String = "MIDI Clip"
 ) : TimelineEntry {
-    private val activeNotes = mutableMapOf<Int, Long>() // pitch to note-on timestamp
+    @kotlinx.serialization.Transient
+    private val activeJobOwner = Any() // Unique owner for scheduled jobs
+
+    // Convert pitch to XY coordinates for launchpad (same logic as PianoRoll)
+    private fun pitchToXY(pitch: Int): Pair<Int, Int> {
+        val localPitch = pitch % 100
+        val x = localPitch % 10
+        val y = localPitch / 10
+        return Pair(x, y)
+    }
 
     override fun start(startAt: Long?) {
-        val actualStartTime = startAt ?: startTimeMs
+        // Cancel any existing scheduled jobs for this clip
+        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.cancelJobsForOwner(activeJobOwner)
+
         val offsetMs = if (startAt != null && startAt > startTimeMs) {
             startAt - startTimeMs
         } else {
             0L
         }
 
-        // Find notes that should be playing at the start time
+        // Schedule all note-on and note-off events
         notes.forEach { note ->
             val noteStartInClip = note.startTimeMs
             val noteEndInClip = note.startTimeMs + note.durationMs
             
-            if (offsetMs >= noteStartInClip && offsetMs < noteEndInClip) {
-                // Note should already be playing
-                // sendNoteOn(note.pitch, note.velocity)
-                println("MIDI Note ON at ${actualStartTime} ms (offset ${offsetMs} ms): pitch=${note.pitch}")
-                activeNotes[note.pitch] = actualStartTime
+            // Schedule note-on
+            if (noteStartInClip >= offsetMs) {
+                val delayMs = noteStartInClip - offsetMs
+                dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
+                    sendNoteOn(note)
+                }
+            } else if (noteEndInClip > offsetMs) {
+                // Note should already be playing, turn it on immediately
+                sendNoteOn(note)
+            }
+
+            // Schedule note-off
+            if (noteEndInClip > offsetMs) {
+                val delayMs = noteEndInClip - offsetMs
+                dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
+                    sendNoteOff(note)
+                }
             }
         }
-        
-        println("Started MIDI entry: $name at ${actualStartTime}ms with offset ${offsetMs}ms - ${notes.size} notes")
     }
 
     override fun stop() {
-        // Send note-off for all active notes
-        activeNotes.keys.forEach { pitch ->
-            sendNoteOff(pitch)
+        // Cancel all scheduled jobs for this clip
+        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.cancelJobsForOwner(activeJobOwner)
+
+        // Turn off all LEDs immediately
+        notes.forEach { note ->
+            sendNoteOff(note)
         }
-        activeNotes.clear()
-        println("Stopped MIDI entry: $name")
     }
 
     /**
      * Process MIDI notes at a given playback position
+     * Note: With Heaven.schedule(), this method may not be needed anymore
      */
     fun processAtTime(currentTimeMs: Long) {
-        val clipOffsetMs = currentTimeMs - startTimeMs
-        if (clipOffsetMs < 0 || clipOffsetMs >= durationMs) return
-
-        notes.forEach { note ->
-            val noteStart = note.startTimeMs
-            val noteEnd = note.startTimeMs + note.durationMs
-
-            if (clipOffsetMs >= noteStart && clipOffsetMs < noteEnd) {
-                // Note should be on
-                if (!activeNotes.containsKey(note.pitch)) {
-                    // sendNoteOn(note.pitch, note.velocity)
-
-                    println("MIDI Note ON at $currentTimeMs ms: pitch=${note.pitch}")
-                    activeNotes[note.pitch] = currentTimeMs
-                }
-            } else if (activeNotes.containsKey(note.pitch)) {
-                // Note should be off
-                sendNoteOff(note.pitch)
-                activeNotes.remove(note.pitch)
-            }
-        }
+        // This method is called by TimelineRepository but with Heaven.schedule()
+        // all note events are already scheduled, so we might not need to do anything here
     }
 
-    private fun sendNoteOn(pitch: Int, velocity: Int) {
-        // TODO: Integrate with MIDI output system
-        println("MIDI Note ON: pitch=$pitch, velocity=$velocity")
+    private fun sendNoteOn(note: MidiNote) {
+        val (x, y) = pitchToXY(note.pitch)
+        val signal = Signal.LED(
+            origin = activeJobOwner,
+            x = x,
+            y = y,
+            color = androidx.compose.ui.graphics.Color(note.led.red, note.led.green, note.led.blue),
+            layer = note.led.layer,
+            blendingMode = note.led.blendingMode
+        )
+        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.midiEnter(listOf(signal))
     }
 
-    private fun sendNoteOff(pitch: Int) {
-        // TODO: Integrate with MIDI output system
-        println("MIDI Note OFF: pitch=$pitch")
+    private fun sendNoteOff(note: MidiNote) {
+        val (x, y) = pitchToXY(note.pitch)
+        val signal = Signal.LED(
+            origin = activeJobOwner,
+            x = x,
+            y = y,
+            color = androidx.compose.ui.graphics.Color.Black,
+            layer = note.led.layer,
+            blendingMode = note.led.blendingMode
+        )
+        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.midiEnter(listOf(signal))
     }
 }
 

@@ -25,7 +25,6 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -57,7 +56,10 @@ private const val MS_PER_BEAT: Long = 500L
 private enum class GridResolution(val snapDivisionsPerBeat: Int, val subBeatsPerBeat: Int) {
     Quarter(snapDivisionsPerBeat = 4, subBeatsPerBeat = 1),
     Eighth(snapDivisionsPerBeat = 8, subBeatsPerBeat = 2),
-    Sixteenth(snapDivisionsPerBeat = 16, subBeatsPerBeat = 4)
+    Sixteenth(snapDivisionsPerBeat = 16, subBeatsPerBeat = 4),
+    ThirtySecond(snapDivisionsPerBeat = 32, subBeatsPerBeat = 8),
+    SixtyFourth(snapDivisionsPerBeat = 64, subBeatsPerBeat = 16),
+    OneTwentyEighth(snapDivisionsPerBeat = 128, subBeatsPerBeat = 32),
 }
 
 private class PianoRollMetrics(
@@ -107,6 +109,15 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     var multiSelectModifierDown by mutableStateOf(false)
 
+    private fun pitchToXY(pitch: Int): Pair<Int, Int> {
+        val launchpadIndex = pitch / 100
+        val localPitch = pitch % 100
+        val x = localPitch % 10
+        val y = localPitch / 10
+        return Pair(x, y)
+    }
+
+    @OptIn(kotlin.time.ExperimentalTime::class)
     @Composable
     fun ModeContent(paddingValues: PaddingValues) {
         val entry = currentEntry ?: return
@@ -129,7 +140,10 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
         fun resolutionForZoom(z: Float): GridResolution = when {
             z < 1.5f -> GridResolution.Quarter
             z < 2.5f -> GridResolution.Eighth
-            else -> GridResolution.Sixteenth
+            z < 4f -> GridResolution.Sixteenth
+            z < 6f -> GridResolution.ThirtySecond
+            z < 9f -> GridResolution.SixtyFourth
+            else -> GridResolution.OneTwentyEighth
         }
 
         Row(
@@ -146,6 +160,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     .padding(bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -235,7 +250,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 onNoteDelete = onNoteDelete,
                 zoomFactorState = zoomFactor,
                 onZoomFactorChange = { newZoom ->
-                    val clamped = newZoom.coerceIn(0.75f, 4f)
+                    val clamped = newZoom.coerceIn(0.75f, 12f)
 
                     zoomFactor = clamped
                     val targetRes = resolutionForZoom(zoomFactor)
@@ -273,7 +288,10 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         val launchpadCount = Heaven.devices.size.coerceAtLeast(1)
                         val totalPitches = launchpadCount * 100
 
-                        val cellDurationMs = MS_PER_BEAT
+                        // Berechne Zellengröße basierend auf BPM (nicht fest 500ms)
+                        val bpm = WorkspaceRepository.bpm.value
+                        val msPerBeat = (60000.0 / bpm).toLong()
+                        val cellDurationMs = msPerBeat / 4 // Viertelnote
 
                         val pitchDelta = when (event.key) {
                             Key.DirectionUp -> 1
@@ -493,8 +511,8 @@ private fun PianoRollEditor(
                                     val deltaY = change?.scrollDelta?.y ?: 0f
                                     if (isZoomModifier && deltaY != 0f) {
                                         val direction = if (deltaY > 0f) -1f else 1f
-                                        val factor = 1f + 0.12f * direction
-                                        val newZoom = (zoomFactorState * factor).coerceIn(0.75f, 4f)
+                                        val factor = 1f + 0.03f * direction // Sehr smooth zoom
+                                        val newZoom = (zoomFactorState * factor).coerceIn(0.75f, 12f)
                                         onZoomFactorChange(newZoom)
                                         change?.consume()
                                     }
@@ -514,6 +532,7 @@ private fun PianoRollEditor(
                             val lightRow = Color(0xFF242424)
                             val beatLine = Color(0xFF444444)
                             val barLine = Color(0xFF555555)
+                            val quarterCellLine = Color(0xFF2A2A2A) // Kaum sichtbar für Viertel-Zellen
 
                             for (pitch in 0 until totalPitches) {
                                 val y = pitch * metrics.noteHeightPx
@@ -530,6 +549,21 @@ private fun PianoRollEditor(
                                 drawLine(Color(0xFF333333), Offset(0f, y), Offset(widthPx, y), 1f)
                             }
 
+                            // Zeichne Viertel-Zellen Grid-Linien (kaum sichtbar)
+                            val quarterSubdivisions = (clipBeats * 4).roundToInt()
+                            for (quarterIndex in 0..quarterSubdivisions) {
+                                val beatIndex = quarterIndex.toFloat() / 4
+                                val x = beatIndex * metrics.pixelsPerBeatPx
+                                if (x > widthPx) break
+                                drawLine(
+                                    color = quarterCellLine,
+                                    start = Offset(x, 0f),
+                                    end = Offset(x, heightPx),
+                                    strokeWidth = 0.5f
+                                )
+                            }
+
+                            // Zeichne Haupt-Grid-Linien (basierend auf aktuellem Grid)
                             val subdivisionsPerBeat = gridResolution.subBeatsPerBeat
                             val totalSubdivisions = (clipBeats * subdivisionsPerBeat).roundToInt()
                             for (subIndex in 0..totalSubdivisions) {
@@ -564,12 +598,26 @@ private fun PianoRollEditor(
                                 },
                                 onDoubleTap = { offset ->
                                     val pitch = metrics.yPxToPitch(offset.y)
-                                    val subdivisions = gridResolution.subBeatsPerBeat
+
+                                    val currentGridResolution = when {
+                                        zoomFactorState < 1.5f -> GridResolution.Quarter
+                                        zoomFactorState < 2.5f -> GridResolution.Eighth
+                                        zoomFactorState < 4f -> GridResolution.Sixteenth
+                                        zoomFactorState < 6f -> GridResolution.ThirtySecond
+                                        zoomFactorState < 9f -> GridResolution.SixtyFourth
+                                        else -> GridResolution.OneTwentyEighth
+                                    }
+
+                                    val subdivisions = currentGridResolution.subBeatsPerBeat
                                     val cellWidthPx = metrics.pixelsPerBeatPx / subdivisions
                                     val cellIndex = (offset.x / cellWidthPx).toInt().coerceAtLeast(0)
-                                    val startMs = (cellIndex * MS_PER_BEAT / subdivisions)
+
+                                    val bpm = WorkspaceRepository.bpm.value
+                                    val msPerBeat = (60000.0 / bpm).toLong()
+                                    val startMs = (cellIndex * msPerBeat / subdivisions)
+
                                     if (startMs >= entry.durationMs) return@detectTapGestures
-                                    val cellDurationMs = MS_PER_BEAT / subdivisions
+                                    val cellDurationMs = msPerBeat / subdivisions
                                     var durationMs = cellDurationMs
                                     if (startMs + durationMs > entry.durationMs) {
                                         durationMs = (entry.durationMs - startMs).coerceAtLeast(0L)
