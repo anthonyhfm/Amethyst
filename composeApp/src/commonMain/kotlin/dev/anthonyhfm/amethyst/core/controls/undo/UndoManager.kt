@@ -195,6 +195,153 @@ object UndoManager {
                     (device.state as kotlinx.coroutines.flow.MutableStateFlow<dev.anthonyhfm.amethyst.devices.DeviceState>).value = action.beforeState
                     redoStack.add(action)
                 }
+
+                is UndoableAction.PianoRollNoteMove -> {
+                    // Undo: Revert notes to their original state
+                    action.notesAfter.zip(action.notesBefore).forEach { (after, before) ->
+                        action.onNoteUpdate(after, before)
+                    }
+
+                    // Update local state
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+
+                    // Restore selection
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesBefore.forEach { beforeNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                beforeNote
+                            ),
+                            single = false
+                        )
+                    }
+
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteCreation -> {
+                    // Undo: Delete the created note
+                    action.onNoteDelete(action.note)
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(notes = currentEntry.notes.filter { it != action.note })
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteDeletion -> {
+                    // Undo: Re-add deleted notes
+                    action.notes.forEach { note ->
+                        action.onNoteAdd(note)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(notes = currentEntry.notes + action.notes)
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notes.forEach { note ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                note
+                            ),
+                            single = false
+                        )
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteDuplication -> {
+                    // Undo: Delete duplicated notes
+                    action.duplicates.forEach { note ->
+                        action.onNoteDelete(note)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(notes = currentEntry.notes.filter { note ->
+                                !action.duplicates.contains(note)
+                            })
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteResize -> {
+                    // Undo: Revert notes to original size
+                    action.notesAfter.zip(action.notesBefore).forEach { (after, before) ->
+                        action.onNoteUpdate(after, before)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesBefore.forEach { beforeNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                beforeNote
+                            ),
+                            single = false
+                        )
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteColorChange -> {
+                    // Undo: Revert notes to original color
+                    action.notesAfter.zip(action.notesBefore).forEach { (after, before) ->
+                        action.onNoteUpdate(after, before)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesBefore.forEach { beforeNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                beforeNote
+                            ),
+                            single = false
+                        )
+                    }
+                    redoStack.add(action)
+                }
             }
         }
     }
@@ -366,6 +513,161 @@ object UndoManager {
                     @Suppress("UNCHECKED_CAST")
                     val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<dev.anthonyhfm.amethyst.devices.DeviceState>
                     (device.state as kotlinx.coroutines.flow.MutableStateFlow<dev.anthonyhfm.amethyst.devices.DeviceState>).value = action.afterState
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteMove -> {
+                    // Redo: Apply notes to their new state
+                    action.notesBefore.zip(action.notesAfter).forEach { (before, after) ->
+                        action.onNoteUpdate(before, after)
+                    }
+
+                    // Update local state
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+
+                    // Restore selection
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesAfter.forEach { afterNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                afterNote
+                            ),
+                            single = false
+                        )
+                    }
+
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteCreation -> {
+                    // Redo: Re-add the created note
+                    action.onNoteAdd(action.note)
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(notes = currentEntry.notes + action.note)
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                        dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                            action.trackIndex,
+                            action.entryStartMs,
+                            action.note
+                        ),
+                        single = true
+                    )
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteDeletion -> {
+                    // Redo: Delete notes again
+                    action.notes.forEach { note ->
+                        action.onNoteDelete(note)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(notes = currentEntry.notes.filter { note ->
+                                !action.notes.contains(note)
+                            })
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteDuplication -> {
+                    // Redo: Re-add duplicated notes
+                    action.duplicates.forEach { note ->
+                        action.onNoteAdd(note)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(notes = currentEntry.notes + action.duplicates)
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.duplicates.forEach { note ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                note
+                            ),
+                            single = false
+                        )
+                    }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteResize -> {
+                    // Redo: Apply resize again
+                    action.notesBefore.zip(action.notesAfter).forEach { (before, after) ->
+                        action.onNoteUpdate(before, after)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesAfter.forEach { afterNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                afterNote
+                            ),
+                            single = false
+                        )
+                    }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteColorChange -> {
+                    // Redo: Apply color change again
+                    action.notesBefore.zip(action.notesAfter).forEach { (before, after) ->
+                        action.onNoteUpdate(before, after)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesAfter.forEach { afterNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                afterNote
+                            ),
+                            single = false
+                        )
+                    }
                     undoStack.add(action)
                 }
             }

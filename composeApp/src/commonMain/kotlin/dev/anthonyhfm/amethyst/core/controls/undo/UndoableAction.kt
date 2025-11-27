@@ -188,4 +188,64 @@ sealed interface UndoableAction {
         val beforeMode: WorkspaceContract.WorkspaceMode,
         val afterMode: WorkspaceContract.WorkspaceMode
     ) : UndoableAction
+
+    data class PianoRollNoteMove(
+        val trackIndex: Int,
+        val entryStartMs: Long,
+        val notesBefore: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val notesAfter: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val onNoteUpdate: (dev.anthonyhfm.amethyst.timeline.data.MidiNote, dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val currentEntryGetter: () -> dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val currentEntrySetter: (dev.anthonyhfm.amethyst.timeline.data.MidiEntry) -> Unit
+    ) : UndoableAction
+
+    data class PianoRollNoteCreation(
+        val trackIndex: Int,
+        val entryStartMs: Long,
+        val note: dev.anthonyhfm.amethyst.timeline.data.MidiNote,
+        val onNoteAdd: (dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val onNoteDelete: (dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val currentEntryGetter: () -> dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val currentEntrySetter: (dev.anthonyhfm.amethyst.timeline.data.MidiEntry) -> Unit
+    ) : UndoableAction
+
+    data class PianoRollNoteDeletion(
+        val trackIndex: Int,
+        val entryStartMs: Long,
+        val notes: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val onNoteAdd: (dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val onNoteDelete: (dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val currentEntryGetter: () -> dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val currentEntrySetter: (dev.anthonyhfm.amethyst.timeline.data.MidiEntry) -> Unit
+    ) : UndoableAction
+
+    data class PianoRollNoteDuplication(
+        val trackIndex: Int,
+        val entryStartMs: Long,
+        val duplicates: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val onNoteAdd: (dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val onNoteDelete: (dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val currentEntryGetter: () -> dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val currentEntrySetter: (dev.anthonyhfm.amethyst.timeline.data.MidiEntry) -> Unit
+    ) : UndoableAction
+
+    data class PianoRollNoteResize(
+        val trackIndex: Int,
+        val entryStartMs: Long,
+        val notesBefore: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val notesAfter: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val onNoteUpdate: (dev.anthonyhfm.amethyst.timeline.data.MidiNote, dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val currentEntryGetter: () -> dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val currentEntrySetter: (dev.anthonyhfm.amethyst.timeline.data.MidiEntry) -> Unit
+    ) : UndoableAction
+
+    data class PianoRollNoteColorChange(
+        val trackIndex: Int,
+        val entryStartMs: Long,
+        val notesBefore: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val notesAfter: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>,
+        val onNoteUpdate: (dev.anthonyhfm.amethyst.timeline.data.MidiNote, dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
+        val currentEntryGetter: () -> dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val currentEntrySetter: (dev.anthonyhfm.amethyst.timeline.data.MidiEntry) -> Unit
+    ) : UndoableAction
 }
