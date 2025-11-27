@@ -23,6 +23,8 @@ fun WaveformView(
     waveColor: Color = Color.White,
     onSeek: ((Float) -> Unit)? = null,
     zoomLevel: Float? = null,
+    fadeInMs: Float = 0f,
+    fadeOutMs: Float = 0f,
 ) {
     val wave = waveColor
     val baseline = waveColor.copy(alpha = 0.6f)
@@ -104,6 +106,32 @@ fun WaveformView(
                 path = path,
                 color = wave.copy(alpha = 0.6f)
             )
+
+            // Draw fade in overlay
+            if (fadeInMs > 0f) {
+                val durationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
+                val fadeInRatio = (fadeInMs / durationMs).coerceIn(0f, 1f)
+                val fadeInWidth = w * fadeInRatio
+                
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.3f),
+                    topLeft = Offset(0f, 0f),
+                    size = androidx.compose.ui.geometry.Size(fadeInWidth, h)
+                )
+            }
+
+            // Draw fade out overlay
+            if (fadeOutMs > 0f) {
+                val durationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
+                val fadeOutRatio = (fadeOutMs / durationMs).coerceIn(0f, 1f)
+                val fadeOutWidth = w * fadeOutRatio
+                
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.3f),
+                    topLeft = Offset(w - fadeOutWidth, 0f),
+                    size = androidx.compose.ui.geometry.Size(fadeOutWidth, h)
+                )
+            }
         }
     }
 }
