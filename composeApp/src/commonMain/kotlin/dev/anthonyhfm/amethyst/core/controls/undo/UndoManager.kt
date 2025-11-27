@@ -133,6 +133,11 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
+                is UndoableAction.MidiTimelineChange -> {
+                    TimelineRepository.setMidiTrackEntries(action.trackIndex, action.beforeEntries)
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.MultiGroupCreation -> {
                     action.device.removeGroupInternal(action.groupIndex)
                     redoStack.add(action)
@@ -176,6 +181,20 @@ object UndoManager {
                             it.entries[orig.startTimeMs] = orig
                         }
                         TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.MidiTimelineClipSplit -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex)
+                    if (track is dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack || track is dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack) {
+                        val midiTrack = track as dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<dev.anthonyhfm.amethyst.timeline.data.MidiEntry>
+                        action.left?.let { seg -> midiTrack.entries.remove(seg.startTimeMs) }
+                        action.right?.let { seg -> midiTrack.entries.remove(seg.startTimeMs) }
+                        action.original?.let { orig ->
+                            midiTrack.entries[orig.startTimeMs] = orig
+                        }
+                        TimelineRepository.setMidiTrackEntries(action.trackIndex, midiTrack.entries.values.toList())
                     }
                     redoStack.add(action)
                 }
@@ -482,6 +501,11 @@ object UndoManager {
                     undoStack.add(action)
                 }
 
+                is UndoableAction.MidiTimelineChange -> {
+                    TimelineRepository.setMidiTrackEntries(action.trackIndex, action.afterEntries)
+                    undoStack.add(action)
+                }
+
                 is UndoableAction.TimelineClipTrim -> {
                     val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex) as? dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
                     track?.let {
@@ -498,6 +522,17 @@ object UndoManager {
                         action.left?.let { seg -> it.entries[seg.startTimeMs] = seg }
                         action.right?.let { seg -> it.entries[seg.startTimeMs] = seg }
                         TimelineRepository.setTrackEntries(action.trackIndex, it.entries.values.toList())
+                    }
+                    undoStack.add(action)
+                }
+                is UndoableAction.MidiTimelineClipSplit -> {
+                    val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex)
+                    if (track is dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack || track is dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack) {
+                        val midiTrack = track as dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<dev.anthonyhfm.amethyst.timeline.data.MidiEntry>
+                        action.original?.let { orig -> midiTrack.entries.remove(orig.startTimeMs) }
+                        action.left?.let { seg -> midiTrack.entries[seg.startTimeMs] = seg }
+                        action.right?.let { seg -> midiTrack.entries[seg.startTimeMs] = seg }
+                        TimelineRepository.setMidiTrackEntries(action.trackIndex, midiTrack.entries.values.toList())
                     }
                     undoStack.add(action)
                 }
