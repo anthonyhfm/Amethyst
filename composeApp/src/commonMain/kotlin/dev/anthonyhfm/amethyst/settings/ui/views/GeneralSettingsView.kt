@@ -2,8 +2,8 @@ package dev.anthonyhfm.amethyst.settings.ui.views
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,20 +31,24 @@ fun GeneralSettingsView() {
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf(90, 120, 140, 180).forEach { fps ->
-                    Button(
-                        onClick = {
-                            selectedFPS = fps
-                            GlobalSettings.performanceFPS = fps
-                        }
-                    ) {
-                        Text(
-                            text = fps.toString(),
-                            color = if (selectedFPS == fps) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
+                    if (selectedFPS == fps) {
+                        FilledTonalButton(
+                            onClick = {
+                                selectedFPS = fps
+                                GlobalSettings.performanceFPS = fps
                             }
-                        )
+                        ) {
+                            Text(text = fps.toString())
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = {
+                                selectedFPS = fps
+                                GlobalSettings.performanceFPS = fps
+                            }
+                        ) {
+                            Text(text = fps.toString())
+                        }
                     }
                 }
             }
@@ -61,20 +65,24 @@ fun GeneralSettingsView() {
                     0.75f to "75%",
                     1f to "100%"
                 ).forEach { (value, label) ->
-                    Button(
-                        onClick = {
-                            selectedGradientSmoothness = value
-                            GlobalSettings.gradientSmoothness = value
-                        }
-                    ) {
-                        Text(
-                            text = label,
-                            color = if (selectedGradientSmoothness == value) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
+                    if (selectedGradientSmoothness == value) {
+                        FilledTonalButton(
+                            onClick = {
+                                selectedGradientSmoothness = value
+                                GlobalSettings.gradientSmoothness = value
                             }
-                        )
+                        ) {
+                            Text(text = label)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = {
+                                selectedGradientSmoothness = value
+                                GlobalSettings.gradientSmoothness = value
+                            }
+                        ) {
+                            Text(text = label)
+                        }
                     }
                 }
             }

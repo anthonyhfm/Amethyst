@@ -20,8 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.util.Platform
-import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.SettingsDialog
@@ -80,11 +78,9 @@ fun WorkspaceTopAppBar(
         }
     }
 
-    // Show settings dialog on desktop platforms
-    if (platform is Platform.Desktop) {
-        SettingsDialog(
-            visible = showSettingsDialog,
-            onDismiss = { showSettingsDialog = false }
-        )
-    }
+    // Settings dialog - platform implementations handle visibility appropriately
+    SettingsDialog(
+        visible = showSettingsDialog,
+        onDismiss = { showSettingsDialog = false }
+    )
 }
