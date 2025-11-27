@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
+import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlinx.cinterop.*
 import platform.AVFAudio.*
@@ -75,6 +76,7 @@ actual object AudioOutput {
             val err = alloc<ObjCObjectVar<NSError?>>()
             val player = AVAudioPlayer(data = nsData, error = err.ptr)
             if (err.value != null) return null
+            player.volume = GlobalSettings.masterVolume
             player.prepareToPlay()
             player.play()
             activePlayers[id] = PlayerHolder(id, player, audioSignal.origin)

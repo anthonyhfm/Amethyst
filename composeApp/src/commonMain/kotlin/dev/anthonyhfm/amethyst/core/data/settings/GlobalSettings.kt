@@ -42,10 +42,40 @@ object GlobalSettings {
             settings.putFloat("gradientSmoothness", value)
         }
 
+    var masterVolume: Float
+        get() = settings.getFloat("masterVolume", 1f)
+        set(value) {
+            settings.putFloat("masterVolume", value.coerceIn(0f, 1f))
+        }
+
     var enableDiscordRPC: Boolean
         get() = settings.getBoolean("enableDiscordRPC", true)
         set(value) {
             settings.putBoolean("enableDiscordRPC", value)
+        }
+
+    var showCurrentProject: Boolean
+        get() = settings.getBoolean("showCurrentProject", true)
+        set(value) {
+            settings.putBoolean("showCurrentProject", value)
+        }
+
+    var showCurrentWorkspaceState: Boolean
+        get() = settings.getBoolean("showCurrentWorkspaceState", true)
+        set(value) {
+            settings.putBoolean("showCurrentWorkspaceState", value)
+        }
+
+    var experimentalAbletonPush2Support: Boolean
+        get() = settings.getBoolean("experimentalAbletonPush2Support", false)
+        set(value) {
+            settings.putBoolean("experimentalAbletonPush2Support", value)
+        }
+
+    var experimentalApolloConversionSupport: Boolean
+        get() = settings.getBoolean("experimentalApolloConversionSupport", false)
+        set(value) {
+            settings.putBoolean("experimentalApolloConversionSupport", value)
         }
 
     // Persisted recent colors using a serializable RGB data class
