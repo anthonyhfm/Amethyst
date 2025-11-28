@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
 data class ProjectSpecials(
     /**
-     * Whether the project uses the Kaskobi page switcher.
+     * If kaskobis page switcher was used in the project. It does super weird stuff in ableton
      */
-    val useKaskobiPageSwitcher: Boolean = false,
+    val kaskobiWeirdAssPageSwitch: Boolean = false,
 )

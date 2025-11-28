@@ -23,7 +23,8 @@ import io.github.vinceglb.filekit.PlatformFile
 class DrumGroupDeviceAdapter(
     private val xml: XmlElement,
     val offset: IntOffset = IntOffset.Zero,
-    val outputOffset: IntOffset = IntOffset.Zero
+    val outputOffset: IntOffset = IntOffset.Zero,
+    private val chainDepth: Int = 0
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<XmlElement> = xml.localQuerySelector("Branches").first().children
@@ -143,7 +144,8 @@ class DrumGroupDeviceAdapter(
                                             resolveAdapter(
                                                 xml = child,
                                                 offset = offset,
-                                                outputOffset = outputOffset
+                                                outputOffset = outputOffset,
+                                                chainDepth = chainDepth + 1
                                             )?.toDeviceStates()?.firstOrNull()
                                         }
                                 )

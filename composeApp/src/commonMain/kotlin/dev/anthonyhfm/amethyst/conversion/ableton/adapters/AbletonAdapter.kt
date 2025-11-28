@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.DrumGroupDeviceAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGroupAdapter
@@ -23,20 +22,23 @@ abstract class AbletonAdapter {
         fun resolveAdapter(
             xml: XmlElement,
             offset: IntOffset = IntOffset.Zero,
-            outputOffset: IntOffset = IntOffset.Zero
+            outputOffset: IntOffset = IntOffset.Zero,
+            chainDepth: Int = 0,
         ): AbletonAdapter? {
             try {
                 return when (xml.name) {
                     "MidiEffectGroupDevice", "InstrumentGroupDevice" -> MidiEffectGroupAdapter(
                         xml = xml,
                         offset = offset,
-                        outputOffset = outputOffset
+                        outputOffset = outputOffset,
+                        chainDepth = chainDepth
                     )
 
                     "DrumGroupDevice" -> DrumGroupDeviceAdapter(
                         xml = xml,
                         offset = offset,
-                        outputOffset = outputOffset
+                        outputOffset = outputOffset,
+                        chainDepth = chainDepth
                     )
 
                     "OriginalSimpler" -> OriginalSimplerAdapter(xml)

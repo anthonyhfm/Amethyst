@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GridFilterAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.PageSwitcherAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator1Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator3Adapter
@@ -108,13 +109,12 @@ class MxDeviceMidiEffectAdapter(
                     return InfinityAdapter().toDeviceStates()
                 }
 
-                "feecaed62c2637a73325446a1ed1e25e" -> {
-                    println("Pager hash detected: $hash")
+                "220a5d8ae9bd63f21c8292c03774ef90" -> {
                     AbletonConverter.special = ProjectSpecials(
-                        useKaskobiPageSwitcher = true
+                        kaskobiWeirdAssPageSwitch = true
                     )
 
-                    return emptyList()
+                    return PageSwitcherAdapter(readDataBlob(blob.text!!)).toDeviceStates()
                 }
 
                 "6257e885f06b1c1fb6258b1066497244" -> { // Resonator 3.0.0

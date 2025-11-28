@@ -341,7 +341,7 @@ interface Resonator3Prototype {
     val down: List<Int>
     val downLeft: List<Int>
     val downRight: List<Int>
-    val launchpadPosition: List<Int>
+    val launchpadPosition: List<Float>
     val left: List<Int>
     val right: List<Int>
     val singleLED: List<Int>
@@ -366,7 +366,7 @@ private data class Resonator3Data(
     @SerialName("pictctrl[4]")
     override val downRight: List<Int> = listOf(0),
     @SerialName("Launchpad Position")
-    override val launchpadPosition: List<Int> = listOf(0),
+    override val launchpadPosition: List<Float> = listOf(0f),
     @SerialName("pictctrl[8]")
     override val left: List<Int> = listOf(0),
     @SerialName("pictctrl[9]")
@@ -398,7 +398,7 @@ private data class Resonator301Data(
     @SerialName("DownRight")
     override val downRight: List<Int> = listOf(0),
     @SerialName("Launchpad Position")
-    override val launchpadPosition: List<Int> = listOf(0),
+    override val launchpadPosition: List<Float> = listOf(0f),
     @SerialName("Left")
     override val left: List<Int> = listOf(0),
     @SerialName("Right")

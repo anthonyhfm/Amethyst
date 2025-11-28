@@ -27,7 +27,8 @@ import io.github.vinceglb.filekit.PlatformFile
 class MidiEffectGroupAdapter(
     private val xml: XmlElement,
     private val offset: IntOffset = IntOffset.Zero,
-    private val outputOffset: IntOffset = IntOffset.Zero
+    private val outputOffset: IntOffset = IntOffset.Zero,
+    private val chainDepth: Int = 0
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<XmlElement> = xml.localQuerySelector("Branches").first().children
@@ -79,7 +80,7 @@ class MidiEffectGroupAdapter(
                             val minKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 0
                             val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127
 
-                            if (hasChains || AbletonConverter.special.useKaskobiPageSwitcher) {
+                            if (hasChains || (AbletonConverter.special.kaskobiWeirdAssPageSwitch && chainDepth == 0)) {
                                 if (maxMacro - minMacro == 0) {
                                     add(
                                         MacroFilterChainDeviceState(
@@ -218,7 +219,8 @@ class MidiEffectGroupAdapter(
                                         resolveAdapter(
                                             xml = child,
                                             offset = offset,
-                                            outputOffset = outputOffset
+                                            outputOffset = outputOffset,
+                                            chainDepth = chainDepth + 1
                                         )?.toDeviceStates()?.firstOrNull()
                                     }
                             )
