@@ -23,9 +23,10 @@ actual fun SettingsDialog(visible: Boolean, onDismiss: () -> Unit) {
         },
         title = "Settings",
         state = rememberDialogState(
-            width = 400.dp,
-            height = 450.dp
-        )
+            width = 550.dp,
+            height = 600.dp,
+        ),
+        resizable = false
     ) {
         if(DesktopPlatform.get() == DesktopPlatform.MacOS) {
             window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)

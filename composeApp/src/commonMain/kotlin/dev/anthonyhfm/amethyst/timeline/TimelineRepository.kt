@@ -99,6 +99,7 @@ object TimelineRepository {
                     }
                 }
             }
+
             is MidiTimelineTrack -> {
                 MidiTimelineTrack().apply {
                     original.entries.forEach { (key, entry) ->
@@ -106,13 +107,7 @@ object TimelineRepository {
                     }
                 }
             }
-            is LightsTimelineTrack -> {
-                LightsTimelineTrack().apply {
-                    original.entries.forEach { (key, entry) ->
-                        entries[key] = entry.copy()
-                    }
-                }
-            }
+
             else -> return null
         }
         
@@ -317,17 +312,14 @@ object TimelineRepository {
     fun setMidiTrackEntries(trackIndex: Int, midiEntries: List<MidiEntry>) {
         val current = tracks.value.toMutableList()
         val track = current.getOrNull(trackIndex)
-        if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+        if (track !is MidiTimelineTrack) return
         
         val midiTrack = track as TimelineTrack<MidiEntry>
         midiTrack.entries.clear()
         midiEntries.sortedBy { it.startTimeMs }.forEach { e -> midiTrack.entries[e.startTimeMs] = e }
 
-        val newTrack = if (track is MidiTimelineTrack) {
-            MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        } else {
-            LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        }
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+
         current[trackIndex] = newTrack
         tracks.value = current.toList()
         rebuildSortedEntries()

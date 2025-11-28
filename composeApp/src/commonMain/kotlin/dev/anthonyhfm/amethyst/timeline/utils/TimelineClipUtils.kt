@@ -8,7 +8,6 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 
 object TimelineClipUtils {
@@ -21,7 +20,7 @@ object TimelineClipUtils {
         
         return when (track) {
             is AudioTimelineTrack -> cutAudioAtSelection(trackIndex, track, cutTimeMs)
-            is MidiTimelineTrack, is LightsTimelineTrack -> cutMidiAtSelection(trackIndex, track, cutTimeMs)
+            is MidiTimelineTrack -> cutMidiAtSelection(trackIndex, track, cutTimeMs)
             else -> false
         }
     }
@@ -131,7 +130,7 @@ object TimelineClipUtils {
             notes = notesInSecond
         )
         
-        replaceMidiClip(trackIndex, clip, first, second, track is LightsTimelineTrack)
+        replaceMidiClip(trackIndex, clip, first, second)
         return true
     }
 
@@ -144,7 +143,7 @@ object TimelineClipUtils {
         val newTrack = AudioTimelineTrack().apply { entries.putAll(audioTrack.entries) }
         currentTracks[trackIndex] = newTrack
         TimelineRepository.tracks.value = currentTracks.toList()
-        // Undo Action hinzufügen
+
         UndoManager.addAction(
             UndoableAction.TimelineClipSplit(
                 trackIndex = trackIndex,
@@ -155,25 +154,22 @@ object TimelineClipUtils {
         )
     }
 
-    private fun replaceMidiClip(trackIndex: Int, original: MidiEntry, first: MidiEntry, second: MidiEntry, isLightsTrack: Boolean) {
+    private fun replaceMidiClip(trackIndex: Int, original: MidiEntry, first: MidiEntry, second: MidiEntry) {
         val currentTracks = TimelineRepository.tracks.value.toMutableList()
         val track = currentTracks[trackIndex]
-        if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+
+        if (track !is MidiTimelineTrack) return
         
         val midiTrack = track as TimelineTrack<MidiEntry>
         midiTrack.entries.remove(original.startTimeMs)
         midiTrack.entries[first.startTimeMs] = first
         midiTrack.entries[second.startTimeMs] = second
         
-        val newTrack = if (isLightsTrack) {
-            LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        } else {
-            MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        }
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+
         currentTracks[trackIndex] = newTrack
         TimelineRepository.tracks.value = currentTracks.toList()
         
-        // Add undo action
         UndoManager.addAction(
             UndoableAction.MidiTimelineClipSplit(
                 trackIndex = trackIndex,

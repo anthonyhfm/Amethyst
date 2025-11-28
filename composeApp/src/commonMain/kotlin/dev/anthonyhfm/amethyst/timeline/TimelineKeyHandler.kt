@@ -17,7 +17,6 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 
 object TimelineKeyHandler {
@@ -115,7 +114,6 @@ object TimelineKeyHandler {
                 grouped.forEach { (trackIndex, selList) ->
                     val track = TimelineRepository.tracks.value.getOrNull(trackIndex)
                     
-                    // Handle AudioTimelineTrack
                     if (track is AudioTimelineTrack) {
                         val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
 
@@ -135,26 +133,19 @@ object TimelineKeyHandler {
                         current[trackIndex] = newTrack
                         TimelineRepository.tracks.value = current.toList()
                         UndoManager.addAction(UndoableAction.TimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
-                    }
-                    // Handle MidiTimelineTrack and LightsTimelineTrack
-                    else if (track is dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack || track is dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack) {
-                        val midiTrack = track as dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<dev.anthonyhfm.amethyst.timeline.data.MidiEntry>
-                        val before = midiTrack.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+                    } else if (track is MidiTimelineTrack) {
+                        val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
 
                         selList.sortedBy { it.entryStartMs }.forEach { sel ->
-                            val original = midiTrack.entries[sel.entryStartMs] ?: return@forEach
+                            val original = track.entries[sel.entryStartMs] ?: return@forEach
                             val duplicateStart = original.endTimeMs
                             val duplicate = original.copy(startTimeMs = duplicateStart)
-                            midiTrack.entries[duplicate.startTimeMs] = duplicate
+                            track.entries[duplicate.startTimeMs] = duplicate
                             newSelections += Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = duplicate.startTimeMs)
                         }
-                        val after = midiTrack.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+                        val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
                         val current = TimelineRepository.tracks.value.toMutableList()
-                        val newTrack = if (track is dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack) {
-                            dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-                        } else {
-                            dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-                        }
+                        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
                         current[trackIndex] = newTrack
                         TimelineRepository.tracks.value = current.toList()
                         UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
@@ -281,17 +272,13 @@ object TimelineKeyHandler {
                 TimelineRepository.tracks.value = current.toList()
                 UndoManager.addAction(UndoableAction.TimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
             }
-            is MidiTimelineTrack, is LightsTimelineTrack -> {
-                val midiTrack = track as TimelineTrack<MidiEntry>
-                val before = midiTrack.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
-                entryStartTimes.forEach { midiTrack.entries.remove(it) }
-                val after = midiTrack.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+            is MidiTimelineTrack -> {
+                val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+                entryStartTimes.forEach { track.entries.remove(it) }
+                val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
                 val current = TimelineRepository.tracks.value.toMutableList()
-                val newTrack = if (track is MidiTimelineTrack) {
-                    MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-                } else {
-                    LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-                }
+                val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+
                 current[trackIndex] = newTrack
                 TimelineRepository.tracks.value = current.toList()
                 UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex, beforeEntries = before, afterEntries = after))

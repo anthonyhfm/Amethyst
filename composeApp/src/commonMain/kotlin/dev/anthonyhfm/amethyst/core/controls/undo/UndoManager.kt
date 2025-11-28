@@ -1,9 +1,13 @@
 package dev.anthonyhfm.amethyst.core.controls.undo
 
+import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 
 object UndoManager {
     private val undoStack: MutableList<UndoableAction> = mutableListOf()
@@ -187,14 +191,13 @@ object UndoManager {
 
                 is UndoableAction.MidiTimelineClipSplit -> {
                     val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex)
-                    if (track is dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack || track is dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack) {
-                        val midiTrack = track as dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<dev.anthonyhfm.amethyst.timeline.data.MidiEntry>
-                        action.left?.let { seg -> midiTrack.entries.remove(seg.startTimeMs) }
-                        action.right?.let { seg -> midiTrack.entries.remove(seg.startTimeMs) }
+                    if (track is MidiTimelineTrack) {
+                        action.left?.let { seg -> track.entries.remove(seg.startTimeMs) }
+                        action.right?.let { seg -> track.entries.remove(seg.startTimeMs) }
                         action.original?.let { orig ->
-                            midiTrack.entries[orig.startTimeMs] = orig
+                            track.entries[orig.startTimeMs] = orig
                         }
-                        TimelineRepository.setMidiTrackEntries(action.trackIndex, midiTrack.entries.values.toList())
+                        TimelineRepository.setMidiTrackEntries(action.trackIndex, track.entries.values.toList())
                     }
                     redoStack.add(action)
                 }
@@ -542,12 +545,11 @@ object UndoManager {
                 }
                 is UndoableAction.MidiTimelineClipSplit -> {
                     val track = TimelineRepository.tracks.value.getOrNull(action.trackIndex)
-                    if (track is dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack || track is dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack) {
-                        val midiTrack = track as dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<dev.anthonyhfm.amethyst.timeline.data.MidiEntry>
-                        action.original?.let { orig -> midiTrack.entries.remove(orig.startTimeMs) }
-                        action.left?.let { seg -> midiTrack.entries[seg.startTimeMs] = seg }
-                        action.right?.let { seg -> midiTrack.entries[seg.startTimeMs] = seg }
-                        TimelineRepository.setMidiTrackEntries(action.trackIndex, midiTrack.entries.values.toList())
+                    if (track is MidiTimelineTrack) {
+                        action.original?.let { orig -> track.entries.remove(orig.startTimeMs) }
+                        action.left?.let { seg -> track.entries[seg.startTimeMs] = seg }
+                        action.right?.let { seg -> track.entries[seg.startTimeMs] = seg }
+                        TimelineRepository.setMidiTrackEntries(action.trackIndex, track.entries.values.toList())
                     }
                     undoStack.add(action)
                 }
@@ -561,8 +563,8 @@ object UndoManager {
                 }
                 is UndoableAction.ChangeDeviceState<*> -> {
                     @Suppress("UNCHECKED_CAST")
-                    val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<dev.anthonyhfm.amethyst.devices.DeviceState>
-                    (device.state as kotlinx.coroutines.flow.MutableStateFlow<dev.anthonyhfm.amethyst.devices.DeviceState>).value = action.afterState
+                    val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<DeviceState>
+                    device.state.value = action.afterState
                     undoStack.add(action)
                 }
 
