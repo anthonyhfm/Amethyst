@@ -50,6 +50,7 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
@@ -182,7 +183,11 @@ fun ExpandingChainDevicePicker(
             )
             .hoverable(interaction)
             .rightClickable {
-                if (clipboard is ClipboardData.ChainDevice) {
+                val isDevice = clipboard is ClipboardData.ChainDevice
+                val isTimelineAudio = clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain
+                val isMidiEntries = clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain
+
+                if (isDevice || isTimelineAudio || isMidiEntries) {
                     showRightClickMenu = true
                 }
 
@@ -191,13 +196,23 @@ fun ExpandingChainDevicePicker(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (clipboard is ClipboardData.ChainDevice) {
+        if (clipboard is ClipboardData.ChainDevice || clipboard is ClipboardData.TimelineAudioEntries) {
             Dropdown(
                 isOpen = showRightClickMenu,
                 offset = rightClickMenuOffset,
                 menu = dropDownMenu {
-                    item("paste", "Paste") {
-                        icon(Icons.Default.ContentPaste)
+                    if (clipboard is ClipboardData.ChainDevice) {
+                        item("paste", "Paste") {
+                            icon(Icons.Default.ContentPaste)
+                        }
+                    } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                        item("paste_audio", "Paste Audio from Timeline") {
+                            icon(Icons.Default.ContentPaste)
+                        }
+                    } else if (clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
+                        item("paste_midi", "Paste Midi from Timeline") {
+                            icon(Icons.Default.ContentPaste)
+                        }
                     }
                 },
                 onItemSelected = {
@@ -211,6 +226,27 @@ fun ExpandingChainDevicePicker(
                                     atIndex = slotIndex
                                 )
                             }
+                        }
+
+                        "paste_audio" -> {
+                            (clipboard as ClipboardData.TimelineAudioEntries).entries.fastForEachReversed {
+                                destinationChain.add(
+                                    device = StateChain.unpackDevice(
+                                        device = ClipChainDeviceState(
+                                            fileName = it.fileName,
+                                            rawData = it.rawData,
+                                            sampleRate = it.sampleRate,
+                                            channels = it.channels,
+                                            bitDepth = it.bitDepth,
+                                            isLoaded = true,
+                                        )
+                                    )
+                                )
+                            }
+                        }
+
+                        "paste_midi" -> {
+
                         }
                     }
 
