@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlin.math.pow
 
 class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
     override val state = MutableStateFlow(ClipChainDeviceState())
@@ -88,7 +89,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
 
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
         ) {
             Box(
                 modifier = Modifier
@@ -198,7 +199,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                 var beforeVolume = deviceState.volumeDb
                 TextDial(
                     headline = "Volume",
-                    text = "${if (deviceState.volumeDb >= 0) "+" else ""}${String.format("%.1f", deviceState.volumeDb)} dB",
+                    text = "${if (deviceState.volumeDb >= 0) "+" else ""}${deviceState.volumeDb} dB",
                     value = (deviceState.volumeDb - VOLUME_MIN_DB) / VOLUME_RANGE_DB,
                     onStartValueChange = { v ->
                         beforeVolume = deviceState.volumeDb
@@ -361,8 +362,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
         val fadeOutFrames = ((fadeOutMs / 1000f) * sampleRate).toInt().coerceAtMost(activeFrames)
         val fadeOutStartFrame = activeFrames - fadeOutFrames
         
-        // Calculate volume gain (dB to linear)
-        val volumeGain = kotlin.math.pow(10.0, (volumeDb / 20.0)).toFloat()
+        val volumeGain = 10.0.pow(volumeDb / 20.0).toFloat()
 
         for (frame in 0 until activeFrames) {
             var gain = volumeGain
