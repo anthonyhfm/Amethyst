@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
+import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlinx.coroutines.*
 import org.lwjgl.openal.*
@@ -194,7 +195,7 @@ actual object AudioOutput {
             }
 
             AL10.alSourcef(sourceId, AL10.AL_PITCH, 1.0f)
-            AL10.alSourcef(sourceId, AL10.AL_GAIN, 0.9f)
+            AL10.alSourcef(sourceId, AL10.AL_GAIN, 0.9f * GlobalSettings.masterVolume)
             AL10.alSource3f(sourceId, AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
             AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
 
@@ -262,7 +263,7 @@ actual object AudioOutput {
             }
 
             AL10.alSourcef(sourceId, AL10.AL_PITCH, 1.0f)
-            AL10.alSourcef(sourceId, AL10.AL_GAIN, 0.9f)
+            AL10.alSourcef(sourceId, AL10.AL_GAIN, 0.9f * GlobalSettings.masterVolume)
             AL10.alSource3f(sourceId, AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
             AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
 

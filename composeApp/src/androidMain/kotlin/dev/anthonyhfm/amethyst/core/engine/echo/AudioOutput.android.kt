@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
+import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -187,7 +188,7 @@ actual object AudioOutput {
                             val fadeInMul = (frameIdx.toFloat() / fadeFrames).coerceIn(0f, 1f)
                             val fadeOutMul = ((src.totalFrames - frameIdx).toFloat() / fadeFrames).coerceIn(0f, 1f)
                             val fadeMul = min(fadeInMul, fadeOutMul)
-                            val g = (src.gain * fadeMul * headroom).toFloat()
+                            val g = (src.gain * fadeMul * headroom * GlobalSettings.masterVolume).toFloat()
                             accum[mixIdx] = accum[mixIdx] + (l * g).toInt()
                             accum[mixIdx + 1] = accum[mixIdx + 1] + (r * g).toInt()
                             byteOff += 4

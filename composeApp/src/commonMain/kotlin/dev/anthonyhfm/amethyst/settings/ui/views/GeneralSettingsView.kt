@@ -1,59 +1,91 @@
 package dev.anthonyhfm.amethyst.settings.ui.views
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsCategory
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsItem
 
 @Composable
 fun GeneralSettingsView() {
+    var selectedFPS by remember { mutableStateOf(GlobalSettings.performanceFPS) }
+    var selectedGradientSmoothness by remember { mutableStateOf(GlobalSettings.gradientSmoothness) }
+
     SettingsCategory(
         title = "General",
     ) {
         SettingsItem(
-            title = "Updates",
+            title = "Frames per Second (FPS)",
         ) {
-            Button(
-                onClick = {
-
-                }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("Check for updates")
+                listOf(90, 120, 140, 180).forEach { fps ->
+                    if (selectedFPS == fps) {
+                        FilledTonalButton(
+                            onClick = {
+                                selectedFPS = fps
+                                GlobalSettings.performanceFPS = fps
+                            }
+                        ) {
+                            Text(text = fps.toString())
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = {
+                                selectedFPS = fps
+                                GlobalSettings.performanceFPS = fps
+                            }
+                        ) {
+                            Text(text = fps.toString())
+                        }
+                    }
+                }
             }
         }
 
         SettingsItem(
-            title = "Language",
+            title = "Gradient Smoothness",
         ) {
-            Text(
-                text = "Currently not supported",
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            )
-        }
-
-        SettingsItem(
-            title = "Dark Mode",
-        ) {
-            Switch(
-                checked = true,
-                onCheckedChange = {
-
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(
+                    0.5f to "50%",
+                    0.75f to "75%",
+                    1f to "100%"
+                ).forEach { (value, label) ->
+                    if (selectedGradientSmoothness == value) {
+                        FilledTonalButton(
+                            onClick = {
+                                selectedGradientSmoothness = value
+                                GlobalSettings.gradientSmoothness = value
+                            }
+                        ) {
+                            Text(text = label)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = {
+                                selectedGradientSmoothness = value
+                                GlobalSettings.gradientSmoothness = value
+                            }
+                        ) {
+                            Text(text = label)
+                        }
+                    }
                 }
-            )
+            }
         }
     }
 }
