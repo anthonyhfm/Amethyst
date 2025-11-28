@@ -32,7 +32,7 @@ fun AddTrackButton(
     var showDropdown by remember { mutableStateOf(false) }
     
     val trackMenu = dropDownMenu {
-        item("track_lights", "Lights Track") {
+        item("track_midi", "Midi Track") {
             icon(Icons.TwoTone.Lightbulb)
         }
         item("track_audio", "Audio Track") {
@@ -64,7 +64,7 @@ fun AddTrackButton(
             onItemSelected = { selectedItem ->
                 showDropdown = false
                 when (selectedItem) {
-                    "track_lights" -> onAddLightsTrack()
+                    "track_midi" -> onAddLightsTrack()
                     "track_audio" -> onAddAudioTrack()
                 }
             },

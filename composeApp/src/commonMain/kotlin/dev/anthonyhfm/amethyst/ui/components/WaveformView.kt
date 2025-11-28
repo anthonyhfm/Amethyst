@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlin.math.abs
@@ -117,7 +118,6 @@ fun WaveformView(
 
             if (samples.isEmpty() || w <= 1f) return@Canvas
 
-            // Berechne Bucket-Anzahl (abhängig von Breite und optional Zoom)
             val rawBucketCount = (w / bucketWidthPx).toInt().coerceAtLeast(1)
             val zoomFactor = zoomLevel?.coerceAtLeast(0.0001f) ?: 1f
             val adjustedBuckets = (rawBucketCount * zoomFactor).toInt().coerceAtLeast(1)
@@ -192,25 +192,16 @@ fun WaveformView(
                 
                 drawPath(
                     path = fadeInPath,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.6f),
-                            Color.Transparent
-                        ),
-                        startX = startX,
-                        endX = startX + fadeInWidth
-                    )
+                    brush = SolidColor(Color.Black.copy(alpha = 0.6f))
                 )
             }
 
-            // Draw triangular fade out overlay (within active region)
             if (fadeOutMs > 0f && activeWidth > 0f) {
                 val durationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
                 val activeDurationMs = durationMs * (endPosition - startPosition)
                 val fadeOutRatio = (fadeOutMs / activeDurationMs).coerceIn(0f, 1f)
                 val fadeOutWidth = activeWidth * fadeOutRatio
                 
-                // Draw triangular gradient for fade out
                 val fadeOutPath = Path().apply {
                     moveTo(endX - fadeOutWidth, 0f)
                     lineTo(endX, 0f)
@@ -220,27 +211,18 @@ fun WaveformView(
                 
                 drawPath(
                     path = fadeOutPath,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.6f)
-                        ),
-                        startX = endX - fadeOutWidth,
-                        endX = endX
-                    )
+                    brush = SolidColor(Color.Black.copy(alpha = 0.6f))
                 )
             }
             
-            // Draw drag handles for start/end positions
             if (onStartPositionChange != null) {
-                // Start handle
                 drawLine(
                     color = Color.White.copy(alpha = 0.8f),
                     start = Offset(startX, 0f),
                     end = Offset(startX, h),
                     strokeWidth = 3f
                 )
-                // Handle indicator
+
                 drawCircle(
                     color = Color.White,
                     radius = 6f,
@@ -249,14 +231,13 @@ fun WaveformView(
             }
             
             if (onEndPositionChange != null) {
-                // End handle
                 drawLine(
                     color = Color.White.copy(alpha = 0.8f),
                     start = Offset(endX, 0f),
                     end = Offset(endX, h),
                     strokeWidth = 3f
                 )
-                // Handle indicator
+
                 drawCircle(
                     color = Color.White,
                     radius = 6f,

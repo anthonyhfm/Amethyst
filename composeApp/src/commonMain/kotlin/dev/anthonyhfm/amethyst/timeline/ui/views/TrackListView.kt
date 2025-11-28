@@ -25,7 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.ui.components.AddTrackButton
 
@@ -60,7 +60,7 @@ fun TrackInfo(
 ) {
     val trackName = when (track) {
         is AudioTimelineTrack -> "Audio Track ${trackIndex + 1}"
-        is LightsTimelineTrack -> "Lights Track ${trackIndex + 1}"
+        is MidiTimelineTrack -> "Midi Track ${trackIndex + 1}"
         else -> "Track ${trackIndex + 1}"
     }
 
@@ -89,7 +89,7 @@ fun TrackInfo(
         Icon(
             imageVector = when (track) {
                 is AudioTimelineTrack -> Icons.Default.Audiotrack
-                is LightsTimelineTrack -> Icons.Default.Lightbulb
+                is MidiTimelineTrack -> Icons.Default.Lightbulb
                 else -> Icons.Default.Lightbulb
             },
             contentDescription = "Track Type Icon",

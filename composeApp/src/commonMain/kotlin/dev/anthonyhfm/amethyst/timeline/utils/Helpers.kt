@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.timeline.utils
 
 import androidx.compose.foundation.ScrollState
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
@@ -13,7 +12,6 @@ internal fun trackIndexOf(track: TimelineTrack<*>): Int = TimelineRepository.tra
 internal fun isPointInsideAnyEntry(track: TimelineTrack<*>, timeMs: Long): Boolean = when (track) {
     is AudioTimelineTrack -> track.entries.values.any { timeMs in it.startTimeMs..(it.startTimeMs + it.durationMs) }
     is MidiTimelineTrack -> track.entries.values.any { timeMs in it.startTimeMs..it.endTimeMs }
-    is LightsTimelineTrack -> track.entries.values.any { timeMs in it.startTimeMs..it.endTimeMs }
     else -> false
 }
 
@@ -45,22 +43,14 @@ internal fun findHeaderEntryHit(
     headerHeightPx: Float
 ): Long? {
     if (y > headerHeightPx) return null
+
     return when (track) {
-        is AudioTimelineTrack -> track.entries.values.firstOrNull { entry ->
+        is AudioTimelineTrack, is MidiTimelineTrack -> track.entries.values.firstOrNull { entry ->
             val left = entry.startTimeMs.toDouble() * zoom.toDouble() - scrollPx.toDouble()
             val right = left + entry.durationMs.toDouble() * zoom.toDouble()
             x.toDouble() in left..right
         }?.startTimeMs
-        is MidiTimelineTrack -> track.entries.values.firstOrNull { entry ->
-            val left = entry.startTimeMs.toDouble() * zoom.toDouble() - scrollPx.toDouble()
-            val right = left + entry.durationMs.toDouble() * zoom.toDouble()
-            x.toDouble() in left..right
-        }?.startTimeMs
-        is LightsTimelineTrack -> track.entries.values.firstOrNull { entry ->
-            val left = entry.startTimeMs.toDouble() * zoom.toDouble() - scrollPx.toDouble()
-            val right = left + entry.durationMs.toDouble() * zoom.toDouble()
-            x.toDouble() in left..right
-        }?.startTimeMs
+
         else -> null
     }
 }

@@ -26,7 +26,6 @@ import androidx.compose.ui.zIndex
 import io.github.vinceglb.filekit.PlatformFile
 import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
@@ -125,7 +124,7 @@ fun TimelineLane(
                                 lastClickPos = null
                                 change.consume(); continue
                             }
-                            val isLights = track is LightsTimelineTrack
+                            val isLights = track is MidiTimelineTrack
                             val snappedMs = computeSnappedTime(pos.x, zoomLevel, bpm, gridType)
                             val isDouble = isLights && lastClickTime != 0L && (time - lastClickTime) in 1..doubleThresholdMs && lastClickPos?.let { prev ->
                                 val dx = pos.x - prev.x
@@ -279,24 +278,6 @@ fun TimelineLane(
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
                                 isLightsTrack = false,
                                 onDoubleClick = {}
-                            )
-                        }
-                    }
-                }
-                is LightsTimelineTrack -> {
-                    track.entries.values.sortedBy { it.startTimeMs }.forEach { midiEntry ->
-                        androidx.compose.runtime.key(midiEntry.startTimeMs) {
-                            val isSelectedEntry = midiEntry.startTimeMs in selectedEntryStarts
-                            MidiClip(
-                                midiEntry = midiEntry,
-                                zoomLevel = zoomLevel,
-                                isSelected = isSelectedEntry,
-                                onSelectEntry = { onSelectEntry(midiEntry.startTimeMs) },
-                                onMoveEntry = { newStart -> onMoveEntry(midiEntry.startTimeMs, newStart) },
-                                onResizeEntry = { oldStart, newStart, newDuration -> onResizeEntry(oldStart, newStart, newDuration) },
-                                gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
-                                isLightsTrack = true,
-                                onDoubleClick = { onDoubleClickLane(midiEntry.startTimeMs) }
                             )
                         }
                     }

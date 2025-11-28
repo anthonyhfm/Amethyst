@@ -27,7 +27,7 @@ fun TimelineView(
     ) {
         TrackListView(
             tracks = tracks,
-            onAddLightsTrack = { viewModel.addLightsTrack() },
+            onAddLightsTrack = { viewModel.addMidiTrack() },
             onAddAudioTrack = { viewModel.addAudioTrack() }
         )
 
@@ -36,7 +36,7 @@ fun TimelineView(
             scrollState = scrollState,
             selectionViewportRelative = true,
             onDoubleClickLightsLane = { trackIndex, timeMs ->
-                viewModel.onDoubleClickLightsTrack(trackIndex, timeMs)
+                viewModel.onDoubleClickMidiTrack(trackIndex, timeMs)
             }
         )
     }

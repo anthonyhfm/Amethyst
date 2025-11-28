@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import kotlin.math.abs
 import kotlin.math.min
@@ -50,7 +49,6 @@ fun TimelineLaneView(
         when (track) {
             is AudioTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
             is MidiTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
-            is LightsTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
             else -> 0L
         }
     } ?: 0L
@@ -157,12 +155,12 @@ fun TimelineLaneView(
                     onMoveEntry = { oldStart, newStart ->
                         when (track) {
                             is AudioTimelineTrack -> viewModel.moveAudioEntry(index, oldStart, newStart)
-                            is MidiTimelineTrack, is LightsTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
+                            is MidiTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
                         }
                     },
                     onResizeEntry = { oldStart, newStart, newDuration ->
                         when (track) {
-                            is MidiTimelineTrack, is LightsTimelineTrack -> viewModel.resizeMidiEntry(index, oldStart, newStart, newDuration)
+                            is MidiTimelineTrack -> viewModel.resizeMidiEntry(index, oldStart, newStart, newDuration)
                             else -> { /* ignore for audio for now */ }
                         }
                     },

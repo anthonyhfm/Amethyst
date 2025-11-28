@@ -1,7 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.data
 
+import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import kotlinx.serialization.Serializable
 
 interface TimelineEntry {
@@ -28,7 +30,6 @@ data class AudioEntry(
     override fun start(startAt: Long?) {
         val actualStartTime = startAt ?: startTimeMs
 
-        // Calculate trimmed audio data if we're starting at a different position
         val trimmedData = if (startAt != null && startAt > startTimeMs) {
             val offsetMs = startAt - startTimeMs  // Fix: subtract, not add
             trimAudioData(rawData, offsetMs)
@@ -150,7 +151,7 @@ data class MidiEntry(
 
     override fun start(startAt: Long?) {
         // Cancel any existing scheduled jobs for this clip
-        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.cancelJobsForOwner(activeJobOwner)
+        Heaven.cancelJobsForOwner(activeJobOwner)
 
         val offsetMs = if (startAt != null && startAt > startTimeMs) {
             startAt - startTimeMs
@@ -166,7 +167,7 @@ data class MidiEntry(
             // Schedule note-on
             if (noteStartInClip >= offsetMs) {
                 val delayMs = noteStartInClip - offsetMs
-                dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
+                Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
                     sendNoteOn(note)
                 }
             } else if (noteEndInClip > offsetMs) {
@@ -177,7 +178,7 @@ data class MidiEntry(
             // Schedule note-off
             if (noteEndInClip > offsetMs) {
                 val delayMs = noteEndInClip - offsetMs
-                dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
+                Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
                     sendNoteOff(note)
                 }
             }
@@ -186,7 +187,7 @@ data class MidiEntry(
 
     override fun stop() {
         // Cancel all scheduled jobs for this clip
-        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.cancelJobsForOwner(activeJobOwner)
+        Heaven.cancelJobsForOwner(activeJobOwner)
 
         // Turn off all LEDs immediately
         notes.forEach { note ->
@@ -209,11 +210,11 @@ data class MidiEntry(
             origin = activeJobOwner,
             x = x,
             y = y,
-            color = androidx.compose.ui.graphics.Color(note.led.red, note.led.green, note.led.blue),
+            color = Color(note.led.red, note.led.green, note.led.blue),
             layer = note.led.layer,
             blendingMode = note.led.blendingMode
         )
-        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.midiEnter(listOf(signal))
+        Heaven.midiEnter(listOf(signal))
     }
 
     private fun sendNoteOff(note: MidiNote) {
@@ -222,24 +223,11 @@ data class MidiEntry(
             origin = activeJobOwner,
             x = x,
             y = y,
-            color = androidx.compose.ui.graphics.Color.Black,
+            color = Color.Black,
             layer = note.led.layer,
             blendingMode = note.led.blendingMode
         )
-        dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.midiEnter(listOf(signal))
-    }
-}
-
-@Serializable
-data class LightEntry(
-    override val startTimeMs: Long,
-    override val durationMs: Long,
-) : TimelineEntry {
-    override fun start(startAt: Long?) {
-        // Light playback start logic
-    }
-
-    override fun stop() {
-        // Light playback stop logic
+        
+        Heaven.midiEnter(listOf(signal))
     }
 }

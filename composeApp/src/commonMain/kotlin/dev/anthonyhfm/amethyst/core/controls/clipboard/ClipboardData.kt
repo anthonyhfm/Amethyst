@@ -30,12 +30,11 @@ sealed interface ClipboardData {
         val groups: List<Group>
     ) : ClipboardData
 
-    data class TimelineEntries(
+    data class TimelineAudioEntries(
         val entries: List<AudioEntry>
     ) : ClipboardData
 
-    data class MidiEntries(
-        val entries: List<MidiEntry>,
-        val isLightsTrack: Boolean
+    data class TimelineMidiEntries(
+        val entries: List<MidiEntry>
     ) : ClipboardData
 }

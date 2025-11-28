@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.LightsTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
@@ -13,7 +12,6 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.utils.MidiImporter
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -76,7 +74,7 @@ class TimelineViewModel : ViewModel() {
     }
 
     private fun initializeDemoData() {
-        _tracks.value = listOf(AudioTimelineTrack(), LightsTimelineTrack())
+        _tracks.value = listOf(AudioTimelineTrack(), MidiTimelineTrack())
 
         _tracks.value.forEach { track ->
             TimelineRepository.addTrack(track)
@@ -412,19 +410,6 @@ class TimelineViewModel : ViewModel() {
     }
 
     /**
-     * Add a lights track to the timeline
-     */
-    fun addLightsTrack() {
-        viewModelScope.launch {
-            val newTrack = LightsTimelineTrack()
-            val currentTracks = _tracks.value.toMutableList()
-            currentTracks.add(newTrack)
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.addTrack(newTrack)
-        }
-    }
-
-    /**
      * Add a MIDI track to the timeline
      */
     fun addMidiTrack() {
@@ -562,8 +547,8 @@ class TimelineViewModel : ViewModel() {
     /**
      * Handle double-click on lights track to create a new MIDI clip or open existing one
      */
-    fun onDoubleClickLightsTrack(trackIndex: Int, timeMs: Long) {
-        val track = _tracks.value.getOrNull(trackIndex) as? LightsTimelineTrack ?: return
+    fun onDoubleClickMidiTrack(trackIndex: Int, timeMs: Long) {
+        val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
         
         // Check if there's an existing entry at this time
         val existingEntry = track.entries.values.firstOrNull { entry ->
@@ -586,7 +571,7 @@ class TimelineViewModel : ViewModel() {
             track.addEntry(newEntry)
             
             val currentTracks = _tracks.value.toMutableList()
-            val newTrack = LightsTimelineTrack().apply { entries.putAll(track.entries) }
+            val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
             currentTracks[trackIndex] = newTrack
             _tracks.value = currentTracks.toList()
             TimelineRepository.tracks.value = currentTracks.toList()
@@ -595,7 +580,6 @@ class TimelineViewModel : ViewModel() {
             
             println("Created new lights clip at ${timeMs}ms on track $trackIndex")
             
-            // Open Piano Roll for the new entry
             openPianoRollForEntry(trackIndex, newEntry)
         }
     }
@@ -640,7 +624,7 @@ class TimelineViewModel : ViewModel() {
         val currentTracks = _tracks.value.toMutableList()
         val track = currentTracks.getOrNull(trackIndex)
         
-        if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+        if (track !is MidiTimelineTrack) return
         
         val midiTrack = track as TimelineTrack<MidiEntry>
         val entry = midiTrack.entries.remove(oldStartMs) ?: return
@@ -654,12 +638,7 @@ class TimelineViewModel : ViewModel() {
         val movedEntry = entry.copy(startTimeMs = snappedStart)
         midiTrack.entries[snappedStart] = movedEntry
         
-        // Update track
-        val newTrack = if (track is MidiTimelineTrack) {
-            MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        } else {
-            LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        }
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
         currentTracks[trackIndex] = newTrack
         _tracks.value = currentTracks.toList()
         TimelineRepository.tracks.value = currentTracks.toList()
@@ -674,22 +653,17 @@ class TimelineViewModel : ViewModel() {
         val currentTracks = _tracks.value.toMutableList()
         val track = currentTracks.getOrNull(trackIndex)
         
-        if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+        if (track !is MidiTimelineTrack) return
         
-        val midiTrack = track as TimelineTrack<MidiEntry>
-        val entry = midiTrack.entries[entryStartMs] ?: return
+        val entry = track.entries[entryStartMs] ?: return
         
         // Place duplicate right after the original
         val newStartMs = entry.endTimeMs
         val duplicatedEntry = entry.copy(startTimeMs = newStartMs)
-        midiTrack.entries[newStartMs] = duplicatedEntry
+        track.entries[newStartMs] = duplicatedEntry
         
         // Update track
-        val newTrack = if (track is MidiTimelineTrack) {
-            MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        } else {
-            LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-        }
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
         currentTracks[trackIndex] = newTrack
         _tracks.value = currentTracks.toList()
         TimelineRepository.tracks.value = currentTracks.toList()
@@ -700,23 +674,19 @@ class TimelineViewModel : ViewModel() {
     private fun updateMidiEntry(trackIndex: Int, entryStartMs: Long, transform: (MidiEntry) -> MidiEntry) {
         val currentTracks = _tracks.value.toMutableList()
         val track = currentTracks.getOrNull(trackIndex)
-        val isMidi = track is MidiTimelineTrack || track is LightsTimelineTrack
+        val isMidi = track is MidiTimelineTrack
         if (!isMidi) return
         val midiTrack = track as TimelineTrack<MidiEntry>
         val entry = midiTrack.entries[entryStartMs] ?: return
         val updated = transform(entry)
         midiTrack.entries[entryStartMs] = updated
-        // Adjust duration if notes extend beyond clip
+
         val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.durationMs
         val newDuration = maxEnd.coerceAtLeast(updated.durationMs)
         if (newDuration != updated.durationMs) {
             midiTrack.entries[entryStartMs] = updated.copy(durationMs = newDuration)
         }
-        val newTrackInstance = when (track) {
-            is MidiTimelineTrack -> MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-            is LightsTimelineTrack -> LightsTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-            else -> return
-        }
+        val newTrackInstance = MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
         currentTracks[trackIndex] = newTrackInstance
         _tracks.value = currentTracks.toList(); TimelineRepository.tracks.value = currentTracks.toList()
         // Update Piano Roll mode entry if open
@@ -746,7 +716,7 @@ class TimelineViewModel : ViewModel() {
     fun resizeMidiEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long, newDurationMs: Long) {
         val currentTracks = _tracks.value.toMutableList()
         val track = currentTracks.getOrNull(trackIndex)
-        if (track !is MidiTimelineTrack && track !is LightsTimelineTrack) return
+        if (track !is MidiTimelineTrack) return
         val timelineTrack = track as TimelineTrack<MidiEntry>
         val entry = timelineTrack.entries[oldStartMs] ?: return
 
@@ -768,11 +738,8 @@ class TimelineViewModel : ViewModel() {
             timelineTrack.entries[newStartMs] = updated.copy(durationMs = finalDuration)
         }
 
-        val newTrackInstance = when (track) {
-            is MidiTimelineTrack -> MidiTimelineTrack().apply { entries.putAll(timelineTrack.entries) }
-            is LightsTimelineTrack -> LightsTimelineTrack().apply { entries.putAll(timelineTrack.entries) }
-            else -> return
-        }
+        val newTrackInstance = MidiTimelineTrack().apply { entries.putAll(timelineTrack.entries) }
+
         currentTracks[trackIndex] = newTrackInstance
         _tracks.value = currentTracks.toList(); TimelineRepository.tracks.value = currentTracks.toList()
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newStartMs))
