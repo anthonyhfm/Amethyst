@@ -69,7 +69,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
             modifier = Modifier
                 .width(
                     width = if (deviceState.isLoaded) {
-                        500.dp
+                        450.dp
                     } else {
                         200.dp
                     }
@@ -90,12 +90,13 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(4.dp)
         ) {
             Box(
                 modifier = Modifier
+                    .padding(4.dp)
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(8.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             ) {
@@ -124,7 +125,6 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
 
             Row(
                 modifier = Modifier
-                    .height(80.dp)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
