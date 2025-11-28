@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,7 +80,14 @@ fun WorkspaceChainEditor(
 
     Column(
         modifier = Modifier
-            .padding(12.dp),
+            .padding(12.dp)
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = {
+                    SelectionManager.clear()
+                }
+            ),
 
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
