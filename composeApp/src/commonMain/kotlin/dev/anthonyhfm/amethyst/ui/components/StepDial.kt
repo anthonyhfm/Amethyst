@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.anthonyhfm.amethyst.ui.modifier.VerticalDrag
 import dev.anthonyhfm.amethyst.ui.modifier.gesturesDisabled
 import kotlin.math.roundToInt
@@ -113,6 +115,27 @@ fun <T> StepDial(
             .border(1.dp, MaterialTheme.colorScheme.surfaceColorAtElevation(48.dp), CircleShape)
             .padding(6.dp)
     ) {
+        val safeSize = (steps.size - 1).coerceAtLeast(1)
+        val displayProgress = if (steps.size <= 1) 1f else selectedIndex / safeSize.toFloat()
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(52.dp)
+                .padding(8.dp)
+                .zIndex(1f)
+                .rotate(-148f + (displayProgress * (148f * 2)))
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .clip(CircleShape)
+                    .width(4.dp)
+                    .height(10.dp)
+                    .background(Color.White.copy(alpha = 0.4f))
+            )
+        }
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = 5.dp.toPx()
             val outerRadius = size.minDimension / 2f
@@ -126,9 +149,6 @@ fun <T> StepDial(
                 sweepAngle = arcSweep,
                 useCenter = true
             )
-
-            val safeSize = (steps.size - 1).coerceAtLeast(1)
-            val displayProgress = if (steps.size <= 1) 1f else selectedIndex / safeSize.toFloat()
 
             drawArc(
                 color = dialColor,
