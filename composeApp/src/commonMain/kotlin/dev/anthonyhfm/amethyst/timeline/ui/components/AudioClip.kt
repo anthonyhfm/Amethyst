@@ -13,9 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,12 +30,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -44,7 +63,9 @@ fun AudioClip(
     isSelected: Boolean,
     onSelectEntry: () -> Unit,
     onMoveEntry: (newStartMs: Long) -> Unit,
-    gridIntervalMs: Long
+    gridIntervalMs: Long,
+    trackIndex: Int,
+    entryStartMs: Long
 ) {
     val startOffsetPx = (audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
     val widthDp = with(LocalDensity.current) { (audioEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().toDp() }
@@ -53,6 +74,43 @@ fun AudioClip(
     val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
     val dragOffsetPx = remember(audioEntry.startTimeMs) { mutableStateOf(0f) }
     var snapEnabled by remember { mutableStateOf(true) }
+    
+    // Rename support
+    val displayName = if (audioEntry.name.isNotEmpty()) audioEntry.name else audioEntry.fileName.substringBeforeLast('.')
+    val renamingEntryIndex = remember { mutableStateOf<Pair<Int, Long>?>(null) }
+    val renaming = renamingEntryIndex.value == Pair(trackIndex, entryStartMs)
+    
+    val renameRequest = SelectionManager.renameRequest.collectAsState().value
+    LaunchedEffect(renameRequest) {
+        renameRequest?.let { req ->
+            if (req is SelectionManager.RenameTarget.TimelineEntry && 
+                req.trackIndex == trackIndex && 
+                req.entryStartMs == entryStartMs) {
+                renamingEntryIndex.value = Pair(trackIndex, entryStartMs)
+                SelectionManager.renameRequest.value = null
+            }
+        }
+    }
+
+    val textValue = remember { mutableStateOf(TextFieldValue(displayName)) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(renaming) {
+        if (renaming) {
+            textValue.value = TextFieldValue(displayName)
+            focusRequester.requestFocus()
+        } else {
+            focusRequester.freeFocus()
+        }
+    }
+
+    LaunchedEffect(isSelected) {
+        if (!isSelected && renaming) {
+            renamingEntryIndex.value = null
+            textValue.value = TextFieldValue(displayName)
+        }
+    }
+    
     val previewStartMs by remember(dragOffsetPx.value, zoomLevel, snapEnabled) {
         derivedStateOf {
             val rawDeltaMsDouble = dragOffsetPx.value / zoomLevel
@@ -75,32 +133,79 @@ fun AudioClip(
             .background(backgroundColor.copy(alpha = if (isSelected) 0.96f else 0.90f))
             .then(if (isSelected) Modifier.border(1.5.dp, borderColor) else Modifier)
     ) {
-        Text(
-            text = audioEntry.fileName.substringBeforeLast('.'),
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(borderColor)
-                .clickable { onSelectEntry() }
-                .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
-                    detectDragGestures(
-                        onDragStart = { onSelectEntry() },
-                        onDragEnd = {
-                            if (previewStartMs != audioEntry.startTimeMs) onMoveEntry(previewStartMs)
-                            dragOffsetPx.value = 0f
-                            snapEnabled = true
-                        },
-                        onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            dragOffsetPx.value += dragAmount.x
+        if (!renaming) {
+            Text(
+                text = displayName,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(borderColor)
+                    .clickable { onSelectEntry() }
+                    .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                        detectDragGestures(
+                            onDragStart = { onSelectEntry() },
+                            onDragEnd = {
+                                if (previewStartMs != audioEntry.startTimeMs) onMoveEntry(previewStartMs)
+                                dragOffsetPx.value = 0f
+                                snapEnabled = true
+                            },
+                            onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragOffsetPx.value += dragAmount.x
+                            }
+                        )
+                    }
+                    .padding(4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(lineHeight = MaterialTheme.typography.labelSmall.fontSize),
+                color = if (isSelected) Color.Black else Color.White,
+                maxLines = 1
+            )
+        } else {
+            val customTextSelectionColors = TextSelectionColors(
+                handleColor = MaterialTheme.colorScheme.secondaryContainer,
+                backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+            )
+
+            CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
+                BasicTextField(
+                    value = textValue.value,
+                    onValueChange = { textValue.value = it },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(borderColor)
+                        .focusRequester(focusRequester)
+                        .onFocusSelectAll(textValue)
+                        .onKeyEvent { ev ->
+                            if (ev.key == Key.Enter) {
+                                audioEntry.name = textValue.value.text
+                                renamingEntryIndex.value = null
+                                return@onKeyEvent true
+                            }
+
+                            if (ev.key == Key.Escape) {
+                                renamingEntryIndex.value = null
+                                textValue.value = TextFieldValue(displayName)
+                                return@onKeyEvent true
+                            }
+
+                            return@onKeyEvent false
                         }
-                    )
-                }
-                .padding(4.dp),
-            style = MaterialTheme.typography.labelSmall.copy(lineHeight = MaterialTheme.typography.labelSmall.fontSize),
-            color = if (isSelected) Color.Black else Color.White,
-            maxLines = 1
-        )
+                        .padding(4.dp),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Unspecified,
+                        imeAction = ImeAction.Done
+                    ),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(
+                        lineHeight = MaterialTheme.typography.labelSmall.fontSize,
+                        color = if (isSelected) Color.Black else Color.White
+                    ),
+                    cursorBrush = SolidColor(if (isSelected) Color.Black else Color.White),
+                )
+            }
+        }
         Box(
             modifier = Modifier
                 .weight(1f)

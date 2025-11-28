@@ -405,9 +405,17 @@ class TimelineViewModel : ViewModel() {
         viewModelScope.launch {
             val newTrack = AudioTimelineTrack()
             val currentTracks = _tracks.value.toMutableList()
+            val trackIndex = currentTracks.size
             currentTracks.add(newTrack)
             _tracks.value = currentTracks.toList()
             TimelineRepository.addTrack(newTrack)
+            
+            UndoManager.addAction(
+                UndoableAction.TrackAddition(
+                    trackIndex = trackIndex,
+                    track = newTrack
+                )
+            )
         }
     }
 
@@ -418,9 +426,17 @@ class TimelineViewModel : ViewModel() {
         viewModelScope.launch {
             val newTrack = LightsTimelineTrack()
             val currentTracks = _tracks.value.toMutableList()
+            val trackIndex = currentTracks.size
             currentTracks.add(newTrack)
             _tracks.value = currentTracks.toList()
             TimelineRepository.addTrack(newTrack)
+            
+            UndoManager.addAction(
+                UndoableAction.TrackAddition(
+                    trackIndex = trackIndex,
+                    track = newTrack
+                )
+            )
         }
     }
 

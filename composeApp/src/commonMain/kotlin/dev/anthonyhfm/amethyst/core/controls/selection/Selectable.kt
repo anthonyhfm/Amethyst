@@ -64,4 +64,9 @@ interface Selectable {
         val endMs: Long,
         override val selectionUUID: String = UUID.randomUUID()
     ) : Selectable
+
+    data class TimelineTrack(
+        val trackIndex: Int,
+        override val selectionUUID: String = UUID.randomUUID()
+    ) : Selectable
 }

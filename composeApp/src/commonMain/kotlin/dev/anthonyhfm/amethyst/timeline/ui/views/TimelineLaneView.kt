@@ -134,6 +134,7 @@ fun TimelineLaneView(
 
                 TimelineLane(
                     track = track,
+                    trackIndex = index,
                     zoomLevel = zoomLevel,
                     contentWidth = contentWidth,
                     scrollState = scrollState,

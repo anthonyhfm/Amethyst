@@ -160,6 +160,12 @@ sealed interface UndoableAction {
         val afterEntries: List<dev.anthonyhfm.amethyst.timeline.data.AudioEntry>
     ) : UndoableAction
 
+    data class MidiTimelineChange(
+        val trackIndex: Int,
+        val beforeEntries: List<dev.anthonyhfm.amethyst.timeline.data.MidiEntry>,
+        val afterEntries: List<dev.anthonyhfm.amethyst.timeline.data.MidiEntry>
+    ) : UndoableAction
+
     data class TimelineClipTrim(
         val trackIndex: Int,
         val original: dev.anthonyhfm.amethyst.timeline.data.AudioEntry,
@@ -171,6 +177,13 @@ sealed interface UndoableAction {
         val original: dev.anthonyhfm.amethyst.timeline.data.AudioEntry?,
         val left: dev.anthonyhfm.amethyst.timeline.data.AudioEntry?,
         val right: dev.anthonyhfm.amethyst.timeline.data.AudioEntry?
+    ) : UndoableAction
+
+    data class MidiTimelineClipSplit(
+        val trackIndex: Int,
+        val original: dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val left: dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
+        val right: dev.anthonyhfm.amethyst.timeline.data.MidiEntry?
     ) : UndoableAction
 
     data class TimelineClipDeletion(
@@ -247,5 +260,21 @@ sealed interface UndoableAction {
         val onNoteUpdate: (dev.anthonyhfm.amethyst.timeline.data.MidiNote, dev.anthonyhfm.amethyst.timeline.data.MidiNote) -> Unit,
         val currentEntryGetter: () -> dev.anthonyhfm.amethyst.timeline.data.MidiEntry?,
         val currentEntrySetter: (dev.anthonyhfm.amethyst.timeline.data.MidiEntry) -> Unit
+    ) : UndoableAction
+
+    data class TrackAddition(
+        val trackIndex: Int,
+        val track: dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<*>
+    ) : UndoableAction
+
+    data class TrackRemoval(
+        val trackIndex: Int,
+        val track: dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<*>
+    ) : UndoableAction
+
+    data class TrackDuplication(
+        val originalIndex: Int,
+        val duplicatedIndex: Int,
+        val duplicatedTrack: dev.anthonyhfm.amethyst.timeline.data.TimelineTrack<*>
     ) : UndoableAction
 }

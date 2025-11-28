@@ -283,7 +283,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
         val renameRequest = SelectionManager.renameRequest.collectAsState().value
         LaunchedEffect(renameRequest) {
             renameRequest?.let { req ->
-                if (req.parentUUID == this@MultiGroupChainDevice.selectionUUID) {
+                if (req is SelectionManager.RenameTarget.GroupItem && req.parentUUID == this@MultiGroupChainDevice.selectionUUID) {
                     renamingGroupIndex.value = req.groupIndex
                     SelectionManager.renameRequest.value = null
                 }

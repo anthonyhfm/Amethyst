@@ -54,6 +54,7 @@ import io.github.vinceglb.filekit.extension
 @Composable
 fun TimelineLane(
     track: TimelineTrack<*>,
+    trackIndex: Int,
     zoomLevel: Float,
     contentWidth: androidx.compose.ui.unit.Dp,
     scrollState: ScrollState,
@@ -260,7 +261,9 @@ fun TimelineLane(
                                 isSelected = isSelectedEntry,
                                 onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) },
                                 onMoveEntry = { newStart -> onMoveEntry(audioEntry.startTimeMs, newStart) },
-                                gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs
+                                gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
+                                trackIndex = trackIndex,
+                                entryStartMs = audioEntry.startTimeMs
                             )
                         }
                     }
@@ -278,7 +281,9 @@ fun TimelineLane(
                                 onResizeEntry = { oldStart, newStart, newDuration -> onResizeEntry(oldStart, newStart, newDuration) },
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
                                 isLightsTrack = false,
-                                onDoubleClick = {}
+                                onDoubleClick = {},
+                                trackIndex = trackIndex,
+                                entryStartMs = midiEntry.startTimeMs
                             )
                         }
                     }
@@ -296,7 +301,9 @@ fun TimelineLane(
                                 onResizeEntry = { oldStart, newStart, newDuration -> onResizeEntry(oldStart, newStart, newDuration) },
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
                                 isLightsTrack = true,
-                                onDoubleClick = { onDoubleClickLane(midiEntry.startTimeMs) }
+                                onDoubleClick = { onDoubleClickLane(midiEntry.startTimeMs) },
+                                trackIndex = trackIndex,
+                                entryStartMs = midiEntry.startTimeMs
                             )
                         }
                     }

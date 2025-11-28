@@ -14,9 +14,16 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,20 +33,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
+import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.round
 import kotlin.math.roundToInt
@@ -55,7 +74,9 @@ fun MidiClip(
     onResizeEntry: (oldStartMs: Long, newStartMs: Long, newDurationMs: Long) -> Unit,
     gridIntervalMs: Long,
     isLightsTrack: Boolean = false,
-    onDoubleClick: () -> Unit = {}
+    onDoubleClick: () -> Unit = {},
+    trackIndex: Int,
+    entryStartMs: Long
 ) {
     val startOffsetPx = (midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
     val baseWidthPx = (midiEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat()
@@ -68,6 +89,41 @@ fun MidiClip(
 
     var resizeLeftDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
     var resizeRightDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
+
+    // Rename support
+    val renamingEntryIndex = remember { mutableStateOf<Pair<Int, Long>?>(null) }
+    val renaming = renamingEntryIndex.value == Pair(trackIndex, entryStartMs)
+    
+    val renameRequest = SelectionManager.renameRequest.collectAsState().value
+    LaunchedEffect(renameRequest) {
+        renameRequest?.let { req ->
+            if (req is SelectionManager.RenameTarget.TimelineEntry && 
+                req.trackIndex == trackIndex && 
+                req.entryStartMs == entryStartMs) {
+                renamingEntryIndex.value = Pair(trackIndex, entryStartMs)
+                SelectionManager.renameRequest.value = null
+            }
+        }
+    }
+
+    val textValue = remember { mutableStateOf(TextFieldValue(midiEntry.name)) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(renaming) {
+        if (renaming) {
+            textValue.value = TextFieldValue(midiEntry.name)
+            focusRequester.requestFocus()
+        } else {
+            focusRequester.freeFocus()
+        }
+    }
+
+    LaunchedEffect(isSelected) {
+        if (!isSelected && renaming) {
+            renamingEntryIndex.value = null
+            textValue.value = TextFieldValue(midiEntry.name)
+        }
+    }
 
     val previewStartMs by remember(dragOffsetPx.value, resizeLeftDeltaPx, zoomLevel, snapEnabled) {
         derivedStateOf {
@@ -95,36 +151,84 @@ fun MidiClip(
             .background(backgroundColor.copy(alpha = if (isSelected) 0.96f else 0.90f))
             .then(if (isSelected) Modifier.border(1.5.dp, borderColor) else Modifier.border(1.dp, borderColor.copy(alpha = 0.85f)))
     ) {
-        Text(
-            text = midiEntry.name,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(20.dp)
-                .background(borderColor, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                .clickable { onSelectEntry() }
-                .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
-                    detectDragGestures(
-                        onDragStart = { onSelectEntry() },
-                        onDragEnd = {
-                            if (dragOffsetPx.value != 0f) {
-                                val newStart = previewStartMs
-                                if (newStart != midiEntry.startTimeMs) onMoveEntry(newStart)
+        if (!renaming) {
+            Text(
+                text = midiEntry.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+                    .background(borderColor, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                    .clickable { onSelectEntry() }
+                    .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                        detectDragGestures(
+                            onDragStart = { onSelectEntry() },
+                            onDragEnd = {
+                                if (dragOffsetPx.value != 0f) {
+                                    val newStart = previewStartMs
+                                    if (newStart != midiEntry.startTimeMs) onMoveEntry(newStart)
+                                }
+                                dragOffsetPx.value = 0f
+                                snapEnabled = true
+                            },
+                            onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
+                            onDrag = { change, dragAmount ->
+                                change.consume(); dragOffsetPx.value += dragAmount.x
                             }
-                            dragOffsetPx.value = 0f
-                            snapEnabled = true
-                        },
-                        onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
-                        onDrag = { change, dragAmount ->
-                            change.consume(); dragOffsetPx.value += dragAmount.x
+                        )
+                    }
+                    .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleClick() }) }
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                style = MaterialTheme.typography.labelSmall.copy(lineHeight = MaterialTheme.typography.labelSmall.fontSize),
+                color = foregroundColor,
+                maxLines = 1
+            )
+        } else {
+            val customTextSelectionColors = TextSelectionColors(
+                handleColor = MaterialTheme.colorScheme.secondaryContainer,
+                backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+            )
+
+            CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
+                BasicTextField(
+                    value = textValue.value,
+                    onValueChange = { textValue.value = it },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp)
+                        .background(borderColor, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .focusRequester(focusRequester)
+                        .onFocusSelectAll(textValue)
+                        .onKeyEvent { ev ->
+                            if (ev.key == Key.Enter) {
+                                midiEntry.name = textValue.value.text
+                                renamingEntryIndex.value = null
+                                return@onKeyEvent true
+                            }
+
+                            if (ev.key == Key.Escape) {
+                                renamingEntryIndex.value = null
+                                textValue.value = TextFieldValue(midiEntry.name)
+                                return@onKeyEvent true
+                            }
+
+                            return@onKeyEvent false
                         }
-                    )
-                }
-                .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleClick() }) }
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall.copy(lineHeight = MaterialTheme.typography.labelSmall.fontSize),
-            color = foregroundColor,
-            maxLines = 1
-        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Unspecified,
+                        imeAction = ImeAction.Done
+                    ),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(
+                        lineHeight = MaterialTheme.typography.labelSmall.fontSize,
+                        color = foregroundColor
+                    ),
+                    cursorBrush = SolidColor(foregroundColor),
+                )
+            }
+        }
         Box(
             modifier = Modifier
                 .weight(1f)

@@ -209,7 +209,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
         val renameRequest = SelectionManager.renameRequest.collectAsState().value
         LaunchedEffect(renameRequest) {
             renameRequest?.let { req ->
-                if (req.parentUUID == this@GroupChainDevice.selectionUUID) {
+                if (req is SelectionManager.RenameTarget.GroupItem && req.parentUUID == this@GroupChainDevice.selectionUUID) {
                     renamingGroupIndex.value = req.groupIndex
                     // Clear the request so it doesn't retrigger
                     SelectionManager.renameRequest.value = null

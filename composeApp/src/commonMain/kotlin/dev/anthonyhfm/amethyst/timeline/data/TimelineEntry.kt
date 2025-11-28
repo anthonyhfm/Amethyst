@@ -21,7 +21,8 @@ data class AudioEntry(
     val rawData: ByteArray?,
     val sampleRate: Int = 44100,
     val channels: Int = 2,
-    val bitDepth: Int = 16
+    val bitDepth: Int = 16,
+    var name: String = ""
 ) : TimelineEntry {
     private var audioSourceId: String? = null
 
@@ -135,7 +136,7 @@ data class MidiEntry(
     override val startTimeMs: Long,
     override val durationMs: Long,
     val notes: List<MidiNote> = emptyList(),
-    val name: String = "MIDI Clip"
+    var name: String = "MIDI Clip"
 ) : TimelineEntry {
     @kotlinx.serialization.Transient
     private val activeJobOwner = Any() // Unique owner for scheduled jobs
