@@ -10,11 +10,26 @@ object SelectionManager {
 
     // Fire-and-forget request to trigger renaming on a specific list item.
     // Use parentUUID to avoid direct dependency on device classes.
-    data class RenameTarget @OptIn(ExperimentalTime::class) constructor(
-        val parentUUID: String,
-        val groupIndex: Int,
-        val token: Long = Clock.System.now().toEpochMilliseconds()
-    )
+    sealed class RenameTarget @OptIn(ExperimentalTime::class) constructor(
+        open val token: Long = Clock.System.now().toEpochMilliseconds()
+    ) {
+        data class GroupItem @OptIn(ExperimentalTime::class) constructor(
+            val parentUUID: String,
+            val groupIndex: Int,
+            override val token: Long = Clock.System.now().toEpochMilliseconds()
+        ) : RenameTarget(token)
+
+        data class Track @OptIn(ExperimentalTime::class) constructor(
+            val trackIndex: Int,
+            override val token: Long = Clock.System.now().toEpochMilliseconds()
+        ) : RenameTarget(token)
+
+        data class TimelineEntry @OptIn(ExperimentalTime::class) constructor(
+            val trackIndex: Int,
+            val entryStartMs: Long,
+            override val token: Long = Clock.System.now().toEpochMilliseconds()
+        ) : RenameTarget(token)
+    }
 
     // Observers (e.g., Group/Multi group items) can listen to this to toggle rename mode.
     val renameRequest: MutableStateFlow<RenameTarget?> = MutableStateFlow(null)

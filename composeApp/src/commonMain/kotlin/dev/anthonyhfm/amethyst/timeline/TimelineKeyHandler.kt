@@ -58,6 +58,26 @@ object TimelineKeyHandler {
             return true
         }
         if (keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace) {
+            // Check for track selections first
+            val trackSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTrack>()
+            if (trackSelections.isNotEmpty()) {
+                trackSelections.sortedByDescending { it.trackIndex }.forEach { sel ->
+                    val removed = TimelineRepository.tracks.value.getOrNull(sel.trackIndex)
+                    if (removed != null) {
+                        UndoManager.addAction(
+                            UndoableAction.TrackRemoval(
+                                trackIndex = sel.trackIndex,
+                                track = removed
+                            )
+                        )
+                        TimelineRepository.removeTrack(sel.trackIndex)
+                    }
+                }
+                SelectionManager.clear()
+                return true
+            }
+            
+            // Otherwise check for entry selections
             val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
             if (entrySelections.isNotEmpty()) {
                 val grouped = entrySelections.groupBy { it.trackIndex }
@@ -69,6 +89,25 @@ object TimelineKeyHandler {
             }
         }
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.D) {
+            // Check for track selections first
+            val trackSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTrack>()
+            if (trackSelections.isNotEmpty()) {
+                trackSelections.sortedBy { it.trackIndex }.forEach { sel ->
+                    val duplicated = TimelineRepository.duplicateTrack(sel.trackIndex)
+                    if (duplicated != null) {
+                        UndoManager.addAction(
+                            UndoableAction.TrackDuplication(
+                                originalIndex = sel.trackIndex,
+                                duplicatedIndex = sel.trackIndex + 1,
+                                duplicatedTrack = duplicated
+                            )
+                        )
+                    }
+                }
+                return true
+            }
+            
+            // Otherwise check for entry selections
             val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
             if (entrySelections.isNotEmpty()) {
                 val grouped = entrySelections.groupBy { it.trackIndex }
