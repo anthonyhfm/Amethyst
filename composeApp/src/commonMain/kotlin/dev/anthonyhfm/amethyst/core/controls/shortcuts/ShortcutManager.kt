@@ -12,8 +12,11 @@ import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.handleRenameShortcut
+import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
+import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -82,9 +85,26 @@ object ShortcutManager {
                     )?.path ?: return@launch
                 }
 
+                WorkspaceRepository.saveableWorkspaceData?.path = path
+
                 PlatformFile(path).write(
-                    AmethystProtoBuf.encodeToByteArray(WorkspaceRepository.saveWorkspace())
+                    bytes = Zip.encode(
+                        data = AmethystProtoBuf
+                            .encodeToByteArray(
+                                value = WorkspaceRepository.saveWorkspace()
+                            )
+                    )
                 )
+
+                GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.filter { it.path != path }.toMutableList().apply {
+                    add(
+                        index = 0,
+                        element = RecentWorkspace(
+                            title = WorkspaceRepository.saveableWorkspaceData?.title ?: "Untitled",
+                            path = path
+                        )
+                    )
+                }
             }
 
             return true

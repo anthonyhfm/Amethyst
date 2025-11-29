@@ -7,6 +7,8 @@ expect object Zip {
     fun getPaths(file: PlatformFile): List<String>
 
     fun decode(data: ByteArray): ByteArray
+
+    fun encode(data: ByteArray): ByteArray
 }
 
 fun Zip.determineFormat(file: PlatformFile): ZippedProjectFormat {

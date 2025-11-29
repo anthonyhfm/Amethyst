@@ -63,7 +63,11 @@ class RecentViewModel(
 
                             GlobalScope.launch {
                                 try {
-                                    val workspace = AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(file.readBytes())
+                                    val workspace = runBlocking {
+                                        AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(
+                                            bytes = Zip.decode(file.readBytes())
+                                        )
+                                    }
 
                                     WorkspaceRepository.loadWorkspace(workspace)
                                     triggerEffect(RecentViewContract.Effect.OpenWorkspace)
@@ -141,7 +145,9 @@ class RecentViewModel(
                 val file = PlatformFile(event.project.path)
 
                 val workspace = runBlocking {
-                    AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(file.readBytes())
+                    AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(
+                        bytes = Zip.decode(file.readBytes())
+                    )
                 }
 
                 GlobalSettings.recentWorkspaces += event.project.copy(lastOpened = Clock.System.now().toEpochMilliseconds())

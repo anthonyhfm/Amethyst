@@ -1,11 +1,14 @@
 package dev.anthonyhfm.amethyst.core.util
 
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.absoluteFile
-import java.io.File
+import sun.nio.cs.UTF_8
+import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import java.util.zip.ZipInputStream
+import kotlin.io.encoding.Base64
+
 
 actual object Zip {
     actual fun getEntries(
@@ -68,5 +71,15 @@ actual object Zip {
         val zipFile = GZIPInputStream(data.inputStream())
 
         return zipFile.readAllBytes()
+    }
+
+    actual fun encode(data: ByteArray): ByteArray {
+        ByteArrayOutputStream(data.size).use { out ->
+            GZIPOutputStream(out).use { gzip ->
+                gzip.write(data)
+            }
+
+            return out.toByteArray()
+        }
     }
 }
