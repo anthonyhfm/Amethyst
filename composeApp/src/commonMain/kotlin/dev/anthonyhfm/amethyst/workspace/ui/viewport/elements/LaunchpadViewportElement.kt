@@ -74,48 +74,116 @@ abstract class LaunchpadViewportElement(
     @Composable
     abstract override fun Content()
 
-    open fun handleButtonEvent(
-        down: Boolean,
+    private var lastDragPad: Pair<Int, Int>? = null
+
+    open fun handlePadDragStart(
         x: Int,
         y: Int
     ) {
+        val (translatedX, translatedY) = translateToDeviceCoordinates(x, y)
+        val mode = WorkspaceRepository.mode.value
+
+        if (mode is WorkspaceContract.WorkspaceMode.Layout) return
+
+        lastDragPad = Pair(translatedX, translatedY)
+
+        when (mode) {
+            is KeyframesWorkspaceMode -> mode.virtualDeviceDragStart(translatedX, translatedY)
+            is CoordinateFilterWorkspaceMode -> mode.virtualDeviceDragStart(translatedX, translatedY)
+            else -> sendGenericPadDown(translatedX, translatedY)
+        }
+    }
+
+    open fun handlePadDrag(
+        x: Int,
+        y: Int
+    ) {
+        val (translatedX, translatedY) = translateToDeviceCoordinates(x, y)
         val mode = WorkspaceRepository.mode.value
 
         if (mode is WorkspaceContract.WorkspaceMode.Layout) return
 
         when (mode) {
-            is KeyframesWorkspaceMode -> {
-                if (down) {
-                    mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
-                }
-            }
-
-            is CoordinateFilterWorkspaceMode -> {
-                if (down) {
-                    mode.virtualDevicePress(x + position.value.x.toInt(), (layout.rows - 1) - y + position.value.y.toInt())
-                }
-            }
-
+            is KeyframesWorkspaceMode -> mode.virtualDeviceDrag(translatedX, translatedY)
+            is CoordinateFilterWorkspaceMode -> mode.virtualDeviceDrag(translatedX, translatedY)
             else -> {
-                WorkspaceRepository.lightsChain.signalEnter(
-                    Signal.LED(
-                        origin = this,
-                        x = x + position.value.x.toInt(),
-                        y = (layout.rows - 1) - y + position.value.y.toInt(),
-                        color = if (down) Color.White else Color.Black,
-                        layer = 0
-                    )
-                )
+                val previousPad = lastDragPad
+                if (previousPad != Pair(translatedX, translatedY)) {
+                    previousPad?.let { (oldX, oldY) ->
+                        sendGenericPadUp(oldX, oldY)
+                    }
 
-                WorkspaceRepository.samplingChain.signalEnter(
-                    Signal.Midi(
-                        origin = this,
-                        x = x + position.value.x.toInt(),
-                        y = (layout.rows - 1) - y + position.value.y.toInt(),
-                        velocity = if (down) 127 else 0
-                    )
-                )
+                    sendGenericPadDown(translatedX, translatedY)
+                    lastDragPad = Pair(translatedX, translatedY)
+                }
             }
         }
+    }
+
+    open fun handlePadDragEnd() {
+        val mode = WorkspaceRepository.mode.value
+
+        if (mode is WorkspaceContract.WorkspaceMode.Layout) return
+
+        when (mode) {
+            is KeyframesWorkspaceMode -> mode.virtualDeviceDragEnd()
+            is CoordinateFilterWorkspaceMode -> mode.virtualDeviceDragEnd()
+            else -> {
+                lastDragPad?.let { (x, y) ->
+                    sendGenericPadUp(x, y)
+                }
+            }
+        }
+
+        lastDragPad = null
+    }
+
+    private fun translateToDeviceCoordinates(x: Int, y: Int): Pair<Int, Int> {
+        return Pair(
+            x + position.value.x.toInt(),
+            (layout.rows - 1) - y + position.value.y.toInt()
+        )
+    }
+
+    private fun sendGenericPadDown(x: Int, y: Int) {
+        WorkspaceRepository.lightsChain.signalEnter(
+            Signal.LED(
+                origin = this,
+                x = x,
+                y = y,
+                color = Color.White,
+                layer = 0
+            )
+        )
+
+        WorkspaceRepository.samplingChain.signalEnter(
+            Signal.Midi(
+                origin = this,
+                x = x,
+                y = y,
+                velocity = 127
+            )
+        )
+    }
+
+    private fun sendGenericPadUp(x: Int, y: Int) {
+        WorkspaceRepository.lightsChain.signalEnter(
+            Signal.LED(
+                origin = this,
+                x = x,
+                y = y,
+                color = Color.Black,
+                layer = 0
+            )
+        )
+
+        WorkspaceRepository.samplingChain.signalEnter(
+            Signal.Midi(
+                origin = this,
+                x = x,
+                y = y,
+                velocity = 0
+            )
+        )
     }
 }

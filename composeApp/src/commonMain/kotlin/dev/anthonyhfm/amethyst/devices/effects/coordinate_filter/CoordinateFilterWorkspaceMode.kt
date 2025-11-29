@@ -7,12 +7,22 @@ class CoordinateFilterWorkspaceMode : WorkspaceContract.WorkspaceMode {
     override val selectable: Boolean = false
     override val claimInputs: Boolean = true
 
-    var onVirtualDevicePress: ((x: Int, y: Int) -> Unit)? = null
+    var onVirtualDeviceDragStart: ((x: Int, y: Int) -> Unit)? = null
+    var onVirtualDeviceDrag: ((x: Int, y: Int) -> Unit)? = null
+    var onVirtualDeviceDragEnd: (() -> Unit)? = null
     var modeWakeup: (() -> Unit)? = null
     var modeClose: (() -> Unit)? = null
 
-    fun virtualDevicePress(x: Int, y: Int) {
-        onVirtualDevicePress?.invoke(x, y)
+    fun virtualDeviceDragStart(x: Int, y: Int) {
+        onVirtualDeviceDragStart?.invoke(x, y)
+    }
+
+    fun virtualDeviceDrag(x: Int, y: Int) {
+        onVirtualDeviceDrag?.invoke(x, y)
+    }
+
+    fun virtualDeviceDragEnd() {
+        onVirtualDeviceDragEnd?.invoke()
     }
 
     fun wake() {

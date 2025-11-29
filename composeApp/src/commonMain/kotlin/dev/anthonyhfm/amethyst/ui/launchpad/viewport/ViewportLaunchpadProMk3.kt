@@ -46,11 +46,14 @@ class ViewportLaunchpadProMk3(
             if (interactive) {
                 LaunchpadSurfaceDetectionOverlay(
                     layoutType = layout,
-                    onPadPressed = { x, y ->
-                        handleButtonEvent(true, x, y)
+                    onPadDragStart = { x, y ->
+                        handlePadDragStart(x, y)
                     },
-                    onPadReleased = { x, y ->
-                        handleButtonEvent(false, x, y)
+                    onPadDrag = { x, y ->
+                        handlePadDrag(x, y)
+                    },
+                    onPadDragEnd = {
+                        handlePadDragEnd()
                     },
                     modifier = Modifier.fillMaxSize(0.94f)
                 ) {

@@ -39,7 +39,9 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     lateinit var state: StateFlow<KeyframesChainDeviceContract.KeyframesChainDeviceState>
 
-    var onVirtualDevicePress: ((x: Int, y: Int) -> Unit)? = null
+    var onVirtualDeviceDragStart: ((x: Int, y: Int) -> Unit)? = null
+    var onVirtualDeviceDrag: ((x: Int, y: Int) -> Unit)? = null
+    var onVirtualDeviceDragEnd: (() -> Unit)? = null
     var onEvent: ((Event) -> Unit)? = null
     var modeWakeup: (() -> Unit)? = null
     var modeClose: (() -> Unit)? = null
@@ -190,8 +192,16 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
         return false
     }
 
-    fun virtualDevicePress(x: Int, y: Int) {
-        onVirtualDevicePress?.invoke(x, y)
+    fun virtualDeviceDragStart(x: Int, y: Int) {
+        onVirtualDeviceDragStart?.invoke(x, y)
+    }
+
+    fun virtualDeviceDrag(x: Int, y: Int) {
+        onVirtualDeviceDrag?.invoke(x, y)
+    }
+
+    fun virtualDeviceDragEnd() {
+        onVirtualDeviceDragEnd?.invoke()
     }
 
     fun wake() {

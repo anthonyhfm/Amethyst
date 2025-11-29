@@ -15,8 +15,9 @@ import kotlin.math.floor
 @Composable
 fun LaunchpadSurfaceDetectionOverlay(
     layoutType: LaunchpadLayout,
-    onPadPressed: (x: Int, y: Int) -> Unit,
-    onPadReleased: (x: Int, y: Int) -> Unit,
+    onPadDragStart: (x: Int, y: Int) -> Unit,
+    onPadDrag: (x: Int, y: Int) -> Unit,
+    onPadDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -47,7 +48,7 @@ fun LaunchpadSurfaceDetectionOverlay(
                                                     val pad = calculatePadFromOffset(change.position, layoutSize, layoutType)
                                                     pad?.let { (x, y) ->
                                                         activePointers = activePointers + (change.id to Pair(x, y))
-                                                        onPadPressed(x, y)
+                                                        onPadDragStart(x, y)
                                                         change.consume()
                                                     }
                                                 }
@@ -61,13 +62,9 @@ fun LaunchpadSurfaceDetectionOverlay(
                                                     val currentPad = activePointers[change.id]
 
                                                     if (newPad != null && newPad != currentPad) {
-                                                        currentPad?.let { (oldX, oldY) ->
-                                                            onPadReleased(oldX, oldY)
-                                                        }
-
                                                         val (newX, newY) = newPad
                                                         activePointers = activePointers + (change.id to Pair(newX, newY))
-                                                        onPadPressed(newX, newY)
+                                                        onPadDrag(newX, newY)
                                                         change.consume()
                                                     }
                                                 }
@@ -76,8 +73,8 @@ fun LaunchpadSurfaceDetectionOverlay(
 
                                         PointerEventType.Release -> {
                                             event.changes.forEach { change ->
-                                                activePointers[change.id]?.let { (x, y) ->
-                                                    onPadReleased(x, y)
+                                                if (activePointers.containsKey(change.id)) {
+                                                    onPadDragEnd()
                                                     activePointers = activePointers - change.id
                                                     change.consume()
                                                 }
