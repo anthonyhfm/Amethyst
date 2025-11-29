@@ -33,6 +33,7 @@ import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.data.settings.RecentColorRGB
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 
 object WorkspaceRepository {
     val deviceRefresh: MutableSharedFlow<Unit> = MutableSharedFlow()
@@ -263,9 +264,11 @@ object WorkspaceRepository {
 
     fun saveWorkspace(): SavableWorkspaceData {
         return SavableWorkspaceData(
-            title = saveableWorkspaceData?.title ?: "Untitled Project",
+            title = saveableWorkspaceData?.title ?: "Untitled",
+            author = saveableWorkspaceData?.author ?: "Unknown Author",
             lights = StateChain.pack(lightsChain),
             sampling = StateChain.pack(samplingChain),
+            timelineData = TimelineRepository.tracks.value,
             macros = _macros.value,
             settings = WorkspaceSettings(
                 bpm = _bpm.value

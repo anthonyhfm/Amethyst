@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
+import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
@@ -29,9 +30,11 @@ class WorkspaceMenuBarViewModel : ViewModel() {
 
         File(workspace.path).let { file ->
             file.writeBytes(
-                AmethystProtoBuf.encodeToByteArray(
-                    serializer = SavableWorkspaceData.serializer(),
-                    value = workspace
+                Zip.encode(
+                    AmethystProtoBuf.encodeToByteArray(
+                        serializer = SavableWorkspaceData.serializer(),
+                        value = workspace
+                    )
                 )
             )
         }

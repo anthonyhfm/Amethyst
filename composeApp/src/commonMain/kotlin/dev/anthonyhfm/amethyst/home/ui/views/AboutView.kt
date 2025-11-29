@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.util.amethystVersion
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
@@ -59,7 +60,7 @@ fun AboutView() {
             )
 
             Text(
-                text = "Private Beta Version 3.0",
+                text = "Version ${amethystVersion.major}.${amethystVersion.minor}.${amethystVersion.hotfix}",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary
             )
