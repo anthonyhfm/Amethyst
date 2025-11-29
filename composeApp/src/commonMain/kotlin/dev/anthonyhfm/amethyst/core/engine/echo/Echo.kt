@@ -43,4 +43,13 @@ object Echo {
             }
         }
     }
+
+    fun cancel(signalOrigin: Any?) {
+        if (signalOrigin == null) return
+        try {
+            AudioOutput.stopByOrigin(signalOrigin)
+        } catch (e: Exception) {
+            println("Audio cancel error: ${e.message}")
+        }
+    }
 }

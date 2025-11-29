@@ -96,7 +96,11 @@ actual object AudioOutput {
         ids.forEach { stop(it) }
     }
 
-    // ---------------- WAV Aufbau & Normalisierung ----------------
+    actual fun stopByOrigin(origin: Any?) {
+        if (origin == null) return
+        val toRemove = activePlayers.filter { it.value.origin == origin }.keys
+        toRemove.forEach { stop(it) }
+    }
 
     private fun buildWav(pcm: ByteArray, channels: Int, sampleRate: Int, bitDepth: Int): ByteArray {
         val dataSize = pcm.size

@@ -40,14 +40,14 @@ actual object AudioOutput {
 
     private data class Source(
         val id: String,
-        val pcm: ByteArray, // 16-bit LE Stereo @ deviceSampleRate
+        val pcm: ByteArray,
         var frameCursor: Int,
         val totalFrames: Int,
         val gain: Float = 1f,
-        val done: AtomicBoolean = AtomicBoolean(false)
+        val done: AtomicBoolean = AtomicBoolean(false),
+        val origin: Any? = null
     )
 
-    // Latenzschätzung
     private val latencySmoothingAlpha = 0.2
     @Volatile private var lastEstimatedLatencyMs: Double = 0.0 // anhand playbackHeadPosition
     @Volatile private var lastPresentedLatencyMs: Double = 0.0 // anhand AudioTimestamp falls verfügbar
@@ -292,13 +292,20 @@ actual object AudioOutput {
         val totalFrames = stereo16.size / bytesPerFrame
         if (totalFrames <= 0) return null
         val id = "aud_${System.nanoTime()}"
-        val src = Source(id, stereo16, 0, totalFrames, 1f)
+        val src = Source(id, stereo16, 0, totalFrames, 1f, AtomicBoolean(false), audioSignal.origin)
         synchronized(lock) { sources[id] = src }
         return id
     }
 
     actual fun stop(sourceId: String) { synchronized(lock) { sources.remove(sourceId)?.done?.set(true) } }
     actual fun stopAll() { synchronized(lock) { sources.values.forEach { it.done.set(true) }; sources.clear() } }
+    actual fun stopByOrigin(origin: Any?) {
+        if (origin == null) return
+        synchronized(lock) {
+            val toRemove = sources.filter { it.value.origin == origin }.keys
+            toRemove.forEach { sources.remove(it)?.done?.set(true) }
+        }
+    }
 
     // === Hilfsfunktionen ===
     private fun pcm8To16(src: ByteArray): ByteArray {

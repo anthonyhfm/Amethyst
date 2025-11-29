@@ -297,6 +297,8 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
     override fun signalEnter(n: List<Signal>) {
         n.filterIsInstance<Signal.Midi>().forEach { midiSignal ->
             if (midiSignal.velocity != 0 && state.value.isLoaded) {
+                // Vorherigen Clip abbrechen, falls einer läuft
+                dev.anthonyhfm.amethyst.core.engine.echo.Echo.cancel(this)
                 val deviceState = state.value
 
                 // Apply volume, fade in, fade out, and trim to start/end positions

@@ -361,14 +361,13 @@ actual object AudioOutput {
 
     actual fun stop(sourceId: String) {
         val audioSource = activeSources[sourceId]
+
         if (audioSource != null) {
             try {
                 AL10.alSourceStop(audioSource.sourceId)
                 activeSources.remove(sourceId)
                 audioSource.cleanup()
-            } catch (e: Exception) {
-                // Silent error handling
-            }
+            } catch (e: Exception) { }
         }
     }
 
@@ -383,6 +382,12 @@ actual object AudioOutput {
         } catch (e: Exception) {
             // Silent error handling
         }
+    }
+
+    actual fun stopByOrigin(origin: Any?) {
+        if (origin == null) return
+        val toRemove = activeSources.filter { it.value.origin == origin }.keys
+        toRemove.forEach { stop(it) }
     }
 
     private fun determineOpenALFormat(audioSignal: Signal.AudioSignal): Int {
