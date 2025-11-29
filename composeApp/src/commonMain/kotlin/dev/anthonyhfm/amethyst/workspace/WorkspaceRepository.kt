@@ -34,6 +34,7 @@ import dev.anthonyhfm.amethyst.core.data.settings.RecentColorRGB
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 
 object WorkspaceRepository {
     val deviceRefresh: MutableSharedFlow<Unit> = MutableSharedFlow()
@@ -264,16 +265,17 @@ object WorkspaceRepository {
 
     fun saveWorkspace(): SavableWorkspaceData {
         return SavableWorkspaceData(
+            path = saveableWorkspaceData?.path,
             title = saveableWorkspaceData?.title ?: "Untitled",
             author = saveableWorkspaceData?.author ?: "Unknown Author",
             lights = StateChain.pack(lightsChain),
             sampling = StateChain.pack(samplingChain),
+            autoPlay = saveableWorkspaceData?.autoPlay ?: AutoPlayData(emptyMap()),
             timelineData = TimelineRepository.tracks.value,
             macros = _macros.value,
             settings = WorkspaceSettings(
                 bpm = _bpm.value
             ),
-            path = saveableWorkspaceData?.path,
             launchpadDevices = Heaven.devices.map { device ->
                 SavableWorkspaceData.SavableViewportLaunchpad(
                     type = when (device) {

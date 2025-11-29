@@ -19,6 +19,7 @@ data class SavableWorkspaceData(
     val timelineData: List<@Polymorphic TimelineTrack<*>> = emptyList(),
     val lights: StateChain = StateChain(),
     val sampling: StateChain = StateChain(),
+    val autoPlay: AutoPlayData = AutoPlayData(emptyMap()),
     val launchpadDevices: List<SavableViewportLaunchpad> = emptyList(),
     val macros: List<Macro> = listOf(Macro(0)),
 

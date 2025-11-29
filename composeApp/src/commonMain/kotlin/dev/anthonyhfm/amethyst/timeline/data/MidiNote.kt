@@ -14,17 +14,12 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class MidiNote(
+    val device: Int,
     val pitch: Int,
     val led: NoteLED,
     val startTimeMs: Long,
     val durationMs: Long
 ) {
-    init {
-        require(pitch in 0..127) { "Note pitch must be between 0 and 127, got $pitch (note: launchpad uses 0-99 per device)" }
-        require(startTimeMs >= 0) { "Start time must be non-negative, got $startTimeMs" }
-        require(durationMs > 0) { "Duration must be positive, got $durationMs" }
-    }
-    
     val endTimeMs: Long get() = startTimeMs + durationMs
     
     companion object {
@@ -32,6 +27,7 @@ data class MidiNote(
          * Creates a MidiNote with a simple color (for backwards compatibility and ease of use)
          */
         fun withColor(
+            device: Int,
             pitch: Int,
             color: Color,
             startTimeMs: Long,
@@ -39,6 +35,7 @@ data class MidiNote(
             layer: Int = 0,
             blendingMode: Signal.LED.BlendingMode = Signal.LED.BlendingMode.Normal
         ) = MidiNote(
+            device = device,
             pitch = pitch,
             led = NoteLED(
                 index = pitch,

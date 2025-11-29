@@ -19,5 +19,6 @@ object MultiPluginHashes {
     val KASKOBI_MULTI_HASHES = listOf(
         "724287b36492668526a597562d7732c6",
         "2e993c63826a4b737b21479f58a7238d",
+        "d098a20a1a2c1165032ece71fd9297ad"
     )
 }

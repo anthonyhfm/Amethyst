@@ -30,6 +30,7 @@ import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
+import dev.anthonyhfm.amethyst.workspace.ui.components.AutoPlayButtons
 import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
@@ -97,6 +98,16 @@ fun Workspace() {
                     viewModel.onEvent(it)
                 }
             )
+
+            AnimatedVisibility(
+                visible = state.mode is WorkspaceContract.WorkspaceMode.Preview,
+                enter = slideInVertically { it },
+                exit = slideOutVertically { it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+            ) {
+                AutoPlayButtons()
+            }
 
             AnimatedVisibility(
                 visible = state.mode is WorkspaceContract.WorkspaceMode.LightsChain,

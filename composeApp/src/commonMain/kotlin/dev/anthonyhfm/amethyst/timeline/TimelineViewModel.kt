@@ -13,7 +13,6 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
-import dev.anthonyhfm.amethyst.timeline.utils.MidiImporter
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import io.github.vinceglb.filekit.PlatformFile
@@ -519,45 +518,6 @@ class TimelineViewModel : ViewModel() {
         val current = _tracks.value.toMutableList(); current[trackIndex] = newTrack
         _tracks.value = current.toList(); TimelineRepository.tracks.value = current.toList()
         // Note: UndoableAction would need to be extended to support MIDI entries
-    }
-
-    /**
-     * Import a MIDI file and add it to a track
-     */
-    fun addMidiFileToTrack(trackIndex: Int, file: PlatformFile, at: Long = 0) {
-        viewModelScope.launch {
-            val currentTracks = _tracks.value.toMutableList()
-            val track = currentTracks.getOrNull(trackIndex) as? MidiTimelineTrack ?: return@launch
-            
-            // Import MIDI file
-            val midiEntry = MidiImporter.importMidiFile(file, at) ?: run {
-                println("Failed to import MIDI file: ${file.name}")
-                return@launch
-            }
-            
-            // Snap to grid if needed
-            val bpm = WorkspaceRepository.bpm.value
-            val gridType = WorkspaceRepository.gridType.value
-            val intervals = GridUtils.computeWithGridType(_zoomLevel.value, bpm, gridType)
-            val gridInterval = intervals.intervalMs
-            val snappedStart = snapToGrid(midiEntry.startTimeMs, gridInterval)
-            
-            val snappedEntry = if (snappedStart != midiEntry.startTimeMs) {
-                midiEntry.copy(startTimeMs = snappedStart)
-            } else {
-                midiEntry
-            }
-            
-            track.addEntry(snappedEntry)
-            
-            // Update tracks
-            val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
-            currentTracks[trackIndex] = newTrack
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.tracks.value = currentTracks.toList()
-            
-            SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = snappedEntry.startTimeMs))
-        }
     }
 
     /**

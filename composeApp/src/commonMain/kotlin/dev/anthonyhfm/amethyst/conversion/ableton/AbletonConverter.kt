@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.reader.BPMReader
 import dev.anthonyhfm.amethyst.conversion.ableton.reader.MidiChainReader
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayout
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayoutDetector
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonTutorialDetector
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.Dual2LightLayoutScanner
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.OriginalSimplerPrerenderer
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
@@ -22,6 +23,7 @@ import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import io.github.vinceglb.filekit.PlatformFile
@@ -124,6 +126,8 @@ object AbletonConverter : AmethystConverter {
         val layout = AbletonLayoutDetector.detectLayout(
             tracks = abletonXml.querySelector("MidiTrack")
         )
+
+        val autoPlayData: AutoPlayData = AbletonTutorialDetector.getAutoPlayData(layout, abletonXml.querySelector("MidiTrack"))
 
         projectLayout = layout
 
@@ -284,6 +288,7 @@ object AbletonConverter : AmethystConverter {
             title = this.file?.nameWithoutExtension ?: name,
             lights = lights,
             sampling = samples,
+            autoPlay = autoPlayData,
             settings = WorkspaceSettings(
                 bpm = bpm
             ),

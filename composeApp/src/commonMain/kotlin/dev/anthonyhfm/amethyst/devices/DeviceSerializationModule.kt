@@ -18,6 +18,7 @@ import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import kotlinx.serialization.modules.SerializersModule
@@ -37,6 +38,7 @@ val DeviceSerializationModule = SerializersModule {
         subclass(ChokeChainDeviceState::class)
         subclass(HoldChainDeviceState::class)
         subclass(KeyframesChainDeviceContract.KeyframesChainDeviceState::class)
+        subclass(PianoRollChainDeviceState::class)
         subclass(LayerChainDeviceState::class)
         subclass(LayerFilterChainDeviceState::class)
         subclass(LoopChainDeviceState::class)

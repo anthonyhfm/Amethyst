@@ -67,6 +67,8 @@ class RecentViewModel(
                                         AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(
                                             bytes = Zip.decode(file.readBytes())
                                         )
+                                    }.apply {
+                                        path = file.path
                                     }
 
                                     WorkspaceRepository.loadWorkspace(workspace)
@@ -148,6 +150,8 @@ class RecentViewModel(
                     AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(
                         bytes = Zip.decode(file.readBytes())
                     )
+                }.apply {
+                    path = file.path
                 }
 
                 GlobalSettings.recentWorkspaces += event.project.copy(lastOpened = Clock.System.now().toEpochMilliseconds())
