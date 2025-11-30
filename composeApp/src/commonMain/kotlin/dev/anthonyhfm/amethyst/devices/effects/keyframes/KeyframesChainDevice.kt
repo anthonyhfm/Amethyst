@@ -45,6 +45,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
     private var lastSelectedFrameIndex: Int? = null
+    private val dragVisitedPads: MutableSet<Pair<Int, Int>> = mutableSetOf()
+    private var dragEraseMode: Boolean = false
 
     init {
         renderAnimation()
@@ -64,8 +66,16 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             }
         }
 
-        customMode.onVirtualDevicePress = { x, y ->
-            onEvent(Event.OnPaintButton(x, y))
+        customMode.onVirtualDeviceDragStart = { x, y ->
+            beginVirtualDrag(x, y)
+        }
+
+        customMode.onVirtualDeviceDrag = { x, y ->
+            continueVirtualDrag(x, y)
+        }
+
+        customMode.onVirtualDeviceDragEnd = {
+            endVirtualDrag()
         }
     }
 
@@ -103,104 +113,122 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         }
     }
 
+    private fun beginVirtualDrag(x: Int, y: Int) {
+        isDragging.value = true
+        dragVisitedPads.clear()
+        dragEraseMode = padMatchesSelectedColor(x, y)
+
+        applyDragAt(x, y)
+    }
+
+    private fun continueVirtualDrag(x: Int, y: Int) {
+        if (!isDragging.value) {
+            beginVirtualDrag(x, y)
+            return
+        }
+
+        applyDragAt(x, y)
+    }
+
+    private fun endVirtualDrag() {
+        isDragging.value = false
+        dragVisitedPads.clear()
+    }
+
+    private fun applyDragAt(x: Int, y: Int) {
+        if (!dragVisitedPads.add(Pair(x, y))) return
+
+        if (dragEraseMode) {
+            applyColorAt(x, y, Triple(0f, 0f, 0f), addToRecent = false)
+        } else {
+            applyColorAt(x, y, state.value.selectedColor, addToRecent = true)
+        }
+    }
+
+    private fun padMatchesSelectedColor(x: Int, y: Int): Boolean {
+        return currentEntryColor(x, y) == state.value.selectedColor
+    }
+
+    private fun currentEntryColor(x: Int, y: Int): Triple<Float, Float, Float> {
+        val frame = state.value.frames[state.value.currentFrameIndex]
+        val entry = frame.entries.firstOrNull { it.x == x && it.y == y }
+
+        return if (entry != null) {
+            Triple(entry.r, entry.g, entry.b)
+        } else {
+            Triple(0f, 0f, 0f)
+        }
+    }
+
+    private fun applyColorAt(
+        x: Int,
+        y: Int,
+        color: Triple<Float, Float, Float>,
+        addToRecent: Boolean
+    ) {
+        if (addToRecent) {
+            WorkspaceRepository.addRecentColor(color)
+        }
+
+        state.update { currentState ->
+            currentState.copy(
+                frames = currentState.frames.toMutableList().apply {
+                    set(
+                        index = currentState.currentFrameIndex,
+                        element = currentState.frames[currentState.currentFrameIndex].copy(
+                            entries = currentState.frames[currentState.currentFrameIndex].entries.toMutableList().apply {
+                                val index = indexOfFirst { it.x == x && it.y == y }
+                                if (index != -1) removeAt(index)
+                                add(
+                                    KeyframesEntry(
+                                        x = x,
+                                        y = y,
+                                        r = color.first,
+                                        g = color.second,
+                                        b = color.third
+                                    )
+                                )
+                            }
+                        )
+                    )
+                }
+            )
+        }
+
+        Heaven.midiEnter(
+            listOf(
+                Signal.LED(
+                    origin = this,
+                    x = x,
+                    y = y,
+                    color = Color(
+                        red = color.first,
+                        green = color.second,
+                        blue = color.third
+                    ),
+                    layer = 0
+                )
+            )
+        )
+    }
+
     fun onEvent(event: Event) {
         when (event) {
             is Event.OnPaintButton -> {
-                state.update { state ->
-                    state.copy(
-                        frames = state.frames.toMutableList().apply {
-                            set(
-                                index = state.currentFrameIndex,
-                                element = state.frames[state.currentFrameIndex].copy(
-                                    entries = state.frames[state.currentFrameIndex].entries.toMutableList().apply {
-                                        val index: Int = indexOfFirst { it.x == event.x && it.y == event.y }
-                                        val selectedColor = Triple(state.selectedColor.first, state.selectedColor.second, state.selectedColor.third)
-
-                                        WorkspaceRepository.addRecentColor(Triple(selectedColor.first, selectedColor.second, selectedColor.third))
-
-                                        if (index != -1) {
-                                            val entry = get(index)
-                                            if (Triple(entry.r, entry.g, entry.b) == selectedColor) {
-                                                removeAt(index)
-                                                add(
-                                                    KeyframesEntry(
-                                                        x = event.x,
-                                                        y = event.y,
-                                                        r = 0f,
-                                                        g = 0f,
-                                                        b = 0f
-                                                    )
-                                                )
-                                                Heaven.midiEnter(
-                                                    listOf(
-                                                        Signal.LED(
-                                                            origin = this,
-                                                            x = event.x,
-                                                            y = event.y,
-                                                            color = Color.Black,
-                                                            layer = 0
-                                                        )
-                                                    )
-                                                )
-                                            } else {
-                                                removeAt(index)
-                                                add(
-                                                    KeyframesEntry(
-                                                        x = event.x,
-                                                        y = event.y,
-                                                        r = selectedColor.first,
-                                                        g = selectedColor.second,
-                                                        b = selectedColor.third
-                                                    )
-                                                )
-                                                Heaven.midiEnter(
-                                                    listOf(
-                                                        Signal.LED(
-                                                            origin = this,
-                                                            x = event.x,
-                                                            y = event.y,
-                                                            color = Color(
-                                                                red = selectedColor.first,
-                                                                green = selectedColor.second,
-                                                                blue = selectedColor.third
-                                                            ),
-                                                            layer = 0
-                                                        )
-                                                    )
-                                                )
-                                        }
-                                        } else {
-                                            add(
-                                                    KeyframesEntry(
-                                                    x = event.x,
-                                                    y = event.y,
-                                                        r = selectedColor.first,
-                                                        g = selectedColor.second,
-                                                        b = selectedColor.third
-                                                )
-                                            )
-                                            Heaven.midiEnter(
-                                                listOf(
-                                                    Signal.LED(
-                                                        origin = this,
-                                                        x = event.x,
-                                                        y = event.y,
-                                                        color = Color(
-                                                                red = selectedColor.first,
-                                                                green = selectedColor.second,
-                                                                blue = selectedColor.third
-                                                        ),
-                                                        layer = 0
-                                                    )
-                                                )
-                                            )
-                                        }
-                                    }
-                                )
-                            )
-                        }
-                    )
+                val selectedColor = state.value.selectedColor
+                val currentColor = currentEntryColor(event.x, event.y)
+                val targetColor = if (currentColor == selectedColor) {
+                    Triple(0f, 0f, 0f)
+                } else {
+                    selectedColor
                 }
+
+                applyColorAt(
+                    x = event.x,
+                    y = event.y,
+                    color = targetColor,
+                    addToRecent = targetColor != Triple(0f, 0f, 0f)
+                )
             }
 
             is Event.OnColorUpdate -> {

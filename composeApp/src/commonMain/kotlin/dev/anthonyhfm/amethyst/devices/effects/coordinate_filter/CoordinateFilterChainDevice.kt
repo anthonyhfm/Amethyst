@@ -27,14 +27,24 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     override val state = MutableStateFlow(CoordinateFilterChainDeviceState())
 
     private val customMode: CoordinateFilterWorkspaceMode = CoordinateFilterWorkspaceMode()
+    private val dragVisitedPads: MutableSet<Pair<Int, Int>> = mutableSetOf()
+    private var dragRemoveMode: Boolean = false
 
     init {
         customMode.modeClose = {
             Heaven.clear()
         }
 
-        customMode.onVirtualDevicePress = { x, y ->
-            onSetKeyFilter(x, y)
+        customMode.onVirtualDeviceDragStart = { x, y ->
+            beginVirtualDrag(x, y)
+        }
+
+        customMode.onVirtualDeviceDrag = { x, y ->
+            continueVirtualDrag(x, y)
+        }
+
+        customMode.onVirtualDeviceDragEnd = {
+            endVirtualDrag()
         }
 
         customMode.modeWakeup = {
@@ -70,6 +80,69 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         }
     }
 
+    private fun beginVirtualDrag(x: Int, y: Int) {
+        isDragging.value = true
+        dragVisitedPads.clear()
+        dragRemoveMode = state.value.filters.contains(Pair(x, y))
+
+        applyDragAt(x, y)
+    }
+
+    private fun continueVirtualDrag(x: Int, y: Int) {
+        if (!isDragging.value) {
+            beginVirtualDrag(x, y)
+            return
+        }
+
+        applyDragAt(x, y)
+    }
+
+    private fun endVirtualDrag() {
+        isDragging.value = false
+        dragVisitedPads.clear()
+    }
+
+    private fun applyDragAt(x: Int, y: Int) {
+        if (!dragVisitedPads.add(Pair(x, y))) return
+
+        setFilterState(x, y, enabled = !dragRemoveMode)
+    }
+
+    private fun setFilterState(x: Int, y: Int, enabled: Boolean) {
+        val coordinatePair = Pair(x, y)
+        val isAlreadyFiltered = state.value.filters.contains(coordinatePair)
+
+        if (enabled == isAlreadyFiltered) return
+
+        val stateBefore = state.value
+
+        state.update { currentState ->
+            if (enabled) {
+                currentState.copy(
+                    filters = currentState.filters + coordinatePair
+                )
+            } else {
+                currentState.copy(
+                    filters = currentState.filters.filter { it != coordinatePair }
+                )
+            }
+        }
+
+        pushStateChange(stateBefore, state.value)
+
+        Heaven.midiEnter(
+            listOf(
+                Signal.LED(
+                    origin = this,
+                    x = x,
+                    y = y,
+                    color = if (enabled) Color.Green else Color.Black,
+                    layer = 0
+                )
+            )
+        )
+    }
+
     fun refreshVirtualDevices() {
         Heaven.clear()
 
@@ -87,37 +160,8 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     }
 
     fun onSetKeyFilter(x: Int, y: Int) {
-        val coordinatePair = Pair(x, y)
-
-        val isAlreadyFiltered = state.value.filters.contains(coordinatePair)
-
-        val stateBefore = state.value
-
-        state.update { currentState ->
-            if (isAlreadyFiltered) {
-                currentState.copy(
-                    filters = currentState.filters.filter { it != coordinatePair }
-                )
-            } else {
-                currentState.copy(
-                    filters = currentState.filters + coordinatePair
-                )
-            }
-        }
-
-        pushStateChange(stateBefore, state.value)
-
-        Heaven.midiEnter(
-            listOf(
-                Signal.LED(
-                    origin = this,
-                    x = x,
-                    y = y,
-                    color = if (isAlreadyFiltered) Color.Black else Color.Green,
-                    layer = 0
-                )
-            )
-        )
+        val isAlreadyFiltered = state.value.filters.contains(Pair(x, y))
+        setFilterState(x, y, enabled = !isAlreadyFiltered)
     }
 
     override fun signalEnter(n: List<Signal>) {
