@@ -19,7 +19,7 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     abstract val state: MutableStateFlow<State>
 
-    val isDragging: MutableState<Boolean> = mutableStateOf(false)
+    var isDragging: MutableState<Boolean> = mutableStateOf(false)
 
     @Composable
     abstract fun Content()

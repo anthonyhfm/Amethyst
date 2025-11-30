@@ -29,7 +29,6 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     private val customMode: CoordinateFilterWorkspaceMode = CoordinateFilterWorkspaceMode()
     private val dragVisitedPads: MutableSet<Pair<Int, Int>> = mutableSetOf()
     private var dragRemoveMode: Boolean = false
-    private var isDragging = false
 
     init {
         customMode.modeClose = {
@@ -82,7 +81,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     }
 
     private fun beginVirtualDrag(x: Int, y: Int) {
-        isDragging = true
+        isDragging.value = true
         dragVisitedPads.clear()
         dragRemoveMode = state.value.filters.contains(Pair(x, y))
 
@@ -90,7 +89,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     }
 
     private fun continueVirtualDrag(x: Int, y: Int) {
-        if (!isDragging) {
+        if (!isDragging.value) {
             beginVirtualDrag(x, y)
             return
         }
@@ -99,7 +98,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     }
 
     private fun endVirtualDrag() {
-        isDragging = false
+        isDragging.value = false
         dragVisitedPads.clear()
     }
 

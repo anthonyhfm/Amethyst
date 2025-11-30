@@ -47,7 +47,6 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     private var lastSelectedFrameIndex: Int? = null
     private val dragVisitedPads: MutableSet<Pair<Int, Int>> = mutableSetOf()
     private var dragEraseMode: Boolean = false
-    private var isDragging = false
 
     init {
         renderAnimation()
@@ -115,7 +114,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun beginVirtualDrag(x: Int, y: Int) {
-        isDragging = true
+        isDragging.value = true
         dragVisitedPads.clear()
         dragEraseMode = padMatchesSelectedColor(x, y)
 
@@ -123,7 +122,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun continueVirtualDrag(x: Int, y: Int) {
-        if (!isDragging) {
+        if (!isDragging.value) {
             beginVirtualDrag(x, y)
             return
         }
@@ -132,7 +131,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun endVirtualDrag() {
-        isDragging = false
+        isDragging.value = false
         dragVisitedPads.clear()
     }
 
