@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.unipad.data.KeyLED
 import dev.anthonyhfm.amethyst.conversion.unipad.data.KeySound
 import dev.anthonyhfm.amethyst.conversion.unipad.data.DecodedAudioClip
+import dev.anthonyhfm.amethyst.conversion.unipad.data.UnipadAutoPlay
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
@@ -12,6 +13,7 @@ import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.runBlocking
@@ -56,6 +58,18 @@ object UnipadConverter : AmethystConverter {
             author = infoMap["producerName"] ?: "Unknown",
             lights = createLightsChain(infoMap["chain"]?.toInt() ?: 1),
             sampling = createAudioChain(infoMap["chain"]?.toInt() ?: 1, clipMap),
+            autoPlay = if (entries["autoPlay"] != null) {
+                try {
+                    UnipadAutoPlay.getAutoPlayData(
+                        autoPlayString = entries["autoPlay"]?.data?.decodeToString() ?: ""
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    AutoPlayData(emptyMap())
+                }
+            } else {
+                AutoPlayData(emptyMap())
+            },
             launchpadDevices = listOf(
                 SavableWorkspaceData.SavableViewportLaunchpad(
                     positionX = 0f,

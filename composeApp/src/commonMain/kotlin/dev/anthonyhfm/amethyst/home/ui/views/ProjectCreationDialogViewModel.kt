@@ -20,6 +20,13 @@ class ProjectCreationDialogViewModel : BaseViewModel<ProjectCreationDialogContra
                 val workspace = SavableWorkspaceData(
                     title = state.value.name.trim(),
                     author = state.value.author.trim().ifBlank { "Unknown Author" },
+                    launchpadDevices = listOf(
+                        SavableWorkspaceData.SavableViewportLaunchpad(
+                            positionX = 0f,
+                            positionY = 0f,
+                            type = SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                        )
+                    )
                 )
 
                 if (state.value.author.isNotBlank()) {

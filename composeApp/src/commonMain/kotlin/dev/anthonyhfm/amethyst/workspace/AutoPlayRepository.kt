@@ -8,18 +8,21 @@ object AutoPlayRepository {
     fun startAutoPlay() {
         val autoplay = WorkspaceRepository.saveableWorkspaceData?.autoPlay ?: return
 
-        autoplay.actions.entries
-            .sortedBy { it.key }
-            .take(10).forEach { map ->
-                map.value.forEach {
-                    println("$${map.key}: ${it.x}, ${it.y}, ${if (it.down) "down" else "up"}")
-                }
-            }
-
         autoplay.actions.entries.forEach {
             Heaven.schedule(it.key, this) {
-                Heaven.midiEnter(
-                    signals = it.value.map {
+                WorkspaceRepository.samplingChain.signalEnter(
+                    it.value.map {
+                        Signal.Midi(
+                            origin = this,
+                            x = it.x,
+                            y = it.y,
+                            velocity = if (it.down) 127 else 0,
+                        )
+                    }
+                )
+
+                WorkspaceRepository.lightsChain.signalEnter(
+                    it.value.map {
                         Signal.LED(
                             origin = this,
                             x = it.x,
