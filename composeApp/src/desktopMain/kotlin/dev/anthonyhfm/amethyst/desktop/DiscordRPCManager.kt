@@ -106,15 +106,14 @@ actual object DiscordRPCManager {
             client?.update {
                 type = ActivityType.GAME
                 
-                // Set details based on project name setting
                 details = if (showProject && projectName != null) {
                     projectName
                 } else {
                     ""
                 }
                 
-                if (showState && WorkspaceRepository.saveableWorkspaceData != null) {
-                    formatWorkspaceMode(workspaceState)
+                if (showState && projectName != null) {
+                    state = formatWorkspaceMode(workspaceState)
                 } else {
                     state = null
                 }
