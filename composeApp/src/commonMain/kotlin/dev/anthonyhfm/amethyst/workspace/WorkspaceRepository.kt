@@ -58,6 +58,9 @@ object WorkspaceRepository {
 
     private val _bpm = MutableStateFlow(120.00)
     val bpm: StateFlow<Double> = _bpm.asStateFlow()
+    
+    private val _projectName = MutableStateFlow<String?>(null)
+    val projectName: StateFlow<String?> = _projectName.asStateFlow()
 
     // Recently used colors; initialize from GlobalSettings for persistence
     private val _recentColors: MutableStateFlow<List<Triple<Float, Float, Float>>> =
@@ -256,6 +259,10 @@ object WorkspaceRepository {
 
         _bpm.update {
             workspaceData.settings.bpm
+        }
+        
+        _projectName.update {
+            workspaceData.title
         }
 
         _mode.update {
