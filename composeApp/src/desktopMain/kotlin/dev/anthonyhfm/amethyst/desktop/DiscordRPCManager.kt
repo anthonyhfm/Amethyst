@@ -109,7 +109,7 @@ actual object DiscordRPCManager {
                 details = if (showProject && projectName != null) {
                     projectName
                 } else {
-                    ""
+                    "Home"
                 }
                 
                 if (showState && projectName != null) {
