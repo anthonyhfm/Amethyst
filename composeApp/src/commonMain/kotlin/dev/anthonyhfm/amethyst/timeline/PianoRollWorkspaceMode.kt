@@ -43,6 +43,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -489,6 +490,9 @@ private fun PianoRollEditor(
     var resizeRightDelta by remember { mutableStateOf(0f) }
     var activeDragNote by remember { mutableStateOf<MidiNote?>(null) }
 
+    // Time Selection State
+    var selectedTimeMs by remember { mutableStateOf<Long?>(null) }
+
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Row(modifier = Modifier.fillMaxWidth().height(40.dp)) {
             Box(
@@ -503,6 +507,19 @@ private fun PianoRollEditor(
                     .weight(1f)
                     .height(40.dp)
                     .horizontalScroll(horizontalScroll, enabled = false)
+                    .pointerInput(gridResolution) {
+                        detectTapGestures { offset ->
+                            val clickX = offset.x
+                            val timeMs = metrics.xPxToTimeMs(clickX)
+                            // Snap to grid
+                            val bpm = WorkspaceRepository.bpm.value
+                            val msPerBeat = (60000.0 / bpm).toLong()
+                            val subdivisions = gridResolution.subBeatsPerBeat
+                            val gridIntervalMs = msPerBeat / subdivisions
+                            val snappedTimeMs = ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
+                            selectedTimeMs = snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs)
+                        }
+                    }
             ) {
                 TimelineRuler(
                     clipBeats = clipBeats,
@@ -628,11 +645,24 @@ private fun PianoRollEditor(
                                                             offset.y >= yPx && offset.y <= yPx + metrics.noteRenderHeightPx
                                                 }
                                                 if (clickedNote != null) {
+                                                    selectedTimeMs = null  // Clear time selection when selecting a note
                                                     SelectionManager.select(
                                                         Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote),
                                                         single = !multiSelectModifierDown
                                                     )
-                                                } else if (!multiSelectModifierDown) SelectionManager.clear()
+                                                } else {
+                                                    if (!multiSelectModifierDown) {
+                                                        SelectionManager.clear()
+                                                        // Set time selection with grid snapping
+                                                        val timeMs = metrics.xPxToTimeMs(offset.x)
+                                                        val bpm = WorkspaceRepository.bpm.value
+                                                        val msPerBeat = (60000.0 / bpm).toLong()
+                                                        val subdivisions = gridResolution.subBeatsPerBeat
+                                                        val gridIntervalMs = msPerBeat / subdivisions
+                                                        val snappedTimeMs = ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
+                                                        selectedTimeMs = snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs)
+                                                    }
+                                                }
                                             },
                                             onDoubleTap = { offset ->
                                                 val pitch = metrics.yPxToPitch(offset.y)
@@ -958,6 +988,21 @@ private fun PianoRollEditor(
                                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                                         )
                                     }
+                                }
+
+                                // Time Selection Cursor
+                                selectedTimeMs?.let { timeMs ->
+                                    val xPx by remember(timeMs, metrics.pixelsPerBeatPx) {
+                                        derivedStateOf { metrics.timeMsToXPx(timeMs) }
+                                    }
+                                    val density = LocalDensity.current
+                                    Box(
+                                        modifier = Modifier
+                                            .offset { IntOffset((xPx - with(density) { 1.5.dp.toPx() }).toInt(), 0) }
+                                            .width(3.dp)
+                                            .height(rowHeight)
+                                            .background(Color.White.copy(alpha = 0.8f))
+                                    )
                                 }
                             }
                         }
