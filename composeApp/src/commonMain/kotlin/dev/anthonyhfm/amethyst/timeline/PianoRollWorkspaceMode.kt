@@ -299,7 +299,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                         val bpm = WorkspaceRepository.bpm.value
                         val msPerBeat = (60000.0 / bpm).toLong()
-                        val cellDurationMs = msPerBeat / 4 // Viertelnote
+                        val cellDurationMs = msPerBeat / 4
 
                         val pitchDelta = when (event.key) {
                             Key.DirectionUp -> 1
@@ -490,7 +490,6 @@ private fun PianoRollEditor(
     var resizeRightDelta by remember { mutableStateOf(0f) }
     var activeDragNote by remember { mutableStateOf<MidiNote?>(null) }
 
-    // Time Selection State
     var selectedTimeMs by remember { mutableStateOf<Long?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
@@ -511,7 +510,7 @@ private fun PianoRollEditor(
                         detectTapGestures { offset ->
                             val clickX = offset.x
                             val timeMs = metrics.xPxToTimeMs(clickX)
-                            // Snap to grid
+
                             val bpm = WorkspaceRepository.bpm.value
                             val msPerBeat = (60000.0 / bpm).toLong()
                             val subdivisions = gridResolution.subBeatsPerBeat
@@ -634,7 +633,7 @@ private fun PianoRollEditor(
                                             )
                                         }
                                     }
-                                    .pointerInput(entry, onNoteAdd) {
+                                    .pointerInput(entry, onNoteAdd, zoomFactorState) {
                                         detectTapGestures(
                                             onTap = { offset ->
                                                 val clickedNote = deviceNotes.firstOrNull { note ->
@@ -645,7 +644,7 @@ private fun PianoRollEditor(
                                                             offset.y >= yPx && offset.y <= yPx + metrics.noteRenderHeightPx
                                                 }
                                                 if (clickedNote != null) {
-                                                    selectedTimeMs = null  // Clear time selection when selecting a note
+                                                    selectedTimeMs = null
                                                     SelectionManager.select(
                                                         Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote),
                                                         single = !multiSelectModifierDown
@@ -653,7 +652,7 @@ private fun PianoRollEditor(
                                                 } else {
                                                     if (!multiSelectModifierDown) {
                                                         SelectionManager.clear()
-                                                        // Set time selection with grid snapping
+
                                                         val timeMs = metrics.xPxToTimeMs(offset.x)
                                                         val bpm = WorkspaceRepository.bpm.value
                                                         val msPerBeat = (60000.0 / bpm).toLong()
@@ -990,7 +989,6 @@ private fun PianoRollEditor(
                                     }
                                 }
 
-                                // Time Selection Cursor
                                 selectedTimeMs?.let { timeMs ->
                                     val xPx by remember(timeMs, metrics.pixelsPerBeatPx) {
                                         derivedStateOf { metrics.timeMsToXPx(timeMs) }
