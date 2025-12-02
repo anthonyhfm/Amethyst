@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +25,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -40,6 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -291,7 +296,6 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         val launchpadCount = Heaven.devices.size.coerceAtLeast(1)
                         val totalPitches = launchpadCount * 100
 
-                        // Berechne Zellengröße basierend auf BPM (nicht fest 500ms)
                         val bpm = WorkspaceRepository.bpm.value
                         val msPerBeat = (60000.0 / bpm).toLong()
                         val cellDurationMs = msPerBeat / 4 // Viertelnote
@@ -485,32 +489,51 @@ private fun PianoRollEditor(
     var resizeRightDelta by remember { mutableStateOf(0f) }
     var activeDragNote by remember { mutableStateOf<MidiNote?>(null) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        Row(modifier = Modifier.fillMaxWidth().height(40.dp)) {
+            Box(
+                modifier = Modifier
+                    .width(100.dp)
+                    .height(40.dp)
+                    .background(Color(0xFF2B2B2B))
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .horizontalScroll(horizontalScroll, enabled = false)
+            ) {
+                TimelineRuler(
+                    clipBeats = clipBeats,
+                    metrics = metrics,
+                    beatsPerBar = beatsPerBar,
+                    canvasWidthDp = canvasWidthDp
+                )
+            }
+        }
+
         LazyColumn(
-            modifier = Modifier,
+            modifier = Modifier.weight(1f),
         ) {
-            itemsIndexed(Heaven.devices) { index, device ->
-                val devicePitchRange = 0 until 100
-                val deviceNotes = notesState.filter { it.device == index && it.pitch in devicePitchRange }
-                val rowHeight = noteHeightDp * 100
+                itemsIndexed(Heaven.devices) { index, device ->
+                    val devicePitchRange = 0 until 100
+                    val deviceNotes = notesState.filter { it.device == index && it.pitch in devicePitchRange }
+                    val rowHeight = noteHeightDp * 100
 
-                Column {
-                    Text(
-                        text = "${device.name} (pos. X: ${device.position.value.x}, Y: ${device.position.value.y})",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(vertical = 6.dp)
-                    )
-
-                    Row(modifier = Modifier.height(rowHeight)) {
-                        PianoKeysColumn(
-                            totalPitches = 100,
-                            noteHeight = noteHeightDp,
-                            verticalScroll = null
+                    Column {
+                        Text(
+                            text = "${device.name} (pos. X: ${device.position.value.x}, Y: ${device.position.value.y})",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(vertical = 6.dp)
                         )
+
+                        Row(modifier = Modifier.height(rowHeight)) {
+                            PianoKeysColumn(
+                                totalPitches = 100,
+                                noteHeight = noteHeightDp,
+                                verticalScroll = null
+                            )
 
                         Box(
                             modifier = Modifier
@@ -528,7 +551,7 @@ private fun PianoRollEditor(
                                                 val deltaY = change?.scrollDelta?.y ?: 0f
                                                 if (isZoomModifier && deltaY != 0f) {
                                                     val direction = if (deltaY > 0f) -1f else 1f
-                                                    val factor = 1f + 0.03f * direction // Sehr smooth zoom
+                                                    val factor = 1f + 0.03f * direction
                                                     val newZoom = (zoomFactorState * factor).coerceIn(0.75f, 12f)
                                                     onZoomFactorChange(newZoom)
                                                     change?.consume()
@@ -549,7 +572,7 @@ private fun PianoRollEditor(
                                         val lightRow = Color(0xFF242424)
                                         val beatLine = Color(0xFF444444)
                                         val barLine = Color(0xFF555555)
-                                        val quarterCellLine = Color(0xFF2A2A2A) // Kaum sichtbar für Viertel-Zellen
+                                        val quarterCellLine = Color(0xFF2A2A2A)
 
                                         for (pitch in devicePitchRange) {
                                             val y = pitch * metrics.noteHeightPx
@@ -566,7 +589,6 @@ private fun PianoRollEditor(
                                             drawLine(Color(0xFF333333), Offset(0f, y), Offset(widthPx, y), 1f)
                                         }
 
-                                        // Zeichne Viertel-Zellen Grid-Linien (kaum sichtbar)
                                         val quarterSubdivisions = (clipBeats * 4).roundToInt()
                                         for (quarterIndex in 0..quarterSubdivisions) {
                                             val beatIndex = quarterIndex.toFloat() / 4
@@ -580,7 +602,6 @@ private fun PianoRollEditor(
                                             )
                                         }
 
-                                        // Zeichne Haupt-Grid-Linien (basierend auf aktuellem Grid)
                                         val subdivisionsPerBeat = gridResolution.subBeatsPerBeat
                                         val totalSubdivisions = (clipBeats * subdivisionsPerBeat).roundToInt()
                                         for (subIndex in 0..totalSubdivisions) {
@@ -1083,4 +1104,80 @@ private fun PianoKeysColumn(
         }
     }
 }
+
+@Composable
+private fun TimelineRuler(
+    clipBeats: Float,
+    metrics: PianoRollMetrics,
+    beatsPerBar: Int,
+    canvasWidthDp: Dp
+) {
+    val textMeasurer = rememberTextMeasurer()
+    val backgroundColor = Color(0xFF2B2B2B)
+    val textColor = Color(0xFFCCCCCC)
+    val majorTickColor = Color(0xFFFFFFFF).copy(alpha = 0.8f)
+    val minorTickColor = Color(0xFFFFFFFF).copy(alpha = 0.4f)
+
+    Canvas(
+        modifier = Modifier
+            .width(canvasWidthDp)
+            .fillMaxHeight()
+            .background(backgroundColor)
+    ) {
+        val heightPx = size.height
+        val totalBeats = clipBeats.toInt() + 1
+
+        for (beatIndex in 0 until totalBeats) {
+            val x = beatIndex * metrics.pixelsPerBeatPx
+            if (x > size.width) break
+
+            val isBar = (beatIndex % beatsPerBar) == 0
+            val tickHeight = if (isBar) heightPx * 0.6f else heightPx * 0.3f
+
+            drawLine(
+                color = if (isBar) majorTickColor else minorTickColor,
+                start = Offset(x, heightPx - tickHeight),
+                end = Offset(x, heightPx),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
+
+        for (beatIndex in 0 until totalBeats) {
+            val x = beatIndex * metrics.pixelsPerBeatPx
+            if (x > size.width) break
+
+            val isBar = (beatIndex % beatsPerBar) == 0
+
+            if (isBar) {
+                val barNumber = (beatIndex / beatsPerBar) + 1
+
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = "$barNumber",
+                    topLeft = Offset(x + 4.dp.toPx(), 4.dp.toPx()),
+                    style = TextStyle(
+                        color = textColor,
+                        fontSize = 11.sp
+                    )
+                )
+
+                for (beat in 1 until beatsPerBar) {
+                    val beatX = (beatIndex + beat) * metrics.pixelsPerBeatPx
+                    if (beatX > size.width) break
+
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = "${beat + 1}",
+                        topLeft = Offset(beatX + 4.dp.toPx(), 4.dp.toPx()),
+                        style = TextStyle(
+                            color = textColor.copy(alpha = 0.6f),
+                            fontSize = 10.sp
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
 
