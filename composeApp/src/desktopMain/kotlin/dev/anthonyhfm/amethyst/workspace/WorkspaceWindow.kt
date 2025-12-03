@@ -9,6 +9,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
@@ -18,7 +23,10 @@ import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
+import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
+import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import javax.swing.UIManager
 import kotlin.system.exitProcess
@@ -29,11 +37,20 @@ fun WorkspaceWindow() {
         UIManager.setLookAndFeel(FlatAmethystLaf())
     }
 
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var pendingClose by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
     Window(
         onCloseRequest = {
-            // AudioOutput.cleanup()
-
-            exitProcess(0)
+            // Check if there are unsaved changes
+            if (WorkspaceRepository.hasUnsavedChanges()) {
+                showSaveDialog = true
+                pendingClose = true
+            } else {
+                // AudioOutput.cleanup()
+                exitProcess(0)
+            }
         },
         title = "Amethyst",
         state = rememberWindowState(
@@ -78,6 +95,35 @@ fun WorkspaceWindow() {
 
                 Workspace()
             }
+        }
+
+        // Show save changes dialog if needed
+        if (showSaveDialog) {
+            SaveChangesDialog(
+                onSave = {
+                    coroutineScope.launch {
+                        val saved = WorkspaceSaveHelper.saveWorkspace()
+                        if (saved && pendingClose) {
+                            // AudioOutput.cleanup()
+                            exitProcess(0)
+                        }
+                        showSaveDialog = false
+                        pendingClose = false
+                    }
+                },
+                onDontSave = {
+                    showSaveDialog = false
+                    if (pendingClose) {
+                        // AudioOutput.cleanup()
+                        exitProcess(0)
+                    }
+                    pendingClose = false
+                },
+                onCancel = {
+                    showSaveDialog = false
+                    pendingClose = false
+                }
+            )
         }
     }
 }

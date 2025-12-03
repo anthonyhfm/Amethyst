@@ -314,4 +314,23 @@ object WorkspaceRepository {
             newList
         }
     }
+
+    fun hasUnsavedChanges(): Boolean {
+        // If there's no saveable workspace data, there are no changes to compare
+        if (saveableWorkspaceData == null) return false
+        
+        // Generate current workspace state and compare with saved state
+        val currentWorkspace = saveWorkspace()
+        val savedWorkspace = saveableWorkspaceData!!
+        
+        // Compare key properties that indicate changes
+        return currentWorkspace.title != savedWorkspace.title ||
+               currentWorkspace.author != savedWorkspace.author ||
+               currentWorkspace.lights != savedWorkspace.lights ||
+               currentWorkspace.sampling != savedWorkspace.sampling ||
+               currentWorkspace.macros != savedWorkspace.macros ||
+               currentWorkspace.settings != savedWorkspace.settings ||
+               currentWorkspace.launchpadDevices != savedWorkspace.launchpadDevices ||
+               currentWorkspace.timelineData != savedWorkspace.timelineData
+    }
 }
