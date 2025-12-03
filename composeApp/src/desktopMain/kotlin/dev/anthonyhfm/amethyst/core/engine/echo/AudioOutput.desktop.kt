@@ -5,7 +5,6 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlinx.coroutines.*
 import org.lwjgl.openal.*
 import org.lwjgl.system.MemoryUtil
-import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -89,7 +88,7 @@ actual object AudioOutput {
 
     private fun initializeOpenAL() {
         try {
-            device = ALC10.alcOpenDevice(null as ByteBuffer?)
+            device = ALC10.alcOpenDevice(null)
             if (device == 0L) {
                 return
             }
@@ -311,7 +310,8 @@ actual object AudioOutput {
         val normalizedData = normalizeAudioForPlayback(rawData, audioSignal)
 
         val sourceId = "audio_${System.currentTimeMillis()}_${(0..999).random()}"
-        val queuedAudio = QueuedAudio(normalizedData, sourceId, audioSignal.origin, 0)
+        // Priority is always 0 (normal priority) - previously this was platform-specific
+        val queuedAudio = QueuedAudio(normalizedData, sourceId, audioSignal.origin, priority = 0)
         queuedAudio.format = Pair(audioSignal, openALFormat)
 
         audioQueue.offer(queuedAudio)
