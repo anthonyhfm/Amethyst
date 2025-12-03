@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BlurLinear
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,13 +26,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientSmoothness
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import io.androidpoet.dropdown.Dropdown
+import io.androidpoet.dropdown.dropDownMenu
 
 @Composable
 fun GradientEditorBar(
@@ -41,6 +46,7 @@ fun GradientEditorBar(
     onAddGradientPoint: (position: Float) -> Unit,
     onGradientDragStart: () -> Unit,
     onGradientDragFinish: () -> Unit,
+    onSmoothnessChange: (String, GradientSmoothness) -> Unit,
 ) {
     val density = LocalDensity.current
 
@@ -57,37 +63,103 @@ fun GradientEditorBar(
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth()
         ) {
-            // Canvas nutzt live Positionswerte
             Canvas(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .fillMaxWidth()
                     .height(28.dp)
+                    .border(2.dp, Color.White, RoundedCornerShape(4.dp))
+                    .padding(4.dp)
                     .rightClickable { offset ->
                         val position = offset.x / constraints.maxWidth.toFloat()
                         val clampedPosition = position.coerceIn(0f, 1f)
                         onAddGradientPoint(clampedPosition)
                     }
             ) {
-                val colorStops = colors.map { c ->
+                val sortedColors = colors.map { c ->
                     val p = positionStates[c.selectionUUID]?.value ?: c.position
-                    p to Color(c.r, c.g, c.b)
-                }.sortedBy { it.first }
+                    c.copy(position = p)
+                }.sortedBy { it.position }
 
-                drawRect(
-                    brush = Brush.horizontalGradient(
-                        colorStops = colorStops.toTypedArray(),
-                        startX = 0f,
-                        endX = size.width
-                    ),
-                    size = size
-                )
+                if (sortedColors.size < 2) return@Canvas
+
+                val visualSteps = 200
+                val stepWidth = size.width / visualSteps
+
+                for (step in 0..visualSteps) {
+                    val progress = step.toDouble() / visualSteps
+
+                    var segmentIndex = 0
+                    for (i in 0 until sortedColors.size - 1) {
+                        if (progress >= sortedColors[i].position && progress <= sortedColors[i + 1].position) {
+                            segmentIndex = i
+                            break
+                        }
+                    }
+
+                    val startColor = sortedColors[segmentIndex]
+                    val endColor = sortedColors.getOrNull(segmentIndex + 1) ?: sortedColors.last()
+                    val smoothness = startColor.smoothness
+
+                    val segmentStart = startColor.position.toDouble()
+                    val segmentEnd = endColor.position.toDouble()
+                    val segmentDuration = segmentEnd - segmentStart
+
+                    val linearT = if (segmentDuration > 0.0001) {
+                        ((progress - segmentStart) / segmentDuration).coerceIn(0.0, 1.0)
+                    } else {
+                        0.0
+                    }
+
+                    val easedT = when (smoothness) {
+                        GradientSmoothness.Linear -> linearT
+                        GradientSmoothness.Hold -> {
+                            if (linearT < 0.95) 0.0 else 1.0
+                        }
+                        GradientSmoothness.Release -> {
+                            if (linearT > 0.05) 1.0 else 0.0
+                        }
+                        GradientSmoothness.Fast -> {
+                            kotlin.math.sqrt(linearT)
+                        }
+                        GradientSmoothness.Slow -> {
+                            1.0 - kotlin.math.sqrt(1.0 - linearT)
+                        }
+                        GradientSmoothness.Sharp -> {
+                            if (linearT < 0.5) {
+                                0.5 - kotlin.math.sqrt(0.5 - linearT) / kotlin.math.sqrt(2.0)
+                            } else {
+                                0.5 + kotlin.math.sqrt(linearT - 0.5) / kotlin.math.sqrt(2.0)
+                            }
+                        }
+                        GradientSmoothness.Smooth -> {
+                            if (linearT < 0.5) {
+                                kotlin.math.sqrt(linearT / 2.0)
+                            } else {
+                                1.0 - kotlin.math.sqrt((1.0 - linearT) / 2.0)
+                            }
+                        }
+                    }
+
+                    val color = Color(
+                        red = (startColor.r + (endColor.r - startColor.r) * easedT.toFloat()).coerceIn(0f, 1f),
+                        green = (startColor.g + (endColor.g - startColor.g) * easedT.toFloat()).coerceIn(0f, 1f),
+                        blue = (startColor.b + (endColor.b - startColor.b) * easedT.toFloat()).coerceIn(0f, 1f)
+                    )
+
+                    drawRect(
+                        color = color,
+                        topLeft = androidx.compose.ui.geometry.Offset(step * stepWidth, 0f),
+                        size = androidx.compose.ui.geometry.Size(stepWidth + 1f, size.height)
+                    )
+                }
             }
 
             colors.forEach { color ->
                 var pos by positionStates.getValue(color.selectionUUID)
+                var showSmoothnessMenu by remember { mutableStateOf(false) }
+                var smoothnessMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
-                // Externe Positionsänderungen (Undo/Redo) zurückspielen
                 LaunchedEffect(color.position) {
                     if (color.position != pos) {
                         pos = color.position
@@ -119,6 +191,10 @@ fun GradientEditorBar(
                                 onSelectionChange(color.selectionUUID)
                             }
                         }
+                        .rightClickable { offset ->
+                            smoothnessMenuOffset = DpOffset((offset.x / density.density).dp, (offset.y / density.density).dp)
+                            showSmoothnessMenu = true
+                        }
                         .pointerInput(Unit) {
                             detectDragGestures(
                                 onDragStart = {
@@ -131,10 +207,16 @@ fun GradientEditorBar(
                                     pos = newPos
                                 },
                                 onDragEnd = {
-                                    // Commit aller Positionen einmalig
                                     val committed = colors.map { c ->
                                         val p = positionStates[c.selectionUUID]?.value ?: c.position
-                                        c.copy(position = p)
+                                        GradientChainDeviceState.GradientColor(
+                                            position = p,
+                                            r = c.r,
+                                            g = c.g,
+                                            b = c.b,
+                                            smoothness = c.smoothness,
+                                            selectionUUID = c.selectionUUID
+                                        )
                                     }
                                     onGradientDataEmit(committed)
                                     onGradientDragFinish()
@@ -142,13 +224,65 @@ fun GradientEditorBar(
                                 onDragCancel = {
                                     val committed = colors.map { c ->
                                         val p = positionStates[c.selectionUUID]?.value ?: c.position
-                                        c.copy(position = p)
+                                        GradientChainDeviceState.GradientColor(
+                                            position = p,
+                                            r = c.r,
+                                            g = c.g,
+                                            b = c.b,
+                                            smoothness = c.smoothness,
+                                            selectionUUID = c.selectionUUID
+                                        )
                                     }
                                     onGradientDataEmit(committed)
                                     onGradientDragFinish()
                                 }
                             )
                         }
+                )
+
+                Dropdown(
+                    isOpen = showSmoothnessMenu,
+                    menu = dropDownMenu {
+                        item("linear", "Linear") {
+                            icon(Icons.Default.BlurLinear)
+                        }
+                        item("smooth", "Smooth") {
+                            icon(Icons.Default.BlurLinear)
+                        }
+                        item("sharp", "Sharp") {
+                            icon(Icons.Default.BlurLinear)
+                        }
+                        item("fast", "Fast") {
+                            icon(Icons.Default.BlurLinear)
+                        }
+                        item("slow", "Slow") {
+                            icon(Icons.Default.BlurLinear)
+                        }
+                        item("hold", "Hold") {
+                            icon(Icons.Default.BlurLinear)
+                        }
+                        item("release", "Release") {
+                            icon(Icons.Default.BlurLinear)
+                        }
+                    },
+                    offset = smoothnessMenuOffset,
+                    onItemSelected = { item ->
+                        val smoothness = when (item) {
+                            "linear" -> GradientSmoothness.Linear
+                            "smooth" -> GradientSmoothness.Smooth
+                            "sharp" -> GradientSmoothness.Sharp
+                            "fast" -> GradientSmoothness.Fast
+                            "slow" -> GradientSmoothness.Slow
+                            "hold" -> GradientSmoothness.Hold
+                            "release" -> GradientSmoothness.Release
+                            else -> GradientSmoothness.Linear
+                        }
+                        onSmoothnessChange(color.selectionUUID, smoothness)
+                        showSmoothnessMenu = false
+                    },
+                    onDismiss = {
+                        showSmoothnessMenu = false
+                    }
                 )
             }
         }

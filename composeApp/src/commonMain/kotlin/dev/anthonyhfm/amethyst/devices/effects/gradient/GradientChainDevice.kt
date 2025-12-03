@@ -4,13 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +51,18 @@ import dev.anthonyhfm.amethyst.ui.components.rememberColorPickerState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kotlin.math.pow
+
+@Serializable
+enum class GradientSmoothness {
+    Linear,
+    Smooth,
+    Sharp,
+    Fast,
+    Slow,
+    Hold,
+    Release
+}
 
 class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(GradientChainDeviceState())
@@ -124,9 +141,9 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                         .fillMaxHeight()
                         .width(300.dp)
                         .padding(16.dp),
-
-                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 ) {
+                    Spacer(Modifier.height(16.dp))
+
                     key(deviceState.gradientData.size) {
                         var beforeGradientData: List<GradientChainDeviceState.GradientColor>? = null
                         GradientEditorBar(
@@ -144,8 +161,17 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                             },
                             colors = deviceState.gradientData,
                             onGradientDataEmit = { data ->
-                                // Während Drag kein Undo pushen, nur State aktualisieren
-                                state.update { it.copy(gradientData = data) }
+                                state.update { currentState ->
+                                    val updatedList = currentState.gradientData.map { currentColor ->
+                                        val newPosition = data.find { it.selectionUUID == currentColor.selectionUUID }?.position
+                                        if (newPosition != null) {
+                                            currentColor.copy(position = newPosition)
+                                        } else {
+                                            currentColor
+                                        }
+                                    }
+                                    currentState.copy(gradientData = updatedList)
+                                }
                             },
                             onAddGradientPoint = { position ->
                                 val before = state.value
@@ -183,9 +209,23 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                     }
                                 }
                                 beforeGradientData = null
+                            },
+                            onSmoothnessChange = { selectionUUID, smoothness ->
+                                val before = state.value
+                                val updatedColors = state.value.gradientData.map { color ->
+                                    if (color.selectionUUID == selectionUUID) {
+                                        color.copy(smoothness = smoothness)
+                                    } else {
+                                        color
+                                    }
+                                }
+                                state.update { it.copy(gradientData = updatedColors) }
+                                pushStateChange(before, state.value)
                             }
                         )
                     }
+
+                    Spacer(Modifier.height(8.dp))
 
                     Row(
                         modifier = Modifier
@@ -256,6 +296,26 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                     }
                                     pushStateChange(before, state.value)
                                 },
+                        )
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = deviceState.loop,
+                            onCheckedChange = { checked ->
+                                val before = state.value
+                                state.update { it.copy(loop = checked) }
+                                pushStateChange(before, state.value)
+                            },
+                        )
+
+                        Text(
+                            text = "Loop",
+                            style = MaterialTheme.typography.bodyMedium,
                         )
                     }
                 }
@@ -337,30 +397,149 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
         }
     }
 
-    private fun interpolateGradient(gradient: List<Pair<Float, Color>>, progress: Float): Color {
-        val (start, end) = gradient.zipWithNext().find { (a, b) -> progress in a.first..b.first }
-            ?: return gradient.last().second
+    data class FadeInfo(
+        val color: Color,
+        val time: Double,
+        val isHold: Boolean = false
+    )
 
-        val t = (progress - start.first) / (end.first - start.first)
+    private fun easeTime(type: GradientSmoothness, start: Double, end: Double, value: Double): Double {
+        if (type == GradientSmoothness.Linear) return value
+        if (type == GradientSmoothness.Hold) return if (start != value) end - 0.1 else start
+        if (type == GradientSmoothness.Release) return start
 
-        return Color(
-            red = start.second.red * (1 - t) + end.second.red * t,
-            green = start.second.green * (1 - t) + end.second.green * t,
-            blue = start.second.blue * (1 - t) + end.second.blue * t
-        )
+        val duration = end - start
+        val proportion = (value - start) / duration
+
+        val easedProportion = when (type) {
+            GradientSmoothness.Fast -> proportion.pow(2)
+            GradientSmoothness.Slow -> 1.0 - (1.0 - proportion).pow(2)
+            GradientSmoothness.Sharp -> {
+                if (proportion < 0.5) {
+                    (proportion - 0.5).pow(2) * -2 + 0.5
+                } else {
+                    (proportion - 0.5).pow(2) * 2 + 0.5
+                }
+            }
+            GradientSmoothness.Smooth -> {
+                if (proportion < 0.5) {
+                    proportion.pow(2) * 2
+                } else {
+                    (proportion - 1).pow(2) * -2 + 1
+                }
+            }
+            else -> proportion
+        }
+
+        return start + duration * easedProportion
+    }
+
+    private fun generateFade(): List<FadeInfo> {
+        val fps = GlobalSettings.performanceFPS
+        val frameTime = 1000.0 / fps
+        val bpm = WorkspaceRepository.bpm.value
+        val totalTime = state.value.timing.toMsValue(bpm) * (state.value.gate * 2)
+
+        val gradientData = state.value.gradientData.sortedBy { it.position }
+
+        if (gradientData.size < 2) return emptyList()
+
+        val steps = mutableListOf<Color>()
+        val counts = mutableListOf<Int>()
+        val cutoffs = mutableListOf(0)
+
+        for (i in 0 until gradientData.size - 1) {
+            val current = gradientData[i]
+            val next = gradientData[i + 1]
+            val fadeType = current.smoothness
+
+            if (fadeType == GradientSmoothness.Hold) {
+                steps.add(Color(current.r, current.g, current.b))
+                counts.add(1)
+                cutoffs.add(1 + cutoffs.last())
+            } else {
+                val maxDiff = maxOf(
+                    kotlin.math.abs(current.r - next.r),
+                    kotlin.math.abs(current.g - next.g),
+                    kotlin.math.abs(current.b - next.b),
+                    1f / 255f
+                ) * 255
+
+                val max = maxDiff.toInt()
+
+                for (k in 0 until max) {
+                    val factor = k.toDouble() / max
+                    steps.add(Color(
+                        red = current.r + (next.r - current.r) * factor.toFloat(),
+                        green = current.g + (next.g - current.g) * factor.toFloat(),
+                        blue = current.b + (next.b - current.b) * factor.toFloat()
+                    ))
+                }
+
+                counts.add(max)
+                cutoffs.add(max + cutoffs.last())
+            }
+        }
+
+        val lastColor = gradientData.last()
+        steps.add(Color(lastColor.r, lastColor.g, lastColor.b))
+
+        val lastColorLit = lastColor.r > 0.01f || lastColor.g > 0.01f || lastColor.b > 0.01f
+        if (lastColorLit) {
+            cutoffs[cutoffs.size - 1]++
+            counts[counts.size - 1]++
+
+            steps.add(Color.Black)
+            counts.add(1)
+            cutoffs.add(1 + cutoffs.last())
+        }
+
+        val fullFade = mutableListOf<FadeInfo>()
+        fullFade.add(FadeInfo(steps[0], 0.0, gradientData.getOrNull(0)?.smoothness == GradientSmoothness.Hold))
+
+        var j = 0
+        for (i in 1 until steps.size) {
+            if (j + 1 < cutoffs.size && cutoffs[j + 1] == i) j++
+
+            if (j < gradientData.size - 1) {
+                val prevTime = if (j != 0) gradientData[j].position.toDouble() * totalTime else 0.0
+                val currTime = (gradientData[j].position +
+                    (gradientData[j + 1].position - gradientData[j].position) *
+                    (i - cutoffs[j]).toDouble() / counts[j]) * totalTime
+                val nextTime = gradientData[j + 1].position.toDouble() * totalTime
+
+                val fadeType = gradientData[j].smoothness
+                val time = easeTime(fadeType, prevTime, nextTime, currTime)
+
+                fullFade.add(FadeInfo(steps[i], time, fadeType == GradientSmoothness.Hold))
+            }
+        }
+
+        val fade = mutableListOf<FadeInfo>()
+        fade.add(fullFade.first())
+
+        for (i in 1 until fullFade.size) {
+            val cutoff = fade.last().time + frameTime
+
+            if (cutoff < fullFade[i].time) {
+                fade.add(fullFade[i])
+            } else if (fade.last().time + 2 * frameTime <=
+                (if (i < fullFade.size - 1) fullFade[i + 1].time else totalTime.toDouble())) {
+                fade.add(fullFade[i].copy(time = cutoff))
+            } else if (i == fullFade.size - 1 &&
+                (fullFade[i].color.red > 0.01f || fullFade[i].color.green > 0.01f || fullFade[i].color.blue > 0.01f)) {
+                fade.add(fullFade[i])
+            }
+        }
+
+        fade.add(FadeInfo(steps.last(), totalTime.toDouble()))
+
+        return fade
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val bpm = WorkspaceRepository.bpm.value
-        val totalDuration = state.value.timing.toMsValue(bpm) * (state.value.gate * 2)
-        val gradientSteps = ((GlobalSettings.performanceFPS / GlobalSettings.gradientSmoothness) * (state.value.durationMs * (state.value.gate * 2)).toInt() / 1000).toInt()
-        val stepLength = totalDuration / gradientSteps
-
-        val gradient = state.value.gradientData
-            .sortedBy { it.position }
-            .map { gradientColor ->
-                gradientColor.position to Color(gradientColor.r, gradientColor.g, gradientColor.b)
-            }
+        val fade = generateFade()
+        if (fade.isEmpty()) return
 
         n.forEach { signal ->
             if (signal.color != Color.Black) {
@@ -372,28 +551,65 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                             job.owner.second == "${signal.x},${signal.y}"
                 }
 
-                for (step in 0..gradientSteps) {
-                    val progress = step.toFloat() / gradientSteps
-                    val color = interpolateGradient(gradient, progress)
+                // Emit initial color immediately
+                signalExit?.invoke(
+                    listOf(signal.copy(color = fade[0].color))
+                )
 
-                    Heaven.schedule(
-                        delayInMs = (stepLength * step).toDouble(),
-                        owner = signalOwner
-                    ) {
-                        signalExit?.invoke(
-                            listOf(signal.copy(color = color))
-                        )
+                if (!state.value.loop) {
+                    for (i in 1 until fade.size) {
+                        Heaven.schedule(
+                            delayInMs = fade[i].time,
+                            owner = signalOwner
+                        ) {
+                            signalExit?.invoke(
+                                listOf(signal.copy(color = fade[i].color))
+                            )
+                        }
                     }
+                } else {
+                    // Loop mode: schedule recursive looping
+                    scheduleFadeLoop(signal, signalOwner, fade, 1)
                 }
+            } else if (state.value.loop) {
+                // Key up in loop mode: cancel ongoing loops
+                Heaven.cancelJobs { job ->
+                    job.owner is Pair<*, *> &&
+                            job.owner.first == this &&
+                            job.owner.second == "${signal.x},${signal.y}"
+                }
+            }
+        }
+    }
 
-                Heaven.schedule(
-                    delayInMs = totalDuration.toDouble(),
-                    owner = signalOwner
-                ) {
-                    signalExit?.invoke(
-                        listOf(signal.copy(color = Color.Black))
-                    )
-                }
+    private fun scheduleFadeLoop(
+        signal: Signal.LED,
+        signalOwner: Any,
+        fade: List<FadeInfo>,
+        index: Int
+    ) {
+        // Check if this index should loop back
+        var currentIndex = index
+        if (currentIndex == fade.size - 1 && state.value.loop) {
+            currentIndex = 0
+        }
+
+        if (currentIndex >= fade.size) return
+
+        // Emit current color
+        signalExit?.invoke(
+            listOf(signal.copy(color = fade[currentIndex].color))
+        )
+
+        // Schedule next step if not at the last frame
+        if (currentIndex < fade.size - 1 && state.value.loop) {
+            val delayTime = fade[currentIndex + 1].time - fade[currentIndex].time
+
+            Heaven.schedule(
+                delayInMs = delayTime,
+                owner = signalOwner
+            ) {
+                scheduleFadeLoop(signal, signalOwner, fade, currentIndex + 1)
             }
         }
     }
@@ -410,13 +626,13 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
 @Serializable
 data class GradientChainDeviceState(
     val gradientData: List<GradientColor> = listOf(
-        GradientColor(0f, 1f, 1f, 1f),
-        GradientColor(0.5f, 1f, 0f, 0f),
-        GradientColor(1f, 0f, 0f, 0f)
+        GradientColor(0f, 1f, 1f, 1f), // Weiß bei Position 0
+        GradientColor(1f, 0f, 0f, 0f)  // Schwarz bei Position 1
     ),
     val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
     val durationMs: Double = 0.0,
     val gate: Float = 0.5f,
+    val loop: Boolean = false,
 ) : DeviceState() {
     @Serializable
     data class GradientColor(
@@ -424,6 +640,7 @@ data class GradientChainDeviceState(
         val r: Float,
         val g: Float,
         val b: Float,
+        val smoothness: GradientSmoothness = GradientSmoothness.Linear,
 
         override val selectionUUID: String = UUID.randomUUID(),
     ) : Selectable

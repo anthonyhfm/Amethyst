@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -108,7 +109,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     var currentEntry by mutableStateOf<MidiEntry?>(null)
     var trackIndex: Int = -1
     var entryStartMs: Long = 0L
-    
+
     var onNoteAdd: ((MidiNote) -> Unit)? = null
     var onNoteUpdate: ((MidiNote, MidiNote) -> Unit)? = null
     var onNoteDelete: ((MidiNote) -> Unit)? = null
@@ -253,6 +254,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 trackIndex = trackIndex,
                 entryStartMs = entryStartMs,
                 multiSelectModifierDown = multiSelectModifierDown,
+                shiftModifierDown = ModifierKeysState.isShiftPressed,
                 selectedColor = selectedColor,
                 onNoteAdd = onNoteAdd,
                 onNoteUpdate = onNoteUpdate,
@@ -275,11 +277,11 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.type == KeyEventType.KeyDown) {
             when (event.key) {
-                Key.CtrlLeft, Key.CtrlRight, Key.MetaLeft, Key.MetaRight -> multiSelectModifierDown = true
+                Key.ShiftLeft, Key.ShiftRight -> multiSelectModifierDown = true
             }
         } else if (event.type == KeyEventType.KeyUp) {
             when (event.key) {
-                Key.CtrlLeft, Key.CtrlRight, Key.MetaLeft, Key.MetaRight -> multiSelectModifierDown = false
+                Key.ShiftLeft, Key.ShiftRight -> multiSelectModifierDown = false
             }
         }
 
@@ -449,6 +451,7 @@ private fun PianoRollEditor(
     trackIndex: Int,
     entryStartMs: Long,
     multiSelectModifierDown: Boolean,
+    shiftModifierDown: Boolean,
     selectedColor: Color,
     onNoteAdd: ((MidiNote) -> Unit)?,
     onNoteUpdate: ((MidiNote, MidiNote) -> Unit)?,
@@ -645,10 +648,32 @@ private fun PianoRollEditor(
                                                 }
                                                 if (clickedNote != null) {
                                                     selectedTimeMs = null
-                                                    SelectionManager.select(
-                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote),
-                                                        single = !multiSelectModifierDown
-                                                    )
+
+                                                    // Shift + Click = Toggle selection
+                                                    if (shiftModifierDown) {
+                                                        val selectable = Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote)
+                                                        val isSelected = selections.any {
+                                                            it is Selectable.PianoRollNote &&
+                                                            it.selectionUUID == selectable.selectionUUID
+                                                        }
+
+                                                        if (isSelected) {
+                                                            // Deselect: Remove from selection
+                                                            SelectionManager.selections.value = selections.filterNot {
+                                                                it is Selectable.PianoRollNote &&
+                                                                it.selectionUUID == selectable.selectionUUID
+                                                            }
+                                                        } else {
+                                                            // Select: Add to selection
+                                                            SelectionManager.select(selectable, single = false)
+                                                        }
+                                                    } else {
+                                                        // Normal click behavior
+                                                        SelectionManager.select(
+                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote),
+                                                            single = !multiSelectModifierDown
+                                                        )
+                                                    }
                                                 } else {
                                                     if (!multiSelectModifierDown) {
                                                         SelectionManager.clear()
