@@ -282,7 +282,7 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
                                                     devicesInChain = devices
                                                 )
                                             }
-                                            ModifierKeysState.isCtrlPressed -> {
+                                            ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
                                                 SelectionManager.select(
                                                     chainDeviceSelectable,
                                                     single = false

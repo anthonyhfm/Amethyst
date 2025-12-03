@@ -772,7 +772,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                                                     devicesInChain = devices
                                                 )
                                             }
-                                            ModifierKeysState.isCtrlPressed -> {
+                                            ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
                                                 SelectionManager.select(
                                                     chainDeviceSelectable,
                                                     single = false

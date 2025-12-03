@@ -173,7 +173,7 @@ fun WorkspaceChainEditor(
                                                                 devicesInChain = devices
                                                             )
                                                         }
-                                                        ModifierKeysState.isCtrlPressed -> {
+                                                        ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
                                                             SelectionManager.select(
                                                                 chainDeviceSelectable,
                                                                 single = false
