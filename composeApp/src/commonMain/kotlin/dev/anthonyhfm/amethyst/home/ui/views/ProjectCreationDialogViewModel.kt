@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.BaseViewModel
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
@@ -10,6 +11,7 @@ import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.write
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -80,14 +82,16 @@ class ProjectCreationDialogViewModel(
                     }
                     
                     // Save the updated workspace
-                    file.write(
-                        bytes = Zip.encode(
-                            data = AmethystProtoBuf.encodeToByteArray(
-                                serializer = SavableWorkspaceData.serializer(),
-                                value = updatedWorkspace
+                    viewModelScope.launch {
+                        file.write(
+                            bytes = Zip.encode(
+                                data = AmethystProtoBuf.encodeToByteArray(
+                                    serializer = SavableWorkspaceData.serializer(),
+                                    value = updatedWorkspace
+                                )
                             )
                         )
-                    )
+                    }
                     
                     // Update recent workspaces list
                     GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.map {
