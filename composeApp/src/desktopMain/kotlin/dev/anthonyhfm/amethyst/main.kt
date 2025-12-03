@@ -41,7 +41,11 @@ fun main() {
                 }
             )
         } else {
-            WorkspaceWindow()
+            WorkspaceWindow(
+                onClose = {
+                    showEditor = false
+                }
+            )
         }
     }
 }

@@ -74,6 +74,10 @@ object WorkspaceRepository {
     val gridType: StateFlow<GridUtils.GridType> = _gridType.asStateFlow()
 
     init {
+        setupChains()
+    }
+
+    private fun setupChains() {
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
         }
@@ -270,7 +274,7 @@ object WorkspaceRepository {
         }
     }
 
-    fun saveWorkspace(): SavableWorkspaceData {
+    private fun buildWorkspaceData(): SavableWorkspaceData {
         return SavableWorkspaceData(
             path = saveableWorkspaceData?.path,
             title = saveableWorkspaceData?.title ?: "Untitled",
@@ -298,7 +302,11 @@ object WorkspaceRepository {
                     positionY = device.position.value.y
                 )
             },
-        ).also { saveableWorkspaceData = it }
+        )
+    }
+
+    fun saveWorkspace(): SavableWorkspaceData {
+        return buildWorkspaceData().also { saveableWorkspaceData = it }
     }
 
     fun addRecentColor(color: Triple<Float, Float, Float>, maxSize: Int = 24) {
@@ -313,5 +321,49 @@ object WorkspaceRepository {
             GlobalSettings.recentColors = newList.map { RecentColorRGB(it.first, it.second, it.third) }
             newList
         }
+    }
+
+    fun hasUnsavedChanges(): Boolean {
+        // If there's no saveable workspace data, there are no changes to compare
+        if (saveableWorkspaceData == null) return false
+        
+        // Save the original reference before generating current state
+        val savedWorkspace = saveableWorkspaceData!!
+        
+        // Generate current workspace state without updating saveableWorkspaceData
+        val currentWorkspace = buildWorkspaceData()
+        
+        // Compare key properties that indicate changes
+        return currentWorkspace.title != savedWorkspace.title ||
+               currentWorkspace.author != savedWorkspace.author ||
+               currentWorkspace.lights != savedWorkspace.lights ||
+               currentWorkspace.sampling != savedWorkspace.sampling ||
+               currentWorkspace.macros != savedWorkspace.macros ||
+               currentWorkspace.settings != savedWorkspace.settings ||
+               currentWorkspace.launchpadDevices != savedWorkspace.launchpadDevices ||
+               currentWorkspace.timelineData != savedWorkspace.timelineData ||
+               currentWorkspace.autoPlay != savedWorkspace.autoPlay
+    }
+
+    fun clean() {
+        // Reset chains
+        lightsChain = Chain()
+        samplingChain = Chain()
+        
+        // Re-setup signal exits
+        setupChains()
+        
+        // Clear devices
+        Heaven.devices = emptyList()
+        
+        // Reset state
+        bounds = Pair(IntOffset(0, 0), IntSize(0, 0))
+        saveableWorkspaceData = null
+        _macros.update { listOf(Macro(1)) }
+        _mode.update { WorkspaceContract.WorkspaceMode.Layout() }
+        _bpm.update { 120.00 }
+        _projectName.update { null }
+        previousMode = WorkspaceContract.WorkspaceMode.Layout()
+        _gridType.update { GridUtils.GridType.Flexible.Medium }
     }
 }
