@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -269,12 +270,28 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
                             TitleBarModifierProvider(
                                 Modifier
                                     .clickable {
-                                        SelectionManager.select(
-                                            Selectable.ChainDevice(
-                                                parent = state.chain,
-                                                device = device
-                                            )
+                                        val chainDeviceSelectable = Selectable.ChainDevice(
+                                            parent = state.chain,
+                                            device = device
                                         )
+                                        
+                                        when {
+                                            ModifierKeysState.isShiftPressed -> {
+                                                SelectionManager.selectRangeInChain(
+                                                    targetDevice = chainDeviceSelectable,
+                                                    devicesInChain = devices
+                                                )
+                                            }
+                                            ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
+                                                SelectionManager.select(
+                                                    chainDeviceSelectable,
+                                                    single = false
+                                                )
+                                            }
+                                            else -> {
+                                                SelectionManager.select(chainDeviceSelectable)
+                                            }
+                                        }
                                     }
                                     .dragAnchor() // Add drag anchor to title bar
                             ) {

@@ -66,9 +66,22 @@ object ClipboardManager {
             }
 
             data.any { it is Selectable.ChainDevice } -> {
+                // Get the parent chain from first device to ensure consistent order
+                val chainDevices = data.filterIsInstance<Selectable.ChainDevice>()
+                val parentChain = chainDevices.firstOrNull()?.parent
+                
+                // Sort by index in the chain to maintain order
+                val sortedDevices = if (parentChain != null) {
+                    chainDevices.sortedBy { chainDevice ->
+                        parentChain.devices.value.indexOfFirst { it.selectionUUID == chainDevice.device.selectionUUID }
+                    }
+                } else {
+                    chainDevices
+                }
+                
                 setClipboardData(
                     data = ClipboardData.ChainDevice(
-                        states = data.filterIsInstance<Selectable.ChainDevice>().map { it.device.state.value },
+                        states = sortedDevices.map { it.device.state.value },
                         type = if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
                             ClipboardData.ChainDevice.ChainType.Lights
                         } else {

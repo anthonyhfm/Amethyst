@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 
 object ModifierKeysState {
@@ -18,9 +19,13 @@ object ModifierKeysState {
     var isAltPressed by mutableStateOf(false)
         private set
 
+    var isMetaPressed by mutableStateOf(false)
+        private set
+
     fun updateFromKeyEvent(event: KeyEvent) {
         isShiftPressed = event.isShiftPressed
         isCtrlPressed = event.isCtrlPressed
         isAltPressed = event.isAltPressed
+        isMetaPressed = event.isMetaPressed
     }
 }

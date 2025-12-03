@@ -23,6 +23,18 @@ sealed interface UndoableAction {
         val originalIndex: Int,
     ) : UndoableAction
 
+    data class ChainDeviceGrouping(
+        val parent: Chain,
+        val groupDevice: GroupChainDevice,
+        val insertionIndex: Int,
+        val removedDevices: List<RemovedDeviceInfo>
+    ) : UndoableAction
+
+    data class RemovedDeviceInfo(
+        val device: dev.anthonyhfm.amethyst.devices.GenericChainDevice<*>,
+        val originalIndex: Int
+    )
+
     data class MovedChainDevice(
         val chainBefore: Chain,
         val chainAfter: Chain,

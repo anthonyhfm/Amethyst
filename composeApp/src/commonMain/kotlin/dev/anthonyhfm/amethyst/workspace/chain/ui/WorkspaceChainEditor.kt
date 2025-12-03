@@ -42,6 +42,7 @@ import androidx.compose.ui.util.fastForEachReversed
 import com.mohamedrejeb.compose.dnd.DragAndDropContainer
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -157,20 +158,34 @@ fun WorkspaceChainEditor(
                                         TitleBarModifierProvider(
                                             Modifier
                                                 .clickable {
-                                                    SelectionManager.select(
-                                                        Selectable.ChainDevice(
-                                                            parent = when (WorkspaceRepository.mode.value) {
-                                                                is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-                                                                else -> WorkspaceRepository.lightsChain
-                                                            },
-                                                            device = device
-                                                        )
+                                                    val chainDeviceSelectable = Selectable.ChainDevice(
+                                                        parent = when (WorkspaceRepository.mode.value) {
+                                                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                                            else -> WorkspaceRepository.lightsChain
+                                                        },
+                                                        device = device
                                                     )
+                                                    
+                                                    when {
+                                                        ModifierKeysState.isShiftPressed -> {
+                                                            SelectionManager.selectRangeInChain(
+                                                                targetDevice = chainDeviceSelectable,
+                                                                devicesInChain = devices
+                                                            )
+                                                        }
+                                                        ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
+                                                            SelectionManager.select(
+                                                                chainDeviceSelectable,
+                                                                single = false
+                                                            )
+                                                        }
+                                                        else -> {
+                                                            SelectionManager.select(chainDeviceSelectable)
+                                                        }
+                                                    }
                                                 }
                                                 .rightClickable {
                                                     rightClickMenuOffset = DpOffset((it.x / density).dp, (it.y / density).dp)
-
-                                                    println(it)
                                                     showRightClickMenu = true
                                                 }
                                                 .dragAnchor()
