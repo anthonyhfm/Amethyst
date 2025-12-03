@@ -20,9 +20,7 @@ actual object AudioOutput {
     private const val SAMPLE_RATE = 44100
     private const val FORMAT = AL10.AL_FORMAT_STEREO16
     private const val MAX_SOURCES = 16
-
-    private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-    private val updateFrequency = if (isWindows) 60 else 30
+    private const val UPDATE_FREQUENCY = 30
 
     data class QueuedAudio(
         val pcmData: ByteArray,
@@ -91,30 +89,12 @@ actual object AudioOutput {
 
     private fun initializeOpenAL() {
         try {
-            val deviceName = if (isWindows) {
-                val devices = ALC11.alcGetString(0L, ALC11.ALC_ALL_DEVICES_SPECIFIER)
-                null
-            } else {
-                null
-            }
-
-            device = ALC10.alcOpenDevice(deviceName as ByteBuffer?)
+            device = ALC10.alcOpenDevice(null as ByteBuffer?)
             if (device == 0L) {
                 return
             }
 
-            val contextAttribs = if (isWindows) {
-                intArrayOf(
-                    ALC10.ALC_FREQUENCY, SAMPLE_RATE,
-                    ALC11.ALC_REFRESH, updateFrequency,
-                    ALC11.ALC_SYNC, ALC10.ALC_FALSE,
-                    0
-                )
-            } else {
-                null
-            }
-
-            context = ALC10.alcCreateContext(device, contextAttribs)
+            context = ALC10.alcCreateContext(device, null)
             if (context == 0L) {
                 ALC10.alcCloseDevice(device)
                 return
@@ -134,14 +114,6 @@ actual object AudioOutput {
                 return
             }
 
-            if (isWindows) {
-                AL10.alListenerf(AL10.AL_GAIN, 1.0f)
-                AL10.alListener3f(AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
-                AL10.alListener3f(AL10.AL_VELOCITY, 0.0f, 0.0f, 0.0f)
-                val orientation = floatArrayOf(0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f)
-                AL10.alListenerfv(AL10.AL_ORIENTATION, orientation)
-            }
-
             isInitialized = true
             startAudioProcessing()
 
@@ -156,7 +128,7 @@ actual object AudioOutput {
                 try {
                     processAudioQueue()
                     cleanupFinishedSources()
-                    delay(if (isWindows) 5 else 10)
+                    delay(10)
                 } catch (e: Exception) {
                     // Continue processing
                 }
@@ -167,7 +139,7 @@ actual object AudioOutput {
     private fun processAudioQueue() {
         if (!isInitialized) return
 
-        val batchSize = if (isWindows) 8 else 4
+        val batchSize = 4
         repeat(batchSize) {
             val queuedAudio = audioQueue.poll() ?: return
 
@@ -267,12 +239,6 @@ actual object AudioOutput {
             AL10.alSource3f(sourceId, AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
             AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
 
-            if (isWindows) {
-                AL10.alSourcef(sourceId, AL10.AL_REFERENCE_DISTANCE, 1.0f)
-                AL10.alSourcef(sourceId, AL10.AL_ROLLOFF_FACTOR, 0.0f)
-                AL10.alSourcef(sourceId, AL10.AL_MAX_DISTANCE, Float.MAX_VALUE)
-            }
-
             val pcmData = queuedAudio.pcmData
             val buffer = MemoryUtil.memAlloc(pcmData.size)
 
@@ -345,16 +311,10 @@ actual object AudioOutput {
         val normalizedData = normalizeAudioForPlayback(rawData, audioSignal)
 
         val sourceId = "audio_${System.currentTimeMillis()}_${(0..999).random()}"
-        val queuedAudio = QueuedAudio(normalizedData, sourceId, audioSignal.origin, if (isWindows) 1 else 0)
+        val queuedAudio = QueuedAudio(normalizedData, sourceId, audioSignal.origin, 0)
         queuedAudio.format = Pair(audioSignal, openALFormat)
 
-        if (isWindows && audioQueue.isEmpty() && activeSources.size < MAX_SOURCES) {
-            CoroutineScope(Dispatchers.Default).launch {
-                createAndPlayAudioSourceWithFormat(queuedAudio, audioSignal, openALFormat)
-            }
-        } else {
-            audioQueue.offer(queuedAudio)
-        }
+        audioQueue.offer(queuedAudio)
 
         return sourceId
     }
