@@ -262,7 +262,10 @@ fun TimelineLane(
                                 onMoveEntry = { newStart -> onMoveEntry(audioEntry.startTimeMs, newStart) },
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
                                 trackIndex = trackIndex,
-                                entryStartMs = audioEntry.startTimeMs
+                                entryStartMs = audioEntry.startTimeMs,
+                                scrollState = scrollState,
+                                bpm = bpm,
+                                gridType = gridType
                             )
                         }
                     }
@@ -282,7 +285,10 @@ fun TimelineLane(
                                 isLightsTrack = true,
                                 onDoubleClick = { onDoubleClickLane(midiEntry.startTimeMs) },
                                 trackIndex = trackIndex,
-                                entryStartMs = midiEntry.startTimeMs
+                                entryStartMs = midiEntry.startTimeMs,
+                                scrollState = scrollState,
+                                bpm = bpm,
+                                gridType = gridType
                             )
                         }
                     }

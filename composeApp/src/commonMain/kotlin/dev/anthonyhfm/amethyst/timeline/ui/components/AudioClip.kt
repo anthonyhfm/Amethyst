@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.timeline.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,8 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -55,8 +57,10 @@ import kotlin.math.roundToLong
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.awaitPointerEventScope
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.ScrollState
+import dev.anthonyhfm.amethyst.timeline.utils.computeStrictGridTime
 import kotlin.math.round
 
 @Composable
@@ -68,8 +72,15 @@ fun AudioClip(
     onMoveEntry: (newStartMs: Long) -> Unit,
     gridIntervalMs: Long,
     trackIndex: Int,
-    entryStartMs: Long
+    entryStartMs: Long,
+    scrollState: ScrollState,
+    bpm: Double,
+    gridType: GridUtils.GridType
 ) {
+    var rangeActive by remember { mutableStateOf(false) }
+    var rangeStartMs by remember { mutableStateOf<Long?>(null) }
+    var rangeEndMs by remember { mutableStateOf<Long?>(null) }
+
     val startOffsetPx = (audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
     val widthDp = with(LocalDensity.current) { (audioEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().toDp() }
     val borderColor = if (isSelected) Color.White else Color(0xFF3C3CBA)
@@ -236,6 +247,84 @@ fun AudioClip(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            // Calculate absolute position considering scroll and clip offset
+                            val clipStartPx = audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
+                            val absoluteX = (clipStartPx + offset.x - scrollState.value.toDouble()).toFloat()
+                            val startMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
+                            rangeStartMs = startMs
+                            rangeEndMs = startMs
+                            rangeActive = true
+                        },
+                        onDrag = { change, _ ->
+                            if (rangeActive && rangeStartMs != null) {
+                                val clipStartPx = audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
+                                val absoluteX = (clipStartPx + change.position.x - scrollState.value.toDouble()).toFloat()
+                                val currentMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
+                                if (currentMs != rangeEndMs) {
+                                    rangeEndMs = currentMs
+                                }
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                                val start = rangeStartMs!!.coerceAtLeast(0L)
+                                val end = rangeEndMs!!.coerceAtLeast(0L)
+                                val normalizedStart = kotlin.math.min(start, end)
+                                val normalizedEnd = kotlin.math.max(start, end)
+                                if (normalizedEnd > normalizedStart) {
+                                    SelectionManager.select(
+                                        Selectable.TimelineRange(
+                                            trackIndex = trackIndex,
+                                            startMs = normalizedStart,
+                                            endMs = normalizedEnd
+                                        )
+                                    )
+                                }
+                            }
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                        },
+                        onDragCancel = {
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                        }
+                    )
+                }
+                .drawWithContent {
+                    drawContent()
+                    // Draw range selection overlay
+                    if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                        val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
+                        val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
+
+                        // Convert to clip-relative coordinates
+                        val clipStartMs = audioEntry.startTimeMs
+                        val clipEndMs = audioEntry.startTimeMs + audioEntry.durationMs
+
+                        // Clip the range to visible portion
+                        val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
+                        val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
+
+                        if (visibleEnd > visibleStart) {
+                            val relStartMs = visibleStart - clipStartMs
+                            val relEndMs = visibleEnd - clipStartMs
+                            val startX = relStartMs * zoomLevel
+                            val width = (relEndMs - relStartMs) * zoomLevel
+
+                            drawRect(
+                                color = Color(0x5533AAFF),
+                                topLeft = Offset(startX, 0f),
+                                size = Size(width, size.height)
+                            )
+                        }
+                    }
+                }
         ) {
             WaveformView(
                 modifier = Modifier.fillMaxSize().padding(vertical = 4.dp),

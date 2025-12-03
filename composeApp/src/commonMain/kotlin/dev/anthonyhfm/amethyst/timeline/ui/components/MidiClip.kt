@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.timeline.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -45,7 +44,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.awaitPointerEventScope
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -55,10 +54,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.ScrollState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.utils.computeStrictGridTime
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
@@ -79,8 +80,15 @@ fun MidiClip(
     isLightsTrack: Boolean = false,
     onDoubleClick: () -> Unit = {},
     trackIndex: Int,
-    entryStartMs: Long
+    entryStartMs: Long,
+    scrollState: ScrollState,
+    bpm: Double,
+    gridType: GridUtils.GridType
 ) {
+    var rangeActive by remember { mutableStateOf(false) }
+    var rangeStartMs by remember { mutableStateOf<Long?>(null) }
+    var rangeEndMs by remember { mutableStateOf<Long?>(null) }
+
     val startOffsetPx = (midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
     val baseWidthPx = (midiEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat()
     val borderColor = if (isSelected) Color.White else if (isLightsTrack) Color(0xFFD4AF37) else Color(0xFFBA3C8C)
@@ -259,6 +267,64 @@ fun MidiClip(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .pointerInput(midiEntry.startTimeMs, zoomLevel, bpm, gridType) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            // Check if we're not on a resize handle
+                            val localX = offset.x
+                            val resizeHandleWidth = with(density) { 6.dp.toPx() }
+                            val totalWidth = size.width.toFloat()
+
+                            if (localX > resizeHandleWidth && localX < (totalWidth - resizeHandleWidth)) {
+                                // Calculate absolute position considering scroll and clip offset
+                                val clipStartPx = midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
+                                val absoluteX = (clipStartPx + localX - scrollState.value.toDouble()).toFloat()
+                                val startMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
+                                rangeStartMs = startMs
+                                rangeEndMs = startMs
+                                rangeActive = true
+                            } else {
+                                rangeActive = false
+                            }
+                        },
+                        onDrag = { change, _ ->
+                            if (rangeActive && rangeStartMs != null) {
+                                val clipStartPx = midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
+                                val absoluteX = (clipStartPx + change.position.x - scrollState.value.toDouble()).toFloat()
+                                val currentMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
+                                if (currentMs != rangeEndMs) {
+                                    rangeEndMs = currentMs
+                                }
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                                val start = rangeStartMs!!.coerceAtLeast(0L)
+                                val end = rangeEndMs!!.coerceAtLeast(0L)
+                                val normalizedStart = kotlin.math.min(start, end)
+                                val normalizedEnd = kotlin.math.max(start, end)
+                                if (normalizedEnd > normalizedStart) {
+                                    SelectionManager.select(
+                                        Selectable.TimelineRange(
+                                            trackIndex = trackIndex,
+                                            startMs = normalizedStart,
+                                            endMs = normalizedEnd
+                                        )
+                                    )
+                                }
+                            }
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                        },
+                        onDragCancel = {
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                        }
+                    )
+                }
         ) {
             Box(
                 modifier = Modifier
@@ -270,6 +336,8 @@ fun MidiClip(
                         val contentHeightPx = size.height
                         val noteBarMinHeightPx = 4f
                         val noteBarMaxHeightPx = 14f
+
+                        // Draw MIDI notes
                         midiEntry.notes.forEach { note ->
                             val overlapStart = maxOf(note.startTimeMs, midiEntry.startTimeMs)
                             val overlapEnd = minOf(note.endTimeMs, midiEntry.endTimeMs)
@@ -294,6 +362,33 @@ fun MidiClip(
                                 size = Size(w, barHeightPx),
                                 style = Stroke(width = 1.0f)
                             )
+                        }
+
+                        // Draw range selection overlay
+                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                            val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
+                            val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
+
+                            // Convert to clip-relative coordinates
+                            val clipStartMs = midiEntry.startTimeMs
+                            val clipEndMs = midiEntry.endTimeMs
+
+                            // Clip the range to visible portion
+                            val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
+                            val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
+
+                            if (visibleEnd > visibleStart) {
+                                val relStartMs = visibleStart - clipStartMs
+                                val relEndMs = visibleEnd - clipStartMs
+                                val startX = relStartMs * zoomLevel
+                                val width = (relEndMs - relStartMs) * zoomLevel
+
+                                drawRect(
+                                    color = Color(0x5533AAFF),
+                                    topLeft = Offset(startX, 0f),
+                                    size = Size(width, size.height)
+                                )
+                            }
                         }
                     }
             ) {

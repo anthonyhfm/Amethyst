@@ -641,7 +641,9 @@ object TimelineKeyHandler {
         
         val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
         val current = TimelineRepository.tracks.value.toMutableList()
-        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = AudioTimelineTrack().apply {
+            entries.plus(track.entries)
+        }
         current[trackIndex] = newTrack
         TimelineRepository.tracks.value = current.toList()
         UndoManager.addAction(UndoableAction.TimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
@@ -663,7 +665,9 @@ object TimelineKeyHandler {
         
         val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
         val current = TimelineRepository.tracks.value.toMutableList()
-        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = MidiTimelineTrack().apply {
+            entries.plus(track.entries)
+        }
         current[trackIndex] = newTrack
         TimelineRepository.tracks.value = current.toList()
         UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
