@@ -319,9 +319,41 @@ object WorkspaceRepository {
         // If there's no saveable workspace data, there are no changes to compare
         if (saveableWorkspaceData == null) return false
         
-        // Generate current workspace state and compare with saved state
-        val currentWorkspace = saveWorkspace()
+        // Save the original reference before generating current state
         val savedWorkspace = saveableWorkspaceData!!
+        
+        // Generate current workspace state - this will temporarily update saveableWorkspaceData
+        val currentWorkspace = SavableWorkspaceData(
+            path = saveableWorkspaceData?.path,
+            title = saveableWorkspaceData?.title ?: "Untitled",
+            author = saveableWorkspaceData?.author ?: "Unknown Author",
+            lights = StateChain.pack(lightsChain),
+            sampling = StateChain.pack(samplingChain),
+            autoPlay = saveableWorkspaceData?.autoPlay ?: AutoPlayData(emptyMap()),
+            timelineData = TimelineRepository.tracks.value,
+            macros = _macros.value,
+            settings = WorkspaceSettings(
+                bpm = _bpm.value
+            ),
+            launchpadDevices = Heaven.devices.map { device ->
+                SavableWorkspaceData.SavableViewportLaunchpad(
+                    type = when (device) {
+                        is ViewportLaunchpadPro -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                        is ViewportLaunchpadProMk3 -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO_MK3
+                        is ViewportLaunchpadX -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_X
+                        is ViewportLaunchpadMk2 -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_MK2
+                        is ViewportMystrix -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MYSTRIX
+                        is ViewportMidiFighter64 -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MIDIFIGHTER64
+                        else -> { TODO("Could not serialize virtual launchpad element for the workspace") }
+                    },
+                    positionX = device.position.value.x,
+                    positionY = device.position.value.y
+                )
+            },
+        )
+        
+        // Restore the original saveableWorkspaceData since we only wanted to check, not save
+        // Don't update saveableWorkspaceData here
         
         // Compare key properties that indicate changes
         return currentWorkspace.title != savedWorkspace.title ||
