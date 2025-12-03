@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
@@ -52,6 +53,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     private var dragEraseMode: Boolean = false
     private var stateBeforeDrag: KeyframesChainDeviceState? = null
     private var lastObservedFrameEntries: List<KeyframesEntry>? = null
+    private val stateObserverScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     init {
         renderAnimation()
@@ -85,7 +87,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         
         // Observe state changes to refresh virtual devices when state is restored (e.g., undo/redo)
         // This ensures the UI updates correctly when state changes externally
-        CoroutineScope(Dispatchers.Default).launch {
+        stateObserverScope.launch {
             state.collect { newState ->
                 // Check if frame entries changed (but only when not actively dragging)
                 if (!isDragging.value) {
