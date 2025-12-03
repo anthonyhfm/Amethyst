@@ -44,6 +44,17 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
+                is UndoableAction.ChainDeviceGrouping -> {
+                    action.parent.remove(action.groupDevice.selectionUUID, fromUser = false)
+
+                    action.removedDevices.sortedBy { it.originalIndex }.forEach { removedInfo ->
+                        val safeIndex = removedInfo.originalIndex.coerceIn(0, action.parent.devices.value.size)
+                        action.parent.add(removedInfo.device, atIndex = safeIndex, fromUser = false)
+                    }
+
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.MovedChainDevice -> {
                     action.chainAfter.remove(action.device.selectionUUID, fromUser = false)
 
@@ -405,6 +416,16 @@ object UndoManager {
                     if (deviceIndex != -1) {
                         action.parent.remove(deviceIndex, fromUser = false)
                     }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.ChainDeviceGrouping -> {
+                    // Redo: Remove individual devices and add group
+                    action.removedDevices.sortedByDescending { it.originalIndex }.forEach { removedInfo ->
+                        action.parent.remove(removedInfo.device.selectionUUID, fromUser = false)
+                    }
+
+                    action.parent.add(action.groupDevice, atIndex = action.insertionIndex, fromUser = false)
                     undoStack.add(action)
                 }
 

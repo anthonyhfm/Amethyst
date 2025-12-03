@@ -9,7 +9,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.engine.elements.Chain
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -20,7 +21,6 @@ object ChainModeKeyHandler {
         if (keyEvent.type == KeyEventType.KeyDown) {
             when (keyEvent.key) {
                 Key.G -> {
-                    // CTRL+G / CMD+G to wrap selected devices in a GroupChainDevice
                     if (keyEvent.isCtrlPressed || keyEvent.isMetaPressed) {
                         val selections = SelectionManager.selections.value.filter { it is Selectable.ChainDevice }
                         
@@ -52,7 +52,14 @@ object ChainModeKeyHandler {
                                                 )
                                             ),
                                         )
-                                    )
+                                    ) as GroupChainDevice
+
+                                    val removedDevices = deviceIndices.map { (chainDevice, index) ->
+                                        UndoableAction.RemovedDeviceInfo(
+                                            device = chainDevice.device,
+                                            originalIndex = index
+                                        )
+                                    }
 
                                     deviceIndices.reversed().forEach { (chainDevice, _) ->
                                         parentChain.remove(chainDevice.device.selectionUUID, fromUser = false)
@@ -60,6 +67,15 @@ object ChainModeKeyHandler {
                                     
                                     parentChain.add(group, firstIndex, fromUser = false)
                                     
+                                    UndoManager.addAction(
+                                        UndoableAction.ChainDeviceGrouping(
+                                            parent = parentChain,
+                                            groupDevice = group,
+                                            insertionIndex = firstIndex,
+                                            removedDevices = removedDevices
+                                        )
+                                    )
+
                                     SelectionManager.clear()
                                     SelectionManager.select(
                                         Selectable.ChainDevice(
