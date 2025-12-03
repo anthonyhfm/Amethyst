@@ -71,6 +71,12 @@ fun RecentView(
     var recentProjects: List<RecentWorkspace> by remember { mutableStateOf(GlobalSettings.recentWorkspaces) }
     var showMenu by remember { mutableStateOf(false) }
 
+    // Refresh the list when returning to this screen (e.g., after editing)
+    val currentBackStackEntry by navigator.currentBackStackEntryFlow.collectAsState(initial = navigator.currentBackStackEntry)
+    LaunchedEffect(currentBackStackEntry) {
+        recentProjects = GlobalSettings.recentWorkspaces
+    }
+
     LaunchedEffect(recentProjects) {
         GlobalSettings.recentWorkspaces = recentProjects
     }
