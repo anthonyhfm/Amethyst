@@ -492,6 +492,54 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
     ) {
         val interaction = remember { MutableInteractionSource() }
         val hovering: Boolean by interaction.collectIsHoveredAsState()
+        val density = LocalDensity.current.density
+        val clipboard by ClipboardManager.clipboardData.collectAsState()
+        val hasDevicesInClipboard = clipboard is ClipboardData.ChainDevice
+        
+        var showRightClickMenu by remember { mutableStateOf(false) }
+        var rightClickMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
+
+        Dropdown(
+            isOpen = showRightClickMenu && hasDevicesInClipboard,
+            menu = dropDownMenu {
+                item("paste_as_group", "Paste as Group") {
+                    icon(Icons.Default.ContentPaste)
+                }
+            },
+            offset = rightClickMenuOffset,
+            onItemSelected = {
+                when (it) {
+                    "paste_as_group" -> {
+                        val clipData = clipboard as ClipboardData.ChainDevice
+                        val newGroup = Group(
+                            name = "Chain #",
+                            chain = Chain().apply {
+                                clipData.states.forEach { state ->
+                                    add(StateChain.unpackDevice(state))
+                                }
+                                signalExit = { signal ->
+                                    this@GroupChainDevice.signalExit?.invoke(signal)
+                                }
+                            }
+                        )
+                        
+                        val insertIndex = state.value.groups.size
+                        state.update {
+                            it.copy(
+                                groups = it.groups.toMutableList().apply {
+                                    add(newGroup)
+                                },
+                                openedGroupIndex = insertIndex
+                            )
+                        }
+                    }
+                }
+                showRightClickMenu = false
+            },
+            onDismiss = {
+                showRightClickMenu = false
+            }
+        )
 
         Row(
             modifier = Modifier
@@ -505,7 +553,13 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                         }
                     ).value
                 )
-                .hoverable(interaction),
+                .hoverable(interaction)
+                .rightClickable {
+                    if (hasDevicesInClipboard) {
+                        rightClickMenuOffset = DpOffset((it.x / density).dp, (it.y / density).dp)
+                        showRightClickMenu = true
+                    }
+                },
 
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
@@ -631,15 +685,15 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                                         
                                         when {
                                             ModifierKeysState.isShiftPressed -> {
-                                                SelectionManager.selectRangeInChain(
-                                                    targetDevice = chainDeviceSelectable,
-                                                    devicesInChain = devices
-                                                )
-                                            }
-                                            ModifierKeysState.isCtrlPressed -> {
                                                 SelectionManager.select(
                                                     chainDeviceSelectable,
                                                     single = false
+                                                )
+                                            }
+                                            ModifierKeysState.isCtrlPressed -> {
+                                                SelectionManager.selectRangeInChain(
+                                                    targetDevice = chainDeviceSelectable,
+                                                    devicesInChain = devices
                                                 )
                                             }
                                             else -> {

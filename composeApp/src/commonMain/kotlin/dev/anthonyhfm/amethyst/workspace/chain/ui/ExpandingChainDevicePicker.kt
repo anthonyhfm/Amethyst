@@ -202,7 +202,8 @@ fun ExpandingChainDevicePicker(
                 offset = rightClickMenuOffset,
                 menu = dropDownMenu {
                     if (clipboard is ClipboardData.ChainDevice) {
-                        item("paste", "Paste") {
+                        val count = (clipboard as ClipboardData.ChainDevice).states.size
+                        item("paste", "Paste all ($count)") {
                             icon(Icons.Default.ContentPaste)
                         }
                     } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
