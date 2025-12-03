@@ -158,7 +158,30 @@ fun MidiClip(
                     .fillMaxWidth()
                     .height(20.dp)
                     .background(borderColor, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                    .clickable { onSelectEntry() }
+                    .pointerInput(midiEntry.startTimeMs) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
+                                    val change = event.changes.firstOrNull()
+                                    if (change != null) {
+                                        val isShiftPressed = event.keyboardModifiers.isShiftPressed
+                                        if (isShiftPressed) {
+                                            // Multi-select mode
+                                            SelectionManager.select(
+                                                dev.anthonyhfm.amethyst.core.controls.selection.Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entryStartMs),
+                                                single = false
+                                            )
+                                        } else {
+                                            // Single select mode
+                                            onSelectEntry()
+                                        }
+                                        change.consume()
+                                    }
+                                }
+                            }
+                        }
+                    }
                     .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
                         detectDragGestures(
                             onDragStart = { onSelectEntry() },

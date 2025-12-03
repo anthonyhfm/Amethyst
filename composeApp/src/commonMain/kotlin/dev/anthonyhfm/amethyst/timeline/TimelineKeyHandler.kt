@@ -31,6 +31,12 @@ object TimelineKeyHandler {
             } ?: false
         }
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.C) {
+            // Check for range selection first
+            val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
+            if (rangeSelections.isNotEmpty()) {
+                return handleRangeCopy(rangeSelections)
+            }
+            
             val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
             if (entrySelections.isNotEmpty()) {
                 ClipboardManager.copy(entrySelections)
@@ -38,6 +44,12 @@ object TimelineKeyHandler {
             }
         }
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.X) {
+            // Check for range selection first
+            val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
+            if (rangeSelections.isNotEmpty()) {
+                return handleRangeCut(rangeSelections)
+            }
+            
             val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
             if (entrySelections.isNotEmpty()) {
                 // Copy first
@@ -57,7 +69,13 @@ object TimelineKeyHandler {
             return true
         }
         if (keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace) {
-            // Check for track selections first
+            // Check for range selection first
+            val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
+            if (rangeSelections.isNotEmpty()) {
+                return handleRangeDelete(rangeSelections)
+            }
+            
+            // Check for track selections
             val trackSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTrack>()
             if (trackSelections.isNotEmpty()) {
                 trackSelections.sortedByDescending { it.trackIndex }.forEach { sel ->
@@ -88,7 +106,13 @@ object TimelineKeyHandler {
             }
         }
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.D) {
-            // Check for track selections first
+            // Check for range selection first
+            val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
+            if (rangeSelections.isNotEmpty()) {
+                return handleRangeDuplicate(rangeSelections)
+            }
+            
+            // Check for track selections
             val trackSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTrack>()
             if (trackSelections.isNotEmpty()) {
                 trackSelections.sortedBy { it.trackIndex }.forEach { sel ->
@@ -284,5 +308,364 @@ object TimelineKeyHandler {
                 UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
             }
         }
+    }
+
+    /**
+     * Handle copy operation for range selections
+     * Copies entries or portions of entries within the range
+     */
+    private fun handleRangeCopy(rangeSelections: List<Selectable.TimelineRange>): Boolean {
+        rangeSelections.forEach { range ->
+            val track = TimelineRepository.tracks.value.getOrNull(range.trackIndex) ?: return@forEach
+            
+            when (track) {
+                is AudioTimelineTrack -> {
+                    val entriesInRange = getAudioEntriesInRange(track, range.startMs, range.endMs)
+                    if (entriesInRange.isNotEmpty()) {
+                        ClipboardManager.setClipboardData(
+                            dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData.TimelineAudioEntries(entriesInRange)
+                        )
+                    }
+                }
+                is MidiTimelineTrack -> {
+                    val entriesInRange = getMidiEntriesInRange(track, range.startMs, range.endMs)
+                    if (entriesInRange.isNotEmpty()) {
+                        ClipboardManager.setClipboardData(
+                            dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData.TimelineMidiEntries(entriesInRange)
+                        )
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    /**
+     * Handle cut operation for range selections
+     * Cuts entries or portions within the range and removes them
+     */
+    private fun handleRangeCut(rangeSelections: List<Selectable.TimelineRange>): Boolean {
+        rangeSelections.forEach { range ->
+            val track = TimelineRepository.tracks.value.getOrNull(range.trackIndex) ?: return@forEach
+            
+            when (track) {
+                is AudioTimelineTrack -> {
+                    val entriesInRange = getAudioEntriesInRange(track, range.startMs, range.endMs)
+                    if (entriesInRange.isNotEmpty()) {
+                        ClipboardManager.setClipboardData(
+                            dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData.TimelineAudioEntries(entriesInRange)
+                        )
+                    }
+                    deleteRangeFromAudioTrack(range.trackIndex, track, range.startMs, range.endMs)
+                }
+                is MidiTimelineTrack -> {
+                    val entriesInRange = getMidiEntriesInRange(track, range.startMs, range.endMs)
+                    if (entriesInRange.isNotEmpty()) {
+                        ClipboardManager.setClipboardData(
+                            dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData.TimelineMidiEntries(entriesInRange)
+                        )
+                    }
+                    deleteRangeFromMidiTrack(range.trackIndex, track, range.startMs, range.endMs)
+                }
+            }
+        }
+        SelectionManager.clear()
+        return true
+    }
+
+    /**
+     * Handle delete operation for range selections
+     * Deletes entries or portions within the range
+     */
+    private fun handleRangeDelete(rangeSelections: List<Selectable.TimelineRange>): Boolean {
+        rangeSelections.forEach { range ->
+            val track = TimelineRepository.tracks.value.getOrNull(range.trackIndex) ?: return@forEach
+            
+            when (track) {
+                is AudioTimelineTrack -> deleteRangeFromAudioTrack(range.trackIndex, track, range.startMs, range.endMs)
+                is MidiTimelineTrack -> deleteRangeFromMidiTrack(range.trackIndex, track, range.startMs, range.endMs)
+            }
+        }
+        SelectionManager.clear()
+        return true
+    }
+
+    /**
+     * Handle duplicate operation for range selections
+     * Duplicates entries or portions within the range
+     */
+    private fun handleRangeDuplicate(rangeSelections: List<Selectable.TimelineRange>): Boolean {
+        rangeSelections.forEach { range ->
+            val track = TimelineRepository.tracks.value.getOrNull(range.trackIndex) ?: return@forEach
+            
+            when (track) {
+                is AudioTimelineTrack -> {
+                    val entriesInRange = getAudioEntriesInRange(track, range.startMs, range.endMs)
+                    if (entriesInRange.isNotEmpty()) {
+                        duplicateAudioEntriesInRange(range.trackIndex, track, entriesInRange, range.endMs)
+                    }
+                }
+                is MidiTimelineTrack -> {
+                    val entriesInRange = getMidiEntriesInRange(track, range.startMs, range.endMs)
+                    if (entriesInRange.isNotEmpty()) {
+                        duplicateMidiEntriesInRange(range.trackIndex, track, entriesInRange, range.endMs)
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    /**
+     * Get audio entries within a range, trimming them at range boundaries
+     */
+    private fun getAudioEntriesInRange(track: AudioTimelineTrack, startMs: Long, endMs: Long): List<AudioEntry> {
+        val result = mutableListOf<AudioEntry>()
+        
+        track.entries.values.forEach { entry ->
+            if (entry.endTimeMs <= startMs || entry.startTimeMs >= endMs) {
+                // Entry is completely outside the range
+                return@forEach
+            }
+            
+            // Entry overlaps with range - trim it
+            val trimmedStart = maxOf(entry.startTimeMs, startMs)
+            val trimmedEnd = minOf(entry.endTimeMs, endMs)
+            val trimmedEntry = trimAudioEntry(entry, trimmedStart, trimmedEnd)
+            if (trimmedEntry != null) {
+                result.add(trimmedEntry)
+            }
+        }
+        
+        return result.sortedBy { it.startTimeMs }
+    }
+
+    /**
+     * Get MIDI entries within a range, trimming them at range boundaries
+     */
+    private fun getMidiEntriesInRange(track: MidiTimelineTrack, startMs: Long, endMs: Long): List<MidiEntry> {
+        val result = mutableListOf<MidiEntry>()
+        
+        track.entries.values.forEach { entry ->
+            if (entry.endTimeMs <= startMs || entry.startTimeMs >= endMs) {
+                // Entry is completely outside the range
+                return@forEach
+            }
+            
+            // Entry overlaps with range - trim it
+            val trimmedStart = maxOf(entry.startTimeMs, startMs)
+            val trimmedEnd = minOf(entry.endTimeMs, endMs)
+            val trimmedEntry = trimMidiEntry(entry, trimmedStart, trimmedEnd)
+            if (trimmedEntry != null) {
+                result.add(trimmedEntry)
+            }
+        }
+        
+        return result.sortedBy { it.startTimeMs }
+    }
+
+    /**
+     * Trim an audio entry to a specific range
+     */
+    private fun trimAudioEntry(entry: AudioEntry, trimStart: Long, trimEnd: Long): AudioEntry? {
+        if (trimEnd <= trimStart) return null
+        
+        val offsetStart = trimStart - entry.startTimeMs
+        val newDuration = trimEnd - trimStart
+        
+        val rawData = entry.rawData
+        if (rawData == null || rawData.isEmpty()) {
+            return entry.copy(startTimeMs = trimStart, durationMs = newDuration, rawData = rawData)
+        }
+        
+        val bytesPerSample = (entry.bitDepth / 8) * entry.channels
+        val samplesPerMs = entry.sampleRate.toDouble() / 1000.0
+        
+        val startSampleExact = offsetStart * samplesPerMs
+        val endSampleExact = (offsetStart + newDuration) * samplesPerMs
+        val startSample = kotlin.math.round(startSampleExact).toLong().coerceAtLeast(0)
+        val endSample = kotlin.math.round(endSampleExact).toLong()
+        
+        val startByte = (startSample * bytesPerSample).toInt().coerceIn(0, rawData.size)
+        val endByte = (endSample * bytesPerSample).toInt().coerceIn(0, rawData.size)
+        
+        if (startByte >= endByte) return null
+        
+        val trimmedData = rawData.sliceArray(startByte until endByte)
+        return entry.copy(startTimeMs = trimStart, durationMs = newDuration, rawData = trimmedData)
+    }
+
+    /**
+     * Trim a MIDI entry to a specific range
+     */
+    private fun trimMidiEntry(entry: MidiEntry, trimStart: Long, trimEnd: Long): MidiEntry? {
+        if (trimEnd <= trimStart) return null
+        
+        val offsetStart = trimStart - entry.startTimeMs
+        val newDuration = trimEnd - trimStart
+        
+        // Filter and adjust notes to fit within the trimmed range
+        val trimmedNotes = entry.notes.mapNotNull { note ->
+            val noteStart = note.startTimeMs
+            val noteEnd = note.startTimeMs + note.durationMs
+            
+            when {
+                // Note entirely before trim range
+                noteEnd <= offsetStart -> null
+                // Note entirely after trim range
+                noteStart >= offsetStart + newDuration -> null
+                // Note overlaps with trim range
+                else -> {
+                    val newNoteStart = maxOf(noteStart, offsetStart) - offsetStart
+                    val newNoteEnd = minOf(noteEnd, offsetStart + newDuration) - offsetStart
+                    val newNoteDuration = newNoteEnd - newNoteStart
+                    
+                    if (newNoteDuration > 0) {
+                        note.copy(startTimeMs = newNoteStart, durationMs = newNoteDuration)
+                    } else null
+                }
+            }
+        }
+        
+        return entry.copy(startTimeMs = trimStart, durationMs = newDuration, notes = trimmedNotes)
+    }
+
+    /**
+     * Delete a range from an audio track, trimming overlapping entries
+     */
+    private fun deleteRangeFromAudioTrack(trackIndex: Int, track: AudioTimelineTrack, startMs: Long, endMs: Long) {
+        val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val entriesToRemove = mutableListOf<Long>()
+        val entriesToAdd = mutableListOf<AudioEntry>()
+        
+        track.entries.values.forEach { entry ->
+            if (entry.startTimeMs >= startMs && entry.endTimeMs <= endMs) {
+                // Entry completely within range - delete it
+                entriesToRemove.add(entry.startTimeMs)
+            } else if (entry.startTimeMs < startMs && entry.endTimeMs > endMs) {
+                // Entry spans across range - split it
+                entriesToRemove.add(entry.startTimeMs)
+                
+                val leftPart = trimAudioEntry(entry, entry.startTimeMs, startMs)
+                val rightPart = trimAudioEntry(entry, endMs, entry.endTimeMs)
+                
+                leftPart?.let { entriesToAdd.add(it) }
+                rightPart?.let { entriesToAdd.add(it) }
+            } else if (entry.startTimeMs < endMs && entry.endTimeMs > endMs) {
+                // Entry overlaps at the end of range - trim it
+                entriesToRemove.add(entry.startTimeMs)
+                
+                val rightPart = trimAudioEntry(entry, endMs, entry.endTimeMs)
+                rightPart?.let { entriesToAdd.add(it) }
+            } else if (entry.startTimeMs < startMs && entry.endTimeMs > startMs) {
+                // Entry overlaps at the start of range - trim it
+                entriesToRemove.add(entry.startTimeMs)
+                
+                val leftPart = trimAudioEntry(entry, entry.startTimeMs, startMs)
+                leftPart?.let { entriesToAdd.add(it) }
+            }
+        }
+        
+        entriesToRemove.forEach { track.entries.remove(it) }
+        entriesToAdd.forEach { track.entries[it.startTimeMs] = it }
+        
+        val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val current = TimelineRepository.tracks.value.toMutableList()
+        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        current[trackIndex] = newTrack
+        TimelineRepository.tracks.value = current.toList()
+        UndoManager.addAction(UndoableAction.TimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
+    }
+
+    /**
+     * Delete a range from a MIDI track, trimming overlapping entries
+     */
+    private fun deleteRangeFromMidiTrack(trackIndex: Int, track: MidiTimelineTrack, startMs: Long, endMs: Long) {
+        val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val entriesToRemove = mutableListOf<Long>()
+        val entriesToAdd = mutableListOf<MidiEntry>()
+        
+        track.entries.values.forEach { entry ->
+            if (entry.startTimeMs >= startMs && entry.endTimeMs <= endMs) {
+                // Entry completely within range - delete it
+                entriesToRemove.add(entry.startTimeMs)
+            } else if (entry.startTimeMs < startMs && entry.endTimeMs > endMs) {
+                // Entry spans across range - split it
+                entriesToRemove.add(entry.startTimeMs)
+                
+                val leftPart = trimMidiEntry(entry, entry.startTimeMs, startMs)
+                val rightPart = trimMidiEntry(entry, endMs, entry.endTimeMs)
+                
+                leftPart?.let { entriesToAdd.add(it) }
+                rightPart?.let { entriesToAdd.add(it) }
+            } else if (entry.startTimeMs < endMs && entry.endTimeMs > endMs) {
+                // Entry overlaps at the end of range - trim it
+                entriesToRemove.add(entry.startTimeMs)
+                
+                val rightPart = trimMidiEntry(entry, endMs, entry.endTimeMs)
+                rightPart?.let { entriesToAdd.add(it) }
+            } else if (entry.startTimeMs < startMs && entry.endTimeMs > startMs) {
+                // Entry overlaps at the start of range - trim it
+                entriesToRemove.add(entry.startTimeMs)
+                
+                val leftPart = trimMidiEntry(entry, entry.startTimeMs, startMs)
+                leftPart?.let { entriesToAdd.add(it) }
+            }
+        }
+        
+        entriesToRemove.forEach { track.entries.remove(it) }
+        entriesToAdd.forEach { track.entries[it.startTimeMs] = it }
+        
+        val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val current = TimelineRepository.tracks.value.toMutableList()
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        current[trackIndex] = newTrack
+        TimelineRepository.tracks.value = current.toList()
+        UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
+    }
+
+    /**
+     * Duplicate audio entries in range
+     */
+    private fun duplicateAudioEntriesInRange(trackIndex: Int, track: AudioTimelineTrack, entries: List<AudioEntry>, placeAfterMs: Long) {
+        val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val rangeStart = entries.minByOrNull { it.startTimeMs }?.startTimeMs ?: return
+        
+        entries.forEach { entry ->
+            val offset = entry.startTimeMs - rangeStart
+            val newStart = placeAfterMs + offset
+            val duplicated = entry.copy(startTimeMs = newStart)
+            val resolved = resolveOverlapForDuplicate(track, duplicated, entry.startTimeMs)
+            track.entries[resolved.startTimeMs] = resolved
+        }
+        
+        val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val current = TimelineRepository.tracks.value.toMutableList()
+        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        current[trackIndex] = newTrack
+        TimelineRepository.tracks.value = current.toList()
+        UndoManager.addAction(UndoableAction.TimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
+    }
+
+    /**
+     * Duplicate MIDI entries in range
+     */
+    private fun duplicateMidiEntriesInRange(trackIndex: Int, track: MidiTimelineTrack, entries: List<MidiEntry>, placeAfterMs: Long) {
+        val before = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val rangeStart = entries.minByOrNull { it.startTimeMs }?.startTimeMs ?: return
+        
+        entries.forEach { entry ->
+            val offset = entry.startTimeMs - rangeStart
+            val newStart = placeAfterMs + offset
+            val duplicated = entry.copy(startTimeMs = newStart)
+            track.entries[duplicated.startTimeMs] = duplicated
+        }
+        
+        val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+        val current = TimelineRepository.tracks.value.toMutableList()
+        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        current[trackIndex] = newTrack
+        TimelineRepository.tracks.value = current.toList()
+        UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex, beforeEntries = before, afterEntries = after))
     }
 }

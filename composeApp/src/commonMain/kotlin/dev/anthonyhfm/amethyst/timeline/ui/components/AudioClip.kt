@@ -139,7 +139,30 @@ fun AudioClip(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(borderColor)
-                    .clickable { onSelectEntry() }
+                    .pointerInput(audioEntry.startTimeMs) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
+                                    val change = event.changes.firstOrNull()
+                                    if (change != null) {
+                                        val isShiftPressed = event.keyboardModifiers.isShiftPressed
+                                        if (isShiftPressed) {
+                                            // Multi-select mode
+                                            SelectionManager.select(
+                                                Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entryStartMs),
+                                                single = false
+                                            )
+                                        } else {
+                                            // Single select mode
+                                            onSelectEntry()
+                                        }
+                                        change.consume()
+                                    }
+                                }
+                            }
+                        }
+                    }
                     .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
                         detectDragGestures(
                             onDragStart = { onSelectEntry() },
