@@ -190,7 +190,7 @@ fun RecentView(
                         Row {
                             IconButton(
                                 onClick = {
-
+                                    viewModel.onEvent(Event.OnClickEditProject(it))
                                 }
                             ) {
                                 Icon(Icons.Default.Edit, null)

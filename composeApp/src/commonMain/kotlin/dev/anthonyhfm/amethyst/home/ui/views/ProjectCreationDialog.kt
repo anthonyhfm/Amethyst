@@ -39,8 +39,9 @@ import kotlinx.coroutines.flow.SharedFlow
 fun ProjectCreationDialog(
     navigator: NavHostController,
     openWorkspace: () -> Unit,
+    projectPath: String? = null,
 ) {
-    val viewModel = viewModel { ProjectCreationDialogViewModel() }
+    val viewModel = viewModel { ProjectCreationDialogViewModel(projectPath = projectPath) }
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -71,7 +72,7 @@ fun ProjectCreationDialog(
                     }
                 },
                 title = {
-                    Text("Create a new Project")
+                    Text(if (projectPath != null) "Edit Project" else "Create a new Project")
                 }
             )
         },
@@ -92,7 +93,7 @@ fun ProjectCreationDialog(
                         viewModel.onEvent(ProjectCreationDialogContract.Event.OnClickCreateProject)
                     }
                 ) {
-                    Text("Create Project")
+                    Text(if (projectPath != null) "Save Changes" else "Create Project")
                 }
             }
         }
