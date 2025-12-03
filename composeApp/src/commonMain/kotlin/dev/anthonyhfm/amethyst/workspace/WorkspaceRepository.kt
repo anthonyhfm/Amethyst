@@ -74,6 +74,10 @@ object WorkspaceRepository {
     val gridType: StateFlow<GridUtils.GridType> = _gridType.asStateFlow()
 
     init {
+        setupChains()
+    }
+
+    private fun setupChains() {
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
         }
@@ -347,13 +351,7 @@ object WorkspaceRepository {
         samplingChain = Chain()
         
         // Re-setup signal exits
-        lightsChain.signalExit = {
-            Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
-        }
-        
-        samplingChain.signalExit = {
-            Echo.audioEnter(it.filterIsInstance<Signal.AudioSignal>())
-        }
+        setupChains()
         
         // Clear devices
         Heaven.devices = emptyList()
