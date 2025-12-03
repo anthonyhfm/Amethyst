@@ -159,6 +159,10 @@ class RecentViewModel(
 
                 triggerEffect(RecentViewContract.Effect.OpenWorkspace)
             }
+            
+            is RecentViewContract.Event.OnClickEditProject -> {
+                navigator.navigate(HomeNavRoute.ProjectEdit(projectPath = event.project.path))
+            }
         }
     }
 }
@@ -169,6 +173,10 @@ sealed interface RecentViewContract {
         data object OnClickNewProject : Event
 
         data class OpenProjectFromHistory(
+            val project: RecentWorkspace
+        ): Event
+        
+        data class OnClickEditProject(
             val project: RecentWorkspace
         ): Event
     }

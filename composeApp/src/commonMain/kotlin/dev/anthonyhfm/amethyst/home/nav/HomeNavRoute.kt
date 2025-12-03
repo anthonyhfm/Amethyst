@@ -20,6 +20,11 @@ sealed interface HomeNavRoute {
     data object ProjectCreation : HomeNavRoute
 
     @Serializable
+    data class ProjectEdit(
+        val projectPath: String
+    ) : HomeNavRoute
+
+    @Serializable
     data class AbletonImportWizard(
         val liveSetPath: String
     ) : HomeNavRoute

@@ -85,6 +85,22 @@ fun Home(
                     )
                 }
 
+                dialog<HomeNavRoute.ProjectEdit>(
+                    dialogProperties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                    )
+                ) {
+                    val route = it.toRoute<HomeNavRoute.ProjectEdit>()
+                    
+                    ProjectCreationDialog(
+                        navigator = navigator,
+                        openWorkspace = {
+                            navigator.popBackStack()
+                        },
+                        projectPath = route.projectPath
+                    )
+                }
+
                 dialog<HomeNavRoute.AbletonImportWizard>(
                     dialogProperties = DialogProperties(
                         usePlatformDefaultWidth = false,
