@@ -168,15 +168,15 @@ fun WorkspaceChainEditor(
                                                     
                                                     when {
                                                         ModifierKeysState.isShiftPressed -> {
-                                                            SelectionManager.select(
-                                                                chainDeviceSelectable,
-                                                                single = false
-                                                            )
-                                                        }
-                                                        ModifierKeysState.isCtrlPressed -> {
                                                             SelectionManager.selectRangeInChain(
                                                                 targetDevice = chainDeviceSelectable,
                                                                 devicesInChain = devices
+                                                            )
+                                                        }
+                                                        ModifierKeysState.isCtrlPressed -> {
+                                                            SelectionManager.select(
+                                                                chainDeviceSelectable,
+                                                                single = false
                                                             )
                                                         }
                                                         else -> {
