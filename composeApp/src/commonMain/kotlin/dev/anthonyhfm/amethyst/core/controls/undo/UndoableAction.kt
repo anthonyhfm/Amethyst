@@ -93,6 +93,13 @@ sealed interface UndoableAction {
         val frame: Frame
     )
 
+    data class KeyframeDrawing(
+        val device: KeyframesChainDevice,
+        val frameIndex: Int,
+        val frameBefore: Frame,
+        val frameAfter: Frame
+    ) : UndoableAction
+
     data class GroupCreation(
         val device: GroupChainDevice,
         val groupIndex: Int,
