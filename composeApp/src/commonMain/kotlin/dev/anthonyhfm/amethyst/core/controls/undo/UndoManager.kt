@@ -103,12 +103,6 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
-                is UndoableAction.KeyframeDrawing -> {
-                    action.device.updateFrameInternal(action.frameIndex, action.frameBefore)
-                    action.device.refreshVirtualDevices()
-                    redoStack.add(action)
-                }
-
                 is UndoableAction.GroupCreation -> {
                     action.device.removeGroupInternal(action.groupIndex)
                     redoStack.add(action)
@@ -474,12 +468,6 @@ object UndoManager {
                     action.pastedFrames.forEach { pasteInfo ->
                         action.device.addFrameInternal(pasteInfo.frameIndex, pasteInfo.frame)
                     }
-                    undoStack.add(action)
-                }
-
-                is UndoableAction.KeyframeDrawing -> {
-                    action.device.updateFrameInternal(action.frameIndex, action.frameAfter)
-                    action.device.refreshVirtualDevices()
                     undoStack.add(action)
                 }
 

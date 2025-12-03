@@ -47,8 +47,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     private var lastSelectedFrameIndex: Int? = null
     private val dragVisitedPads: MutableSet<Pair<Int, Int>> = mutableSetOf()
     private var dragEraseMode: Boolean = false
-    private var frameBeforeDrag: Frame? = null
-    private var frameIndexBeforeDrag: Int = -1
+    private var stateBeforeDrag: KeyframesChainDeviceState? = null
 
     init {
         renderAnimation()
@@ -120,11 +119,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         dragVisitedPads.clear()
         dragEraseMode = padMatchesSelectedColor(x, y)
         
-        // Capture the frame state and index before drawing starts
-        frameIndexBeforeDrag = state.value.currentFrameIndex
-        frameBeforeDrag = state.value.frames[frameIndexBeforeDrag].copy(
-            entries = state.value.frames[frameIndexBeforeDrag].entries.toList()
-        )
+        // Capture the state before drawing starts
+        stateBeforeDrag = state.value
 
         applyDragAt(x, y)
     }
@@ -141,30 +137,12 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     private fun endVirtualDrag() {
         isDragging.value = false
         
-        // Create undoable action if we have captured the before state
-        frameBeforeDrag?.let { beforeFrame ->
-            // Use the frame index from when dragging started
-            val frameIndex = frameIndexBeforeDrag
-            // Ensure frame index is still valid
-            if (frameIndex >= 0 && frameIndex < state.value.frames.size) {
-                val afterFrame = state.value.frames[frameIndex]
-                
-                // Only add undo action if the frame actually changed
-                if (beforeFrame.entries != afterFrame.entries) {
-                    UndoManager.addAction(
-                        UndoableAction.KeyframeDrawing(
-                            device = this,
-                            frameIndex = frameIndex,
-                            frameBefore = beforeFrame,
-                            frameAfter = afterFrame
-                        )
-                    )
-                }
-            }
+        // Push state change for undo/redo
+        stateBeforeDrag?.let { beforeState ->
+            pushStateChange(beforeState, state.value)
         }
         
-        frameBeforeDrag = null
-        frameIndexBeforeDrag = -1
+        stateBeforeDrag = null
         dragVisitedPads.clear()
     }
 
@@ -571,16 +549,6 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             currentFrames.add(safeTargetIndex, newFrame)
 
             it.copy(frames = currentFrames)
-        }
-    }
-
-    internal fun updateFrameInternal(frameIndex: Int, frame: Frame) {
-        state.update {
-            it.copy(
-                frames = it.frames.toMutableList().apply {
-                    set(frameIndex, frame)
-                }
-            )
         }
     }
 
