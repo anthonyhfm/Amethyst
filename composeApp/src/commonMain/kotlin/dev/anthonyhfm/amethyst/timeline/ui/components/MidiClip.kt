@@ -68,6 +68,7 @@ import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun MidiClip(
     midiEntry: MidiEntry,
@@ -263,6 +264,7 @@ fun MidiClip(
                 )
             }
         }
+
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -270,28 +272,30 @@ fun MidiClip(
                 .pointerInput(midiEntry.startTimeMs, zoomLevel, bpm, gridType) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            // Check if we're not on a resize handle
-                            val localX = offset.x
-                            val resizeHandleWidth = with(density) { 6.dp.toPx() }
-                            val totalWidth = size.width.toFloat()
-
-                            if (localX > resizeHandleWidth && localX < (totalWidth - resizeHandleWidth)) {
-                                // Calculate absolute position considering scroll and clip offset
-                                val clipStartPx = midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
-                                val absoluteX = (clipStartPx + localX - scrollState.value.toDouble()).toFloat()
-                                val startMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
-                                rangeStartMs = startMs
-                                rangeEndMs = startMs
-                                rangeActive = true
-                            } else {
-                                rangeActive = false
-                            }
+                            val clipStartPx = midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
+                            val absoluteX = (clipStartPx + offset.x - scrollState.value.toDouble()).toFloat()
+                            val startMs = computeStrictGridTime(
+                                absoluteX + scrollState.value.toFloat(),
+                                scrollState,
+                                zoomLevel,
+                                bpm,
+                                gridType
+                            )
+                            rangeStartMs = startMs
+                            rangeEndMs = startMs
+                            rangeActive = true
                         },
                         onDrag = { change, _ ->
                             if (rangeActive && rangeStartMs != null) {
                                 val clipStartPx = midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
                                 val absoluteX = (clipStartPx + change.position.x - scrollState.value.toDouble()).toFloat()
-                                val currentMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
+                                val currentMs = computeStrictGridTime(
+                                    absoluteX + scrollState.value.toFloat(),
+                                    scrollState,
+                                    zoomLevel,
+                                    bpm,
+                                    gridType
+                                )
                                 if (currentMs != rangeEndMs) {
                                     rangeEndMs = currentMs
                                 }
@@ -325,85 +329,31 @@ fun MidiClip(
                         }
                     )
                 }
-        ) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .padding(horizontal = 4.dp, vertical = 4.dp)
-                    .drawWithContent {
-                        drawContent()
-                        if (zoomLevel <= 0f) return@drawWithContent
-                        val contentHeightPx = size.height
-                        val noteBarMinHeightPx = 4f
-                        val noteBarMaxHeightPx = 14f
-
-                        // Draw MIDI notes
-                        midiEntry.notes.forEach { note ->
-                            val overlapStart = maxOf(note.startTimeMs, midiEntry.startTimeMs)
-                            val overlapEnd = minOf(note.endTimeMs, midiEntry.endTimeMs)
-                            if (overlapEnd <= overlapStart) return@forEach
-                            val relStartMs = overlapStart - midiEntry.startTimeMs
-                            val relDurationMs = overlapEnd - overlapStart
-                            val x = relStartMs * zoomLevel
-                            val w = relDurationMs * zoomLevel
-                            if (w < 0.5f) return@forEach
-                            val pitchRatio = (note.pitch.coerceIn(0, 127)) / 127f
-                            val y = (1f - pitchRatio) * (contentHeightPx - noteBarMaxHeightPx)
-                            val barHeightPx = noteBarMinHeightPx + (noteBarMaxHeightPx - noteBarMinHeightPx) * 0.55f
-                            val noteColor = Color(note.led.red, note.led.green, note.led.blue)
+                .drawWithContent {
+                    drawContent()
+                    // Range-Overlay wie beim AudioClip
+                    if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                        val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
+                        val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
+                        val clipStartMs = midiEntry.startTimeMs
+                        val clipEndMs = midiEntry.startTimeMs + midiEntry.durationMs
+                        val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
+                        val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
+                        if (visibleEnd > visibleStart) {
+                            val relStartMs = visibleStart - clipStartMs
+                            val relEndMs = visibleEnd - clipStartMs
+                            val startX = relStartMs * zoomLevel
+                            val width = (relEndMs - relStartMs) * zoomLevel
                             drawRect(
-                                color = noteColor.copy(alpha = 0.60f),
-                                topLeft = Offset(x, y),
-                                size = Size(w, barHeightPx)
+                                color = Color(0x5533AAFF),
+                                topLeft = Offset(startX, 0f),
+                                size = Size(width, size.height)
                             )
-                            drawRect(
-                                color = noteColor.copy(alpha = 0.92f),
-                                topLeft = Offset(x, y),
-                                size = Size(w, barHeightPx),
-                                style = Stroke(width = 1.0f)
-                            )
-                        }
-
-                        // Draw range selection overlay
-                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                            val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
-                            val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
-
-                            // Convert to clip-relative coordinates
-                            val clipStartMs = midiEntry.startTimeMs
-                            val clipEndMs = midiEntry.endTimeMs
-
-                            // Clip the range to visible portion
-                            val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
-                            val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
-
-                            if (visibleEnd > visibleStart) {
-                                val relStartMs = visibleStart - clipStartMs
-                                val relEndMs = visibleEnd - clipStartMs
-                                val startX = relStartMs * zoomLevel
-                                val width = (relEndMs - relStartMs) * zoomLevel
-
-                                drawRect(
-                                    color = Color(0x5533AAFF),
-                                    topLeft = Offset(startX, 0f),
-                                    size = Size(width, size.height)
-                                )
-                            }
                         }
                     }
-            ) {
-                Text(
-                    text = "${midiEntry.notes.size} notes",
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .background(backgroundColor.copy(alpha = 0.35f))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize * 0.75f),
-                    color = foregroundColor.copy(alpha = 0.9f),
-                    maxLines = 1
-                )
-            }
-
+                }
+        ) {
+            // Left resize handle
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -431,6 +381,7 @@ fun MidiClip(
                         )
                     }
             )
+            // Right resize handle
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
