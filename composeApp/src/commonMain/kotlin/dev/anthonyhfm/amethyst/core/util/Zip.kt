@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.util
 
+import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import io.github.vinceglb.filekit.PlatformFile
 
 expect object Zip {
@@ -20,7 +21,7 @@ fun Zip.determineFormat(file: PlatformFile): ZippedProjectFormat {
         paths.any {
             it.contains(".als")
         } && paths.any {
-            it.contains(".approj")
+            it.contains(".approj") && GlobalSettings.experimentalApolloConversionSupport
         } -> ZippedProjectFormat.ABLETON_APOLLO
 
         else -> ZippedProjectFormat.UNIPAD

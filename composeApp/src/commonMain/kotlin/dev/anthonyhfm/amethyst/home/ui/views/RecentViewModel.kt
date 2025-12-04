@@ -47,7 +47,11 @@ class RecentViewModel(
                     val file = FileKit.openFilePicker(
                         type = FileKitType.File(
                             extensions = if (platform is Platform.Desktop) {
-                                listOf("amproj", "als", "approj", "zip")
+                                listOf("amproj", "als", "zip").toMutableList().apply {
+                                    if (GlobalSettings.experimentalApolloConversionSupport) {
+                                        add("approj")
+                                    }
+                                }
                             } else {
                                 listOf("amproj", "zip")
                             }

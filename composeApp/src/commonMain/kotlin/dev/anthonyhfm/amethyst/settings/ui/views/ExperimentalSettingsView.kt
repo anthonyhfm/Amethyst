@@ -35,6 +35,7 @@ fun ExperimentalSettingsView() {
         ) {
             Switch(
                 checked = apolloConversionSupport,
+                enabled = false,
                 onCheckedChange = {
                     apolloConversionSupport = it
                     GlobalSettings.experimentalApolloConversionSupport = it
