@@ -119,6 +119,17 @@ object WorkspaceRepository {
         }
     }
 
+    fun updateAutoPlaySettings(showButtonPresses: Boolean, showLights: Boolean) {
+        saveableWorkspaceData?.let { currentData ->
+            saveableWorkspaceData = currentData.copy(
+                settings = currentData.settings.copy(
+                    autoPlayShowButtonPresses = showButtonPresses,
+                    autoPlayShowLights = showLights
+                )
+            )
+        }
+    }
+
     fun setGridType(type: GridUtils.GridType) { _gridType.update { type } }
 
     fun setMacroValue(index: Int, macro: Macro) {

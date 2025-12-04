@@ -72,7 +72,7 @@ fun AutoPlaySettingsDialog(
                     )
                 }
                 Text(
-                    text = "Sends artificial autoplay signals to the lights chain",
+                    text = "Sends AutoPlay signals to the lights chain",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp)
@@ -82,15 +82,10 @@ fun AutoPlaySettingsDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    val currentData = WorkspaceRepository.saveableWorkspaceData
-                    if (currentData != null) {
-                        WorkspaceRepository.saveableWorkspaceData = currentData.copy(
-                            settings = currentData.settings.copy(
-                                autoPlayShowButtonPresses = showButtonPresses,
-                                autoPlayShowLights = showLights
-                            )
-                        )
-                    }
+                    WorkspaceRepository.updateAutoPlaySettings(
+                        showButtonPresses = showButtonPresses,
+                        showLights = showLights
+                    )
                     onDismiss()
                 }
             ) {

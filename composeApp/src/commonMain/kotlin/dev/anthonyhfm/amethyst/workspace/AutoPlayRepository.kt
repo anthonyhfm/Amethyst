@@ -70,6 +70,8 @@ object AutoPlayRepository {
                     }
 
                     // Show button presses on layer 100 if enabled
+                    // This sends visual feedback to Heaven directly rather than through
+                    // the lights chain, allowing button press visualization on devices
                     if (settings?.autoPlayShowButtonPresses == true) {
                         Heaven.midiEnter(
                             entry.value.map {
