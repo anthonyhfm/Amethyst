@@ -34,12 +34,10 @@ class Resonator3Adapter(
     override fun toDeviceStates(): List<DeviceState> {
         val palette = AbletonConverter.palette
 
-        val direction: Resonator3Prototype = jsonDecoder.let {
-            if (isUpdatedVersion) {
-                it.decodeFromString<Resonator301Data>(blob.decodeToString())
-            } else {
-                it.decodeFromString<Resonator3Data>(blob.decodeToString())
-            }
+        val direction: Resonator3Prototype = if (isUpdatedVersion) {
+            jsonDecoder.decodeFromString<Resonator301Data>(blob.decodeToString())
+        } else {
+            jsonDecoder.decodeFromString<Resonator3Data>(blob.decodeToString())
         }
         
         val parameterList = xml.querySelector("ParameterList")[1]
@@ -272,6 +270,8 @@ class Resonator3Adapter(
                 if (colorCount > 1) {
                     GradientChainDeviceState(
                         gradientData = mutableListOf<GradientChainDeviceState.GradientColor>().apply {
+                            println("Colors: $colorCount in $gradientColors")
+
                             for (i in 0 until colorCount) {
                                 add(
                                     GradientChainDeviceState.GradientColor(
@@ -336,7 +336,7 @@ class Resonator3Adapter(
 
 interface Resonator3Prototype {
     val circle: List<Int>
-    val device: List<Int>
+    val device: List<Float>
     val diamond: List<Int>
     val down: List<Int>
     val downLeft: List<Int>
@@ -356,7 +356,7 @@ private data class Resonator3Data(
     @SerialName("pictctrl[13]")
     override val circle: List<Int> = listOf(0),
     @SerialName("Device")
-    override val device: List<Int> = listOf(0),
+    override val device: List<Float> = listOf(0f),
     @SerialName("pictctrl[15]")
     override val diamond: List<Int> = listOf(0),
     @SerialName("pictctrl[10]")
@@ -388,7 +388,7 @@ private data class Resonator301Data(
     @SerialName("Circle")
     override val circle: List<Int> = listOf(0),
     @SerialName("Device")
-    override val device: List<Int> = listOf(0),
+    override val device: List<Float> = listOf(0f),
     @SerialName("Diamond")
     override val diamond: List<Int> = listOf(0),
     @SerialName("Down")

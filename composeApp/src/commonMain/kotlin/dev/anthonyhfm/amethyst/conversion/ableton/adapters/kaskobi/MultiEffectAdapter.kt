@@ -66,10 +66,10 @@ class MultiEffectAdapter (
                                     addAll(
                                         it.querySelector("DeviceChain").first()
                                             .querySelector("Devices").first()
-                                            .children.mapNotNull { child ->
+                                            .children.flatMap { child ->
                                                 resolveAdapter(child)
                                                     ?.toDeviceStates()
-                                                    ?.firstOrNull()
+                                                    ?: emptyList()
                                             }
                                     )
                                 }

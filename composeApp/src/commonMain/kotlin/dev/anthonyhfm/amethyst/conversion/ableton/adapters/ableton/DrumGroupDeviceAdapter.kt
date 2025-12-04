@@ -140,13 +140,13 @@ class DrumGroupDeviceAdapter(
                                 addAll(
                                     branch.querySelector("DeviceChain")[0]
                                         .querySelector("Devices")[0]
-                                        .children.mapNotNull { child ->
+                                        .children.flatMap { child ->
                                             resolveAdapter(
                                                 xml = child,
                                                 offset = offset,
                                                 outputOffset = outputOffset,
                                                 chainDepth = chainDepth + 1
-                                            )?.toDeviceStates()?.firstOrNull()
+                                            )?.toDeviceStates() ?: emptyList()
                                         }
                                 )
                             }
