@@ -30,7 +30,7 @@ fun WaveformView(
     modifier: Modifier = Modifier,
     waveColor: Color = Color.White,
     onSeek: ((Float) -> Unit)? = null,
-    zoomLevel: Float, // px per ms
+    zoomLevel: Float, // px per ms (beibehalten für API-Kompatibilität, intern nicht genutzt)
     fadeInMs: Float = 0f,
     fadeOutMs: Float = 0f,
     startPosition: Float = 0f,
@@ -120,9 +120,8 @@ fun WaveformView(
 
             if (samples.isEmpty() || w <= 1f) return@Canvas
 
-            // Calculate total buckets for the entire audio signal based on its full duration and the current zoom
-            val totalWidthPx = totalDurationMs * zoomLevel
-            val bucketCount = (totalWidthPx / bucketWidthPx).toInt().coerceIn(1, MAX_BUCKETS)
+            // Bucket-Anzahl basierend auf tatsächlicher Canvas-Breite berechnen
+            val bucketCount = (w / bucketWidthPx).toInt().coerceIn(1, MAX_BUCKETS)
 
             val amps = envelopeCache.getOrPut(bucketCount) {
                 envelope(samples, bucketCount)
@@ -130,10 +129,9 @@ fun WaveformView(
 
             if (amps.isEmpty()) return@Canvas
 
-            // Calculate which part of the envelope to draw
-            val startBucket = ((startMs.toFloat() / totalDurationMs.toFloat()) * bucketCount).toInt()
-            val visibleBuckets = ((durationMs.toFloat() / totalDurationMs.toFloat()) * bucketCount).toInt()
-            val endBucket = (startBucket + visibleBuckets).coerceAtMost(amps.size)
+            // Für die aktuelle Ansicht den kompletten Bereich zeichnen
+            val startBucket = 0
+            val visibleBuckets = bucketCount
 
             val path = Path().apply {
                 moveTo(0f, centerY)
@@ -141,7 +139,7 @@ fun WaveformView(
 
                 for (i in 0 until visibleBuckets) {
                     val bucketIndex = startBucket + i
-                    if (bucketIndex < endBucket) {
+                    if (bucketIndex < amps.size) {
                         val x = i * stepX
                         val y = centerY - amps[bucketIndex] * half
                         lineTo(x, y)
@@ -151,7 +149,7 @@ fun WaveformView(
 
                 for (i in (visibleBuckets - 1) downTo 0) {
                     val bucketIndex = startBucket + i
-                    if (bucketIndex < endBucket) {
+                    if (bucketIndex < amps.size) {
                         val x = i * stepX
                         val y = centerY + amps[bucketIndex] * half
                         lineTo(x, y)
