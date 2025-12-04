@@ -192,7 +192,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                     }
                 )
         ) {
-            Box(
+            /*Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(5.dp)
@@ -200,7 +200,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
                     .height(42.dp)
                     .width(18.dp)
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            )
+            )*/
         }
     }
 
