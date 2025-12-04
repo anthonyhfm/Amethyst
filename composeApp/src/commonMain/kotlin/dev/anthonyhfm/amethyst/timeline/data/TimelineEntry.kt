@@ -24,39 +24,39 @@ data class AudioEntry(
     val sampleRate: Int = 44100,
     val channels: Int = 2,
     val bitDepth: Int = 16,
-    var name: String = ""
+    var name: String = "",
+    val sourceStartMs: Long = 0, // Offset within the original audio data
+    val sourceDurationMs: Long = durationMs // Duration of the original audio data
 ) : TimelineEntry {
     private var audioSourceId: String? = null
 
     override fun start(startAt: Long?) {
         val actualStartTime = startAt ?: startTimeMs
+        val playheadOffsetInClip = if (startAt != null && startAt > startTimeMs) startAt - startTimeMs else 0L
+        val totalOffsetMs = sourceStartMs + playheadOffsetInClip
 
-        val trimmedData = if (startAt != null && startAt > startTimeMs) {
-            val offsetMs = startAt - startTimeMs  // Fix: subtract, not add
-            trimAudioData(rawData, offsetMs)
-        } else {
-            rawData
-        }
+        val trimmedData = trimAudioData(rawData, totalOffsetMs)
 
         if (trimmedData != null && trimmedData.isNotEmpty()) {
+            val remainingDurationMs = if (startAt != null && startAt > startTimeMs) {
+                maxOf(0, durationMs - (startAt - startTimeMs))
+            } else {
+                durationMs
+            }
+
             audioSourceId = AudioOutput.play(
                 audioSignal = Signal.AudioSignal(
                     rawData = trimmedData,
                     sampleRate = sampleRate,
                     channels = channels,
                     bitDepth = bitDepth,
-                    durationMs = if (startAt != null && startAt > startTimeMs) {
-                        // Adjust duration if we're starting later
-                        maxOf(0, durationMs - (startAt - startTimeMs))
-                    } else {
-                        durationMs
-                    },
+                    durationMs = remainingDurationMs,
                     origin = "AudioEntry_$fileName"
                 )
             )
 
             if (audioSourceId != null) {
-                println("Started audio entry: $fileName at ${actualStartTime}ms (source: ${audioSourceId}) - offset: ${if (startAt != null && startAt > startTimeMs) startAt - startTimeMs else 0}ms")
+                println("Started audio entry: $fileName at ${actualStartTime}ms (source: ${audioSourceId}) - offset: ${playheadOffsetInClip}ms")
             } else {
                 println("Failed to start audio entry: $fileName")
             }

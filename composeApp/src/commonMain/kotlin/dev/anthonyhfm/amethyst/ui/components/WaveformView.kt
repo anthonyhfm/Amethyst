@@ -12,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -25,10 +24,13 @@ import kotlin.math.min
 @Composable
 fun WaveformView(
     signal: Signal.AudioSignal,
+    totalDurationMs: Long,
+    startMs: Long,
+    durationMs: Long,
     modifier: Modifier = Modifier,
     waveColor: Color = Color.White,
     onSeek: ((Float) -> Unit)? = null,
-    zoomLevel: Float? = null,
+    zoomLevel: Float, // px per ms
     fadeInMs: Float = 0f,
     fadeOutMs: Float = 0f,
     startPosition: Float = 0f,
@@ -40,7 +42,7 @@ fun WaveformView(
     val baseline = waveColor.copy(alpha = 0.6f)
 
     val bucketWidthPx = 2f
-    val MAX_BUCKETS = 3000
+    val MAX_BUCKETS = 10000 // Increased for more detail
 
     val samples: FloatArray = remember(signal.rawData, signal.bitDepth, signal.channels) {
         val bytes = signal.rawData ?: return@remember FloatArray(0)
@@ -49,7 +51,7 @@ fun WaveformView(
 
     // Cache für amplitude envelopes nach BucketCount
     val envelopeCache = remember { mutableMapOf<Int, FloatArray>() }
-    
+
     // State for drag handle interaction
     var isDraggingStart by remember { mutableStateOf(false) }
     var isDraggingEnd by remember { mutableStateOf(false) }
@@ -80,7 +82,7 @@ fun WaveformView(
                                     val startX = w * startPosition
                                     val endX = w * endPosition
                                     val handleSize = 20f
-                                    
+
                                     when {
                                         abs(x - startX) < handleSize -> isDraggingStart = true
                                         abs(x - endX) < handleSize -> isDraggingEnd = true
@@ -89,7 +91,7 @@ fun WaveformView(
                                 onDrag = { _, dragAmount ->
                                     val w = size.width
                                     val delta = dragAmount.x / w
-                                    
+
                                     when {
                                         isDraggingStart -> onStartPositionChange?.invoke((startPosition + delta).coerceIn(0f, endPosition - 0.01f))
                                         isDraggingEnd -> onEndPositionChange?.invoke((endPosition + delta).coerceIn(startPosition + 0.01f, 1f))
@@ -118,32 +120,42 @@ fun WaveformView(
 
             if (samples.isEmpty() || w <= 1f) return@Canvas
 
-            val rawBucketCount = (w / bucketWidthPx).toInt().coerceAtLeast(1)
-            val zoomFactor = zoomLevel?.coerceAtLeast(0.0001f) ?: 1f
-            val adjustedBuckets = (rawBucketCount * zoomFactor).toInt().coerceAtLeast(1)
-            val bucketCount = adjustedBuckets.coerceAtMost(MAX_BUCKETS)
+            // Calculate total buckets for the entire audio signal based on its full duration and the current zoom
+            val totalWidthPx = totalDurationMs * zoomLevel
+            val bucketCount = (totalWidthPx / bucketWidthPx).toInt().coerceIn(1, MAX_BUCKETS)
 
             val amps = envelopeCache.getOrPut(bucketCount) {
                 envelope(samples, bucketCount)
             }
 
-            if (amps.size != bucketCount) return@Canvas
+            if (amps.isEmpty()) return@Canvas
+
+            // Calculate which part of the envelope to draw
+            val startBucket = ((startMs.toFloat() / totalDurationMs.toFloat()) * bucketCount).toInt()
+            val visibleBuckets = ((durationMs.toFloat() / totalDurationMs.toFloat()) * bucketCount).toInt()
+            val endBucket = (startBucket + visibleBuckets).coerceAtMost(amps.size)
 
             val path = Path().apply {
                 moveTo(0f, centerY)
-                val stepX = w / (bucketCount - 1).coerceAtLeast(1)
+                val stepX = w / visibleBuckets.coerceAtLeast(1)
 
-                for (i in 0 until bucketCount) {
-                    val x = i * stepX
-                    val y = centerY - amps[i] * half
-                    lineTo(x, y)
+                for (i in 0 until visibleBuckets) {
+                    val bucketIndex = startBucket + i
+                    if (bucketIndex < endBucket) {
+                        val x = i * stepX
+                        val y = centerY - amps[bucketIndex] * half
+                        lineTo(x, y)
+                    }
                 }
                 lineTo(w, centerY)
 
-                for (i in bucketCount - 1 downTo 0) {
-                    val x = i * stepX
-                    val y = centerY + amps[i] * half
-                    lineTo(x, y)
+                for (i in (visibleBuckets - 1) downTo 0) {
+                    val bucketIndex = startBucket + i
+                    if (bucketIndex < endBucket) {
+                        val x = i * stepX
+                        val y = centerY + amps[bucketIndex] * half
+                        lineTo(x, y)
+                    }
                 }
                 close()
             }
@@ -157,7 +169,7 @@ fun WaveformView(
             val startX = w * startPosition
             val endX = w * endPosition
             val activeWidth = endX - startX
-            
+
             // Dim regions outside start/end
             if (startPosition > 0f) {
                 drawRect(
@@ -166,7 +178,7 @@ fun WaveformView(
                     size = androidx.compose.ui.geometry.Size(startX, h)
                 )
             }
-            
+
             if (endPosition < 1f) {
                 drawRect(
                     color = Color.Black.copy(alpha = 0.5f),
@@ -177,11 +189,11 @@ fun WaveformView(
 
             // Draw triangular fade in overlay (within active region)
             if (fadeInMs > 0f && activeWidth > 0f) {
-                val durationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
-                val activeDurationMs = durationMs * (endPosition - startPosition)
+                val signalDurationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
+                val activeDurationMs = signalDurationMs * (endPosition - startPosition)
                 val fadeInRatio = (fadeInMs / activeDurationMs).coerceIn(0f, 1f)
                 val fadeInWidth = activeWidth * fadeInRatio
-                
+
                 // Draw triangular gradient for fade in
                 val fadeInPath = Path().apply {
                     moveTo(startX, 0f)
@@ -189,7 +201,7 @@ fun WaveformView(
                     lineTo(startX, h)
                     close()
                 }
-                
+
                 drawPath(
                     path = fadeInPath,
                     brush = SolidColor(Color.Black.copy(alpha = 0.6f))
@@ -197,24 +209,24 @@ fun WaveformView(
             }
 
             if (fadeOutMs > 0f && activeWidth > 0f) {
-                val durationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
-                val activeDurationMs = durationMs * (endPosition - startPosition)
+                val signalDurationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
+                val activeDurationMs = signalDurationMs * (endPosition - startPosition)
                 val fadeOutRatio = (fadeOutMs / activeDurationMs).coerceIn(0f, 1f)
                 val fadeOutWidth = activeWidth * fadeOutRatio
-                
+
                 val fadeOutPath = Path().apply {
                     moveTo(endX - fadeOutWidth, 0f)
                     lineTo(endX, 0f)
                     lineTo(endX, h)
                     close()
                 }
-                
+
                 drawPath(
                     path = fadeOutPath,
                     brush = SolidColor(Color.Black.copy(alpha = 0.6f))
                 )
             }
-            
+
             if (onStartPositionChange != null) {
                 drawLine(
                     color = Color.White.copy(alpha = 0.8f),
@@ -229,7 +241,7 @@ fun WaveformView(
                     center = Offset(startX, h / 2f)
                 )
             }
-            
+
             if (onEndPositionChange != null) {
                 drawLine(
                     color = Color.White.copy(alpha = 0.8f),

@@ -100,6 +100,15 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                     .clip(RoundedCornerShape(6.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             ) {
+                // Calculate zoom level based on available width
+                // We use a fixed width assumption for the ClipChainDevice
+                val estimatedWidthPx = 400f // Approximate width in pixels
+                val zoomLevel = if (deviceState.totalDurationMs > 0) {
+                    estimatedWidthPx / deviceState.totalDurationMs.toFloat()
+                } else {
+                    1f
+                }
+
                 WaveformView(
                     signal = Signal.AudioSignal(
                         origin = this,
@@ -108,6 +117,10 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                         channels = deviceState.channels,
                         bitDepth = deviceState.bitDepth
                     ),
+                    totalDurationMs = deviceState.totalDurationMs,
+                    startMs = 0L,
+                    durationMs = deviceState.totalDurationMs,
+                    zoomLevel = zoomLevel,
                     fadeInMs = deviceState.fadeInMs,
                     fadeOutMs = deviceState.fadeOutMs,
                     startPosition = deviceState.startPosition,
@@ -257,6 +270,12 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                             )
 
                             audioSignal?.let { signal ->
+                                // Calculate duration from samples
+                                val bytesPerSample = signal.bitDepth / 8
+                                val frameSize = bytesPerSample * signal.channels
+                                val totalFrames = (signal.rawData?.size ?: 0) / frameSize
+                                val durationMs = ((totalFrames.toFloat() / signal.sampleRate) * 1000f).toLong()
+
                                 state.update { currentState ->
                                     currentState.copy(
                                         fileName = selectedFile.name,
@@ -264,6 +283,7 @@ class ClipChainDevice : AudioChainDevice<ClipChainDeviceState>() {
                                         sampleRate = signal.sampleRate,
                                         channels = signal.channels,
                                         bitDepth = signal.bitDepth,
+                                        totalDurationMs = durationMs,
                                         isLoaded = true
                                     )
                                 }
@@ -439,6 +459,7 @@ data class ClipChainDeviceState(
     val sampleRate: Int = 44100,
     val channels: Int = 2,
     val bitDepth: Int = 16,
+    val totalDurationMs: Long = 0L,
     val isLoaded: Boolean = false,
     val fadeInMs: Float = 0f,
     val fadeOutMs: Float = 0f,

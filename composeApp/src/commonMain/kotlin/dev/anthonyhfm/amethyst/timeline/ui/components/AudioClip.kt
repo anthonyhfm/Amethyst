@@ -335,7 +335,11 @@ fun AudioClip(
                     bitDepth = audioEntry.bitDepth,
                     channels = audioEntry.channels,
                     sampleRate = audioEntry.sampleRate
-                )
+                ),
+                totalDurationMs = audioEntry.sourceDurationMs,
+                startMs = audioEntry.sourceStartMs,
+                durationMs = audioEntry.durationMs,
+                zoomLevel = zoomLevel
             )
         }
     }
