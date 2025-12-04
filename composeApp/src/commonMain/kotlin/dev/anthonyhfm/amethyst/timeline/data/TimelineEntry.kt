@@ -140,18 +140,16 @@ data class MidiEntry(
     var name: String = "MIDI Clip"
 ) : TimelineEntry {
     @kotlinx.serialization.Transient
-    private val activeJobOwner = Any() // Unique owner for scheduled jobs
+    private val activeJobOwner = Any()
 
-    // Convert pitch to XY coordinates for launchpad (same logic as PianoRoll)
     private fun pitchToXY(pitch: Int): Pair<Int, Int> {
         val localPitch = pitch % 100
         val x = localPitch % 10
-        val y = localPitch / 10
+        val y = 9 - (localPitch / 10)
         return Pair(x, y)
     }
 
     override fun start(startAt: Long?) {
-        // Cancel any existing scheduled jobs for this clip
         Heaven.cancelJobsForOwner(activeJobOwner)
 
         val offsetMs = if (startAt != null && startAt > startTimeMs) {
@@ -160,23 +158,19 @@ data class MidiEntry(
             0L
         }
 
-        // Schedule all note-on and note-off events
         notes.forEach { note ->
             val noteStartInClip = note.startTimeMs
             val noteEndInClip = note.startTimeMs + note.durationMs
             
-            // Schedule note-on
             if (noteStartInClip >= offsetMs) {
                 val delayMs = noteStartInClip - offsetMs
                 Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
                     sendNoteOn(note)
                 }
             } else if (noteEndInClip > offsetMs) {
-                // Note should already be playing, turn it on immediately
                 sendNoteOn(note)
             }
 
-            // Schedule note-off
             if (noteEndInClip > offsetMs) {
                 val delayMs = noteEndInClip - offsetMs
                 Heaven.schedule(delayMs.toDouble(), owner = activeJobOwner) {
