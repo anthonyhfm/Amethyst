@@ -85,8 +85,7 @@ fun AutoPlaySettingsDialog(
                     val currentData = WorkspaceRepository.saveableWorkspaceData
                     if (currentData != null) {
                         WorkspaceRepository.saveableWorkspaceData = currentData.copy(
-                            settings = WorkspaceSettings(
-                                bpm = currentData.settings.bpm,
+                            settings = currentData.settings.copy(
                                 autoPlayShowButtonPresses = showButtonPresses,
                                 autoPlayShowLights = showLights
                             )
