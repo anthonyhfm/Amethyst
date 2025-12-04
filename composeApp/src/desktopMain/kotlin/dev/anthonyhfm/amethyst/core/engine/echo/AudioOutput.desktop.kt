@@ -22,7 +22,12 @@ actual object AudioOutput {
     private const val MAX_SOURCES = 16
 
     private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-    private val updateFrequency = if (isWindows) 60 else 30
+    // Windows needs higher update frequency for lower latency (120Hz vs 30Hz)
+    private val updateFrequency = if (isWindows) 120 else 30
+    // Windows needs smaller buffer periods for lower latency (2ms vs 10ms)
+    private val processingDelay = if (isWindows) 2L else 10L
+    // Windows processes more sources per cycle to compensate for faster updates
+    private val batchSize = if (isWindows) 12 else 4
 
     data class QueuedAudio(
         val pcmData: ByteArray,
@@ -91,23 +96,26 @@ actual object AudioOutput {
 
     private fun initializeOpenAL() {
         try {
-            val deviceName = if (isWindows) {
-                val devices = ALC11.alcGetString(0L, ALC11.ALC_ALL_DEVICES_SPECIFIER)
-                null
-            } else {
-                null
-            }
+            // On Windows, use default device for best compatibility
+            // On other platforms, let OpenAL choose the best device
+            val deviceName: ByteBuffer? = null
 
-            device = ALC10.alcOpenDevice(deviceName as ByteBuffer?)
+            device = ALC10.alcOpenDevice(deviceName)
             if (device == 0L) {
                 return
             }
 
             val contextAttribs = if (isWindows) {
+                // Configure OpenAL for low-latency on Windows:
+                // - Higher refresh rate (120Hz) for more responsive updates
+                // - Async mode (ALC_SYNC=FALSE) for non-blocking operations
+                // - Smaller internal buffer periods for lower latency
+                val AL_SOFT_BUFFER_SAMPLES = 0x1010  // OpenAL Soft extension for buffer control
                 intArrayOf(
                     ALC10.ALC_FREQUENCY, SAMPLE_RATE,
                     ALC11.ALC_REFRESH, updateFrequency,
                     ALC11.ALC_SYNC, ALC10.ALC_FALSE,
+                    AL_SOFT_BUFFER_SAMPLES, 512,  // Hint for smaller internal buffers
                     0
                 )
             } else {
@@ -152,11 +160,20 @@ actual object AudioOutput {
 
     private fun startAudioProcessing() {
         processingJob = CoroutineScope(Dispatchers.Default).launch {
+            // On Windows, boost thread priority for audio processing to reduce latency
+            if (isWindows) {
+                try {
+                    Thread.currentThread().priority = Thread.MAX_PRIORITY
+                } catch (e: Exception) {
+                    // Ignore if we can't set priority
+                }
+            }
+            
             while (isActive && isInitialized) {
                 try {
                     processAudioQueue()
                     cleanupFinishedSources()
-                    delay(if (isWindows) 5 else 10)
+                    delay(processingDelay)
                 } catch (e: Exception) {
                     // Continue processing
                 }
@@ -167,7 +184,7 @@ actual object AudioOutput {
     private fun processAudioQueue() {
         if (!isInitialized) return
 
-        val batchSize = if (isWindows) 8 else 4
+        // Windows processes more sources per cycle due to higher update frequency
         repeat(batchSize) {
             val queuedAudio = audioQueue.poll() ?: return
 
@@ -268,6 +285,11 @@ actual object AudioOutput {
             AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
 
             if (isWindows) {
+                // Optimize for low-latency 2D audio on Windows:
+                // - Use relative positioning (no 3D calculations)
+                // - Disable distance attenuation
+                // - Set maximum distance to avoid culling
+                AL10.alSourcei(sourceId, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE)
                 AL10.alSourcef(sourceId, AL10.AL_REFERENCE_DISTANCE, 1.0f)
                 AL10.alSourcef(sourceId, AL10.AL_ROLLOFF_FACTOR, 0.0f)
                 AL10.alSourcef(sourceId, AL10.AL_MAX_DISTANCE, Float.MAX_VALUE)
