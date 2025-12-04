@@ -28,6 +28,10 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
@@ -47,6 +51,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     private var lastSelectedFrameIndex: Int? = null
     private val dragVisitedPads: MutableSet<Pair<Int, Int>> = mutableSetOf()
     private var dragEraseMode: Boolean = false
+    private var stateBeforeDrag: KeyframesChainDeviceState? = null
+    private var lastObservedFrameEntries: List<KeyframesEntry>? = null
+    private val stateObserverScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     init {
         renderAnimation()
@@ -76,6 +83,21 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
         customMode.onVirtualDeviceDragEnd = {
             endVirtualDrag()
+        }
+        
+        // Observe state changes to refresh virtual devices when state is restored (e.g., undo/redo)
+        // This ensures the UI updates correctly when state changes externally
+        stateObserverScope.launch {
+            state.collect { newState ->
+                // Check if frame entries changed (but only when not actively dragging)
+                if (!isDragging.value) {
+                    val currentFrameEntries = newState.frames.getOrNull(newState.currentFrameIndex)?.entries
+                    if (currentFrameEntries != lastObservedFrameEntries) {
+                        lastObservedFrameEntries = currentFrameEntries
+                        refreshVirtualDevices()
+                    }
+                }
+            }
         }
     }
 
@@ -117,6 +139,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         isDragging.value = true
         dragVisitedPads.clear()
         dragEraseMode = padMatchesSelectedColor(x, y)
+        
+        // Capture the state before drawing starts
+        stateBeforeDrag = state.value
 
         applyDragAt(x, y)
     }
@@ -132,6 +157,13 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private fun endVirtualDrag() {
         isDragging.value = false
+        
+        // Push state change for undo/redo
+        stateBeforeDrag?.let { beforeState ->
+            pushStateChange(beforeState, state.value)
+        }
+        
+        stateBeforeDrag = null
         dragVisitedPads.clear()
     }
 
