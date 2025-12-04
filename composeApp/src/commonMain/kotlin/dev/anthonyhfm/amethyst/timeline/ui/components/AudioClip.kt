@@ -81,8 +81,10 @@ fun AudioClip(
     var rangeStartMs by remember { mutableStateOf<Long?>(null) }
     var rangeEndMs by remember { mutableStateOf<Long?>(null) }
 
-    val startOffsetPx = (audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
-    val widthDp = with(LocalDensity.current) { (audioEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().toDp() }
+    // Konsistente Pixel-Mapping-Strategie: Start via floor, Breite via ceil
+    val startOffsetPx = kotlin.math.floor(audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).toInt()
+    val widthPx = kotlin.math.ceil(audioEntry.durationMs.toDouble() * zoomLevel.toDouble()).toInt()
+    val widthDp = with(LocalDensity.current) { widthPx.toDp() }
     val borderColor = if (isSelected) Color.White else Color(0xFF3C3CBA)
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF5656EF)
     val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
@@ -336,8 +338,8 @@ fun AudioClip(
                     channels = audioEntry.channels,
                     sampleRate = audioEntry.sampleRate
                 ),
-                totalDurationMs = audioEntry.sourceDurationMs,
-                startMs = audioEntry.sourceStartMs,
+                totalDurationMs = audioEntry.durationMs,
+                startMs = 0L,
                 durationMs = audioEntry.durationMs,
                 zoomLevel = zoomLevel
             )

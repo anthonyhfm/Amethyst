@@ -30,7 +30,7 @@ fun WaveformView(
     modifier: Modifier = Modifier,
     waveColor: Color = Color.White,
     onSeek: ((Float) -> Unit)? = null,
-    zoomLevel: Float, // px per ms
+    zoomLevel: Float, // px per ms (nicht für Datenbasis genutzt)
     fadeInMs: Float = 0f,
     fadeOutMs: Float = 0f,
     startPosition: Float = 0f,
@@ -41,16 +41,12 @@ fun WaveformView(
     val wave = waveColor
     val baseline = waveColor.copy(alpha = 0.6f)
 
-    val bucketWidthPx = 2f
-    val MAX_BUCKETS = 20000 // mehr Detail für starken Zoom
+    val MAX_BUCKETS = 20000
 
     val samples: FloatArray = remember(signal.rawData, signal.bitDepth, signal.channels) {
         val bytes = signal.rawData ?: return@remember FloatArray(0)
         pcmToMonoFloats(bytes, signal.bitDepth, signal.channels)
     }
-
-    // Cache für amplitude envelopes: key enthält BucketCount und Samples-Länge
-    val envelopeCache = remember { mutableMapOf<Pair<Int, Int>, FloatArray>() }
 
     // State for drag handle interaction
     var isDraggingStart by remember { mutableStateOf(false) }
@@ -120,47 +116,59 @@ fun WaveformView(
 
             if (samples.isEmpty() || w <= 1f) return@Canvas
 
-            // Gesamtbreite in Pixel abhängig vom aktuellen Zoom
-            val totalWidthPx = (totalDurationMs.toFloat() * zoomLevel).coerceAtLeast(w)
-            val bucketCountTotal = (totalWidthPx / bucketWidthPx).toInt().coerceIn(1, MAX_BUCKETS)
+            // Sichtbarer Zeitraum -> Sample-Indices
+            // totalDurationMs ist die tatsächliche Dauer dieses Signals
+            val startRatio = (startMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
+            val endRatio = ((startMs + durationMs).toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
+            val startSample = (startRatio * samples.size).toInt().coerceIn(0, samples.size)
+            val endSample = (endRatio * samples.size).toInt().coerceIn(startSample + 1, samples.size)
 
-            val amps = envelopeCache.getOrPut(bucketCountTotal to samples.size) {
-                envelope(samples, bucketCountTotal)
-            }
+            val subsetLen = endSample - startSample
+            if (subsetLen <= 0) return@Canvas
+
+            // 1 Bucket pro Pixel: stabil und immer volle Breite
+            val bucketCount = ceil(w).toInt().coerceIn(2, min(MAX_BUCKETS, maxOf(2, subsetLen)))
+
+            // Envelope über das Subset berechnen mit fraktionalen Fenstern
+            val sub = samples.copyOfRange(startSample, endSample)
+            val amps = computeEnvelopeFractional(sub, bucketCount)
             if (amps.isEmpty()) return@Canvas
 
-            // Zeit -> Bucket Mapping
-            val msPerBucket = totalDurationMs.toFloat() / bucketCountTotal
-            val startBucket = (startMs.toFloat() / msPerBucket).toInt().coerceIn(0, bucketCountTotal - 1)
-            val endBucketIncl = ((startMs + durationMs).toFloat() / msPerBucket).toInt().coerceIn(startBucket + 1, bucketCountTotal)
-            val visibleBuckets = (endBucketIncl - startBucket).coerceAtLeast(1)
+            val visibleBuckets = bucketCount
 
             val path = Path().apply {
+                // Oberer Rand: von links (0) nach rechts (w)
                 moveTo(0f, centerY)
-                val stepX = w / visibleBuckets
-
                 var i = 0
                 while (i < visibleBuckets) {
-                    val bucketIndex = startBucket + i
-                    if (bucketIndex in amps.indices) {
-                        val x = i * stepX
-                        val y = centerY - amps[bucketIndex] * half
-                        lineTo(x, y)
-                    }
+                    val bucketIndex = i
+                    val x = (i.toFloat() / (visibleBuckets - 1).toFloat()) * w
+                    val amp = amps[bucketIndex]
+                    val y = centerY - amp * half
+                    lineTo(x, y)
                     i++
                 }
+                // Sicherheit: expliziter Punkt am rechten Rand mit letzter Amplitude
+                val lastAmpTop = amps.last()
+                lineTo(w, centerY - lastAmpTop * half)
+                // Rechter Abschluss auf der Mittellinie
                 lineTo(w, centerY)
 
+                // Unterer Rand: von rechts (w) zurück nach links (0)
                 i = visibleBuckets - 1
                 while (i >= 0) {
-                    val bucketIndex = startBucket + i
-                    if (bucketIndex in amps.indices) {
-                        val x = i * stepX
-                        val y = centerY + amps[bucketIndex] * half
-                        lineTo(x, y)
-                    }
+                    val bucketIndex = i
+                    val x = (i.toFloat() / (visibleBuckets - 1).toFloat()) * w
+                    val amp = amps[bucketIndex]
+                    val y = centerY + amp * half
+                    lineTo(x, y)
                     i--
                 }
+                // Sicherheit: expliziter Punkt am linken Rand mit erster Amplitude
+                val firstAmpBottom = amps.first()
+                lineTo(0f, centerY + firstAmpBottom * half)
+                // Linker Abschluss auf der Mittellinie und schließen
+                lineTo(0f, centerY)
                 close()
             }
 
@@ -191,7 +199,7 @@ fun WaveformView(
                 )
             }
 
-            // Fades zeichnen innerhalb der aktiven Region
+            // Fades innerhalb der aktiven Region
             if (fadeInMs > 0f && activeWidth > 0f) {
                 val signalDurationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
                 val activeDurationMs = signalDurationMs * (endPosition - startPosition)
@@ -263,23 +271,26 @@ fun WaveformView(
     }
 }
 
-private fun envelope(samples: FloatArray, bucketCount: Int): FloatArray {
+private fun computeEnvelopeFractional(samples: FloatArray, bucketCount: Int): FloatArray {
     if (samples.isEmpty() || bucketCount <= 0) return FloatArray(0)
     val out = FloatArray(bucketCount)
-    val step = ceil(samples.size.toFloat() / bucketCount).toInt().coerceAtLeast(1)
-
-    var src = 0
-    for (b in 0 until bucketCount) {
+    val n = samples.size
+    // Für jedes Bucket ein fraktionales Fenster [left,right) über die Sample-Indizes
+    var b = 0
+    while (b < bucketCount) {
+        val leftF = (b.toFloat() / bucketCount.toFloat()) * n
+        val rightF = (((b + 1).toFloat()) / bucketCount.toFloat()) * n
+        val left = kotlin.math.floor(leftF).toInt().coerceIn(0, n - 1)
+        val right = kotlin.math.ceil(rightF).toInt().coerceIn(left + 1, n)
         var maxAmp = 0f
-        val end = min(samples.size, src + step)
-        var i = src
-        while (i < end) {
-            val v = abs(samples[i])
+        var i = left
+        while (i < right) {
+            val v = kotlin.math.abs(samples[i])
             if (v > maxAmp) maxAmp = v
             i++
         }
         out[b] = maxAmp.coerceIn(0f, 1f)
-        src += step
+        b++
     }
     return out
 }

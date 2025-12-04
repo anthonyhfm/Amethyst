@@ -132,6 +132,154 @@ class TimelineViewModel : ViewModel() {
         return newEntry.copy(durationMs = newDuration, rawData = croppedData)
     }
 
+    private fun findNearestZeroCrossing(samples: FloatArray, fromIndex: Int, searchRadius: Int): Int {
+        val n = samples.size
+        var bestIdx = fromIndex.coerceIn(0, n - 2)
+        var minAbs = Float.MAX_VALUE
+        val start = (fromIndex - searchRadius).coerceAtLeast(0)
+        val end = (fromIndex + searchRadius).coerceAtMost(n - 2)
+        var i = start
+        while (i <= end) {
+            val s0 = samples[i]
+            val s1 = samples[i + 1]
+            val crosses = (s0 <= 0f && s1 >= 0f) || (s0 >= 0f && s1 <= 0f)
+            val score = kotlin.math.abs(s0) + kotlin.math.abs(s1)
+            if (crosses && score < minAbs) {
+                minAbs = score
+                bestIdx = i
+            }
+            i++
+        }
+        return bestIdx
+    }
+
+    private fun applyEdgeFadesPcm(raw: ByteArray, bitDepth: Int, channels: Int, sampleRate: Int, fadeMs: Int): ByteArray {
+        if (fadeMs <= 0 || raw.isEmpty()) return raw
+        val samplesPerMs = sampleRate / 1000f
+        val fadeSamples = kotlin.math.max(1, (samplesPerMs * fadeMs).toInt())
+        val bytesPerSample = (bitDepth / 8) * channels
+        val totalFrames = raw.size / bytesPerSample
+        if (totalFrames <= 1) return raw
+
+        // Wandeln in Float-Mono für Fade-Berechnung, dann zurück in PCM mit gleicher BitTiefe/Kanälen
+        fun pcmToMonoFloatsLocal(raw: ByteArray): FloatArray {
+            val out = FloatArray(totalFrames)
+            var frameIdx = 0
+            var byteIndex = 0
+            while (frameIdx < totalFrames) {
+                var sum = 0f
+                var c = 0
+                while (c < channels) {
+                    val off = byteIndex + c * (bitDepth / 8)
+                    val sample = when (bitDepth) {
+                        8 -> {
+                            val u = raw[off].toInt() and 0xFF
+                            ((u - 128) / 128f)
+                        }
+                        16 -> {
+                            val lo = raw[off].toInt() and 0xFF
+                            val hi = raw[off + 1].toInt() shl 8
+                            val s = (lo or hi).toShort().toInt()
+                            (s / 32768f)
+                        }
+                        24 -> {
+                            val b0 = raw[off].toInt() and 0xFF
+                            val b1 = raw[off + 1].toInt() and 0xFF
+                            val b2 = raw[off + 2].toInt()
+                            var v = b0 or (b1 shl 8) or (b2 shl 16)
+                            if ((v and 0x800000) != 0) v = v or -0x1000000
+                            (v / 8388608f)
+                        }
+                        32 -> {
+                            val b0 = raw[off].toInt() and 0xFF
+                            val b1 = raw[off + 1].toInt() and 0xFF
+                            val b2 = raw[off + 2].toInt() and 0xFF
+                            val b3 = raw[off + 3].toInt()
+                            val v = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
+                            if (v == Int.MIN_VALUE) -1f else (v / 2147483648f)
+                        }
+                        else -> {
+                            val lo = raw[off].toInt() and 0xFF
+                            val hi = raw[off + 1].toInt() shl 8
+                            val s = (lo or hi).toShort().toInt()
+                            (s / 32768f)
+                        }
+                    }
+                    sum += sample
+                    c++
+                }
+                out[frameIdx] = (sum / channels)
+                frameIdx++
+                byteIndex += bytesPerSample
+            }
+            return out
+        }
+
+        fun monoFloatsToPcm(rawTemplate: ByteArray, mono: FloatArray): ByteArray {
+            val out = rawTemplate.copyOf()
+            var frameIdx = 0
+            var byteIndex = 0
+            while (frameIdx < totalFrames) {
+                val v = mono[frameIdx].coerceIn(-1f, 1f)
+                var c = 0
+                while (c < channels) {
+                    val off = byteIndex + c * (bitDepth / 8)
+                    when (bitDepth) {
+                        8 -> {
+                            val u = ((v * 128f) + 128f).toInt().coerceIn(0, 255)
+                            out[off] = u.toByte()
+                        }
+                        16 -> {
+                            val s = (v * 32768f).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                            out[off] = (s.toInt() and 0xFF).toByte()
+                            out[off + 1] = ((s.toInt() shr 8) and 0xFF).toByte()
+                        }
+                        24 -> {
+                            var vv = (v * 8388608f).toInt()
+                            out[off] = (vv and 0xFF).toByte()
+                            out[off + 1] = ((vv shr 8) and 0xFF).toByte()
+                            out[off + 2] = ((vv shr 16) and 0xFF).toByte()
+                        }
+                        32 -> {
+                            val iv = (v * 2147483648f).toInt()
+                            out[off] = (iv and 0xFF).toByte()
+                            out[off + 1] = ((iv shr 8) and 0xFF).toByte()
+                            out[off + 2] = ((iv shr 16) and 0xFF).toByte()
+                            out[off + 3] = ((iv shr 24) and 0xFF).toByte()
+                        }
+                        else -> {
+                            val s = (v * 32768f).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                            out[off] = (s.toInt() and 0xFF).toByte()
+                            out[off + 1] = ((s.toInt() shr 8) and 0xFF).toByte()
+                        }
+                    }
+                    c++
+                }
+                frameIdx++
+                byteIndex += bytesPerSample
+            }
+            return out
+        }
+
+        val mono = pcmToMonoFloatsLocal(raw)
+        // Fade-In
+        var i = 0
+        while (i < fadeSamples && i < mono.size) {
+            val g = i.toFloat() / fadeSamples.toFloat()
+            mono[i] *= g
+            i++
+        }
+        // Fade-Out
+        i = 0
+        while (i < fadeSamples && i < mono.size) {
+            val idx = mono.size - 1 - i
+            val g = i.toFloat() / fadeSamples.toFloat()
+            mono[idx] *= g
+            i++
+        }
+        return monoFloatsToPcm(raw, mono)
+    }
+
     private fun sliceAudio(entry: AudioEntry, startMs: Long, endMs: Long): ByteArray? {
         val raw = entry.rawData ?: return null
         val safeStart = startMs.coerceAtLeast(entry.startTimeMs)
@@ -139,14 +287,54 @@ class TimelineViewModel : ViewModel() {
         if (safeEnd <= safeStart) return ByteArray(0)
         val bytesPerSample = (entry.bitDepth / 8) * entry.channels
         val samplesPerMs = entry.sampleRate.toDouble() / 1000.0
-        val startSamplesExact = (safeStart - entry.startTimeMs) * samplesPerMs
-        val endSamplesExact = (safeEnd - entry.startTimeMs) * samplesPerMs
-        val startSamples = kotlin.math.round(startSamplesExact).toLong().coerceAtLeast(0)
-        val endSamples = kotlin.math.round(endSamplesExact).toLong().coerceAtLeast(startSamples)
+        var startSamplesExact = (safeStart - entry.startTimeMs) * samplesPerMs
+        var endSamplesExact = (safeEnd - entry.startTimeMs) * samplesPerMs
+        var startSamples = kotlin.math.round(startSamplesExact).toLong().coerceAtLeast(0)
+        var endSamples = kotlin.math.round(endSamplesExact).toLong().coerceAtLeast(startSamples + 1)
+
+        // Zero-Crossing Snap innerhalb ±searchRadius Samples
+        val totalFrames = raw.size / bytesPerSample
+        val mono = try {
+            // Schnelle lokale Konvertierung (wie oben) für Zero-Crossing
+            val floats = kotlin.run {
+                val out = FloatArray(totalFrames)
+                var frameIdx = 0
+                var byteIndex = 0
+                while (frameIdx < totalFrames) {
+                    var sum = 0f; var c = 0
+                    while (c < entry.channels) {
+                        val off = byteIndex + c * (entry.bitDepth / 8)
+                        val sample = when (entry.bitDepth) {
+                            8 -> { val u = raw[off].toInt() and 0xFF; ((u - 128) / 128f) }
+                            16 -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f) }
+                            24 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt(); var v = b0 or (b1 shl 8) or (b2 shl 16); if ((v and 0x800000) != 0) v = v or -0x1000000; (v / 8388608f) }
+                            32 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt() and 0xFF; val b3 = raw[off + 3].toInt(); val v = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24); if (v == Int.MIN_VALUE) -1f else (v / 2147483648f) }
+                            else -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f) }
+                        }
+                        sum += sample; c++
+                    }
+                    out[frameIdx] = (sum / entry.channels)
+                    frameIdx++
+                    byteIndex += bytesPerSample
+                }
+                out
+            }
+            floats
+        } catch (e: Exception) { null }
+        if (mono != null && mono.isNotEmpty()) {
+            val radius = 64 // ca. ~1.5ms bei 44.1kHz
+            val startIdx = findNearestZeroCrossing(mono, startSamples.toInt(), radius)
+            val endIdx = findNearestZeroCrossing(mono, (endSamples - 1).toInt(), radius)
+            startSamples = startIdx.toLong().coerceIn(0, endSamples - 1)
+            endSamples = endIdx.toLong().coerceIn(startSamples + 1, totalFrames.toLong())
+        }
+
         val startByte = (startSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
         val endByte = (endSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
         if (startByte >= endByte) return ByteArray(0)
-        return raw.sliceArray(startByte until endByte)
+        val sliced = raw.sliceArray(startByte until endByte)
+        // Mikro-Fades anwenden (z. B. 4ms)
+        return applyEdgeFadesPcm(sliced, entry.bitDepth, entry.channels, entry.sampleRate, fadeMs = 4)
     }
 
     private fun buildEntrySegment(original: AudioEntry, segStartMs: Long, segEndMs: Long): AudioEntry? {
@@ -333,23 +521,32 @@ class TimelineViewModel : ViewModel() {
     }
 
     fun setZoomLevel(zoom: Float) {
+        val before = _zoomLevel.value
         val clamped = zoom.coerceIn(0.01f, 10.0f)
         _zoomLevel.value = clamped
+        println("[TimelineViewModel] setZoomLevel: requested=$zoom clamped=$clamped before=$before after=${_zoomLevel.value}")
     }
 
     fun zoomBy(factor: Float) {
-        val newZoom = _zoomLevel.value * factor
-        setZoomLevel(newZoom)
+        val before = _zoomLevel.value
+        val requested = before * factor
+        val clamped = requested.coerceIn(0.01f, 10.0f)
+        _zoomLevel.value = clamped
+        println("[TimelineViewModel] zoomBy: factor=$factor before=$before requested=$requested clamped=$clamped after=${_zoomLevel.value}")
     }
 
     fun msToPixels(timeMs: Long): Float {
         // Use Double precision for better accuracy
-        return (timeMs.toDouble() * _zoomLevel.value.toDouble()).toFloat()
+        val px = (timeMs.toDouble() * _zoomLevel.value.toDouble()).toFloat()
+        // println("[TimelineViewModel] msToPixels: ms=$timeMs zoom=${_zoomLevel.value} -> px=$px")
+        return px
     }
 
     fun pixelsToMs(pixels: Float): Long {
         // Use Double precision for better accuracy
-        return (pixels.toDouble() / _zoomLevel.value.toDouble()).toLong()
+        val ms = (pixels.toDouble() / _zoomLevel.value.toDouble()).toLong()
+        // println("[TimelineViewModel] pixelsToMs: px=$pixels zoom=${_zoomLevel.value} -> ms=$ms")
+        return ms
     }
 
     fun setScrollState(scrollState: ScrollState) {
