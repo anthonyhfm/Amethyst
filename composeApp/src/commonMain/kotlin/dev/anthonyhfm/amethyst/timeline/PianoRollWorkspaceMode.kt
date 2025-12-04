@@ -52,11 +52,16 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
+import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.ColorControls
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -94,11 +99,6 @@ private class PianoRollMetrics(
         val snappedBeatTime = (beatTime * gridResolution.snapDivisionsPerBeat).roundToInt() / gridResolution.snapDivisionsPerBeat.toFloat()
         return (snappedBeatTime * MS_PER_BEAT).toLong().coerceAtLeast(0L)
     }
-
-    fun xPxToBeatStartTimeMs(x: Float): Long {
-        val beatIndex = (x / pixelsPerBeatPx).toInt().coerceAtLeast(0)
-        return beatIndex * MS_PER_BEAT
-    }
 }
 
 class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
@@ -115,17 +115,14 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     var onNoteDelete: ((MidiNote) -> Unit)? = null
     var modeClose: (() -> Unit)? = null
 
+    /**
+     * State flow tracking pressed keys: Map<Pair<DeviceIndex, Pitch>, IsPressed>
+     */
+    val pressedKeysState = MutableStateFlow<Map<Pair<Int, Int>, Boolean>>(emptyMap())
+
     var selectedColor by mutableStateOf(Color(0xFFFF6B35))
 
     var multiSelectModifierDown by mutableStateOf(false)
-
-    private fun pitchToXY(pitch: Int): Pair<Int, Int> {
-        val launchpadIndex = pitch / 100
-        val localPitch = pitch % 100
-        val x = localPitch % 10
-        val y = localPitch / 10
-        return Pair(x, y)
-    }
 
     @OptIn(kotlin.time.ExperimentalTime::class)
     @Composable
@@ -269,7 +266,8 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         gridResolution = targetRes
                     }
                 },
-                gridResolution = gridResolution
+                gridResolution = gridResolution,
+                pressedKeysState = pressedKeysState
             )
         }
     }
@@ -442,6 +440,22 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
         }
         return false
     }
+
+    override fun onMidiInput(data: MidiInputData, offset: Offset): () -> Unit = {
+        val deviceIndex = Heaven.devices.indexOfFirst { it.position.value == offset }
+
+        val isPressed = data.velocity > 0
+
+        val key = Pair(deviceIndex, data.pitch)
+
+        pressedKeysState.value = pressedKeysState.value.toMutableMap().apply {
+            if (isPressed) {
+                this[key] = true
+            } else {
+                this.remove(key)
+            }
+        }
+    }
 }
 
 @Composable
@@ -458,7 +472,8 @@ private fun PianoRollEditor(
     onNoteDelete: ((MidiNote) -> Unit)?,
     zoomFactorState: Float,
     onZoomFactorChange: (Float) -> Unit,
-    gridResolution: GridResolution
+    gridResolution: GridResolution,
+    pressedKeysState: StateFlow<Map<Pair<Int, Int>, Boolean>>
 ) {
     val horizontalScroll = rememberScrollState()
     val verticalScroll = rememberScrollState()
@@ -483,6 +498,17 @@ private fun PianoRollEditor(
 
     var notesState by remember { mutableStateOf(entry.notes) }
     LaunchedEffect(entry) { notesState = entry.notes }
+
+    // Collect pressed keys state
+    val pressedKeys by pressedKeysState.collectAsState()
+
+    // Extract pressed pitches per device from the state
+    val pressedKeysPerDevice = remember(pressedKeys) {
+        pressedKeys.entries
+            .filter { it.value }
+            .groupBy({ it.key.first }, { it.key.second })
+            .mapValues { it.value.toSet() }
+    }
 
     val selections by SelectionManager.selections.collectAsState()
 
@@ -548,10 +574,16 @@ private fun PianoRollEditor(
                         )
 
                         Row(modifier = Modifier.height(rowHeight)) {
+                            val pressedForDevice = pressedKeysPerDevice[index] ?: emptySet()
+                            if (pressedForDevice.isNotEmpty()) {
+                                println("🎹 Rendering device $index with pressed keys: $pressedForDevice")
+                            }
                             PianoKeysColumn(
                                 totalPitches = 100,
                                 noteHeight = noteHeightDp,
-                                verticalScroll = null
+                                verticalScroll = null,
+                                deviceIndex = index,
+                                pressedPitches = pressedForDevice
                             )
 
                         Box(
@@ -1100,7 +1132,7 @@ private fun NoteBox(
                 .align(Alignment.CenterStart)
                 .width(6.dp)
                 .fillMaxHeight()
-                .pointerHoverIcon(PointerIcon.Hand)
+                .pointerHoverIcon(PointerIcon.ResizeLeft)
                 .pointerInput(note) {
                     detectDragGestures(
                         onDragStart = { onSelect() },
@@ -1112,12 +1144,13 @@ private fun NoteBox(
                     )
                 }
         )
+
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .width(6.dp)
                 .fillMaxHeight()
-                .pointerHoverIcon(PointerIcon.Hand)
+                .pointerHoverIcon(PointerIcon.ResizeRight)
                 .pointerInput(note) {
                     detectDragGestures(
                         onDragStart = { onSelect() },
@@ -1136,7 +1169,9 @@ private fun NoteBox(
 private fun PianoKeysColumn(
     totalPitches: Int,
     noteHeight: Dp,
-    verticalScroll: ScrollState?
+    verticalScroll: ScrollState?,
+    deviceIndex: Int,
+    pressedPitches: Set<Int>
 ) {
     Box(
         modifier = Modifier
@@ -1153,11 +1188,19 @@ private fun PianoKeysColumn(
             for (pitch in (totalPitches - 1) downTo 0) {
                 val noteInOctave = pitch % 12
                 val isBlackKey = noteInOctave in listOf(1, 3, 6, 8, 10)
+                val isPressed = pressedPitches.contains(pitch)
+
+                val keyColor = when {
+                    isPressed -> Color(0xFFFF0000) // Red for pressed keys
+                    isBlackKey -> MaterialTheme.colorScheme.surfaceDim
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(noteHeight)
-                        .background(if (isBlackKey) MaterialTheme.colorScheme.surfaceDim else MaterialTheme.colorScheme.onSurface)
+                        .background(keyColor)
                         .drawBehind {
                             drawLine(
                                 color = Color(0xFF0A0A0A),
