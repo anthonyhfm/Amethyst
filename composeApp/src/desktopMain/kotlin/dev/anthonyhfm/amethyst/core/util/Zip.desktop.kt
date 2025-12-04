@@ -1,70 +1,110 @@
 package dev.anthonyhfm.amethyst.core.util
 
 import io.github.vinceglb.filekit.PlatformFile
-import sun.nio.cs.UTF_8
 import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
-import kotlin.io.encoding.Base64
 
 
+@Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 actual object Zip {
     actual fun getEntries(
         file: PlatformFile,
     ): List<ZipEntry> {
-        val file: FileInputStream = file.file.let {
-            if (!it.exists() || !it.isFile) {
-                return emptyList()
+        val javaFile = file.file
+        if (!javaFile.exists() || !javaFile.isFile) {
+            return emptyList()
+        }
+
+        return try {
+            // Try using ZipFile first (more robust)
+            ZipFile(javaFile).use { zipFile ->
+                val entries = mutableListOf<ZipEntry>()
+
+                zipFile.entries().asSequence().forEach { entry ->
+                    val data = if (!entry.isDirectory) {
+                        zipFile.getInputStream(entry).use { it.readBytes() }
+                    } else {
+                        ByteArray(0)
+                    }
+
+                    entries.add(
+                        ZipEntry(
+                            path = entry.name,
+                            data = data,
+                            isDirectory = entry.isDirectory,
+                        )
+                    )
+                }
+
+                entries
             }
+        } catch (_: Exception) {
+            // Fallback to ZipInputStream if ZipFile fails
+            try {
+                FileInputStream(javaFile).use { fis ->
+                    ZipInputStream(fis).use { zipStream ->
+                        val entries = mutableListOf<ZipEntry>()
 
-            return@let it.inputStream()
+                        var entry = zipStream.nextEntry
+                        while (entry != null) {
+                            entries.add(
+                                ZipEntry(
+                                    path = entry.name,
+                                    data = zipStream.readBytes(),
+                                    isDirectory = entry.isDirectory,
+                                )
+                            )
+                            entry = zipStream.nextEntry
+                        }
+
+                        entries
+                    }
+                }
+            } catch (e2: Exception) {
+                println("Error reading ZIP file: ${e2.message}")
+                emptyList()
+            }
         }
-
-        val zipFile = ZipInputStream(file)
-
-        val entries = mutableListOf<ZipEntry>()
-
-        var entry = zipFile.nextEntry
-        while (entry != null) {
-            entries.add(
-                ZipEntry(
-                    path = entry.name,
-                    data = zipFile.readBytes(),
-                    isDirectory = entry.isDirectory,
-                )
-            )
-            entry = zipFile.nextEntry
-        }
-
-        zipFile.close()
-
-        return entries
     }
 
     actual fun getPaths(file: PlatformFile): List<String> {
-        val file: FileInputStream = file.file.let {
-            if (!it.exists() || !it.isFile) {
-                return emptyList()
+        val javaFile = file.file
+        if (!javaFile.exists() || !javaFile.isFile) {
+            return emptyList()
+        }
+
+        return try {
+            // Try using ZipFile first (more robust)
+            ZipFile(javaFile).use { zipFile ->
+                zipFile.entries().asSequence()
+                    .map { it.name }
+                    .toList()
             }
+        } catch (_: Exception) {
+            // Fallback to ZipInputStream if ZipFile fails
+            try {
+                FileInputStream(javaFile).use { fis ->
+                    ZipInputStream(fis).use { zipStream ->
+                        val entries = mutableListOf<String>()
 
-            return@let it.inputStream()
+                        var entry = zipStream.nextEntry
+                        while (entry != null) {
+                            entries.add(entry.name)
+                            entry = zipStream.nextEntry
+                        }
+
+                        entries
+                    }
+                }
+            } catch (e2: Exception) {
+                println("Error reading ZIP paths: ${e2.message}")
+                emptyList()
+            }
         }
-
-        val zipFile = ZipInputStream(file)
-
-        val entries = mutableListOf<String>()
-
-        var entry = zipFile.nextEntry
-        while (entry != null) {
-            entries.add(entry.name)
-            entry = zipFile.nextEntry
-        }
-
-        zipFile.close()
-
-        return entries
     }
 
     actual fun decode(data: ByteArray): ByteArray {
