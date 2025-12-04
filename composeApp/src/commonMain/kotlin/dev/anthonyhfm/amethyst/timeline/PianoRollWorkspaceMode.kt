@@ -68,7 +68,7 @@ import kotlin.math.roundToInt
 
 private const val MS_PER_BEAT: Long = 500L
 
-private enum class GridResolution(val snapDivisionsPerBeat: Int, val subBeatsPerBeat: Int) {
+enum class GridResolution(val snapDivisionsPerBeat: Int, val subBeatsPerBeat: Int) {
     Quarter(snapDivisionsPerBeat = 4, subBeatsPerBeat = 1),
     Eighth(snapDivisionsPerBeat = 8, subBeatsPerBeat = 2),
     Sixteenth(snapDivisionsPerBeat = 16, subBeatsPerBeat = 4),
@@ -121,6 +121,8 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     val pressedKeysState = MutableStateFlow<Map<Pair<Int, Int>, Boolean>>(emptyMap())
 
     var selectedColor by mutableStateOf(Color(0xFFFF6B35))
+    var selectedTimeMs by mutableStateOf<Long?>(null)
+    var gridResolution by mutableStateOf(GridResolution.Quarter)
 
     var multiSelectModifierDown by mutableStateOf(false)
 
@@ -142,7 +144,6 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
         }
 
         var zoomFactor by remember { mutableStateOf(1f) }
-        var gridResolution by remember { mutableStateOf(GridResolution.Quarter) }
 
         fun resolutionForZoom(z: Float): GridResolution = when {
             z < 1.5f -> GridResolution.Quarter
@@ -262,12 +263,14 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                     zoomFactor = clamped
                     val targetRes = resolutionForZoom(zoomFactor)
-                    if (targetRes != gridResolution) {
-                        gridResolution = targetRes
+                    if (targetRes != this@PianoRollWorkspaceMode.gridResolution) {
+                        this@PianoRollWorkspaceMode.gridResolution = targetRes
                     }
                 },
-                gridResolution = gridResolution,
-                pressedKeysState = pressedKeysState
+                gridResolution = this@PianoRollWorkspaceMode.gridResolution,
+                pressedKeysState = pressedKeysState,
+                selectedTimeMs = selectedTimeMs,
+                onSelectedTimeMsChange = { selectedTimeMs = it }
             )
         }
     }
@@ -292,6 +295,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
 
                     if (selected.isNotEmpty()) {
+                        // Existing logic: Move selected notes
                         val currentEntry = currentEntry ?: return false
 
                         val launchpadCount = Heaven.devices.size.coerceAtLeast(1)
@@ -355,6 +359,212 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                                 Selectable.PianoRollNote(trackIndex, entryStartMs, updatedNote),
                                 single = false
                             )
+                        }
+
+                        return true
+                    } else {
+                        // New logic: Move time selection and draw notes with arrow keys
+                        // Works when no notes are selected
+
+                        // Only left/right for time selection and note drawing
+                        if (event.key != Key.DirectionLeft && event.key != Key.DirectionRight) {
+                            return false
+                        }
+
+                        val currentEntry = currentEntry ?: return false
+                        val bpm = WorkspaceRepository.bpm.value
+                        val msPerBeat = (60000.0 / bpm).toLong()
+
+                        // Calculate cell duration based on current grid resolution
+                        val cellDurationMs = msPerBeat / this@PianoRollWorkspaceMode.gridResolution.subBeatsPerBeat
+
+                        // Get current time or default to 0
+                        val currentTimeMs = this@PianoRollWorkspaceMode.selectedTimeMs ?: 0L
+
+                        val pressedKeys = pressedKeysState.value.filter { it.value }.keys
+
+                        if (event.key == Key.DirectionRight) {
+                            // Move forward: Add/extend notes if buttons pressed, otherwise just move selection
+                            val newTimeMs = (currentTimeMs + cellDurationMs).coerceAtMost(currentEntry.durationMs)
+
+                            if (pressedKeys.isNotEmpty()) {
+                                // Add or extend notes for each pressed button
+                                val notesAdded = mutableListOf<MidiNote>()
+                                val notesExtended = mutableListOf<Pair<MidiNote, MidiNote>>() // before, after
+
+                                pressedKeys.forEach { (deviceIndex, pitch) ->
+                                    // Check if there's a note ending at currentTimeMs (to extend)
+                                    val noteToExtend = currentEntry.notes.find {
+                                        it.device == deviceIndex &&
+                                        it.pitch == pitch &&
+                                        it.endTimeMs == currentTimeMs
+                                    }
+
+                                    if (noteToExtend != null) {
+                                        // Extend existing note
+                                        val extendedNote = noteToExtend.copy(
+                                            durationMs = noteToExtend.durationMs + cellDurationMs
+                                        )
+                                        notesExtended.add(noteToExtend to extendedNote)
+                                        onNoteUpdate?.invoke(noteToExtend, extendedNote)
+                                    } else {
+                                        // Check if note already exists at this position
+                                        val existingNote = currentEntry.notes.find {
+                                            it.device == deviceIndex &&
+                                            it.pitch == pitch &&
+                                            it.startTimeMs == currentTimeMs
+                                        }
+
+                                        if (existingNote == null && currentTimeMs + cellDurationMs <= currentEntry.durationMs) {
+                                            // Create new note
+                                            val newNote = MidiNote(
+                                                device = deviceIndex,
+                                                pitch = pitch,
+                                                led = MidiNote.NoteLED(
+                                                    index = pitch,
+                                                    red = selectedColor.red,
+                                                    green = selectedColor.green,
+                                                    blue = selectedColor.blue
+                                                ),
+                                                startTimeMs = currentTimeMs,
+                                                durationMs = cellDurationMs
+                                            )
+                                            notesAdded.add(newNote)
+                                            onNoteAdd?.invoke(newNote)
+                                        }
+                                    }
+                                }
+
+                                // Apply changes
+                                if (notesAdded.isNotEmpty() || notesExtended.isNotEmpty()) {
+                                    var updatedNotes = currentEntry.notes
+
+                                    // Add new notes
+                                    updatedNotes = updatedNotes + notesAdded
+
+                                    // Update extended notes
+                                    notesExtended.forEach { (old, new) ->
+                                        updatedNotes = updatedNotes.map { if (it == old) new else it }
+                                    }
+
+                                    this.currentEntry = currentEntry.copy(notes = updatedNotes)
+
+                                    // Add to undo history
+                                    if (notesAdded.isNotEmpty()) {
+                                        notesAdded.forEach { note ->
+                                            UndoManager.addAction(
+                                                UndoableAction.PianoRollNoteCreation(
+                                                    trackIndex = trackIndex,
+                                                    entryStartMs = entryStartMs,
+                                                    note = note,
+                                                    onNoteAdd = { n: MidiNote -> onNoteAdd?.invoke(n) },
+                                                    onNoteDelete = { n: MidiNote -> onNoteDelete?.invoke(n) },
+                                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                                    currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                                )
+                                            )
+                                        }
+                                    }
+
+                                    if (notesExtended.isNotEmpty()) {
+                                        UndoManager.addAction(
+                                            UndoableAction.PianoRollNoteResize(
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
+                                                notesBefore = notesExtended.map { it.first },
+                                                notesAfter = notesExtended.map { it.second },
+                                                onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                                currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Move time selection forward
+                            this@PianoRollWorkspaceMode.selectedTimeMs = newTimeMs
+
+                        } else if (event.key == Key.DirectionLeft) {
+                            // Move backward: Remove/shorten notes if buttons pressed, otherwise just move selection
+                            val newTimeMs = (currentTimeMs - cellDurationMs).coerceAtLeast(0L)
+
+                            if (pressedKeys.isNotEmpty()) {
+                                // Remove or shorten notes for each pressed button
+                                val notesDeleted = mutableListOf<MidiNote>()
+                                val notesShortened = mutableListOf<Pair<MidiNote, MidiNote>>() // before, after
+
+                                pressedKeys.forEach { (deviceIndex, pitch) ->
+                                    // Find note ending at currentTimeMs (to shorten or delete)
+                                    val noteToModify = currentEntry.notes.find {
+                                        it.device == deviceIndex &&
+                                        it.pitch == pitch &&
+                                        it.endTimeMs == currentTimeMs
+                                    }
+
+                                    if (noteToModify != null) {
+                                        if (noteToModify.durationMs <= cellDurationMs) {
+                                            // Delete note if it would become too short
+                                            notesDeleted.add(noteToModify)
+                                            onNoteDelete?.invoke(noteToModify)
+                                        } else {
+                                            // Shorten note
+                                            val shortenedNote = noteToModify.copy(
+                                                durationMs = noteToModify.durationMs - cellDurationMs
+                                            )
+                                            notesShortened.add(noteToModify to shortenedNote)
+                                            onNoteUpdate?.invoke(noteToModify, shortenedNote)
+                                        }
+                                    }
+                                }
+
+                                // Apply changes
+                                if (notesDeleted.isNotEmpty() || notesShortened.isNotEmpty()) {
+                                    var updatedNotes = currentEntry.notes
+
+                                    // Remove deleted notes
+                                    updatedNotes = updatedNotes.filter { it !in notesDeleted }
+
+                                    // Update shortened notes
+                                    notesShortened.forEach { (old, new) ->
+                                        updatedNotes = updatedNotes.map { if (it == old) new else it }
+                                    }
+
+                                    this.currentEntry = currentEntry.copy(notes = updatedNotes)
+
+                                    // Add to undo history
+                                    if (notesDeleted.isNotEmpty()) {
+                                        UndoManager.addAction(
+                                            UndoableAction.PianoRollNoteDeletion(
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
+                                                notes = notesDeleted,
+                                                onNoteAdd = { n: MidiNote -> onNoteAdd?.invoke(n) },
+                                                onNoteDelete = { n: MidiNote -> onNoteDelete?.invoke(n) },
+                                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                                currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                            )
+                                        )
+                                    }
+
+                                    if (notesShortened.isNotEmpty()) {
+                                        UndoManager.addAction(
+                                            UndoableAction.PianoRollNoteResize(
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
+                                                notesBefore = notesShortened.map { it.first },
+                                                notesAfter = notesShortened.map { it.second },
+                                                onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                                currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Move time selection backward
+                            this@PianoRollWorkspaceMode.selectedTimeMs = newTimeMs
                         }
 
                         return true
@@ -473,7 +683,9 @@ private fun PianoRollEditor(
     zoomFactorState: Float,
     onZoomFactorChange: (Float) -> Unit,
     gridResolution: GridResolution,
-    pressedKeysState: StateFlow<Map<Pair<Int, Int>, Boolean>>
+    pressedKeysState: StateFlow<Map<Pair<Int, Int>, Boolean>>,
+    selectedTimeMs: Long?,
+    onSelectedTimeMsChange: (Long?) -> Unit
 ) {
     val horizontalScroll = rememberScrollState()
     val verticalScroll = rememberScrollState()
@@ -519,7 +731,6 @@ private fun PianoRollEditor(
     var resizeRightDelta by remember { mutableStateOf(0f) }
     var activeDragNote by remember { mutableStateOf<MidiNote?>(null) }
 
-    var selectedTimeMs by remember { mutableStateOf<Long?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Row(modifier = Modifier.fillMaxWidth().height(40.dp)) {
@@ -545,7 +756,7 @@ private fun PianoRollEditor(
                             val subdivisions = gridResolution.subBeatsPerBeat
                             val gridIntervalMs = msPerBeat / subdivisions
                             val snappedTimeMs = ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
-                            selectedTimeMs = snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs)
+                            onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
                         }
                     }
             ) {
@@ -679,7 +890,7 @@ private fun PianoRollEditor(
                                                             offset.y >= yPx && offset.y <= yPx + metrics.noteRenderHeightPx
                                                 }
                                                 if (clickedNote != null) {
-                                                    selectedTimeMs = null
+                                                    onSelectedTimeMsChange(null)
 
                                                     // Shift + Click = Toggle selection
                                                     if (shiftModifierDown) {
@@ -716,7 +927,7 @@ private fun PianoRollEditor(
                                                         val subdivisions = gridResolution.subBeatsPerBeat
                                                         val gridIntervalMs = msPerBeat / subdivisions
                                                         val snappedTimeMs = ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
-                                                        selectedTimeMs = snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs)
+                                                        onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
                                                     }
                                                 }
                                             },
