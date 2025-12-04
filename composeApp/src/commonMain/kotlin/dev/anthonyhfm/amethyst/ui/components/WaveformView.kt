@@ -30,7 +30,7 @@ fun WaveformView(
     modifier: Modifier = Modifier,
     waveColor: Color = Color.White,
     onSeek: ((Float) -> Unit)? = null,
-    zoomLevel: Float, // px per ms (beibehalten für API-Kompatibilität, intern nicht genutzt)
+    zoomLevel: Float, // px per ms
     fadeInMs: Float = 0f,
     fadeOutMs: Float = 0f,
     startPosition: Float = 0f,
@@ -42,15 +42,15 @@ fun WaveformView(
     val baseline = waveColor.copy(alpha = 0.6f)
 
     val bucketWidthPx = 2f
-    val MAX_BUCKETS = 10000 // Increased for more detail
+    val MAX_BUCKETS = 20000 // mehr Detail für starken Zoom
 
     val samples: FloatArray = remember(signal.rawData, signal.bitDepth, signal.channels) {
         val bytes = signal.rawData ?: return@remember FloatArray(0)
         pcmToMonoFloats(bytes, signal.bitDepth, signal.channels)
     }
 
-    // Cache für amplitude envelopes nach BucketCount
-    val envelopeCache = remember { mutableMapOf<Int, FloatArray>() }
+    // Cache für amplitude envelopes: key enthält BucketCount und Samples-Länge
+    val envelopeCache = remember { mutableMapOf<Pair<Int, Int>, FloatArray>() }
 
     // State for drag handle interaction
     var isDraggingStart by remember { mutableStateOf(false) }
@@ -120,40 +120,46 @@ fun WaveformView(
 
             if (samples.isEmpty() || w <= 1f) return@Canvas
 
-            // Bucket-Anzahl basierend auf tatsächlicher Canvas-Breite berechnen
-            val bucketCount = (w / bucketWidthPx).toInt().coerceIn(1, MAX_BUCKETS)
+            // Gesamtbreite in Pixel abhängig vom aktuellen Zoom
+            val totalWidthPx = (totalDurationMs.toFloat() * zoomLevel).coerceAtLeast(w)
+            val bucketCountTotal = (totalWidthPx / bucketWidthPx).toInt().coerceIn(1, MAX_BUCKETS)
 
-            val amps = envelopeCache.getOrPut(bucketCount) {
-                envelope(samples, bucketCount)
+            val amps = envelopeCache.getOrPut(bucketCountTotal to samples.size) {
+                envelope(samples, bucketCountTotal)
             }
-
             if (amps.isEmpty()) return@Canvas
 
-            // Für die aktuelle Ansicht den kompletten Bereich zeichnen
-            val startBucket = 0
-            val visibleBuckets = bucketCount
+            // Zeit -> Bucket Mapping
+            val msPerBucket = totalDurationMs.toFloat() / bucketCountTotal
+            val startBucket = (startMs.toFloat() / msPerBucket).toInt().coerceIn(0, bucketCountTotal - 1)
+            val endBucketIncl = ((startMs + durationMs).toFloat() / msPerBucket).toInt().coerceIn(startBucket + 1, bucketCountTotal)
+            val visibleBuckets = (endBucketIncl - startBucket).coerceAtLeast(1)
 
             val path = Path().apply {
                 moveTo(0f, centerY)
-                val stepX = w / visibleBuckets.coerceAtLeast(1)
+                val stepX = w / visibleBuckets
 
-                for (i in 0 until visibleBuckets) {
+                var i = 0
+                while (i < visibleBuckets) {
                     val bucketIndex = startBucket + i
-                    if (bucketIndex < amps.size) {
+                    if (bucketIndex in amps.indices) {
                         val x = i * stepX
                         val y = centerY - amps[bucketIndex] * half
                         lineTo(x, y)
                     }
+                    i++
                 }
                 lineTo(w, centerY)
 
-                for (i in (visibleBuckets - 1) downTo 0) {
+                i = visibleBuckets - 1
+                while (i >= 0) {
                     val bucketIndex = startBucket + i
-                    if (bucketIndex < amps.size) {
+                    if (bucketIndex in amps.indices) {
                         val x = i * stepX
                         val y = centerY + amps[bucketIndex] * half
                         lineTo(x, y)
                     }
+                    i--
                 }
                 close()
             }
@@ -163,12 +169,12 @@ fun WaveformView(
                 color = wave.copy(alpha = 0.6f)
             )
 
-            // Calculate the active region based on start/end positions
+            // Aktive Region basierend auf startPosition/endPosition
             val startX = w * startPosition
             val endX = w * endPosition
             val activeWidth = endX - startX
 
-            // Dim regions outside start/end
+            // Bereiche außerhalb abdunkeln
             if (startPosition > 0f) {
                 drawRect(
                     color = Color.Black.copy(alpha = 0.5f),
@@ -185,14 +191,13 @@ fun WaveformView(
                 )
             }
 
-            // Draw triangular fade in overlay (within active region)
+            // Fades zeichnen innerhalb der aktiven Region
             if (fadeInMs > 0f && activeWidth > 0f) {
                 val signalDurationMs = (samples.size.toFloat() / signal.sampleRate) * 1000f
                 val activeDurationMs = signalDurationMs * (endPosition - startPosition)
                 val fadeInRatio = (fadeInMs / activeDurationMs).coerceIn(0f, 1f)
                 val fadeInWidth = activeWidth * fadeInRatio
 
-                // Draw triangular gradient for fade in
                 val fadeInPath = Path().apply {
                     moveTo(startX, 0f)
                     lineTo(startX + fadeInWidth, 0f)
