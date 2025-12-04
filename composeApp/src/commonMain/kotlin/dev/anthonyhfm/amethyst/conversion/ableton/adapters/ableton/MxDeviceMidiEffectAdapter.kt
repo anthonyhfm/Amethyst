@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.AutoPageAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GridFilterAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.PageSwitcherAdapter
@@ -163,6 +164,10 @@ class MxDeviceMidiEffectAdapter(
 
                 "168cda682434227f77d52824814c8235" -> {
                     return GridFilterAdapter(readDataBlob(blob.text!!), offset).toDeviceStates()
+                }
+
+                "c328c055ae8daf2d9a4e2c0346bcc2ee" -> {
+                    return AutoPageAdapter(readDataBlob(blob.text!!), xml).toDeviceStates()
                 }
 
                 else -> {
