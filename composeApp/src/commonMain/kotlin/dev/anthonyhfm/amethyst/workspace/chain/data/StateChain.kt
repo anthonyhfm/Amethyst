@@ -39,6 +39,8 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDevice
@@ -217,6 +219,12 @@ data class StateChain(
 
                 is BlurChainDeviceState -> {
                     BlurChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is PianoRollChainDeviceState -> {
+                    PianoRollChainDevice().apply {
                         state.update { device }
                     }
                 }

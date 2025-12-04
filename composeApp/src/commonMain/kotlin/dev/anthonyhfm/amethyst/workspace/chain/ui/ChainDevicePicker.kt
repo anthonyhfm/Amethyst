@@ -19,6 +19,7 @@ import androidx.compose.material.icons.twotone.LineAxis
 import androidx.compose.material.icons.twotone.Loop
 import androidx.compose.material.icons.twotone.MyLocation
 import androidx.compose.material.icons.twotone.Pause
+import androidx.compose.material.icons.twotone.Piano
 import androidx.compose.material.icons.twotone.RotateLeft
 import androidx.compose.material.icons.twotone.Science
 import androidx.compose.material.icons.twotone.ShapeLine
@@ -48,6 +49,7 @@ import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDevice
 import io.androidpoet.dropdown.Dropdown
@@ -110,6 +112,10 @@ fun getLightsMenu(): MenuItem<String> {
 
             item("device_keyframes", "Keyframes") {
                 icon(Icons.TwoTone.Timeline)
+            }
+
+            item("device_pianoroll", "Piano Roll") {
+                icon(Icons.TwoTone.Piano)
             }
         }
         item("cat_timing", "Timing") {
@@ -239,6 +245,7 @@ fun ChainDevicePicker(
         "device_choke" to ChokeChainDevice(),
         "device_multi" to MultiGroupChainDevice(),
         "device_keyframes" to KeyframesChainDevice(),
+        "device_pianoroll" to PianoRollChainDevice(),
         "device_layer" to LayerChainDevice(),
         "device_layer_filter" to LayerFilterChainDevice(),
         "device_offset" to OffsetChainDevice(),

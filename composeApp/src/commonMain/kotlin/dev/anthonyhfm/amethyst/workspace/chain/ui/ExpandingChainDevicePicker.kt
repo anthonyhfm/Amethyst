@@ -196,7 +196,7 @@ fun ExpandingChainDevicePicker(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (clipboard is ClipboardData.ChainDevice || clipboard is ClipboardData.TimelineAudioEntries) {
+        if (clipboard is ClipboardData.ChainDevice || clipboard is ClipboardData.TimelineAudioEntries || clipboard is ClipboardData.TimelineMidiEntries) {
             Dropdown(
                 isOpen = showRightClickMenu,
                 offset = rightClickMenuOffset,
@@ -247,7 +247,16 @@ fun ExpandingChainDevicePicker(
                         }
 
                         "paste_midi" -> {
-
+                            (clipboard as ClipboardData.TimelineMidiEntries).entries.fastForEachReversed { midiEntry ->
+                                destinationChain.add(
+                                    device = StateChain.unpackDevice(
+                                        device = dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDeviceState(
+                                            midiEntry = midiEntry.copy()
+                                        )
+                                    ),
+                                    atIndex = slotIndex
+                                )
+                            }
                         }
                     }
 
