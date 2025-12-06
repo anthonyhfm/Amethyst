@@ -96,29 +96,26 @@ object AbletonConverter : AmethystConverter {
         isZip = true
 
         zipEntries.clear()
-        val e = Zip.getEntries(file)
+        val entries = Zip.getEntries(file)
 
-        zipStartPath = e.map { it.path }
+        zipStartPath = entries.map { it.path }
             .first { it.endsWith(".als") }
             .substringBeforeLast("/")
 
         zipEntries.putAll(
-            from = Zip.getEntries(file)
-                .associateBy {
-                    it.path
-                }
-                .toMutableMap()
+            entries.associateBy { it.path }
         )
 
-        val als = zipEntries.values.first { it.path.endsWith(".als") }
+        // .als-Datei dekodieren und frühzeitig aus Map entfernen, um Speicher zu sparen
+        val alsEntry = entries.first { it.path.endsWith(".als") }
+        val decodedAlsBytes = Zip.decode(alsEntry.data)
+        val decodedAlsString = decodedAlsBytes.decodeToString()
+        // decodedAlsBytes wird nicht mehr benötigt, kann vom GC gesammelt werden
 
-        name = zipEntries.values.first { it.path.endsWith(".als") }.path
-            .substringAfterLast("/")
-            .removeSuffix(".als")
+        val abletonData = xml.decodeFromString<Ableton>(decodedAlsString)
 
-        val decodedAls = Zip.decode(als.data)
-
-        val abletonData = xml.decodeFromString<Ableton>(decodedAls.decodeToString())
+        // .als Eintrag räumen (wir brauchen ihn nicht mehr)
+        zipEntries.remove(alsEntry.path)
 
         return runLiveConversion(abletonData).also {
             isZip = false
@@ -304,8 +301,10 @@ object AbletonConverter : AmethystConverter {
             (layout as AbletonLayout.Single).audioTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
         }
 
+        // Nach der Erstellung der StateChains brauchen wir die AudioMap nicht mehr im Konverter
         audioMap = emptyMap()
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
+        // projectLayout wird im SavableWorkspaceData nicht benötigt; freigeben, um weniger RAM zu halten
         projectLayout = null
 
         return SavableWorkspaceData(

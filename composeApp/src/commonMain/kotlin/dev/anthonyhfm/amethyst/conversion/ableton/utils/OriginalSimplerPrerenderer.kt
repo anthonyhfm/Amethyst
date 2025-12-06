@@ -35,37 +35,34 @@ class OriginalSimplerPrerenderer {
         val gate = Semaphore(8)
 
         return runBlocking {
-            val localCache = mutableMapOf<String, Deferred<FullAudio?>>()
-
-            val uniquePaths = simplers.map { it.filePath }.distinct()
-
-            println("OriginalSimplerPrerenderer: Decoding ${uniquePaths.size} Files")
+            val groupedByPath = simplers.groupBy { it.filePath }
+            println("OriginalSimplerPrerenderer: Decoding ${groupedByPath.size} Files")
 
             coroutineScope {
-                uniquePaths.forEach { path ->
-                    localCache[path] = async(limitedIO) {
-                        gate.withPermit { decodeFull(path) }
+                val perPathJobs = groupedByPath.map { (path, pathSimplers) ->
+                    async(limitedIO) {
+                        gate.withPermit {
+                            val full = decodeFull(path) ?: return@async path to emptyMap<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState>()
+
+                            try {
+                                val states = pathSimplers.associateWith { simpler ->
+                                    sliceSegment(
+                                        filePath = path,
+                                        full = full,
+                                        sampleStart = simpler.sampleStart,
+                                        sampleEnd = simpler.sampleEnd
+                                    )
+                                }
+                                path to states
+                            } finally { }
+                        }
                     }
                 }
 
-                val decodedMap: Map<String, FullAudio?> = localCache
-                    .mapValues { (_, deferred) -> deferred.await() }
-
-                val result = simplers.associateWith { simpler ->
-                    val full = decodedMap[simpler.filePath]
-                    if (full == null) {
-                        ClipChainDeviceState()
-                    } else {
-                        sliceSegment(
-                            filePath = simpler.filePath,
-                            full = full,
-                            sampleStart = simpler.sampleStart,
-                            sampleEnd = simpler.sampleEnd
-                        )
-                    }
-                }
-
-                result
+                perPathJobs
+                    .awaitAll()
+                    .flatMap { it.second.entries }
+                    .associate { it.toPair() }
             }
         }
     }
@@ -94,13 +91,14 @@ class OriginalSimplerPrerenderer {
             sampleEnd = null
         )
 
+        if (AbletonConverter.isZip) {
+            // zipEntries kann viel Speicher halten – frühzeitig freigeben
+            AbletonConverter.zipEntries.remove(filePath)
+        }
+
         if (audioSignal == null) {
             println("OriginalSimplerPrerenderer: error while decoding $filePath")
             return@withContext null
-        }
-
-        if (AbletonConverter.isZip) {
-            AbletonConverter.zipEntries.remove(filePath)
         }
 
         val frameSizeBytes = (audioSignal.channels * (audioSignal.bitDepth / 8))
