@@ -1,7 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDeviceState
@@ -11,15 +10,14 @@ import dev.anthonyhfm.amethyst.devices.effects.hold.HoldChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 class Resonator1Adapter(
-    private val blob: ByteArray,
+    private val blob: String,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val data = jsonDecoder.decodeFromString<ResonatorData>(blob.decodeToString())
+        val data = jsonDecoder.decodeFromString<ResonatorData>(blob)
 
         return listOf(
             GroupChainDeviceState(

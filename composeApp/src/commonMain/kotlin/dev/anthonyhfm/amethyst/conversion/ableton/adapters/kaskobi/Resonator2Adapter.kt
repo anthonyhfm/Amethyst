@@ -2,8 +2,8 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
-import dev.anthonyhfm.amethyst.core.util.Palettes
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.MaxParam
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
@@ -15,8 +15,6 @@ import dev.anthonyhfm.amethyst.devices.effects.hold.HoldChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlin.math.roundToLong
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -27,53 +25,30 @@ import kotlin.time.Duration.Companion.milliseconds
  * However it shouldnt be too broken when playing a project.
  */
 class Resonator2Adapter(
-    val blob: ByteArray,
-    val xml: XmlElement
+    val blob: String,
+    val device: MxDeviceMidiEffect
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val palette = AbletonConverter.palette
-        
-        val parameterList = xml.querySelector("ParameterList")[1]
-        val direction = jsonDecoder.decodeFromString<ResonatorBlob>(blob.decodeToString())
 
-        val noteLengthValue: Double = (parameterList
-            .querySelector("MxDFloatParameter").find {
-                it.attributes["Id"] == "20"
-            }!!.querySelector("Manual").first()
-            .attributes["Value"]?.toFloatOrNull() ?: 0f)
-            .let {
-                convertWeirdFuckingFloatValues(it.toDouble())
-            }
+        val parameters = MaxParam(device.parameterList.parameterList.parameters)
+        val direction = jsonDecoder.decodeFromString<ResonatorBlob>(blob)
 
-        val stepDelayValue: Double = (parameterList
-            .querySelector("MxDFloatParameter").find {
-                it.attributes["Id"] == "19"
-            }!!.querySelector("Manual").first()
-            .attributes["Value"]?.toFloatOrNull() ?: 0f)
-            .let {
-                convertWeirdFuckingFloatValues(it.toDouble())
-            }
+        val noteLengthValue: Double = parameters.getFloatValue(20).let {
+            convertWeirdFuckingFloatValues(it.toDouble())
+        }
 
-        val timeBetweenColors: Double = (parameterList
-            .querySelector("MxDFloatParameter").find {
-                it.attributes["Id"] == "21"
-            }!!.querySelector("Manual").first()
-            .attributes["Value"]?.toFloatOrNull() ?: 0f)
-            .let {
-                convertWeirdFuckingFloatValues(it.toDouble())
-            }
+        val stepDelayValue: Double = parameters.getFloatValue(19).let {
+            convertWeirdFuckingFloatValues(it.toDouble())
+        }
 
-        val steps: Int = (parameterList
-            .querySelector("MxDIntParameter").find {
-                it.attributes["Id"] == "1"
-            }!!.querySelector("Manual").first()
-            .attributes["Value"]?.toIntOrNull()?.minus(1) ?: 0)
+        val timeBetweenColors: Double = parameters.getFloatValue(21).let {
+            convertWeirdFuckingFloatValues(it.toDouble())
+        }
 
-        val isolation: CopyChainDeviceState.IsolationType = (parameterList
-            .querySelector("MxDEnumParameter").find {
-                it.attributes["Id"] == "15"
-            }!!.querySelector("Manual").first()
-            .attributes["Value"]?.toIntOrNull() ?: 0f)
+        val steps: Int = parameters.getIntValue(1)
+
+        val isolation: CopyChainDeviceState.IsolationType = parameters.getEnumValue(15)
             .let {
                 when (it) {
                     1 -> CopyChainDeviceState.IsolationType.FULL
@@ -81,28 +56,16 @@ class Resonator2Adapter(
                 }
             }
 
-        val gradientEnabled: Boolean = (parameterList
-            .querySelector("MxDEnumParameter").find {
-                it.attributes["Id"] == "18"
-            }!!.querySelector("Manual").first()
-            .attributes["Value"]?.toIntOrNull() ?: 0f)
+        val gradientEnabled: Boolean = parameters.getEnumValue(18)
             .let { it == 1 }
 
-        val colorCount = (parameterList
-            .querySelector("MxDIntParameter").find {
-                it.attributes["Id"] == "13"
-            }!!.querySelector("Manual").first()
-            .attributes["Value"]?.toIntOrNull() ?: 0)
+        val colorCount = parameters.getIntValue(13)
 
         val gradientColors: List<Int> = run {
-            val ids = listOf("14", "3", "4", "5", "2", "8", "7", "6", "12", "11", "10", "9")
+            val ids = listOf(14, 3, 4, 5, 2, 8, 7, 6, 12, 11, 10, 9)
 
             return@run ids.map { id ->
-                (parameterList
-                    .querySelector("MxDIntParameter").find {
-                        it.attributes["Id"] == id
-                    }!!.querySelector("Manual").first()
-                    .attributes["Value"]?.toIntOrNull() ?: 0)
+                parameters.getIntValue(id)
             }
         }
 

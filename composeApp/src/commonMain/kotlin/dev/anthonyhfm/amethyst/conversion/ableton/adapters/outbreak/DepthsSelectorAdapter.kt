@@ -13,11 +13,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class DepthsSelectorAdapter(
-    private val data: ByteArray,
+    private val blob: String,
     private val offset: IntOffset
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val dataObj: DepthsSelectorData = jsonDecoder.decodeFromString(data.decodeToString())
+        val dataObj: DepthsSelectorData = jsonDecoder.decodeFromString(blob)
 
         if (AbletonConverter.projectLayout is AbletonLayout.Dual2Light) {
             if (dataObj.channelField.isNotEmpty()) {

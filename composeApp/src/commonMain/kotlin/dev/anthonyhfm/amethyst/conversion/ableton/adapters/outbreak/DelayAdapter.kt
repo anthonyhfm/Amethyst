@@ -8,14 +8,13 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDeviceState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.milliseconds
 
 class DelayAdapter(
-    private val data: ByteArray
+    private val blob: String
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val dataObj: DelayData = jsonDecoder.decodeFromString(data.decodeToString())
+        val dataObj: DelayData = jsonDecoder.decodeFromString(blob)
 
         val bpm = AbletonConverter.bpm
 
@@ -28,7 +27,7 @@ class DelayAdapter(
 
         return listOf(
             DelayChainDeviceState(
-                timing = Timing.Duration(delayMs.toLong().milliseconds),
+                timing = Timing.Duration(delayMs.milliseconds),
                 delayMs = delayMs,
                 gate = (dataObj.gatePercentage.first().toFloat() / 100.0f) * 0.5f,
             )

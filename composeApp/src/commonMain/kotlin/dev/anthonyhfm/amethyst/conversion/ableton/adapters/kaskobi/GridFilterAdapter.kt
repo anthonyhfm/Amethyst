@@ -8,19 +8,18 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class GridFilterAdapter(
-    private val blob: ByteArray,
+    private val blob: String,
     val offset: IntOffset = IntOffset.Zero,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val data = jsonDecoder.decodeFromString<GridFilterData>(blob.decodeToString())
+        val data = jsonDecoder.decodeFromString<GridFilterData>(blob)
 
         return listOf(
             CoordinateFilterChainDeviceState(
                 filters = data.matrixctrl.chunked(3).map { list ->
+                    // For some reason, the third data block is always "1.0". Maybe it has something to do with the color in max or some shit
                     val x = list[0].toInt()
                     val y = list[1].toInt()
-
-                    // For some reason, the third data block is always "1.0". Maybe it has something to do with the color in max or some shit
 
                     Pair(x + offset.x, y + offset.y)
                 }

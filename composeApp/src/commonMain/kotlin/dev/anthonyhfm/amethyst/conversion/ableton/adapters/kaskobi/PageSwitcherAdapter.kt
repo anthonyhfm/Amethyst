@@ -11,7 +11,6 @@ import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
 class PageSwitcherAdapter(
-    private val blob: ByteArray,
     private val offset: IntOffset,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {

@@ -1,15 +1,13 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
-import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState.TYPE
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
-class RandomDeviceMultisamplingAdapter (
+/*class RandomDeviceMultisamplingAdapter (
     private val randomDeviceXml: XmlElement,
     private val containerXml: XmlElement
 ) : AbletonAdapter() {
@@ -58,7 +56,7 @@ class RandomDeviceMultisamplingAdapter (
                             stateChain = StateChain(
                                 devices = mutableListOf<DeviceState>().apply {
                                     branch?.let {
-                                        addAll(
+                                        /*addAll(
                                             // TODO: remove pitch element before sample when using instrument rack (used in some projects)
                                             it.querySelector("DeviceChain").first()
                                                 .querySelector("Devices").first()
@@ -67,7 +65,7 @@ class RandomDeviceMultisamplingAdapter (
                                                         ?.toDeviceStates()
                                                         ?.firstOrNull()
                                                 }
-                                        )
+                                        )*/
                                     }
                                 }
                             )
@@ -80,4 +78,4 @@ class RandomDeviceMultisamplingAdapter (
         println("Random device does not have Chance 100% and Alt mode, skipping...; Values: chance=$randomChance, steps=$multiSteps, alt=$altModeEnabled")
         return listOf()
     }
-}
+}*/

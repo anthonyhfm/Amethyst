@@ -2,6 +2,9 @@ package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
+import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
 import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import io.github.vinceglb.filekit.PlatformFile
@@ -13,61 +16,56 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 class OriginalSimplerPrerenderer {
-    // Vollständig decodierte PCM-Daten Cache (pro Datei nur einmal decodieren)
     private data class FullAudio(
         val rawData: ByteArray,
         val sampleRate: Int,
         val channels: Int,
         val bitDepth: Int,
-        val totalFrames: Long // Anzahl PCM Frames (nicht Samples * Channels)
+        val totalFrames: Long
     )
 
-    private val fullDecodeCache = mutableMapOf<String, Deferred<FullAudio?>>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    fun clearCache() {
-        fullDecodeCache.clear()
-    }
-
-    fun decodeAll(tracksList: List<XmlElement>): Map<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState> {
+    fun decodeAll(tracksList: List<MidiTrack>): Map<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState> {
         val simplers = tracksList
-            .flatMap { it.querySelector("OriginalSimpler") }
-            .mapNotNull { OriginalSimplerAdapter.getSimplerData(it) }
+            .flatMap { MidiChainReader.getAllDevicesOfType<OriginalSimpler>(it) }
+            .map { OriginalSimplerAdapter.getSimplerData(it) }
+
         if (simplers.isEmpty()) return emptyMap()
 
         val limitedIO = Dispatchers.Default.limitedParallelism(8)
         val gate = Semaphore(8)
 
         return runBlocking {
-            // Einmalige Decodes pro Datei vorbereiten
+            val localCache = mutableMapOf<String, Deferred<FullAudio?>>()
+
             val uniquePaths = simplers.map { it.filePath }.distinct()
 
-            uniquePaths.forEach { path ->
-                if (!fullDecodeCache.containsKey(path)) {
-                    fullDecodeCache[path] = scope.async(limitedIO) {
+            println("OriginalSimplerPrerenderer: Decoding ${uniquePaths.size} Files")
+
+            coroutineScope {
+                uniquePaths.forEach { path ->
+                    localCache[path] = async(limitedIO) {
                         gate.withPermit { decodeFull(path) }
                     }
                 }
-            }
 
-            // Sicherstellen dass alle Decodes abgeschlossen sind
-            val decodedMap: Map<String, FullAudio?> = fullDecodeCache
-                .filter { it.key in uniquePaths }
-                .mapValues { (_, deferred) -> deferred.await() }
+                val decodedMap: Map<String, FullAudio?> = localCache
+                    .mapValues { (_, deferred) -> deferred.await() }
 
-            // Für jeden Simpler entsprechenden Ausschnitt erstellen
-            simplers.associateWith { simpler ->
-                val full = decodedMap[simpler.filePath]
-                if (full == null) {
-                    ClipChainDeviceState() // Fehler beim Decodieren der Datei
-                } else {
-                    sliceSegment(
-                        filePath = simpler.filePath,
-                        full = full,
-                        sampleStart = simpler.sampleStart,
-                        sampleEnd = simpler.sampleEnd
-                    )
+                val result = simplers.associateWith { simpler ->
+                    val full = decodedMap[simpler.filePath]
+                    if (full == null) {
+                        ClipChainDeviceState()
+                    } else {
+                        sliceSegment(
+                            filePath = simpler.filePath,
+                            full = full,
+                            sampleStart = simpler.sampleStart,
+                            sampleEnd = simpler.sampleEnd
+                        )
+                    }
                 }
+
+                result
             }
         }
     }
@@ -76,14 +74,14 @@ class OriginalSimplerPrerenderer {
         val audioFileBytes: ByteArray = if (AbletonConverter.isZip) {
             val fileBytes = AbletonConverter.zipEntries[filePath]?.data
             if (fileBytes == null) {
-                println("OriginalSimplerPrerenderer: Datei im ZIP nicht gefunden: $filePath")
+                println("OriginalSimplerPrerenderer: file not found in zip: $filePath")
                 return@withContext null
             }
             fileBytes
         } else {
             val audioFile = PlatformFile(filePath)
             if (!audioFile.exists() || !audioFile.isRegularFile()) {
-                println("OriginalSimplerPrerenderer: Datei nicht vorhanden: $filePath")
+                println("OriginalSimplerPrerenderer: file not found: $filePath")
                 return@withContext null
             }
             audioFile.readBytes()
@@ -97,7 +95,7 @@ class OriginalSimplerPrerenderer {
         )
 
         if (audioSignal == null) {
-            println("OriginalSimplerPrerenderer: Decoding fehlgeschlagen für $filePath")
+            println("OriginalSimplerPrerenderer: error while decoding $filePath")
             return@withContext null
         }
 
@@ -148,6 +146,7 @@ class OriginalSimplerPrerenderer {
         }
         val safeEndByte = endByte.coerceAtMost(full.rawData.size)
         val slice = full.rawData.copyOfRange(startByte, safeEndByte)
+
 
         return ClipChainDeviceState(
             fileName = filePath,

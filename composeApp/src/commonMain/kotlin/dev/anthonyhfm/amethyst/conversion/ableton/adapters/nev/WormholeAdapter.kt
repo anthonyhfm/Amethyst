@@ -12,10 +12,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class WormholeAdapter (
-    val data: ByteArray
+    private val data: String
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val dataObj: WormholeData = jsonDecoder.decodeFromString(data.decodeToString())
+        val dataObj: WormholeData = jsonDecoder.decodeFromString(data)
 
         return listOf(
             GroupChainDeviceState(

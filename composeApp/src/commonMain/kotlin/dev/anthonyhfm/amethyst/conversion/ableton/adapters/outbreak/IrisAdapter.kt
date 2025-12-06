@@ -18,10 +18,10 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 class IrisAdapter (
-    private val data: ByteArray
+    private val blob: String
 ): AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val data = jsonDecoder.decodeFromString<IrisSelectorData>(data.decodeToString())
+        val data = jsonDecoder.decodeFromString<IrisSelectorData>(blob)
 
         val bpm = AbletonConverter.bpm
 

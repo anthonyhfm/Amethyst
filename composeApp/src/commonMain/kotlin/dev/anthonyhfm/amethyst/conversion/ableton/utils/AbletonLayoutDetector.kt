@@ -1,48 +1,43 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
-import dev.anthonyhfm.amethyst.conversion.ableton.reader.MidiChainReader
+import dev.anthonyhfm.amethyst.conversion.ableton.data.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
+import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
 
 object AbletonLayoutDetector {
-    fun detectLayout(tracks: List<XmlElement>): AbletonLayout {
-        val reader = MidiChainReader()
-
-        val audioTracks: List<Pair<Int, XmlElement>> = tracks.filterNot {
-            (it.querySelector("OriginalSimpler").firstOrNull() == null && it.querySelector("InstrumentGroupDevice").firstOrNull() == null)
+    fun detectLayout(tracks: List<MidiTrack>): AbletonLayout {
+        val audioTracks: List<Pair<Int, MidiTrack>> = tracks.filterNot {
+            it.deviceChain.devices.firstOrNull { it is OriginalSimpler } == null &&
+                it.deviceChain.devices.firstOrNull { it is InstrumentGroupDevice } == null
         }.map {
-            reader.getChainWeight(it) to it
+            println("${it.name} has a weight of ${MidiChainReader.getChainWeight(it)}")
+
+            MidiChainReader.getChainWeight(it) to it
         }.sortedByDescending {
             it.first
         }
 
-        val lightsTracks: List<Pair<Int, XmlElement>> = tracks.filter {
-            (it.querySelector("OriginalSimpler").firstOrNull() == null && it.querySelector("InstrumentGroupDevice").firstOrNull() == null)
+        println("-------------------------------------")
+
+        val lightsTracks: List<Pair<Int, MidiTrack>> = tracks.filter {
+            it.deviceChain.devices.firstOrNull { it is OriginalSimpler } == null &&
+                it.deviceChain.devices.firstOrNull { it is InstrumentGroupDevice } == null
         }.map {
-            reader.getChainWeight(it) to it
+            println("${it.name} has a weight of ${MidiChainReader.getChainWeight(it)}")
+
+            MidiChainReader.getChainWeight(it) to it
         }.sortedByDescending {
             it.first
         }
 
         val maxAudio = audioTracks.firstOrNull()?.first ?: 0
         val audioCandidates = audioTracks.filter { it.first >= maxAudio * 0.2 }
-            .sortedBy {
-                it.second.querySelector("EffectiveName")
-                    .firstOrNull()
-                    ?.attributes
-                    ?.get("Value")
-                    ?.lowercase()
-                    ?: ""
-            }
+            .sortedBy { it.second.name }
 
         val maxLight = lightsTracks.firstOrNull()?.first ?: 0
         val lightCandidates = lightsTracks.filter { it.first >= maxLight * 0.2 }
-            .sortedBy {
-                it.second.querySelector("EffectiveName")
-                    .firstOrNull()
-                    ?.attributes
-                    ?.get("Value")
-                    ?.lowercase()
-                    ?: ""
-            }
+            .sortedBy { it.second.name }
 
         if (audioCandidates.size == 1 && lightCandidates.size == 1) {
             return AbletonLayout.Single(
@@ -66,8 +61,6 @@ object AbletonLayoutDetector {
                 lightsRight = lightCandidates[3].second
             )
         } else {
-            println("LAYOUT DETECTION ERROR: Falling back to best effort layout detection")
-
             return AbletonLayout.Single(
                 audioTrack = audioTracks.firstOrNull()?.second,
                 lightsTrack = lightsTracks.firstOrNull()?.second
@@ -78,29 +71,23 @@ object AbletonLayoutDetector {
 
 sealed interface AbletonLayout {
     data class Single(
-        val audioTrack: XmlElement?,
-        val lightsTrack: XmlElement?
+        val audioTrack: MidiTrack?,
+        val lightsTrack: MidiTrack?
     ) : AbletonLayout
 
     data class Dual2Light(
-        val audioLeft: XmlElement?,
-        val audioRight: XmlElement?,
-        val lightsLeft: XmlElement?,
-        val lightsRight: XmlElement?
+        val audioLeft: MidiTrack?,
+        val audioRight: MidiTrack?,
+        val lightsLeft: MidiTrack?,
+        val lightsRight: MidiTrack?
     ) : AbletonLayout
 
     data class Dual4Light(
-        val audioLeft: XmlElement?,
-        val audioRight: XmlElement?,
-        val lightsLeft: XmlElement?,
-        val lightsLeftToRight: XmlElement?,
-        val lightsRightToLeft: XmlElement?,
-        val lightsRight: XmlElement?,
+        val audioLeft: MidiTrack?,
+        val audioRight: MidiTrack?,
+        val lightsLeft: MidiTrack?,
+        val lightsLeftToRight: MidiTrack?,
+        val lightsRightToLeft: MidiTrack?,
+        val lightsRight: MidiTrack?,
     ) : AbletonLayout
-}
-
-enum class LaunchpadSetup(val displayName: String) {
-    SINGLE("Single"),
-    DUAL_2_LIGHT("Dual (2 Light-Tracks)"),
-    DUAL_4_LIGHT("Dual (4 Light-Tracks)")
 }

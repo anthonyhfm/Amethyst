@@ -1,32 +1,31 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MxParameter
+
 class MaxParam(
-    private val parameterList: XmlElement
+    private val parameterList: List<MxParameter>
 ) {
     fun getEnumValue(id: Int): Int {
-        return parameterList.querySelector("MxDEnumParameter").find {
-            it.attributes["Id"] == "$id"
-        }?.querySelector("Manual")
-            ?.first()
-            ?.attributes["Value"]
-            ?.toIntOrNull() ?: error("Enum parameter with id $id not found")
+        val param = parameterList.find {
+            it.id == id
+        } as? MxParameter.MxDEnumParameter
+
+        return param?.timeable?.manual?.value ?: error("Enum parameter with id $id not found")
     }
 
     fun getIntValue(id: Int): Int {
-        return parameterList.querySelector("MxDIntParameter").find {
-            it.attributes["Id"] == "$id"
-        }?.querySelector("Manual")
-            ?.first()
-            ?.attributes["Value"]
-            ?.toIntOrNull() ?: error("Int parameter with id $id not found")
+        val param = parameterList.find {
+            it.id == id
+        } as? MxParameter.MxDIntParameter
+
+        return param?.timeable?.manual?.value ?: error("Int parameter with id $id not found")
     }
 
     fun getFloatValue(id: Int): Float {
-        return parameterList.querySelector("MxDFloatParameter").find {
-            it.attributes["Id"] == "$id"
-        }?.querySelector("Manual")
-            ?.first()
-            ?.attributes["Value"]
-            ?.toFloatOrNull() ?: error("Float parameter with id $id not found")
+        val param = parameterList.find {
+            it.id == id
+        } as? MxParameter.MxDFloatParameter
+
+        return param?.timeable?.manual?.value ?: error("Float parameter with id $id not found")
     }
 }

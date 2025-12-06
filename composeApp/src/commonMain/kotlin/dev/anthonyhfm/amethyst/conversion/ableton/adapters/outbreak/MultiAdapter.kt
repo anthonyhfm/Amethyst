@@ -2,7 +2,6 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.TwistAdapter.TwistData
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
@@ -12,7 +11,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-class MultiAdapter(
+/*class MultiAdapter(
     private val blob: ByteArray,
     private val containerXml: XmlElement
 ) : AbletonAdapter() {
@@ -66,7 +65,7 @@ class MultiAdapter(
                         stateChain = StateChain(
                             devices = mutableListOf<DeviceState>().apply {
                                 branch?.let {
-                                    addAll(
+                                    /*addAll(
                                         it.querySelector("DeviceChain").first()
                                             .querySelector("Devices").first()
                                             .children.mapNotNull { child ->
@@ -74,7 +73,7 @@ class MultiAdapter(
                                                     ?.toDeviceStates()
                                                     ?.firstOrNull()
                                             }
-                                    )
+                                    )*/
                                 }
                             }
                         )
@@ -89,4 +88,4 @@ class MultiAdapter(
         @SerialName("live.numbox")
         val steps: List<Double>,
     )
-}
+}*/

@@ -1,44 +1,40 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import androidx.compose.ui.unit.IntOffset
-import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.readDataBlob
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MultiEffectAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.MultiAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
+import dev.anthonyhfm.amethyst.conversion.ableton.data.DrumGroupDevice
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import io.github.vinceglb.filekit.PlatformFile
 
 class DrumGroupDeviceAdapter(
-    private val xml: XmlElement,
+    private val device: DrumGroupDevice,
     val offset: IntOffset = IntOffset.Zero,
     val outputOffset: IntOffset = IntOffset.Zero,
     private val chainDepth: Int = 0
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val branches: List<XmlElement> = xml.localQuerySelector("Branches").first().children
+        val branches: List<DrumGroupDevice.Branches.DrumBranch> = device.branches.branches
 
         return listOf(
             GroupChainDeviceState(
                 groups = branches.mapIndexed { index, branch ->
                     Group(
-                        name = branch.querySelector("UserName")[0].attributes["Value"] ?: "Chain ${index + 1}",
+                        name = branch.name.effectiveName.let {
+                            if (it?.value != null) {
+                                return@let it.value.ifBlank {
+                                    "Chain ${index + 1}"
+                                }
+                            } else {
+                                return@let "Chain #"
+                            }
+                        },
                         stateChain = StateChain(
                             devices = mutableListOf<DeviceState>().apply {
-                                val branchInfo = branch.localQuerySelector("BranchInfo")[0]
-
-                                val note = branchInfo.localQuerySelector("ReceivingNote")[0].attributes["Value"]?.toInt() ?: 0
+                                val note = branch.branchInfo.receivingNote.value
 
                                 val xy = DRUM_RACK_TO_XY[128 - note] // WHYYYYYY
                                 val x: Int = xy % 10
@@ -52,7 +48,7 @@ class DrumGroupDeviceAdapter(
                                     )
                                 )
 
-                                // Multisampling logic
+                                /*// Multisampling logic
                                 val branchElements = branch.querySelector("DeviceChain")[0]
                                     .querySelector("Devices")[0]
                                     .children
@@ -135,19 +131,17 @@ class DrumGroupDeviceAdapter(
 
                                         return@apply
                                     }
-                                }
+                                }*/
 
                                 addAll(
-                                    branch.querySelector("DeviceChain")[0]
-                                        .querySelector("Devices")[0]
-                                        .children.flatMap { child ->
-                                            resolveAdapter(
-                                                xml = child,
-                                                offset = offset,
-                                                outputOffset = outputOffset,
-                                                chainDepth = chainDepth + 1
-                                            )?.toDeviceStates() ?: emptyList()
-                                        }
+                                    branch.deviceChain.deviceChain.devices.devices.flatMap {
+                                        resolveAdapter(
+                                            device = it,
+                                            offset = offset,
+                                            outputOffset = outputOffset,
+                                            chainDepth = chainDepth + 1
+                                        )?.toDeviceStates() ?: emptyList()
+                                    }
                                 )
                             }
                         )

@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import kotlin.math.roundToLong
@@ -14,8 +15,8 @@ object AbletonTutorialDetector {
     // Main-Layer Threshold (Hot Topic etc: 41 ist "echter" Layer)
     private const val VELOCITY_THRESHOLD = 41
 
-    fun getAutoPlayData(layout: AbletonLayout, tracks: List<XmlElement>): AutoPlayData {
-        val tutorialTracks = detectPossibleTutorialTracks(layout, tracks)
+    fun getAutoPlayData(layout: AbletonLayout, tracks: List<MidiTrack>): AutoPlayData {
+        /*val tutorialTracks = detectPossibleTutorialTracks(layout, tracks)
 
         if (tutorialTracks.isEmpty()) {
             println("No tutorial tracks found")
@@ -62,13 +63,12 @@ object AbletonTutorialDetector {
                 out
             } else deduped
 
-        return AutoPlayData(normalized)
+        return AutoPlayData(normalized)*/
+
+        return AutoPlayData(emptyMap())
     }
 
-    /**
-     * Findet potenzielle Tutorial-Tracks anhand des Track-Namens (EffectiveName enthält "tutorial").
-     */
-    fun detectPossibleTutorialTracks(
+    /*fun detectPossibleTutorialTracks(
         layout: AbletonLayout,
         tracks: List<XmlElement>
     ): List<XmlElement> {
@@ -292,5 +292,5 @@ object AbletonTutorialDetector {
                 ?.get("Value")
                 ?.toDoubleOrNull() ?: 0.0
         }
-    }
+    }*/
 }

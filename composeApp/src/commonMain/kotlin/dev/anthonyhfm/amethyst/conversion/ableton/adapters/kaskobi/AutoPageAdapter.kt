@@ -3,7 +3,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmIndexToDuration
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDeviceState
@@ -12,11 +12,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 class AutoPageAdapter(
-    val blob: ByteArray,
-    val xml: XmlElement
+    val blob: String,
+    val xml: MxDeviceMidiEffect
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val data = jsonDecoder.decodeFromString<AutoPageData>(blob.decodeToString())
+        val data = jsonDecoder.decodeFromString<AutoPageData>(blob)
 
         return mutableListOf<DeviceState>().apply {
             val time = timeSplits[data.delay.first().toInt()]

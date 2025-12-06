@@ -3,7 +3,13 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
+import dev.anthonyhfm.amethyst.conversion.ableton.data.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
@@ -13,15 +19,16 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import io.github.vinceglb.filekit.PlatformFile
 
-class MidiEffectGroupAdapter(
-    private val device: MidiEffectGroupDevice,
+class InstrumentGroupAdapter(
+    private val device: InstrumentGroupDevice,
     private val offset: IntOffset = IntOffset.Zero,
     private val outputOffset: IntOffset = IntOffset.Zero,
     private val chainDepth: Int = 0
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val branches: List<MidiEffectGroupDevice.Branches.MidiEffectBranch> = device.branches.branches
+        val branches: List<InstrumentGroupDevice.Branches.InstrumentBranch> = device.branches.branches
 
         val hasChains = device.chainSelector.keyMidi != null
 
@@ -108,10 +115,10 @@ class MidiEffectGroupAdapter(
                             }
 
                             // Multisampling logic
-                            /*val branchElements = branch.deviceChain.deviceChain.devices.devices
+                            val branchElements = branch.deviceChain.deviceChain.devices.devices
 
                             if (branchElements.size >= 2) {
-                                val potentialMultiDevice: MxDeviceMidiEffect? = branchElements.find {
+                                /*val potentialMultiDevice: MxDeviceMidiEffect? = branchElements.find {
                                     it is MxDeviceMidiEffect
                                 } as MxDeviceMidiEffect?
 
@@ -138,8 +145,8 @@ class MidiEffectGroupAdapter(
                                 }
 
                                 val lightsContainer = branchElements.find {
-                                    it.name == "MidiEffectGroupDevice"
-                                }
+                                    it is MidiEffectGroupDevice
+                                } as MidiEffectGroupDevice?
 
                                 if (potentialMultiDevice != null && multiHashMatches && lightsContainer != null) {
                                     println("Found multi and container, using MultiAdapter")
@@ -187,8 +194,8 @@ class MidiEffectGroupAdapter(
                                     )
 
                                     return@apply
-                                }
-                            }*/
+                                }*/
+                            }
 
                             addAll(
                                 branch.deviceChain.deviceChain.devices.devices.flatMap {

@@ -2,12 +2,16 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters
 
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.DrumGroupDeviceAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.InstrumentGroupAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGroupAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiNoteLengthAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiVelocityAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.DrumGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import kotlinx.serialization.json.Json
 
@@ -20,13 +24,44 @@ abstract class AbletonAdapter {
 
     companion object {
         fun resolveAdapter(
-            xml: XmlElement,
+            device: AbletonDevice,
             offset: IntOffset = IntOffset.Zero,
             outputOffset: IntOffset = IntOffset.Zero,
             chainDepth: Int = 0,
         ): AbletonAdapter? {
             try {
-                return when (xml.name) {
+                return when (device) {
+                    is DrumGroupDevice -> DrumGroupDeviceAdapter(
+                        device = device,
+                        offset = offset,
+                        outputOffset = outputOffset,
+                        chainDepth = chainDepth
+                    )
+
+                    is InstrumentGroupDevice -> InstrumentGroupAdapter(
+                        device = device,
+                        offset = offset,
+                        outputOffset = outputOffset,
+                        chainDepth = chainDepth
+                    )
+
+                    is MidiEffectGroupDevice -> MidiEffectGroupAdapter(
+                        device = device,
+                        offset = offset,
+                        outputOffset = outputOffset,
+                        chainDepth = chainDepth
+                    )
+
+                    is MxDeviceMidiEffect -> MxDeviceMidiEffectAdapter(
+                        device = device,
+                        offset = offset,
+                        outputOffset = outputOffset
+                    )
+
+                    is OriginalSimpler -> OriginalSimplerAdapter(device)
+                }
+
+                /*return when (xml.name) {
                     "MidiEffectGroupDevice", "InstrumentGroupDevice" -> MidiEffectGroupAdapter(
                         xml = xml,
                         offset = offset,
@@ -55,9 +90,9 @@ abstract class AbletonAdapter {
                         println("Unsupported Ableton XML element: ${xml.name}")
                         null
                     }
-                }
+                }*/
             } catch (e: Exception) {
-                println("Error while resolving Ableton adapter for element ${xml.name}: ${e.message}")
+                println("Error while resolving Ableton adapter for element ${device::class.simpleName}: ${e.message}")
             }
 
             return null

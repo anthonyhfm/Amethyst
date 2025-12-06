@@ -3,8 +3,8 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmIndexToDuration
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MaxParam
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
@@ -16,8 +16,6 @@ import dev.anthonyhfm.amethyst.devices.effects.hold.HoldChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.Json.Default.decodeFromString
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -28,20 +26,19 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class Resonator3Adapter(
     val isUpdatedVersion: Boolean,
-    val blob: ByteArray,
-    val xml: XmlElement
+    val blob: String,
+    val device: MxDeviceMidiEffect
 ): AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val palette = AbletonConverter.palette
 
         val direction: Resonator3Prototype = if (isUpdatedVersion) {
-            jsonDecoder.decodeFromString<Resonator301Data>(blob.decodeToString())
+            jsonDecoder.decodeFromString<Resonator301Data>(blob)
         } else {
-            jsonDecoder.decodeFromString<Resonator3Data>(blob.decodeToString())
+            jsonDecoder.decodeFromString<Resonator3Data>(blob)
         }
         
-        val parameterList = xml.querySelector("ParameterList")[1]
-        val parameters = MaxParam(parameterList)
+        val parameters = MaxParam(device.parameterList.parameterList.parameters)
 
         val noteLengthMode: Boolean = parameters.getEnumValue(if (isUpdatedVersion) 9 else 26) == 1
         val noteLengthValueMs: Double = convertWeirdFuckingFloatValues(parameters.getFloatValue(if (isUpdatedVersion) 10 else 21).toDouble())
@@ -270,8 +267,6 @@ class Resonator3Adapter(
                 if (colorCount > 1) {
                     GradientChainDeviceState(
                         gradientData = mutableListOf<GradientChainDeviceState.GradientColor>().apply {
-                            println("Colors: $colorCount in $gradientColors")
-
                             for (i in 0 until colorCount) {
                                 add(
                                     GradientChainDeviceState.GradientColor(

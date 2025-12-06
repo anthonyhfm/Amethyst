@@ -4,8 +4,9 @@ import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.reader.BPMReader
-import dev.anthonyhfm.amethyst.conversion.ableton.reader.MidiChainReader
+import dev.anthonyhfm.amethyst.conversion.ableton.data.Ableton
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayout
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayoutDetector
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonTutorialDetector
@@ -13,8 +14,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.Dual2LightLayoutScanner
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.OriginalSimplerPrerenderer
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.SimpleXmlParser
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Zip
@@ -31,6 +30,14 @@ import io.github.vinceglb.filekit.nameWithoutExtension
 import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.readString
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.decodeFromString
+import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
+import nl.adaptivity.xmlutil.QName
+import nl.adaptivity.xmlutil.XmlReader
+import nl.adaptivity.xmlutil.serialization.InputKind
+import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
+import nl.adaptivity.xmlutil.serialization.XML
+import nl.adaptivity.xmlutil.serialization.structure.XmlDescriptor
 
 object AbletonConverter : AmethystConverter {
     var file: PlatformFile? = null
@@ -63,6 +70,28 @@ object AbletonConverter : AmethystConverter {
     var zipStartPath: String = ""
         private set
 
+    @OptIn(ExperimentalXmlUtilApi::class)
+    val xml = XML(AbletonDevice.module) {
+        defaultPolicy {
+            autoPolymorphic = true
+
+            unknownChildHandler = object : UnknownChildHandler {
+                override fun handleUnknownChildRecovering(
+                    input: XmlReader,
+                    inputKind: InputKind,
+                    descriptor: XmlDescriptor,
+                    name: QName?,
+                    candidates: Collection<Any>,
+                ): List<XML.ParsedData<*>> {
+                    // println("Unknown child: ${input.name} at ${input.extLocationInfo?.toString()}")
+
+                    return emptyList()
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalXmlUtilApi::class)
     override fun convertZipToWorkspace(file: PlatformFile): SavableWorkspaceData {
         isZip = true
 
@@ -89,9 +118,9 @@ object AbletonConverter : AmethystConverter {
 
         val decodedAls = Zip.decode(als.data)
 
-        val abletonXml = SimpleXmlParser.parse(decodedAls.decodeToString())
+        val abletonData = xml.decodeFromString<Ableton>(decodedAls.decodeToString())
 
-        return runLiveConversion(abletonXml).also {
+        return runLiveConversion(abletonData).also {
             isZip = false
             zipEntries.clear()
             FileHelper.clearCache()
@@ -105,7 +134,7 @@ object AbletonConverter : AmethystConverter {
         file = PlatformFile(path)
 
         val file = Zip.decode(runBlocking { file?.readBytes() ?: ByteArray(0) }) // Decompresses the .als GZIP format
-        val abletonXml = SimpleXmlParser.parse(file.decodeToString())
+        val abletonData = xml.decodeFromString<Ableton>(file.decodeToString())
 
         if (palettePath == null) {
             palette = Palettes.novation
@@ -117,20 +146,20 @@ object AbletonConverter : AmethystConverter {
             }
         }
 
-        return runLiveConversion(abletonXml)
+        return runLiveConversion(abletonData)
     }
 
-    fun runLiveConversion(abletonXml: XmlElement): SavableWorkspaceData {
+    fun runLiveConversion(abletonData: Ableton): SavableWorkspaceData {
         val audioRenderer = OriginalSimplerPrerenderer()
 
         val layout = AbletonLayoutDetector.detectLayout(
-            tracks = abletonXml.querySelector("MidiTrack")
+            tracks = abletonData.liveSet.tracks.midiTracks
         )
 
-        bpm = BPMReader().readBPM(abletonXml)
+        bpm = abletonData.liveSet.masterTrack.deviceChain.mixer.tempo.manual.value
         projectLayout = layout
 
-        val autoPlayData: AutoPlayData = AbletonTutorialDetector.getAutoPlayData(layout, abletonXml.querySelector("MidiTrack"))
+        val autoPlayData: AutoPlayData = AbletonTutorialDetector.getAutoPlayData(layout, abletonData.liveSet.tracks.midiTracks)
 
         when (layout) {
             is AbletonLayout.Single -> {
@@ -152,13 +181,11 @@ object AbletonConverter : AmethystConverter {
             }
         }
 
-        val minorVersion: String = abletonXml.attributes["MinorVersion"]!!
-
         liveVersion = when {
-            minorVersion.startsWith("9") -> LiveVersion.LIVE_9
-            minorVersion.startsWith("10") -> LiveVersion.LIVE_10
-            minorVersion.startsWith("11") -> LiveVersion.LIVE_11
-            minorVersion.startsWith("12") -> LiveVersion.LIVE_12
+            abletonData.minorVersion.startsWith("9") -> LiveVersion.LIVE_9
+            abletonData.minorVersion.startsWith("10") -> LiveVersion.LIVE_10
+            abletonData.minorVersion.startsWith("11") -> LiveVersion.LIVE_11
+            abletonData.minorVersion.startsWith("12") -> LiveVersion.LIVE_12
 
             else -> null
         }
@@ -277,9 +304,7 @@ object AbletonConverter : AmethystConverter {
             (layout as AbletonLayout.Single).audioTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
         }
 
-        audioRenderer.clearCache()
-
-        audioMap = mapOf()
+        audioMap = emptyMap()
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
         projectLayout = null
 

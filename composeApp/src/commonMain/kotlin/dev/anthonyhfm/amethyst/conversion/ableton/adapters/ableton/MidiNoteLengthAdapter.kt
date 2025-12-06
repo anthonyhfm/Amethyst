@@ -3,16 +3,13 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmIndexToDuration
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
-import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.hold.HoldChainDeviceState
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-class MidiNoteLengthAdapter(
+/*class MidiNoteLengthAdapter(
     private val xml: XmlElement
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
@@ -88,4 +85,4 @@ class MidiNoteLengthAdapter(
             else -> "1/8" // Default to 1/8 if unknown
         }
     }
-}
+}*/

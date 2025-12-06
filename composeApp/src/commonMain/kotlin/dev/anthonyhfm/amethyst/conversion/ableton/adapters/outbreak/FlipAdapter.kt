@@ -1,19 +1,17 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak
 
-import androidx.compose.ui.graphics.TileMode
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.flip.FlipChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 class FlipAdapter(
-    private val data: ByteArray
+    private val blob: String
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-         val dataObj: FlipData = jsonDecoder.decodeFromString(data.decodeToString())
+         val dataObj: FlipData = jsonDecoder.decodeFromString(blob)
 
         when (dataObj.flipMode.first().toInt()) {
             1 -> { // Mirror

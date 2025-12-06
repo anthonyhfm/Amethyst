@@ -10,12 +10,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class DepthsMixerAdapter(
-    private val blob: ByteArray,
+    private val blob: String,
     val offset: IntOffset = IntOffset.Zero,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         if (AbletonConverter.projectLayout is AbletonLayout.Dual2Light) {
-            val data = jsonDecoder.decodeFromString<DepthsMixerData>(blob.decodeToString())
+            val data = jsonDecoder.decodeFromString<DepthsMixerData>(blob)
 
             println("Found mixer with channel ${data.channel[0]} at offset $offset")
 

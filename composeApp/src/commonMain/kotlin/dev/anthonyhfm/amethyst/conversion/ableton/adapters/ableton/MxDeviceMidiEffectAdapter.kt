@@ -18,9 +18,8 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.FlipAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.InfinityAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.IrisAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.TwistAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.FileRef
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -28,21 +27,14 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.nameWithoutExtension
 
 class MxDeviceMidiEffectAdapter(
-    private val xml: XmlElement,
+    private val device: MxDeviceMidiEffect,
     val offset: IntOffset = IntOffset.Zero,
     val outputOffset: IntOffset = IntOffset.Zero
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val patchSlot = xml.localQuerySelector("PatchSlot")[0]
-            .localQuerySelector("Value")[0]
-            .localQuerySelector("MxDPatchRef")[0]
+        val blob = device.decodeBlob()
 
-        val blob = xml.localQuerySelector("BlobSlot")[0]
-            .localQuerySelector("Value")[0]
-            .localQuerySelector("MxDBlob")[0]
-            .localQuerySelector("Blob")[0]
-
-        val path = FileRef.resolveFileReference(patchSlot.localQuerySelector("FileRef").first())
+        val path = device.patchSlot.value.patchRef.fileRef.resolvePath()
 
         val hash: String = fileHashMap[path].let {
             if (it != null) {
@@ -72,12 +64,12 @@ class MxDeviceMidiEffectAdapter(
                 "fe575828d488675752a087c80401af63",
                 "e8726f6b3088125c4c6aaff083b1730b",
                 "9a7f0ac3bc4d354c2a560427b6093f87"-> {
-                    return TwistAdapter(readDataBlob(blob.text!!)).toDeviceStates()
+                    return TwistAdapter(blob).toDeviceStates()
                 }
 
                 "14783922241a74cd4da95beed0f57b95",
                 "349064d3d33e7ed2c39d766f308aa023" -> {
-                    return DelayAdapter(readDataBlob(blob.text!!)).toDeviceStates()
+                    return DelayAdapter(blob).toDeviceStates()
                 }
 
                 "4ca220e9b84d740854eb8e1b00843265",
@@ -87,7 +79,7 @@ class MxDeviceMidiEffectAdapter(
                 "dfb2c1c6968c8547b26efd31c69dd555",
                 "620a46951d419c62150da25467ec044b",
                 "811c3c410fce75959c8ab17220186701" -> {
-                    return FlipAdapter(readDataBlob(blob.text!!)).toDeviceStates()
+                    return FlipAdapter(blob).toDeviceStates()
                 }
 
                 // "1123f889d9f60562ca63945c5a823665", NEEDS EXTRA HANDLING, OLDER VERSION
@@ -95,12 +87,12 @@ class MxDeviceMidiEffectAdapter(
                 "4feeb78db6367007b1badf8f9d2c1cae",
                 "bcfb325a212a70bdd0acdbf740114389",
                 "a591e409a908e4bd1898152222cc8336"-> {
-                    return IrisAdapter(readDataBlob(blob.text!!)).toDeviceStates()
+                    return IrisAdapter(blob).toDeviceStates()
                 }
 
                 "7bd5bf9ea8431c5697b226aa906d87ac",
                 "af7c8717c232587ecea9ee2105eca17c" -> {
-                    return DepthsSelectorAdapter(readDataBlob(blob.text!!), offset).toDeviceStates()
+                    return DepthsSelectorAdapter(blob, offset).toDeviceStates()
                 }
 
                 "07b41f57975c3f6b65b37be548c23377",
@@ -116,23 +108,23 @@ class MxDeviceMidiEffectAdapter(
                         kaskobiWeirdAssPageSwitch = true
                     )
 
-                    return PageSwitcherAdapter(readDataBlob(blob.text!!), offset).toDeviceStates()
+                    return PageSwitcherAdapter(offset).toDeviceStates()
                 }
 
                 "6257e885f06b1c1fb6258b1066497244" -> { // Resonator 3.0.0
-                    return Resonator3Adapter(false, readDataBlob(blob.text!!), xml).toDeviceStates()
+                    return Resonator3Adapter(false, blob, device).toDeviceStates()
                 }
 
-                "72bbd3837984d7eb1a881116c5ab5fe6" -> { // Resonator 3.0.1
-                    return Resonator3Adapter(true, readDataBlob(blob.text!!), xml).toDeviceStates()
+                "72bbd3837984d7eb1a881116c5ab5fe6" -> {
+                    return Resonator3Adapter(true, blob, device).toDeviceStates()
                 }
 
                 "d8c48c67824319295bb5bf7abda47f27" -> {
-                    return Resonator2Adapter(readDataBlob(blob.text!!), xml).toDeviceStates()
+                    return Resonator2Adapter(blob, device).toDeviceStates()
                 }
 
                 "4bd554ebb0ee0536dee1ab7a9875fc20" -> {
-                    return Resonator1Adapter(readDataBlob(blob.text!!)).toDeviceStates()
+                    return Resonator1Adapter(blob).toDeviceStates()
                 }
 
                 "2491c3c841b70b7c9765db8e4defdfff",
@@ -154,20 +146,20 @@ class MxDeviceMidiEffectAdapter(
                 "4dd48ac60e858928fff89a28865ce735",
                 "2ef098a53fe4e9a4b035588561080343",
                 "d53dcb292a173ab7853183f3cab7620c"-> {
-                    return GenericMidiExtAdapter(xml, offset).toDeviceStates()
+                    return GenericMidiExtAdapter(device, offset).toDeviceStates()
                 }
 
                 "9f50358372279f946cae0fdac0cfbf56", // Wormhole Lite, unsure if this actually works!
                 "3d3de9b05506f279ad6cfe14d26e0084" -> {
-                    return WormholeAdapter(readDataBlob(blob.text!!)).toDeviceStates()
+                    return WormholeAdapter(blob).toDeviceStates()
                 }
 
                 "168cda682434227f77d52824814c8235" -> {
-                    return GridFilterAdapter(readDataBlob(blob.text!!), offset).toDeviceStates()
+                    return GridFilterAdapter(blob, offset).toDeviceStates()
                 }
 
                 "c328c055ae8daf2d9a4e2c0346bcc2ee" -> {
-                    return AutoPageAdapter(readDataBlob(blob.text!!), xml).toDeviceStates()
+                    return AutoPageAdapter(blob, device).toDeviceStates()
                 }
 
                 else -> {
@@ -192,24 +184,5 @@ class MxDeviceMidiEffectAdapter(
 
     companion object {
         val fileHashMap: MutableMap<String, String> = mutableMapOf()
-
-        fun readDataBlob(blob: String): ByteArray {
-            val cleanHex = blob.replace("\\s".toRegex(), "")
-            require(cleanHex.length % 2 == 0) { "" }
-
-            val raw = ByteArray(cleanHex.length / 2) { idx ->
-                cleanHex
-                    .substring(idx * 2, idx * 2 + 2)
-                    .toInt(16)
-                    .toByte()
-            }
-
-            val lastNonZero = raw.indexOfLast { it != 0.toByte() }
-            return if (lastNonZero == -1) {
-                ByteArray(0)
-            } else {
-                raw.copyOfRange(0, lastNonZero + 1)
-            }
-        }
     }
 }

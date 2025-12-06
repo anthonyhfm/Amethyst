@@ -8,22 +8,18 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
-import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlin.math.abs
-import kotlin.math.pow
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.DurationUnit
 
 class TwistAdapter (
-    private val data: ByteArray
+    private val blob: String
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val dataObj: TwistData = jsonDecoder.decodeFromString(data.decodeToString())
+        val dataObj: TwistData = jsonDecoder.decodeFromString(blob)
 
         val bpm = AbletonConverter.bpm
 

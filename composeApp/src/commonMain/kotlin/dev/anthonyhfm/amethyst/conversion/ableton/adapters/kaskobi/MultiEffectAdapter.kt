@@ -1,14 +1,13 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.XmlElement
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState.TYPE
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
-class MultiEffectAdapter (
+/*class MultiEffectAdapter (
     private val deviceXml: XmlElement,
     private val containerXml: XmlElement
 ) : AbletonAdapter() {
@@ -63,7 +62,7 @@ class MultiEffectAdapter (
                         stateChain = StateChain(
                             devices = mutableListOf<DeviceState>().apply {
                                 branch?.let {
-                                    addAll(
+                                    /*addAll(
                                         it.querySelector("DeviceChain").first()
                                             .querySelector("Devices").first()
                                             .children.flatMap { child ->
@@ -71,7 +70,7 @@ class MultiEffectAdapter (
                                                     ?.toDeviceStates()
                                                     ?: emptyList()
                                             }
-                                    )
+                                    )*/
                                 }
                             }
                         )
@@ -80,4 +79,4 @@ class MultiEffectAdapter (
             )
         )
     }
-}
+}*/
