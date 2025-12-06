@@ -1,5 +1,13 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data
 
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiNoteLength
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
@@ -7,8 +15,7 @@ import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import nl.adaptivity.xmlutil.serialization.XmlElement
 
-@Serializable
-sealed interface AbletonDevice {
+interface AbletonDevice {
     companion object {
         val module = SerializersModule {
             polymorphic(AbletonDevice::class) {
@@ -17,6 +24,9 @@ sealed interface AbletonDevice {
                 subclass(DrumGroupDevice::class)
                 subclass(MxDeviceMidiEffect::class)
                 subclass(OriginalSimpler::class)
+                subclass(MidiVelocity::class)
+                subclass(MidiNoteLength::class)
+                subclass(MidiRandom::class)
             }
 
             polymorphic(MxParameter::class) {

@@ -18,7 +18,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.FlipAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.InfinityAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.IrisAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.TwistAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash

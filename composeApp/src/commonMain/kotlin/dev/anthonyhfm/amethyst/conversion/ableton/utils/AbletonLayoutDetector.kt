@@ -1,6 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
-import dev.anthonyhfm.amethyst.conversion.ableton.data.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
 import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader

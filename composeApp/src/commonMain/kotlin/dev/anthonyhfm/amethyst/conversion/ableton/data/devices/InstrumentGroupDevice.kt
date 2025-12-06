@@ -1,5 +1,6 @@
-package dev.anthonyhfm.amethyst.conversion.ableton.data
+package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -7,7 +8,7 @@ import nl.adaptivity.xmlutil.serialization.XmlElement
 import nl.adaptivity.xmlutil.serialization.XmlSerialName
 
 @Serializable
-data class DrumGroupDevice(
+data class InstrumentGroupDevice(
     @SerialName("Id")
     val id: Int,
 
@@ -33,44 +34,33 @@ data class DrumGroupDevice(
 
     @Serializable
     data class Branches(
-        val branches: List<DrumBranch>
+        val branches: List<InstrumentBranch>
     ) {
         @Serializable
-        data class DrumBranch(
+        data class InstrumentBranch(
             @SerialName("Id")
             val id: Int,
 
             @XmlElement
-            val name: Name,
+            val name: Branches.InstrumentBranch.Name,
 
             @XmlElement
-            val deviceChain: DeviceChain,
+            val deviceChain: Branches.InstrumentBranch.DeviceChain,
 
             @XmlElement
-            val branchSelectorRange: BranchSelectorRange,
+            val zoneSettings: Branches.InstrumentBranch.ZoneSettings,
 
             @XmlElement
-            val masterDevice: MixerDevice,
+            val branchSelectorRange: Branches.InstrumentBranch.BranchSelectorRange,
 
             @XmlElement
-            val branchInfo: BranchInfo
+            val masterDevice: Branches.InstrumentBranch.MixerDevice
         ) {
-            @Serializable
-            data class BranchInfo(
-                val receivingNote: ReceivingNote
-            ) {
-                @Serializable
-                data class ReceivingNote(
-                    @SerialName("Value")
-                    val value: Int
-                )
-            }
-
             @Serializable
             data class Name(
                 @XmlElement
                 @XmlSerialName("EffectiveName")
-                val effectiveName: Name.EffectiveName? = null,
+                val effectiveName: Branches.InstrumentBranch.Name.EffectiveName? = null,
             ) {
                 @Serializable
                 data class EffectiveName(
@@ -83,13 +73,13 @@ data class DrumGroupDevice(
             data class DeviceChain(
                 @XmlElement
                 @SerialName("DeviceChain")
-                val deviceChain: MidiToAudioDeviceChain,
+                val deviceChain: Branches.InstrumentBranch.DeviceChain.MidiToAudioDeviceChain,
             ) {
                 @Serializable
                 data class MidiToAudioDeviceChain(
                     @XmlElement
                     @SerialName("Devices")
-                    val devices: Devices
+                    val devices: Branches.InstrumentBranch.DeviceChain.MidiToAudioDeviceChain.Devices
                 ) {
                     @Serializable
                     data class Devices(
@@ -102,11 +92,11 @@ data class DrumGroupDevice(
             data class BranchSelectorRange(
                 @XmlElement
                 @XmlSerialName("Min")
-                val min: MinMax,
+                val min: Branches.InstrumentBranch.BranchSelectorRange.MinMax,
 
                 @XmlElement
                 @XmlSerialName("Max")
-                val max: MinMax
+                val max: Branches.InstrumentBranch.BranchSelectorRange.MinMax
             ) {
                 @Serializable
                 data class MinMax(
@@ -118,17 +108,17 @@ data class DrumGroupDevice(
             @Serializable
             data class ZoneSettings(
                 @XmlElement
-                val keyRange: KeyRange
+                val keyRange: Branches.InstrumentBranch.ZoneSettings.KeyRange
             ) {
                 @Serializable
                 data class KeyRange(
                     @XmlElement
                     @XmlSerialName("Min")
-                    val min: MinMax,
+                    val min: Branches.InstrumentBranch.ZoneSettings.KeyRange.MinMax,
 
                     @XmlElement
                     @XmlSerialName("Max")
-                    val max: MinMax
+                    val max: Branches.InstrumentBranch.ZoneSettings.KeyRange.MinMax
                 ) {
                     @Serializable
                     data class MinMax(
@@ -141,12 +131,12 @@ data class DrumGroupDevice(
             @Serializable
             data class MixerDevice(
                 @XmlElement
-                val speaker: Speaker
+                val speaker: Branches.InstrumentBranch.MixerDevice.Speaker
             ) {
                 @Serializable
                 data class Speaker(
                     @XmlElement
-                    val manual: Manual
+                    val manual: Branches.InstrumentBranch.MixerDevice.Speaker.Manual
                 ) {
                     @Serializable
                     data class Manual(

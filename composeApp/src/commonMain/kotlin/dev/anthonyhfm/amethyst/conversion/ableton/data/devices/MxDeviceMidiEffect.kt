@@ -1,5 +1,7 @@
-package dev.anthonyhfm.amethyst.conversion.ableton.data
+package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.FileRef
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

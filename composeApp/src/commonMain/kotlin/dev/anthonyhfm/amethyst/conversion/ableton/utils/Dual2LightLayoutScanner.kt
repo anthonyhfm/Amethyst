@@ -5,8 +5,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter.Companion.fileHashMap
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsMixerAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import io.github.vinceglb.filekit.PlatformFile
 
 object Dual2LightLayoutScanner {

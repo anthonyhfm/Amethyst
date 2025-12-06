@@ -7,11 +7,14 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGro
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.DrumGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.InstrumentGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiEffectGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiNoteLength
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import kotlinx.serialization.json.Json
 
@@ -59,6 +62,12 @@ abstract class AbletonAdapter {
                     )
 
                     is OriginalSimpler -> OriginalSimplerAdapter(device)
+
+                    else -> {
+                        println("Unsupported Ableton device type: ${device::class.simpleName}")
+
+                        null
+                    }
                 }
 
                 /*return when (xml.name) {

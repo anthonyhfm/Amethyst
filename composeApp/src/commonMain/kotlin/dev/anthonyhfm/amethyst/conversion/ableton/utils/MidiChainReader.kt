@@ -3,9 +3,9 @@ package dev.anthonyhfm.amethyst.conversion.ableton.utils
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.DrumGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.InstrumentGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain

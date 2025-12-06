@@ -1,6 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MxParameter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
 
 class MaxParam(
     private val parameterList: List<MxParameter>

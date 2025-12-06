@@ -3,13 +3,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
-import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
-import dev.anthonyhfm.amethyst.conversion.ableton.data.InstrumentGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiEffectGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.MxDeviceMidiEffect
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
@@ -19,7 +13,6 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.SwitchChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import io.github.vinceglb.filekit.PlatformFile
 
 class InstrumentGroupAdapter(
     private val device: InstrumentGroupDevice,
