@@ -54,7 +54,7 @@ fun WorkspaceWindow(
                 onClose()
             }
         },
-        title = "Amethyst",
+        title = "Amethyst - [${WorkspaceRepository.saveableWorkspaceData?.title ?: "Untitled Project"}]",
         state = rememberWindowState(
             width = 1200.dp,
             height = 800.dp
