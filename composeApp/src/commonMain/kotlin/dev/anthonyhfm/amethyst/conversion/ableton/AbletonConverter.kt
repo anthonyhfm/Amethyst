@@ -83,8 +83,6 @@ object AbletonConverter : AmethystConverter {
                     name: QName?,
                     candidates: Collection<Any>,
                 ): List<XML.ParsedData<*>> {
-                    // println("Unknown child: ${input.name} at ${input.extLocationInfo?.toString()}")
-
                     return emptyList()
                 }
             }
@@ -97,6 +95,7 @@ object AbletonConverter : AmethystConverter {
 
         zipEntries.clear()
         val entries = Zip.getEntries(file)
+        FileHelper.clearCache()
 
         zipStartPath = entries.map { it.path }
             .first { it.endsWith(".als") }
@@ -106,21 +105,17 @@ object AbletonConverter : AmethystConverter {
             entries.associateBy { it.path }
         )
 
-        // .als-Datei dekodieren und frühzeitig aus Map entfernen, um Speicher zu sparen
         val alsEntry = entries.first { it.path.endsWith(".als") }
         val decodedAlsBytes = Zip.decode(alsEntry.data)
         val decodedAlsString = decodedAlsBytes.decodeToString()
-        // decodedAlsBytes wird nicht mehr benötigt, kann vom GC gesammelt werden
 
         val abletonData = xml.decodeFromString<Ableton>(decodedAlsString)
 
-        // .als Eintrag räumen (wir brauchen ihn nicht mehr)
         zipEntries.remove(alsEntry.path)
 
         return runLiveConversion(abletonData).also {
             isZip = false
             zipEntries.clear()
-            FileHelper.clearCache()
         }
     }
 

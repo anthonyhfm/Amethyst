@@ -59,4 +59,8 @@ actual object Zip {
             it.decode(data.toNSData())?.toByteArray()
         } ?: ByteArray(0)
     }
+
+    actual fun encode(data: ByteArray): ByteArray {
+        TODO("Not yet implemented")
+    }
 }

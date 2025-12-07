@@ -3,7 +3,7 @@
 //  iosApp
 //
 //  Created by Anthony Hofmeister on 30.10.25.
-//  Copyright © 2025 orgName. All rights reserved.
+//  Copyright © 2025 Anthony Hofmeister. All rights reserved.
 //
 
 import ComposeApp
@@ -84,7 +84,6 @@ class ZipImplementation : ZipAPI {
         var stream = z_stream()
         var status: Int32
 
-        // zlib initialisieren für gzip (15+16 = gzip)
         status = inflateInit2_(&stream, 16 + 15, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
         if status != Z_OK {
             return nil
