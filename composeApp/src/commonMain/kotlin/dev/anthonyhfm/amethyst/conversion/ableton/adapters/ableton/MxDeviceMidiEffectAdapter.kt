@@ -41,7 +41,11 @@ class MxDeviceMidiEffectAdapter(
                 return@let it
             } else {
                 val hash: String = if (AbletonConverter.isZip) {
-                    AbletonConverter.zipEntries[path]?.data?.toFileHash() ?: ""
+                    val entry = AbletonConverter.zipEntries[path]
+                    val computed = entry?.data?.toFileHash() ?: ""
+
+                    AbletonConverter.zipEntries.remove(path)
+                    computed
                 } else {
                     val maxFile = PlatformFile(path)
                     maxFile.getFileHash()
