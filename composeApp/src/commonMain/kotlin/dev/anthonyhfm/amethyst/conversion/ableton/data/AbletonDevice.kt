@@ -2,8 +2,11 @@ package dev.anthonyhfm.amethyst.conversion.ableton.data
 
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiArpeggiator
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiChord
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiNoteLength
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiPitcher
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
@@ -27,6 +30,9 @@ interface AbletonDevice {
                 subclass(MidiVelocity::class)
                 subclass(MidiNoteLength::class)
                 subclass(MidiRandom::class)
+                subclass(MidiPitcher::class)
+                subclass(MidiChord::class)
+                subclass(MidiArpeggiator::class)
             }
 
             polymorphic(MxParameter::class) {
