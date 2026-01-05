@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -136,14 +137,8 @@ data class MidiEffectGroupDevice(
                 @Serializable
                 data class Speaker(
                     @XmlElement
-                    val manual: Manual
-                ) {
-                    @Serializable
-                    data class Manual(
-                        @SerialName("Value")
-                        val value: Boolean
-                    )
-                }
+                    val manual: AbletonManual<Boolean>
+                )
             }
         }
     }

@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data
 
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -105,13 +106,7 @@ data class MasterTrack(
         @Serializable
         data class Tempo(
             @XmlElement
-            val manual: Manual
-        ) {
-            @Serializable
-            data class Manual(
-                @SerialName("Value")
-                val value: Double
-            )
-        }
+            val manual: AbletonManual<Double>
+        )
     }
 }

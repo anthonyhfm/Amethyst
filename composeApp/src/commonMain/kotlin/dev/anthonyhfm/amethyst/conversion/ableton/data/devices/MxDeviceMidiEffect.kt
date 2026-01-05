@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.FileRef
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -159,12 +160,6 @@ sealed interface MxParameter {
     @SerialName("Timeable")
     data class MxParameterValue<T>(
         @XmlElement
-        val manual: Manual<T>
-    ) {
-        @Serializable
-        data class Manual<T>(
-            @SerialName("Value")
-            val value: T
-        )
-    }
+        val manual: AbletonManual<T>
+    )
 }
