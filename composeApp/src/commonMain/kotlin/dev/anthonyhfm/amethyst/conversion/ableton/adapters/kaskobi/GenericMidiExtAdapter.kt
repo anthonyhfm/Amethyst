@@ -17,10 +17,7 @@ class GenericMidiExtAdapter(
     override fun toDeviceStates(): List<DeviceState> {
         val fileRef = device.fileDropList.fileDropList.items.firstOrNull()?.ref?.fileRef ?: return emptyList()
 
-        println(fileRef.resolvePath())
-
         val palette = AbletonConverter.palette
-
         val filePath: String = fileRef.resolvePath()
 
         val data = if (AbletonConverter.isZip) {

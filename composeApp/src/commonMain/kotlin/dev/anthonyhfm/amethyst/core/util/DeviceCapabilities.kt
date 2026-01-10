@@ -10,6 +10,9 @@ package dev.anthonyhfm.amethyst.core.util
  */
 data class DeviceCapabilities(
     val showFPSSettings: Boolean = true,
+    val initialFPS: Int = 60,
     val showGradientSmoothnessSettings: Boolean = true,
     val lowRamUsageMode: Boolean = false,
 )
+
+expect fun getDeviceCapabilities(): DeviceCapabilities

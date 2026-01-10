@@ -23,8 +23,8 @@ object AutoPlayRepository {
     fun startAutoPlay() {
         if (_state.value == AutoPlayState.PLAYING) return
         
-        val autoplay = WorkspaceRepository.saveableWorkspaceData?.autoPlay ?: return
-        val settings = WorkspaceRepository.saveableWorkspaceData?.settings
+        val autoplay = WorkspaceRepository.workspaceMeta?.autoPlay ?: return
+        val settings = WorkspaceRepository.workspaceMeta?.settings
 
         Heaven.cancelJobsForOwner(this)
 

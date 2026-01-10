@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import nl.adaptivity.xmlutil.serialization.XmlElement
 import nl.adaptivity.xmlutil.serialization.XmlSerialName
 
@@ -18,6 +19,34 @@ data class MidiEffectGroupDevice(
 
     @XmlElement
     val chainSelector: ChainSelector,
+
+    @XmlElement
+    @XmlSerialName("MacroControls.0")
+    private val macro0: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.1")
+    private val macro1: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.2")
+    private val macro2: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.3")
+    private val macro3: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.4")
+    private val macro4: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.5")
+    private val macro5: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.6")
+    private val macro6: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.7")
+    private val macro7: Macro? = null,
+
+    @Transient
+    val macros: List<Macro> = listOfNotNull(macro0, macro1, macro2, macro3, macro4, macro5, macro6, macro7)
 ) : AbletonDevice {
     @Serializable
     data class ChainSelector(
@@ -142,4 +171,9 @@ data class MidiEffectGroupDevice(
             }
         }
     }
+
+    @Serializable
+    data class Macro(
+        val manual: AbletonManual<Int>
+    )
 }

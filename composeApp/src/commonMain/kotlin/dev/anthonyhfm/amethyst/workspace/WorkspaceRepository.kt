@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
+import dev.anthonyhfm.amethyst.workspace.data.WorkspaceMeta
 
 object WorkspaceRepository {
     val deviceRefresh: MutableSharedFlow<Unit> = MutableSharedFlow()
@@ -48,7 +49,8 @@ object WorkspaceRepository {
     var bounds: Pair<IntOffset, IntSize> = Pair(IntOffset(0, 0), IntSize(0, 0))
         private set
 
-    var saveableWorkspaceData: SavableWorkspaceData? = null
+    // Only keep lightweight metadata in memory instead of the full SavableWorkspaceData
+    var workspaceMeta: WorkspaceMeta? = null
 
     private val _macros: MutableStateFlow<List<Macro>> = MutableStateFlow(listOf(Macro(1)))
     val macros: StateFlow<List<Macro>> = _macros.asStateFlow()
@@ -120,9 +122,9 @@ object WorkspaceRepository {
     }
 
     fun updateAutoPlaySettings(showButtonPresses: Boolean, showLights: Boolean) {
-        saveableWorkspaceData?.let { currentData ->
-            saveableWorkspaceData = currentData.copy(
-                settings = currentData.settings.copy(
+        workspaceMeta?.let { currentMeta ->
+            workspaceMeta = currentMeta.copy(
+                settings = currentMeta.settings.copy(
                     autoPlayShowButtonPresses = showButtonPresses,
                     autoPlayShowLights = showLights
                 )
@@ -212,7 +214,14 @@ object WorkspaceRepository {
     }
 
     fun loadWorkspace(workspaceData: SavableWorkspaceData) {
-        saveableWorkspaceData = workspaceData
+        // Store only metadata in memory
+        workspaceMeta = WorkspaceMeta(
+            path = workspaceData.path,
+            title = workspaceData.title,
+            author = workspaceData.author,
+            settings = workspaceData.settings,
+            autoPlay = workspaceData.autoPlay
+        )
 
         lightsChain = workspaceData.lights.unpack()
         samplingChain = workspaceData.sampling.unpack()
@@ -287,16 +296,18 @@ object WorkspaceRepository {
 
     private fun buildWorkspaceData(): SavableWorkspaceData {
         return SavableWorkspaceData(
-            path = saveableWorkspaceData?.path,
-            title = saveableWorkspaceData?.title ?: "Untitled",
-            author = saveableWorkspaceData?.author ?: "Unknown Author",
+            path = workspaceMeta?.path,
+            title = workspaceMeta?.title ?: "Untitled",
+            author = workspaceMeta?.author ?: "Unknown Author",
             lights = StateChain.pack(lightsChain),
             sampling = StateChain.pack(samplingChain),
-            autoPlay = saveableWorkspaceData?.autoPlay ?: AutoPlayData(emptyMap()),
+            autoPlay = workspaceMeta?.autoPlay ?: AutoPlayData(emptyMap()),
             timelineData = TimelineRepository.tracks.value,
             macros = _macros.value,
             settings = WorkspaceSettings(
-                bpm = _bpm.value
+                bpm = _bpm.value,
+                autoPlayShowButtonPresses = workspaceMeta?.settings?.autoPlayShowButtonPresses ?: true,
+                autoPlayShowLights = workspaceMeta?.settings?.autoPlayShowLights ?: true
             ),
             launchpadDevices = Heaven.devices.map { device ->
                 SavableWorkspaceData.SavableViewportLaunchpad(
@@ -317,7 +328,8 @@ object WorkspaceRepository {
     }
 
     fun saveWorkspace(): SavableWorkspaceData {
-        return buildWorkspaceData().also { saveableWorkspaceData = it }
+        // Build and return current state; metadata remains lightweight
+        return buildWorkspaceData()
     }
 
     fun addRecentColor(color: Triple<Float, Float, Float>, maxSize: Int = 24) {
@@ -335,25 +347,9 @@ object WorkspaceRepository {
     }
 
     fun hasUnsavedChanges(): Boolean {
-        // If there's no saveable workspace data, there are no changes to compare
-        if (saveableWorkspaceData == null) return false
-        
-        // Save the original reference before generating current state
-        val savedWorkspace = saveableWorkspaceData!!
-        
-        // Generate current workspace state without updating saveableWorkspaceData
-        val currentWorkspace = buildWorkspaceData()
-        
-        // Compare key properties that indicate changes
-        return currentWorkspace.title != savedWorkspace.title ||
-               currentWorkspace.author != savedWorkspace.author ||
-               currentWorkspace.lights != savedWorkspace.lights ||
-               currentWorkspace.sampling != savedWorkspace.sampling ||
-               currentWorkspace.macros != savedWorkspace.macros ||
-               currentWorkspace.settings != savedWorkspace.settings ||
-               currentWorkspace.launchpadDevices != savedWorkspace.launchpadDevices ||
-               currentWorkspace.timelineData != savedWorkspace.timelineData ||
-               currentWorkspace.autoPlay != savedWorkspace.autoPlay
+        // Always show the Unsaved Changes dialog when attempting to close
+        // This avoids file system access (PlatformFile) on mobile platforms
+        return true
     }
 
     fun clean() {
@@ -369,7 +365,7 @@ object WorkspaceRepository {
         
         // Reset state
         bounds = Pair(IntOffset(0, 0), IntSize(0, 0))
-        saveableWorkspaceData = null
+        workspaceMeta = null
         _macros.update { listOf(Macro(1)) }
         _mode.update { WorkspaceContract.WorkspaceMode.Layout() }
         _bpm.update { 120.00 }

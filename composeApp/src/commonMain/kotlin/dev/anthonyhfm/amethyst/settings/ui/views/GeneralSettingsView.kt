@@ -11,15 +11,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
-import dev.anthonyhfm.amethyst.desktop.DiscordRPCManager
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsCategory
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsItem
+import dev.anthonyhfm.amethyst.core.util.getDeviceCapabilities
 
 @Composable
 fun GeneralSettingsView() {
+    val caps = remember { getDeviceCapabilities() }
+
     var selectedFPS by remember { mutableStateOf(GlobalSettings.performanceFPS) }
     var selectedGradientSmoothness by remember { mutableStateOf(GlobalSettings.gradientSmoothness) }
     var animationsEnabled by remember { mutableStateOf(GlobalSettings.enableAnimations) }
@@ -33,7 +34,9 @@ fun GeneralSettingsView() {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf(90, 120, 140, 180).forEach { fps ->
+                val fpsChoices = if (caps.showFPSSettings) listOf(60, 90, 120) else listOf(caps.initialFPS)
+
+                fpsChoices.forEach { fps ->
                     if (selectedFPS == fps) {
                         FilledTonalButton(
                             onClick = {

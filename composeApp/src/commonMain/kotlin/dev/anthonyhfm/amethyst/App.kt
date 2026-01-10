@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import dev.anthonyhfm.amethyst.home.Home
 import dev.anthonyhfm.amethyst.ui.theme.AMETHYST_THEME
 import dev.anthonyhfm.amethyst.workspace.Workspace
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
@@ -17,7 +18,10 @@ fun App() {
         colorScheme = AMETHYST_THEME
     ) {
         if (inWorkspace) {
-            Workspace()
+            Workspace(onBack = {
+                WorkspaceRepository.clean()
+                inWorkspace = false
+            })
         } else {
             Surface {
                 Home(

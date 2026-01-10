@@ -36,7 +36,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
 
 @Composable
-fun Workspace() {
+fun Workspace(onBack: () -> Unit = {}) {
     val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
 
     val state by viewModel.state.collectAsState()
@@ -53,7 +53,7 @@ fun Workspace() {
                 mode = state.mode,
                 onEvent = {
                     viewModel.onEvent(it)
-                }
+                },
             )
         },
         floatingActionButton = {

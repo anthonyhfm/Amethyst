@@ -29,7 +29,7 @@ class OriginalSimplerAdapter(
                 .player
                 .multiSampleMap
                 .sampleParts
-                .multiSamplePart
+                .multiSamplePart ?: return OriginalSimplerData("", 0, 0)
 
             return OriginalSimplerData(
                 filePath = samplePart.sampleRef.fileRef.resolvePath(),

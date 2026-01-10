@@ -69,9 +69,9 @@ kotlin {
             implementation("io.github.vinceglb:filekit-core:0.10.0")
             implementation("io.github.vinceglb:filekit-dialogs:0.10.0")
             implementation(libs.dropdown)
-            implementation("io.github.pdvrieze.xmlutil:core:0.91.3")
-            implementation("io.github.pdvrieze.xmlutil:serialization:0.91.3")
-            implementation("io.github.pdvrieze.xmlutil:serialutil:0.91.3")
+            implementation("io.github.pdvrieze.xmlutil:core:1.0.0-rc1")
+            implementation("io.github.pdvrieze.xmlutil:serialization:1.0.0-rc1")
+            implementation("io.github.pdvrieze.xmlutil:serialutil:1.0.0-rc1")
             implementation("com.squareup.okio:okio:3.9.0")
             kotlin("stdlib")
         }

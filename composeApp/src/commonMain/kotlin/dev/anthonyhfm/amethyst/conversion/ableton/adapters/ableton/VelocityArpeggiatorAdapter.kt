@@ -3,21 +3,17 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmIndexToDuration
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
 
-/*class VelocityArpeggiatorAdapter(
-    private val xml: XmlElement
+class VelocityArpeggiatorAdapter(
+    private val device: MidiEffectGroupDevice
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         // get macro values from midi effect rack (rate, colors)
-        val gradientRate = xml
-            .localQuerySelector("MacroControls.0")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
+        val gradientRate = device.macros[0].manual.value
 
         val velocities = getGradientVelocities()
 
@@ -50,64 +46,11 @@ import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
     }
 
     fun getGradientVelocities(): List<Int> {
-        val velocity1 = xml
-            .localQuerySelector("MacroControls.1")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
-
-        val velocity2 = xml
-            .localQuerySelector("MacroControls.2")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
-
-        val velocity3 = xml
-            .localQuerySelector("MacroControls.3")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
-
-        val velocity4 = xml
-            .localQuerySelector("MacroControls.4")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
-
-        val velocity5 = xml
-            .localQuerySelector("MacroControls.5")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
-
-        val velocity6 = xml
-            .localQuerySelector("MacroControls.6")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
-
-        val velocity7 = xml
-            .localQuerySelector("MacroControls.7")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 0
-
-        return listOf(
-            velocity1,
-            velocity2,
-            velocity3,
-            velocity4,
-            velocity5,
-            velocity6,
-            velocity7
-        ).filter { it != 0 } // only return non-zero velocities
+        return device.macros.map {
+            it.manual.value
+        }.filter {
+            it != 0
+        }
     }
 
     fun rateRangeToTiming(rate: Int): String {
@@ -124,4 +67,4 @@ import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
             else -> "1/8"
         }
     }
-}*/
+}

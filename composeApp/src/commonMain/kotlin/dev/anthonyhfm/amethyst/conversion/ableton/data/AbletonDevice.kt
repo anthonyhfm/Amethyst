@@ -65,7 +65,7 @@ data class OriginalSimpler(
             @Serializable
             data class SampleParts(
                 @XmlElement
-                val multiSamplePart: MultiSamplePart
+                val multiSamplePart: MultiSamplePart? = null
             ) {
                 @Serializable
                 data class MultiSamplePart(

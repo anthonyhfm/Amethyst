@@ -20,16 +20,18 @@ object WorkspaceSaveHelper {
      */
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun saveWorkspace(): Boolean {
-        var path = WorkspaceRepository.saveableWorkspaceData?.path
+        var path = WorkspaceRepository.workspaceMeta?.path
 
         if (path == null) {
             path = FileKit.openFileSaver(
-                suggestedName = WorkspaceRepository.saveableWorkspaceData?.title ?: "Untitled",
+                suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
                 extension = "amproj"
             )?.path ?: return false
         }
 
-        WorkspaceRepository.saveableWorkspaceData?.path = path
+        // Update metadata path
+        WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = path)
+            ?: WorkspaceRepository.workspaceMeta
 
         PlatformFile(path).write(
             bytes = Zip.encode(
@@ -47,7 +49,7 @@ object WorkspaceSaveHelper {
                 add(
                     index = 0,
                     element = RecentWorkspace(
-                        title = WorkspaceRepository.saveableWorkspaceData?.title ?: "Untitled",
+                        title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
                         path = path
                     )
                 )

@@ -25,8 +25,8 @@ import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 fun AutoPlaySettingsDialog(
     onDismiss: () -> Unit
 ) {
-    val currentSettings = WorkspaceRepository.saveableWorkspaceData?.settings
-    
+    val currentSettings = WorkspaceRepository.workspaceMeta?.settings
+
     var showButtonPresses by remember { 
         mutableStateOf(currentSettings?.autoPlayShowButtonPresses ?: true) 
     }

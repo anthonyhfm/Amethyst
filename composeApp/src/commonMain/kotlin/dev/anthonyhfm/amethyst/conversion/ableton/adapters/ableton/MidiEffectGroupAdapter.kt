@@ -31,9 +31,7 @@ class MidiEffectGroupAdapter(
         val branch2Name = branches.getOrNull(1)?.name?.effectiveName?.value
 
         if (branch1Name == "Magic" && branch2Name == "Rate Preview") {
-            return emptyList()
-            TODO("Velocity Arpeggiator needs to be fixed for the new system")
-            // return VelocityArpeggiatorAdapter(xml).toDeviceStates()
+            return VelocityArpeggiatorAdapter(device).toDeviceStates()
         }
 
         groups.addAll(

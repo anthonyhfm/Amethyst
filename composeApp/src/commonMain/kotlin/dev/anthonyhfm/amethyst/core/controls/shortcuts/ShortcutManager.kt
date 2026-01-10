@@ -75,17 +75,19 @@ object ShortcutManager {
         }
 
         if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.S) {
-            var path = WorkspaceRepository.saveableWorkspaceData?.path
+            var path = WorkspaceRepository.workspaceMeta?.path
 
             GlobalScope.launch {
                 if (path == null) {
                     path = FileKit.openFileSaver(
-                        suggestedName = WorkspaceRepository.saveableWorkspaceData?.title ?: "Untitled",
+                        suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
                         extension = "amproj"
                     )?.path ?: return@launch
                 }
 
-                WorkspaceRepository.saveableWorkspaceData?.path = path
+                // Update metadata path
+                WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = path)
+                    ?: WorkspaceRepository.workspaceMeta
 
                 PlatformFile(path).write(
                     bytes = Zip.encode(
@@ -100,7 +102,7 @@ object ShortcutManager {
                     add(
                         index = 0,
                         element = RecentWorkspace(
-                            title = WorkspaceRepository.saveableWorkspaceData?.title ?: "Untitled",
+                            title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
                             path = path
                         )
                     )
