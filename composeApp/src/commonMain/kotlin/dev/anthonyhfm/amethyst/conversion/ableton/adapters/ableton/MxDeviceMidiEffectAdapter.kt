@@ -109,6 +109,7 @@ class MxDeviceMidiEffectAdapter(
                 }
 
                 "220a5d8ae9bd63f21c8292c03774ef90",
+                "32b6bec96552a6e40f6743787a20b9df",
                 "feecaed62c2637a73325446a1ed1e25e" -> {
                     AbletonConverter.special = ProjectSpecials(
                         kaskobiWeirdAssPageSwitch = true
