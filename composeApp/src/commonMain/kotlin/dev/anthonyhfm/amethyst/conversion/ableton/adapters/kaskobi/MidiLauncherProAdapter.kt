@@ -16,16 +16,16 @@ import kotlinx.coroutines.runBlocking
  *
  * Found features and their implementation state:
  *
- * - Skip Silence
- * - Delay
- * - Loop
- * - Mirroring
- * - Key Tracking
- * - Input Response
- * - Choke Mode
- * - Shift Mode
- * - Side Lights
- * -
+ * - ✅ Skip Silence
+ * - ❌ Delay
+ * - ❌ Loop
+ * - ❌ Mirroring
+ * - ❌ Key Tracking
+ * - ❌ Input Response
+ * - ❌ Choke Mode
+ * - ❌ Shift Mode
+ * - ❌ Side Lights
+ * - ❌ ... more stuff that i dont want to scroll through rn
  */
 class MidiLauncherProAdapter(
     private val device: MxDeviceMidiEffect,
