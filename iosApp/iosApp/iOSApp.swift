@@ -5,6 +5,7 @@ import ComposeApp
 struct iOSApp: App {
     init() {
         Zip.shared.zipAPI = ZipImplementation()
+        UIApplication.shared.isIdleTimerDisabled = true
     }
     
     var body: some Scene {
