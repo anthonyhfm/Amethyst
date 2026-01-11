@@ -1,25 +1,12 @@
 package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiManager
-import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevice
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMK2
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMiniMk3
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMystrix
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePro
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePush2
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
-import dev.anthonyhfm.amethyst.core.midi.platformMidiAccess
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
@@ -28,18 +15,11 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
-import dev.atsushieno.ktmidi.EmptyMidiAccess
-import dev.atsushieno.ktmidi.MidiAccess
-import dev.atsushieno.ktmidi.MidiInput
-import dev.atsushieno.ktmidi.MidiOutput
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class WorkspaceViewModel(
-    private val midiAccess: MidiAccess = platformMidiAccess ?: EmptyMidiAccess(),
     private val amethystMidiManager: AmethystMidiManager = AmethystMidiManager()
 ) : ViewModel() {
     val state = MutableStateFlow(
@@ -220,7 +200,7 @@ class WorkspaceViewModel(
 
             is WorkspaceContract.Event.OnChangeDeviceConfig -> {
                 if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
-                    changeDeviceConfig(event)
+                    amethystMidiManager.changeDeviceConfig(event)
                 }
             }
 
@@ -232,99 +212,5 @@ class WorkspaceViewModel(
                 }
             }
         }
-    }
-
-    fun changeDeviceConfig(event: WorkspaceContract.Event.OnChangeDeviceConfig) {
-        state.value.viewportElements.find { it.selectionUUID == event.uuid }?.apply {
-            deviceConfig.input?.close()
-            deviceConfig.launchpadDevice?.midiOutput?.close()
-
-            CoroutineScope(Dispatchers.Default).launch {
-                var inputDevice: MidiInput? = null
-                var outputDevice: MidiOutput? = null
-
-                event.inputPort?.let { input ->
-                    inputDevice = midiAccess.openInput(input.id)
-                }
-
-                event.outputPort?.let { output ->
-                    outputDevice = midiAccess.openOutput(output.id)
-                }
-
-                var deviceType: LaunchpadDeviceType? = null
-
-                if (inputDevice != null && outputDevice != null) {
-                    deviceType = amethystMidiManager.detect(inputDevice, outputDevice)
-                }
-
-                inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
-                    val data = if (deviceType == LaunchpadDeviceType.ABLETON_PUSH_2) {
-                        LaunchpadDevicePush2.getMidiInputData(bytes)
-                    } else {
-                        getMidiInputData(bytes)
-                    }
-
-                    data?.let {
-                        if (WorkspaceRepository.mode.value.claimInputs) {
-                            val offset = this@apply.position.value.copy(
-                                x = this@apply.position.value.x - this@apply.layout.offsetX,
-                                y = this@apply.position.value.y - this@apply.layout.offsetY
-                            )
-
-                            WorkspaceRepository.mode.value.onMidiInput(it, offset).invoke()
-                        } else {
-                            val offset = this@apply.position.value.copy(
-                                x = this@apply.position.value.x - this@apply.layout.offsetX,
-                                y = this@apply.position.value.y - this@apply.layout.offsetY
-                            )
-
-                            val x = it.pitch % 10
-                            val y = it.pitch / 10
-                            val posX = offset.x.toInt()
-                            val posY = offset.y.toInt()
-
-                            WorkspaceRepository.samplingChain.signalEnter(
-                                Signal.Midi(
-                                    origin = null,
-                                    x = posX + x,
-                                    y = posY + (9 - y),
-                                    velocity = it.velocity
-                                )
-                            )
-
-                            WorkspaceRepository.lightsChain.signalEnter(
-                                Signal.LED(
-                                    origin = null,
-                                    x = posX + x,
-                                    y = posY + (9 - y),
-                                    color = if (it.velocity == 0) Color.Black else Color.White,
-                                    layer = 0
-                                )
-                            )
-                        }
-                    }
-                }
-
-                deviceConfig = deviceConfig.copy(
-                    input = inputDevice,
-                    launchpadDevice = outputDevice?.let { output ->
-                        deviceType?.mapLaunchpadDevice(output)
-                    },
-                )
-            }
-        }
-    }
-}
-
-private fun LaunchpadDeviceType.mapLaunchpadDevice(output: MidiOutput): LaunchpadDevice? {
-    return when (this) {
-        LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 -> LaunchpadDeviceProMk3(output)
-        LaunchpadDeviceType.LAUNCHPAD_X -> LaunchpadDeviceX(output)
-        LaunchpadDeviceType.LAUNCHPAD_MINI_MK3 -> LaunchpadDeviceMiniMk3(output)
-        LaunchpadDeviceType.LAUNCHPAD_PRO -> LaunchpadDevicePro(output)
-        LaunchpadDeviceType.LAUNCHPAD_PRO_CFW -> LaunchpadDevicePro(output, true)
-        LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(output)
-        LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(output)
-        LaunchpadDeviceType.ABLETON_PUSH_2 -> LaunchpadDevicePush2(output)
     }
 }

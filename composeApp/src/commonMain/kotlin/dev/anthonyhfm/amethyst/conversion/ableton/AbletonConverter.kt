@@ -44,8 +44,6 @@ object AbletonConverter : AmethystConverter {
     var file: PlatformFile? = null
         private set
 
-    var name: String = "Ableton Converted Workspace"
-
     var special = ProjectSpecials()
 
     var bpm: Double = 120.0
@@ -117,6 +115,8 @@ object AbletonConverter : AmethystConverter {
             .filter { it.path.endsWith(".als") }
             .minBy { it.path.length }
 
+        val projectName = alsEntry.path.substringAfterLast("/").removeSuffix(".als")
+
         val decodedAlsBytes = Zip.decode(alsEntry.data)
         val sanitizedAlsString = decodedAlsBytes.decodeToString()
             .replace(Regex(">\\s+<"), "><")
@@ -125,7 +125,10 @@ object AbletonConverter : AmethystConverter {
 
         zipEntries.remove(alsEntry.path)
 
-        return runLiveConversion(abletonData).also {
+        return runLiveConversion(
+            name = projectName,
+            abletonData = abletonData
+        ).also {
             isZip = false
             zipEntries.clear()
         }
@@ -138,7 +141,6 @@ object AbletonConverter : AmethystConverter {
         file = PlatformFile(path)
 
         val file = Zip.decode(runBlocking { file?.readBytes() ?: ByteArray(0) }) // Decompresses the .als GZIP format
-        // Entferne nur reinen Zwischen-Tag-Whitespace, um xmlutil-Fehlklassifikation zu vermeiden
         val sanitizedAlsString = file.decodeToString()
             .replace(Regex(">\\s+<"), "><")
         val abletonData = xml.decodeFromString<Ableton>(sanitizedAlsString)
@@ -153,10 +155,10 @@ object AbletonConverter : AmethystConverter {
             }
         }
 
-        return runLiveConversion(abletonData)
+        return runLiveConversion(AbletonConverter.file?.nameWithoutExtension ?: "Ableton Live-Set", abletonData)
     }
 
-    fun runLiveConversion(abletonData: Ableton): SavableWorkspaceData {
+    fun runLiveConversion(name: String, abletonData: Ableton): SavableWorkspaceData {
         val audioRenderer = OriginalSimplerPrerenderer()
 
         val layout = AbletonLayoutDetector.detectLayout(
@@ -311,14 +313,12 @@ object AbletonConverter : AmethystConverter {
             (layout as AbletonLayout.Single).audioTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
         }
 
-        // Nach der Erstellung der StateChains brauchen wir die AudioMap nicht mehr im Konverter
         audioMap = emptyMap()
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
-        // projectLayout wird im SavableWorkspaceData nicht benötigt; freigeben, um weniger RAM zu halten
         projectLayout = null
 
         return SavableWorkspaceData(
-            title = this.file?.nameWithoutExtension ?: name,
+            title = name,
             lights = lights,
             sampling = samples,
             autoPlay = autoPlayData,
