@@ -1,42 +1,44 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState.TYPE
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
-/*class RandomDeviceMultisamplingAdapter (
-    private val randomDeviceXml: XmlElement,
-    private val containerXml: XmlElement
+class RandomDeviceMultisamplingAdapter (
+    private val random: MidiRandom,
+    private val midiContainer: MidiEffectGroupDevice?,
+    private val instrumentContainer: InstrumentGroupDevice?
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val randomChance = randomDeviceXml.querySelector("Chance").first()
-            .querySelector("Manual").first().attributes["Value"]?.toDoubleOrNull() ?: 0.0
+        val randomChance = random.chance.manual.value
+        val multiSteps = random.choices.manual.value
+        val altModeEnabled = random.alternate.manual.value
 
-        val multiSteps = randomDeviceXml.querySelector("Choices").first()
-            .querySelector("Manual").first().attributes["Value"]?.toDoubleOrNull() ?: 1.0
+        var instrumentBranches: List<InstrumentGroupDevice.Branches.InstrumentBranch> = emptyList()
+        var midiBranches: List<MidiEffectGroupDevice.Branches.MidiEffectBranch> = emptyList()
 
-        val altModeEnabled = randomDeviceXml.querySelector("Alternate").first()
-            .querySelector("Manual").first().attributes["Value"] == "true"
+        if (midiContainer != null) {
+            midiBranches = midiContainer.branches.branches.map {
+                val min = it.zoneSettings.keyRange.min.value
+                val max = it.zoneSettings.keyRange.max.value
 
-        var branches: List<XmlElement> = containerXml.localQuerySelector("Branches").first().children
+                List(max - min + 1) { note ->
+                    it.copy()
+                }
+            }.flatten()
+        } else if (instrumentContainer != null) {
+            instrumentBranches = instrumentContainer.branches.branches.map {
+                val min = it.zoneSettings.keyRange.min.value
+                val max = it.zoneSettings.keyRange.max.value
 
-        if (containerXml.name == "MidiEffectGroupDevice" || containerXml.name == "InstrumentGroupDevice") {
-            // check each chain for range of notes, if it's bigger than 1, duplicate the chain for each note
-            branches = branches.map { branch ->
-                val zoneSettings = branch.localQuerySelector("ZoneSettings")[0]
-                val minKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Min")[0].attributes["Value"]?.toInt() ?: 127
-                val maxKey = zoneSettings.localQuerySelector("KeyRange")[0].localQuerySelector("Max")[0].attributes["Value"]?.toInt() ?: 127
-
-                if (maxKey > minKey) {
-                    // duplicate chain for each note
-                    List(maxKey - minKey + 1) { note ->
-                        branch.copy()
-                    }
-                } else {
-                    listOf(branch)
+                List(max - min + 1) { note ->
+                    it.copy()
                 }
             }.flatten()
         }
@@ -46,30 +48,41 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
                 MultiGroupChainDeviceState(
                     type = TYPE.FORWARD,
                     groups = List(multiSteps.toInt()) { step ->
-                        val branch = branches.getOrNull(step)
-
-                        val name = branch?.querySelector("UserName")?.getOrNull(0)?.attributes?.get("Value")
-                            ?: "Chain ${step + 1}"
-
-                        Group(
-                            name = name,
-                            stateChain = StateChain(
-                                devices = mutableListOf<DeviceState>().apply {
-                                    branch?.let {
-                                        /*addAll(
-                                            // TODO: remove pitch element before sample when using instrument rack (used in some projects)
-                                            it.querySelector("DeviceChain").first()
-                                                .querySelector("Devices").first()
-                                                .children.mapNotNull { child ->
+                        if (instrumentContainer != null) {
+                            Group(
+                                name = instrumentBranches[step].name.effectiveName?.value ?: "Chain #",
+                                stateChain = StateChain(
+                                    devices = mutableListOf<DeviceState>().apply {
+                                        instrumentBranches[step].let {
+                                            addAll(
+                                                elements = it.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
                                                     resolveAdapter(child)
                                                         ?.toDeviceStates()
                                                         ?.firstOrNull()
                                                 }
-                                        )*/
+                                            )
+                                        }
                                     }
-                                }
+                                )
                             )
-                        )
+                        } else if (midiContainer != null) {
+                            Group(
+                                name = midiBranches[step].name.effectiveName?.value ?: "Chain #",
+                                stateChain = StateChain(
+                                    devices = mutableListOf<DeviceState>().apply {
+                                        midiBranches[step].let {
+                                            addAll(
+                                                elements = it.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
+                                                    resolveAdapter(child)
+                                                        ?.toDeviceStates()
+                                                        ?.firstOrNull()
+                                                }
+                                            )
+                                        }
+                                    }
+                                )
+                            )
+                        } else Group("Empty")
                     }
                 )
             )
@@ -78,4 +91,4 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
         println("Random device does not have Chance 100% and Alt mode, skipping...; Values: chance=$randomChance, steps=$multiSteps, alt=$altModeEnabled")
         return listOf()
     }
-}*/
+}
