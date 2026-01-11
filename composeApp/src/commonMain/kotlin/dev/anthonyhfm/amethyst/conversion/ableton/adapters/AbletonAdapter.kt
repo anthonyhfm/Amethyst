@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.DrumGroupDeviceAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.InstrumentGroupAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGroupAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiNoteLengthAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
@@ -62,6 +63,7 @@ abstract class AbletonAdapter {
                     )
 
                     is OriginalSimpler -> OriginalSimplerAdapter(device)
+                    is MidiNoteLength -> MidiNoteLengthAdapter(device)
 
                     else -> {
                         println("Unsupported Ableton device type: ${device::class.simpleName}")

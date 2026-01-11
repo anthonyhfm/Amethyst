@@ -3,55 +3,26 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmIndexToDuration
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiNoteLength
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.hold.HoldChainDeviceState
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-/*class MidiNoteLengthAdapter(
-    private val xml: XmlElement
+class MidiNoteLengthAdapter(
+    private val device: MidiNoteLength,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val isNoteOff = xml
-            .querySelector("Mode")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toBoolean() ?: false
+        val isNoteOff = device.mode.manual.value
+        val gate = device.gate.manual.value
+        val isSync = device.syncState.manual.value
+        val timeLength = device.timeLength.manual.value
+        val syncedLength: Duration = device.syncedLength.manual.value.let {
+            val stringTiming = indexToSyncTiming(it ?: 4)
 
-        val isSync = xml
-            .querySelector("SyncState")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toBoolean() ?: false
-
-        val timeLength = xml
-            .querySelector("TimeLength")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toDouble() ?: 100.0
-
-        val syncedLength: Duration = xml
-            .querySelector("SyncedLength")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt()
-            .let {
-                val stringTiming = indexToSyncTiming(it ?: 4)
-
-                return@let rythmIndexToDuration(stringTiming, AbletonConverter.bpm, 1)
-            }
-
-        val gate = xml
-            .querySelector("Gate")
-            .first()
-            .querySelector("Manual")
-            .first()
-            .attributes["Value"]?.toInt() ?: 100
+            return@let rythmIndexToDuration(stringTiming, AbletonConverter.bpm, 1)
+        }
 
         return listOf(
             HoldChainDeviceState(
@@ -85,4 +56,4 @@ import kotlin.time.Duration.Companion.milliseconds
             else -> "1/8" // Default to 1/8 if unknown
         }
     }
-}*/
+}
