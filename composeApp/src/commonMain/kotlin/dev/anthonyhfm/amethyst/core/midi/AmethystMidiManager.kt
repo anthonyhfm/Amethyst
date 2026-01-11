@@ -21,8 +21,6 @@ import dev.atsushieno.ktmidi.MidiInput
 import dev.atsushieno.ktmidi.MidiOutput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -35,7 +33,7 @@ import kotlinx.coroutines.runBlocking
 class AmethystMidiManager {
     private val midiAccess: MidiAccess = platformMidiAccess ?: EmptyMidiAccess()
 
-    val midiInScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    val midiInScope = CoroutineScope(Dispatchers.Default)
 
     @OptIn(ExperimentalUnsignedTypes::class)
     val inquiryTests: Map<LaunchpadDeviceType, (UByteArray) -> Boolean> = mapOf(
