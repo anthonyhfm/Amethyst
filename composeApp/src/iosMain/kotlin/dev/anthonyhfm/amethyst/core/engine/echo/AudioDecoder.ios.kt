@@ -108,7 +108,9 @@ actual object AudioDecoder {
 
             val inChunkFrames: UInt = 4096u
             val ratio = if (inRate > 0.0) TARGET_SR / inRate else 1.0
-            val outChunkFrames: UInt = maxOf(1024u, (inChunkFrames.toDouble() * ratio).toUInt())
+            // Ensure output buffer capacity is at least as large as input frame capacity to satisfy AVAudioConverter requirement
+            val scaledOutFrames = (inChunkFrames.toDouble() * ratio).toUInt()
+            val outChunkFrames: UInt = maxOf(inChunkFrames, maxOf(1024u, scaledOutFrames))
 
             val inBuf = AVAudioPCMBuffer(pCMFormat = inFmt, frameCapacity = inChunkFrames)
             val outBuf = AVAudioPCMBuffer(pCMFormat = outFmt, frameCapacity = outChunkFrames)
