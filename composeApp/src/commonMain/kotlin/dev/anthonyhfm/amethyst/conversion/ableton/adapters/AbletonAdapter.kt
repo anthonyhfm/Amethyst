@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.DrumGroupDevi
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.InstrumentGroupAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGroupAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiNoteLengthAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiVelocityAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
@@ -64,6 +65,7 @@ abstract class AbletonAdapter {
 
                     is OriginalSimpler -> OriginalSimplerAdapter(device)
                     is MidiNoteLength -> MidiNoteLengthAdapter(device)
+                    is MidiVelocity -> MidiVelocityAdapter(device)
 
                     else -> {
                         println("Unsupported Ableton device type: ${device::class.simpleName}")
@@ -71,37 +73,6 @@ abstract class AbletonAdapter {
                         null
                     }
                 }
-
-                /*return when (xml.name) {
-                    "MidiEffectGroupDevice", "InstrumentGroupDevice" -> MidiEffectGroupAdapter(
-                        xml = xml,
-                        offset = offset,
-                        outputOffset = outputOffset,
-                        chainDepth = chainDepth
-                    )
-
-                    "DrumGroupDevice" -> DrumGroupDeviceAdapter(
-                        xml = xml,
-                        offset = offset,
-                        outputOffset = outputOffset,
-                        chainDepth = chainDepth
-                    )
-
-                    "OriginalSimpler" -> OriginalSimplerAdapter(xml)
-                    "MidiVelocity" -> MidiVelocityAdapter(xml)
-                    "MidiNoteLength" -> MidiNoteLengthAdapter(xml)
-
-                    "MxDeviceMidiEffect" -> MxDeviceMidiEffectAdapter(
-                        xml = xml,
-                        offset = offset,
-                        outputOffset = outputOffset
-                    ) // Will resolve max plugins
-
-                    else -> {
-                        println("Unsupported Ableton XML element: ${xml.name}")
-                        null
-                    }
-                }*/
             } catch (e: Exception) {
                 println("Error while resolving Ableton adapter for element ${device::class.simpleName}: ${e.message}")
             }
