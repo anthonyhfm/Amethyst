@@ -293,16 +293,6 @@ class Resonator2Adapter(
     private val IDENTITY_ANCHORS = doubleArrayOf(10.0, 2000.0)
     private val EPS = 1e-6
 
-    /**
-     * To anybody reading this code in the future, I'm very sorry.
-     * I have no idea why Kaskobi did this, but the float values in Ableton
-     * are stored in a very weird way. They are not linear at all.
-     *
-     * This function is trying to GUESS the correct value based on some
-     * anchor points I found by testing the plugin in Ableton.
-     *
-     * For questions, do not contact me, I have no idea either.
-     */
     private fun convertWeirdFuckingFloatValues(raw: Double): Double {
         if (IDENTITY_ANCHORS.any { kotlin.math.abs(raw - it) <= EPS }) return raw
         return kotlin.math.exp((raw - A) / B)

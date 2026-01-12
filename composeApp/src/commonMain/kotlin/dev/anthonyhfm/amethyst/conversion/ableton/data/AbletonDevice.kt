@@ -11,12 +11,14 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import nl.adaptivity.xmlutil.serialization.XmlElement
+import nl.adaptivity.xmlutil.serialization.XmlSerialName
 
 interface AbletonDevice {
     companion object {
@@ -50,7 +52,8 @@ data class OriginalSimpler(
     val id: Int = 0,
 
     @XmlElement
-    val player: Player
+    val player: Player,
+    val volumeAndPan: VolumeAndPan
 ) : AbletonDevice {
     @Serializable
     data class Player(
@@ -97,6 +100,27 @@ data class OriginalSimpler(
                     )
                 }
             }
+        }
+    }
+
+    @Serializable
+    data class VolumeAndPan(
+        val oneShotEnvelope: OneShotEnvelope
+    ) {
+        @Serializable
+        data class OneShotEnvelope(
+            @XmlElement
+            @XmlSerialName("FadeInTime")
+            val fadeInTime: FadeData,
+
+            @XmlElement
+            @XmlSerialName("FadeOutTime")
+            val fadeOutTime: FadeData
+        ) {
+            @Serializable
+            data class FadeData(
+                val manual: AbletonManual<Float>
+            )
         }
     }
 }
