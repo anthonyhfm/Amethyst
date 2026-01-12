@@ -79,6 +79,12 @@ object GlobalSettings {
             settings.putBoolean("experimentalApolloConversionSupport", value)
         }
 
+    var experimentalExtensions: Boolean
+        get() = settings.getBoolean("experimentalExtensions", false)
+        set(value) {
+            settings.putBoolean("experimentalExtensions", value)
+        }
+
     // Persisted recent colors using a serializable RGB data class
     var recentColors: List<RecentColorRGB>
         get() {

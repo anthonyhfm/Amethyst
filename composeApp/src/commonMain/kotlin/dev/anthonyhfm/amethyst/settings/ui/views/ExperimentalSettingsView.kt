@@ -14,12 +14,13 @@ import dev.anthonyhfm.amethyst.settings.ui.components.SettingsItem
 fun ExperimentalSettingsView() {
     var abletonPush2Support by remember { mutableStateOf(GlobalSettings.experimentalAbletonPush2Support) }
     var apolloConversionSupport by remember { mutableStateOf(GlobalSettings.experimentalApolloConversionSupport) }
+    var enableExtension by remember { mutableStateOf(GlobalSettings.experimentalExtensions) }
 
     SettingsCategory(
-        title = "Experiments",
+        title = "Experimental Features",
     ) {
         SettingsItem(
-            title = "Experimental Ableton Push 2 Support",
+            title = "Ableton Push 2 Support",
         ) {
             Switch(
                 checked = abletonPush2Support,
@@ -31,14 +32,25 @@ fun ExperimentalSettingsView() {
         }
 
         SettingsItem(
-            title = "Experimental Apollo Conversion Support",
+            title = "Apollo Conversion Support",
         ) {
             Switch(
                 checked = apolloConversionSupport,
-                enabled = false,
                 onCheckedChange = {
                     apolloConversionSupport = it
                     GlobalSettings.experimentalApolloConversionSupport = it
+                }
+            )
+        }
+
+        SettingsItem(
+            title = "Extensions",
+        ) {
+            Switch(
+                checked = enableExtension,
+                onCheckedChange = {
+                    enableExtension = it
+                    GlobalSettings.experimentalExtensions = it
                 }
             )
         }

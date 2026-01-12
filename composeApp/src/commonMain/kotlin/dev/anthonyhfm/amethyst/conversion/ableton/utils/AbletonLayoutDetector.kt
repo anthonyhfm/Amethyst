@@ -3,13 +3,14 @@ package dev.anthonyhfm.amethyst.conversion.ableton.utils
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
 import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
 
 object AbletonLayoutDetector {
     fun detectLayout(tracks: List<MidiTrack>): AbletonLayout {
         val audioTracks: List<Pair<Int, MidiTrack>> = tracks.filterNot {
             it.deviceChain.devices.firstOrNull { it is OriginalSimpler } == null &&
-                it.deviceChain.devices.firstOrNull { it is InstrumentGroupDevice } == null
+                it.deviceChain.devices.firstOrNull { it is InstrumentGroupDevice || it is DrumGroupDevice } == null
         }.map {
             println("${it.name} has a weight of ${MidiChainReader.getChainWeight(it)}")
 
@@ -22,7 +23,7 @@ object AbletonLayoutDetector {
 
         val lightsTracks: List<Pair<Int, MidiTrack>> = tracks.filter {
             it.deviceChain.devices.firstOrNull { it is OriginalSimpler } == null &&
-                it.deviceChain.devices.firstOrNull { it is InstrumentGroupDevice } == null
+                it.deviceChain.devices.firstOrNull { it is InstrumentGroupDevice || it is DrumGroupDevice } == null
         }.map {
             println("${it.name} has a weight of ${MidiChainReader.getChainWeight(it)}")
 
