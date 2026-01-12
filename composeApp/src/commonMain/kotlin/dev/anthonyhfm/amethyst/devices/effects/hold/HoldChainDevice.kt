@@ -22,7 +22,8 @@ import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import kotlinx.coroutines.delay
+import dev.anthonyhfm.amethyst.ui.components.toMsValue
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -191,60 +192,64 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
     }
 
     override fun signalEnter(n: List<Signal>) {
-        n.forEach { signal ->
-            val down: Boolean = when (signal) {
-                is Signal.LED -> signal.color != Color.Black
-                is Signal.Midi -> signal.velocity != 0
-                else -> false
+         val bpm = WorkspaceRepository.bpm.value
+
+         n.forEach { signal ->
+             val down: Boolean = when (signal) {
+                 is Signal.LED -> signal.color != Color.Black
+                 is Signal.Midi -> signal.velocity != 0
+                 else -> false
+             }
+
+             val signalX = when (signal) {
+                 is Signal.LED -> signal.x
+                 is Signal.Midi -> signal.x
+                 else -> null
+             }
+             val signalY = when (signal) {
+                 is Signal.LED -> signal.y
+                 is Signal.Midi -> signal.y
+                 else -> null
+             }
+
+            val signalOwner: Any = if (signalX != null && signalY != null) {
+                Pair(this, "${signalX},${signalY}")
+            } else {
+                Pair(this, signal.hashCode()) // fallback for signals without coordinates
             }
 
-            val signalX = when (signal) {
-                is Signal.LED -> signal.x
-                is Signal.Midi -> signal.x
-                else -> null
-            }
-            val signalY = when (signal) {
-                is Signal.LED -> signal.y
-                is Signal.Midi -> signal.y
-                else -> null
-            }
+            val holdDelayMs = state.value.timing.toMsValue(bpm).toDouble() * (state.value.gate * 2)
 
-            val updateSchedule: (Double) -> Unit = { delayMs ->
-                if (signalX != null && signalY != null) {
-                    val signalOwner = Pair(this, "${signalX},${signalY}")
+            val updateSchedule: () -> Unit = {
+                Heaven.cancelJobs { job ->
+                    job.owner == signalOwner
+                }
 
-                    Heaven.cancelJobs { job ->
-                        job.owner is Pair<*, *> &&
-                                job.owner.first == this &&
-                                job.owner.second == "${signalX},${signalY}"
-                    }
-
-                    Heaven.schedule(delayMs, signalOwner) {
-                        if (signal is Signal.LED) {
-                            signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
-                        } else if (signal is Signal.Midi) {
-                            signalExit?.invoke(listOf(signal.copy(velocity = 0)))
-                        }
+                Heaven.schedule(holdDelayMs, signalOwner) {
+                    if (signal is Signal.LED) {
+                        signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
+                    } else if (signal is Signal.Midi) {
+                        signalExit?.invoke(listOf(signal.copy(velocity = 0)))
                     }
                 }
-            }
+             }
 
-            if (down) {
-                if (state.value.onRelease) {
-                    return@forEach
-                }
+             if (down) {
+                 if (state.value.onRelease) {
+                     return@forEach
+                 }
 
                 signalExit?.invoke(listOf(signal))
 
                 if (state.value.infinite) {
-                    return@forEach
-                }
+                     return@forEach
+                 }
 
-                updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
-            } else {
-                if (!state.value.onRelease) {
-                    return@forEach
-                }
+                updateSchedule()
+             } else {
+                 if (!state.value.onRelease) {
+                     return@forEach
+                 }
 
                 Heaven.schedule(0.0) {
                     if (signal is Signal.LED) {
@@ -255,13 +260,13 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                 }
 
                 if (state.value.infinite) {
-                    return@forEach
-                }
+                     return@forEach
+                 }
 
-                updateSchedule(state.value.delayMs.toDouble() * state.value.gate * 2)
-            }
-        }
-    }
+                updateSchedule()
+             }
+         }
+     }
 
     override fun onChoke() {
         // Cancel all scheduled Heaven tasks owned by this device
