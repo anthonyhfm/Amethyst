@@ -70,7 +70,7 @@ class Resonator3Adapter(
 
         val gradientColors: List<Int> = run {
             val ids = if (isUpdatedVersion) {
-                listOf(18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33)
+                listOf(29, 22, 28, 27, 26, 21, 25, 24, 23, 20, 19, 18, 33, 32, 31, 30)
             } else {
                 listOf(12, 5, 11, 10, 9, 4, 8, 7, 6, 3, 2, 1, 16, 15, 14, 13)
             }
