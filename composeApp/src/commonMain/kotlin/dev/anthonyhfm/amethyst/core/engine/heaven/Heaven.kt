@@ -68,7 +68,11 @@ object Heaven {
     @OptIn(ExperimentalTime::class)
     fun schedule(delayInMs: Double, owner: Any? = null, job: () -> Unit): String {
         val jobId = "job_${jobIdCounter.incrementAndGet()}_${Clock.System.now().toEpochMilliseconds()}"
-        val targetTime = prev + msToTicks(delayInMs)
+        val nowTicks = stopWatch.elapsedTicks()
+        if (!isAwake) {
+            prev = nowTicks
+        }
+        val targetTime = nowTicks + msToTicks(delayInMs)
         val scheduledJob = ScheduledJob(jobId, targetTime, job, owner)
 
         renderScope.launch {
