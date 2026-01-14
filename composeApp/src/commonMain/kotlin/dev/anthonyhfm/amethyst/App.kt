@@ -18,10 +18,12 @@ fun App() {
         colorScheme = AMETHYST_THEME
     ) {
         if (inWorkspace) {
-            Workspace(onBack = {
-                WorkspaceRepository.clean()
-                inWorkspace = false
-            })
+            Workspace(
+                onBack = {
+                    WorkspaceRepository.clean()
+                    inWorkspace = false
+                }
+            )
         } else {
             Surface {
                 Home(

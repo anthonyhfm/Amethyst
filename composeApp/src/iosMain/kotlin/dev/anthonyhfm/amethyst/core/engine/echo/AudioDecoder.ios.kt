@@ -68,8 +68,73 @@ actual object AudioDecoder {
                 println("Failed to open audio file: ${err.value?.localizedDescription}")
                 return null
             }
+            fastPathRead(avFile, sampleStart, sampleEnd)?.let { return it }
             return decodeViaConverter(avFile, sampleStart, sampleEnd)
         }
+    }
+
+    private fun fastPathRead(avFile: AVAudioFile, sampleStart: Long?, sampleEnd: Long?): Signal.AudioSignal? = memScoped {
+        val fmt = avFile.processingFormat
+        val isInt16 = fmt.commonFormat == AVAudioPCMFormatInt16
+        val isInterleaved = fmt.isInterleaved()
+        val srOk = kotlin.math.abs(fmt.sampleRate - TARGET_SR) < 1e-6
+        val ch = fmt.channelCount.toInt()
+        if (!isInt16 || !srOk || ch <= 0 || ch > 2) return null
+
+        val totalFrames = avFile.length
+        val start = (sampleStart ?: 0L).coerceAtLeast(0L).let { if (totalFrames > 0) it.coerceAtMost(totalFrames) else it }
+        val end = (sampleEnd ?: totalFrames.takeIf { it > 0 } ?: Long.MAX_VALUE)
+            .coerceAtLeast(0L)
+            .let { if (totalFrames > 0) it.coerceAtMost(totalFrames) else it }
+        if (start > 0) avFile.framePosition = start
+        val framesToRead = if (end == Long.MAX_VALUE || end <= start) totalFrames - start else end - start
+        if (framesToRead <= 0) return null
+
+        val buf = AVAudioPCMBuffer(pCMFormat = fmt, frameCapacity = framesToRead.toUInt()) ?: return null
+        val err = alloc<ObjCObjectVar<NSError?>>()
+        val ok = avFile.readIntoBuffer(buf, frameCount = framesToRead.toUInt(), error = err.ptr)
+        if (!ok) {
+            err.value?.let { println("Fast-path read error: ${it.localizedDescription}") }
+        }
+        val frames = buf.frameLength.toInt()
+        if (frames <= 0) return null
+
+        val out: ByteArray = if (isInterleaved) {
+            val bytes = frames * ch * 2
+            val outBA = ByteArray(bytes)
+            val src = buf.int16ChannelData?.get(0)?.reinterpret<ByteVar>() ?: return null
+            outBA.usePinned { pinned -> platform.posix.memcpy(pinned.addressOf(0), src, bytes.convert()) }
+            if (ch == TARGET_CHANNELS.toInt()) outBA else monoToStereo(outBA)
+        } else {
+            // planar -> interleave manually, but still cheaper than converter
+            val channels = minOf(ch, TARGET_CHANNELS.toInt())
+            val outBA = ByteArray(frames * channels * 2)
+            val c0 = buf.int16ChannelData?.get(0)
+            val c1 = if (channels > 1) buf.int16ChannelData?.get(1) else null
+            var o = 0
+            for (f in 0 until frames) {
+                val s0 = c0?.get(f)?.toInt() ?: 0
+                outBA[o++] = (s0 and 0xFF).toByte()
+                outBA[o++] = ((s0 ushr 8) and 0xFF).toByte()
+                if (channels > 1) {
+                    val s1 = c1?.get(f)?.toInt() ?: 0
+                    outBA[o++] = (s1 and 0xFF).toByte()
+                    outBA[o++] = ((s1 ushr 8) and 0xFF).toByte()
+                }
+            }
+            if (channels == 1) monoToStereo(outBA) else outBA
+        }
+
+        val bytesPerFrame = TARGET_CHANNELS.toInt() * 2
+        val durMs = (out.size / bytesPerFrame) * 1000L / TARGET_SR.toLong()
+        return Signal.AudioSignal(
+            origin = "AudioDecoder.iOS.Fast",
+            rawData = out,
+            sampleRate = TARGET_SR.toInt(),
+            channels = TARGET_CHANNELS.toInt(),
+            bitDepth = TARGET_BITS,
+            durationMs = durMs
+        )
     }
 
     private fun decodeViaConverter(
@@ -106,11 +171,10 @@ actual object AudioDecoder {
 
             if (start > 0) avFile.framePosition = start
 
-            val inChunkFrames: UInt = 4096u
+            val inChunkFrames: UInt = 16384u
             val ratio = if (inRate > 0.0) TARGET_SR / inRate else 1.0
-            // Ensure output buffer capacity is at least as large as input frame capacity to satisfy AVAudioConverter requirement
             val scaledOutFrames = (inChunkFrames.toDouble() * ratio).toUInt()
-            val outChunkFrames: UInt = maxOf(inChunkFrames, maxOf(1024u, scaledOutFrames))
+            val outChunkFrames: UInt = maxOf(inChunkFrames, maxOf(4096u, scaledOutFrames))
 
             val inBuf = AVAudioPCMBuffer(pCMFormat = inFmt, frameCapacity = inChunkFrames)
             val outBuf = AVAudioPCMBuffer(pCMFormat = outFmt, frameCapacity = outChunkFrames)
@@ -153,11 +217,16 @@ actual object AudioDecoder {
                     val outBA = ByteArray(frames * channels * 2)
                     if (chData != null) {
                         var o = 0
+                        val c0 = chData[0]
+                        val c1 = if (channels > 1) chData[1] else null
                         for (f in 0 until frames) {
-                            for (c in 0 until channels) {
-                                val sample = chData[c]?.get(f)?.toInt() ?: 0
-                                outBA[o++] = (sample and 0xFF).toByte()
-                                outBA[o++] = ((sample ushr 8) and 0xFF).toByte()
+                            val s0 = c0?.get(f)?.toInt() ?: 0
+                            outBA[o++] = (s0 and 0xFF).toByte()
+                            outBA[o++] = ((s0 ushr 8) and 0xFF).toByte()
+                            if (channels > 1) {
+                                val s1 = c1?.get(f)?.toInt() ?: 0
+                                outBA[o++] = (s1 and 0xFF).toByte()
+                                outBA[o++] = ((s1 ushr 8) and 0xFF).toByte()
                             }
                         }
                     } else {
@@ -198,5 +267,20 @@ actual object AudioDecoder {
             println("Failed to decode with converter: ${e.message}")
             null
         }
+    }
+
+    private fun monoToStereo(input: ByteArray): ByteArray {
+        val output = ByteArray(input.size * 2)
+        var o = 0
+        for (i in input.indices step 2) {
+            val sample = (input[i].toInt() and 0xFF) or ((input[i + 1].toInt() and 0xFF) shl 8)
+            // Left channel
+            output[o++] = input[i]
+            output[o++] = input[i + 1]
+            // Right channel (duplicate of left)
+            output[o++] = input[i]
+            output[o++] = input[i + 1]
+        }
+        return output
     }
 }

@@ -51,6 +51,7 @@ fun Workspace(onBack: () -> Unit = {}) {
         topBar = {
             WorkspaceTopAppBar(
                 mode = state.mode,
+                onBack = onBack,
                 onEvent = {
                     viewModel.onEvent(it)
                 },
