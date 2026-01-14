@@ -86,7 +86,7 @@ actual object AudioDecoder {
                 commonFormat = AVAudioPCMFormatInt16,
                 sampleRate = TARGET_SR,
                 channels = TARGET_CHANNELS,
-                interleaved = true
+                interleaved = false // use planar to interleave manually and avoid channel skew
             ) ?: run {
                 println("Failed to create target AVAudioFormat")
                 return null
@@ -147,23 +147,23 @@ actual object AudioDecoder {
 
                 val produced = outBuf.frameLength.toLong()
                 if (produced > 0) {
-                    val bytes = (produced * TARGET_CHANNELS.toLong() * 2L).toInt()
-                    val outBA = ByteArray(bytes)
-                    val basePtr = outBuf.int16ChannelData?.get(0) ?: run {
-                        var idx = 0
-                        for (f in 0 until produced) {
-                            for (c in 0 until TARGET_CHANNELS.toInt()) {
-                                outBA[idx++] = 0
-                                outBA[idx++] = 0
+                    val chData = outBuf.int16ChannelData
+                    val channels = minOf(TARGET_CHANNELS.toInt(), outFmt.channelCount.toInt())
+                    val frames = produced.toInt()
+                    val outBA = ByteArray(frames * channels * 2)
+                    if (chData != null) {
+                        var o = 0
+                        for (f in 0 until frames) {
+                            for (c in 0 until channels) {
+                                val sample = chData[c]?.get(f)?.toInt() ?: 0
+                                outBA[o++] = (sample and 0xFF).toByte()
+                                outBA[o++] = ((sample ushr 8) and 0xFF).toByte()
                             }
                         }
-                        outChunks.add(outBA)
+                    } else {
+                        outChunks.add(ByteArray(outBA.size))
                         inBuf.frameLength = 0u
                         continue@loop
-                    }
-                    val bytePtr = basePtr.reinterpret<ByteVar>()
-                    outBA.usePinned { pinned ->
-                        platform.posix.memcpy(pinned.addressOf(0), bytePtr, bytes.convert())
                     }
                     outChunks.add(outBA)
                 }
