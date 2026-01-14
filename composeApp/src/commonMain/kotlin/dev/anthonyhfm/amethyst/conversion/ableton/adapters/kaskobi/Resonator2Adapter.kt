@@ -228,6 +228,7 @@ class Resonator2Adapter(
             HoldChainDeviceState(
                 timing = Timing.Duration(noteLengthValue.milliseconds),
                 delayMs = noteLengthValue.roundToLong(),
+                gate = 0.5f
             ),
             if (gradientEnabled) {
                 if (colorCount > 1) {

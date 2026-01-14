@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.devices.effects.hold.HoldChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.SerialName
@@ -41,6 +42,11 @@ class IrisAdapter (
             else -> Timing.Rythm(Timing.Rythm.RythmTiming._1_8)
         }
 
+        val durationMs = when (timing) {
+            is Timing.Duration -> timing.duration.inWholeMilliseconds
+            is Timing.Rythm -> rythmIndexToDuration(timing.timing.text, bpm, filteredVelocities.size).inWholeMilliseconds
+        }
+
         val gradientDevice = GradientChainDeviceState(
             gradientData = List(filteredVelocities.size) { index ->
                 val color = palette.getOrElse(filteredVelocities[index]) { index -> Triple(0, 0, 0) }
@@ -53,12 +59,7 @@ class IrisAdapter (
                 )
             },
             timing = timing,
-            durationMs = timing.let {
-                when (it) {
-                    is Timing.Duration -> it.duration.inWholeMilliseconds.toInt() * filteredVelocities.size
-                    is Timing.Rythm -> rythmIndexToDuration(it.timing.text, bpm, filteredVelocities.size).inWholeMilliseconds.toInt()
-                }
-            }.toDouble(),
+            durationMs = durationMs.toDouble(),
         )
 
         val loopDevice = LoopChainDeviceState(
@@ -76,7 +77,7 @@ class IrisAdapter (
                             stateChain = StateChain(
                                 devices = mutableListOf(
                                     loopDevice,
-                                    gradientDevice
+                                    gradientDevice,
                                 )
                             )
                         )
@@ -84,7 +85,9 @@ class IrisAdapter (
                 )
             )
         } else {
-            listOf(gradientDevice)
+            listOf(
+                gradientDevice,
+            )
         }
     }
 

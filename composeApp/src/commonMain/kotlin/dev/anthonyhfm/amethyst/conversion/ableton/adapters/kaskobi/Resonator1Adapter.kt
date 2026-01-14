@@ -181,7 +181,8 @@ class Resonator1Adapter(
             ),
             HoldChainDeviceState(
                 timing = Timing.Duration(data.noteLength.first().toLong().milliseconds),
-                delayMs = data.stepDelay.first().toLong()
+                delayMs = data.noteLength.first().toLong(),
+                gate = 0.5f
             )
         )
 

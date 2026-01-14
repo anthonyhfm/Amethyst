@@ -261,6 +261,7 @@ class Resonator3Adapter(
                 HoldChainDeviceState(
                     timing = Timing.Duration(noteLengthValue.milliseconds),
                     delayMs = noteLengthValue,
+                    gate = 0.5f
                 )
             } else null,
             if (gradientEnabled) {
