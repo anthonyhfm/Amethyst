@@ -309,7 +309,7 @@ object MidiFileImporter {
                 }
             }
 
-            val speedFactor = if (platform is Platform.iOS) 1.0 else 0.96
+            val speedFactor = if (platform is Platform.iOS) 0.98 else 0.96
             if (speedFactor != 1.0 && frames.isNotEmpty()) {
                 val durMs = frames.map { f ->
                     when (val t = f.timing) {

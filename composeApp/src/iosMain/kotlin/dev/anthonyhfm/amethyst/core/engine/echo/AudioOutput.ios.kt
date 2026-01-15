@@ -6,6 +6,7 @@ import kotlinx.cinterop.*
 import platform.AVFAudio.*
 import kotlinx.cinterop.BetaInteropApi
 import platform.Foundation.*
+import platform.posix.memcpy
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -15,29 +16,38 @@ actual object AudioOutput {
     private const val TARGET_BIT_DEPTH = 16
     private const val NORMALIZE_THRESHOLD_RATIO = 0.95
     private const val NORMALIZE_REDUCTION = 0.85
+    private const val FALLBACK_SAMPLE_RATE = 44100.0
+    private const val PREFERRED_IO_BUFFER = 0.002 // 2 ms target for <10 ms E2E
 
     private var sessionConfigured = false
+    private var currentSampleRate = FALLBACK_SAMPLE_RATE
 
     private data class PlayerHolder(
         val id: String,
-        val player: AVAudioPlayer,
-        val origin: Any?
+        val origin: Any?,
+        val node: AVAudioPlayerNode,
+        val buffer: AVAudioPCMBuffer
     )
 
+    private val engine = AVAudioEngine()
     private val activePlayers = mutableMapOf<String, PlayerHolder>()
 
-    private fun ensureSession() {
+    private fun ensureSession(preferredRate: Double) {
         if (sessionConfigured) return
         try {
             val session = AVAudioSession.sharedInstance()
             memScoped {
                 val err = alloc<ObjCObjectVar<NSError?>>()
-                // Verwende String statt Konstante für Kategorie (falls Konstante nicht verfügbar)
-                session.setCategory("AVAudioSessionCategoryPlayback", error = err.ptr)
-                if (err.value == null) {
-                    session.setActive(true, err.ptr)
-                }
+                session.setCategory(AVAudioSessionCategoryPlayback, mode = AVAudioSessionModeGameChat, options = 0u, error = err.ptr)
+                if (err.value != null) println("AudioSession setCategory error: ${'$'}{err.value?.localizedDescription}")
+                session.setPreferredSampleRate(preferredRate, err.ptr)
+                if (err.value != null) println("AudioSession preferredSampleRate error: ${'$'}{err.value?.localizedDescription}")
+                session.setPreferredIOBufferDuration(PREFERRED_IO_BUFFER, err.ptr)
+                if (err.value != null) println("AudioSession preferredIOBuffer error: ${'$'}{err.value?.localizedDescription}")
+                session.setActive(true, err.ptr)
+                if (err.value != null) println("AudioSession setActive error: ${'$'}{err.value?.localizedDescription}")
             }
+            currentSampleRate = session.sampleRate.takeIf { it > 0 } ?: preferredRate
             sessionConfigured = true
         } catch (_: Throwable) {
             sessionConfigured = false
@@ -45,10 +55,25 @@ actual object AudioOutput {
     }
 
     private fun generateSourceKey(signal: Signal.AudioSignal): String =
-        "aud_${signal.origin?.hashCode() ?: 0}_${TimeSource.Monotonic.markNow().elapsedNow().inWholeNanoseconds}"
+        "aud_${'$'}{signal.origin?.hashCode() ?: 0}_${'$'}{TimeSource.Monotonic.markNow().elapsedNow().inWholeNanoseconds}"
+
+    private fun ensureEngineRunning(format: AVAudioFormat): Boolean {
+        // Attach and connect nodes on demand; engine runs once.
+        if (!engine.isRunning()) {
+            memScoped {
+                val err = alloc<ObjCObjectVar<NSError?>>()
+                engine.prepare()
+                engine.startAndReturnError(err.ptr)
+                if (err.value != null) {
+                    println("AudioEngine start error: ${'$'}{err.value?.localizedDescription}")
+                    return false
+                }
+            }
+        }
+        return true
+    }
 
     actual fun play(audioSignal: Signal.AudioSignal): String? {
-        ensureSession()
         val raw = audioSignal.rawData ?: return null
         if (raw.isEmpty()) return null
         if (audioSignal.bitDepth != TARGET_BIT_DEPTH) return null // Nur 16-bit PCM unterstützt
@@ -62,8 +87,25 @@ actual object AudioOutput {
         val trimmed = if (validSize == raw.size) raw else raw.copyOf(validSize)
         val maybeNormalized = normalizeIfNeeded(trimmed, TARGET_BIT_DEPTH)
 
-        val wavData = buildWav(maybeNormalized, channels, audioSignal.sampleRate, TARGET_BIT_DEPTH)
-        val nsData = wavData.toNSData() ?: return null
+        val preferredRate = audioSignal.sampleRate.takeIf { it > 0 }?.toDouble() ?: FALLBACK_SAMPLE_RATE
+        ensureSession(preferredRate)
+        currentSampleRate = preferredRate
+
+        val format = AVAudioFormat(
+            commonFormat = AVAudioPCMFormatInt16,
+            sampleRate = currentSampleRate,
+            channels = channels.toUInt(),
+            interleaved = true
+        ) ?: return null
+
+        val frames = (maybeNormalized.size / frameBytes).toUInt()
+        val buffer = AVAudioPCMBuffer(pCMFormat = format, frameCapacity = frames) ?: return null
+        buffer.frameLength = frames
+
+        val dst = buffer.int16ChannelData?.get(0)?.reinterpret<ByteVar>() ?: return null
+        maybeNormalized.usePinned { pinned ->
+            memcpy(dst, pinned.addressOf(0), maybeNormalized.size.convert())
+        }
 
         val id = generateSourceKey(audioSignal)
 
@@ -72,22 +114,27 @@ actual object AudioOutput {
             activePlayers.keys.firstOrNull()?.let { stop(it) }
         }
 
-        memScoped {
-            val err = alloc<ObjCObjectVar<NSError?>>()
-            val player = AVAudioPlayer(data = nsData, error = err.ptr)
-            if (err.value != null) return null
-            player.volume = GlobalSettings.masterVolume
-            player.prepareToPlay()
-            player.play()
-            activePlayers[id] = PlayerHolder(id, player, audioSignal.origin)
+        val node = AVAudioPlayerNode()
+        node.volume = GlobalSettings.masterVolume
+        engine.attachNode(node)
+        engine.connect(node, to = engine.mainMixerNode, format = format)
+
+        if (!ensureEngineRunning(format)) {
+            engine.detachNode(node)
+            return null
         }
 
+        node.scheduleBuffer(buffer, atTime = null, options = AVAudioPlayerNodeBufferInterrupts) { /* no-op */ }
+        node.play()
+
+        activePlayers[id] = PlayerHolder(id, audioSignal.origin, node, buffer)
         return id
     }
 
     actual fun stop(sourceId: String) {
         activePlayers.remove(sourceId)?.let { holder ->
-            try { holder.player.stop() } catch (_: Throwable) {}
+            try { holder.node.stop() } catch (_: Throwable) {}
+            try { engine.detachNode(holder.node) } catch (_: Throwable) {}
         }
     }
 
@@ -100,50 +147,6 @@ actual object AudioOutput {
         if (origin == null) return
         val toRemove = activePlayers.filter { it.value.origin == origin }.keys
         toRemove.forEach { stop(it) }
-    }
-
-    private fun buildWav(pcm: ByteArray, channels: Int, sampleRate: Int, bitDepth: Int): ByteArray {
-        val dataSize = pcm.size
-        val headerSize = 44
-        val totalSize = headerSize + dataSize
-        val byteRate = sampleRate * channels * (bitDepth / 8)
-        val blockAlign = channels * (bitDepth / 8)
-
-        val out = ByteArray(totalSize)
-        var o = 0
-        fun putAscii(s: String) { s.forEach { out[o++] = it.code.toByte() } }
-        fun putIntLE(value: Int) {
-            out[o++] = (value and 0xFF).toByte()
-            out[o++] = (value shr 8 and 0xFF).toByte()
-            out[o++] = (value shr 16 and 0xFF).toByte()
-            out[o++] = (value shr 24 and 0xFF).toByte()
-        }
-        fun putShortLE(value: Int) {
-            out[o++] = (value and 0xFF).toByte()
-            out[o++] = (value shr 8 and 0xFF).toByte()
-        }
-
-        // RIFF Header
-        putAscii("RIFF")
-        putIntLE(36 + dataSize) // ChunkSize
-        putAscii("WAVE")
-        // fmt subchunk
-        putAscii("fmt ")
-        putIntLE(16) // Subchunk1Size
-        putShortLE(1) // AudioFormat PCM
-        putShortLE(channels)
-        putIntLE(sampleRate)
-        putIntLE(byteRate)
-        putShortLE(blockAlign)
-        putShortLE(bitDepth)
-        // data subchunk
-        putAscii("data")
-        putIntLE(dataSize)
-
-        // PCM Daten
-        // System.arraycopy ersetzt durch copyInto für Kotlin/Native
-        pcm.copyInto(out, destinationOffset = headerSize, startIndex = 0, endIndex = dataSize)
-        return out
     }
 
     private fun normalizeIfNeeded(data: ByteArray, bitDepth: Int): ByteArray {

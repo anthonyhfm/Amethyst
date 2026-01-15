@@ -33,7 +33,7 @@ import kotlinx.coroutines.runBlocking
 class AmethystMidiManager {
     private val midiAccess: MidiAccess = platformMidiAccess ?: EmptyMidiAccess()
 
-    val midiInScope = CoroutineScope(Dispatchers.Default)
+    val midiInScope = CoroutineScope(Dispatchers.Main.limitedParallelism(1))
 
     @OptIn(ExperimentalUnsignedTypes::class)
     val inquiryTests: Map<LaunchpadDeviceType, (UByteArray) -> Boolean> = mapOf(
