@@ -67,18 +67,6 @@ enum class GradientSmoothness {
 class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(GradientChainDeviceState())
 
-    private data class FadeSignature(
-        val gradientHash: Int,
-        val fps: Int,
-        val totalTimeBits: Long
-    )
-
-    private var cachedFadeSignature: FadeSignature? = null
-    private var cachedFade: List<FadeInfo> = emptyList()
-    private val colorStepBuffer = mutableListOf<Color>()
-    private val stepCountBuffer = mutableListOf<Int>()
-    private val cutoffBuffer = mutableListOf<Int>()
-
     @Composable
     override fun Content() {
         val deviceState by state.collectAsState()
@@ -456,80 +444,74 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
 
         if (gradientData.size < 2) return emptyList()
 
-        val signature = FadeSignature(
-            gradientHash = gradientData.fold(gradientData.size) { acc, color ->
-                (((((acc * 31 + color.position.toBits()) * 31 + color.r.toBits()) * 31 + color.g.toBits()) * 31 + color.b.toBits()) * 31 + color.smoothness.ordinal)
-            },
-            fps = fps,
-            totalTimeBits = totalTime.toDouble().toBits()
-        )
-        cachedFadeSignature?.let { cachedSig ->
-            if (cachedSig == signature) return cachedFade
-        }
-
-        colorStepBuffer.clear()
-        stepCountBuffer.clear()
-        cutoffBuffer.clear()
-        cutoffBuffer.add(0)
+        val steps = mutableListOf<Color>()
+        val counts = mutableListOf<Int>()
+        val cutoffs = mutableListOf(0)
 
         for (i in 0 until gradientData.size - 1) {
             val current = gradientData[i]
             val next = gradientData[i + 1]
             val fadeType = current.smoothness
-            val segmentDurationMs = (next.position - current.position).coerceAtLeast(0f).toDouble() * totalTime
-            val targetFrames = (segmentDurationMs / frameTime).toInt().coerceAtLeast(1)
 
-            if (fadeType == GradientSmoothness.Hold || targetFrames == 0) {
-                colorStepBuffer.add(Color(current.r, current.g, current.b))
-                stepCountBuffer.add(1)
-                cutoffBuffer.add(1 + cutoffBuffer.last())
+            if (fadeType == GradientSmoothness.Hold) {
+                steps.add(Color(current.r, current.g, current.b))
+                counts.add(1)
+                cutoffs.add(1 + cutoffs.last())
             } else {
-                val frames = targetFrames.coerceAtMost(10_000)
-                for (k in 0 until frames) {
-                    val factor = k.toDouble() / frames
-                    colorStepBuffer.add(Color(
+                val maxDiff = maxOf(
+                    kotlin.math.abs(current.r - next.r),
+                    kotlin.math.abs(current.g - next.g),
+                    kotlin.math.abs(current.b - next.b),
+                    1f / 255f
+                ) * 255
+
+                val max = maxDiff.toInt()
+
+                for (k in 0 until max) {
+                    val factor = k.toDouble() / max
+                    steps.add(Color(
                         red = current.r + (next.r - current.r) * factor.toFloat(),
                         green = current.g + (next.g - current.g) * factor.toFloat(),
                         blue = current.b + (next.b - current.b) * factor.toFloat()
                     ))
                 }
 
-                stepCountBuffer.add(frames)
-                cutoffBuffer.add(frames + cutoffBuffer.last())
+                counts.add(max)
+                cutoffs.add(max + cutoffs.last())
             }
         }
 
         val lastColor = gradientData.last()
-        colorStepBuffer.add(Color(lastColor.r, lastColor.g, lastColor.b))
+        steps.add(Color(lastColor.r, lastColor.g, lastColor.b))
 
         val lastColorLit = lastColor.r > 0.01f || lastColor.g > 0.01f || lastColor.b > 0.01f
         if (lastColorLit) {
-            cutoffBuffer[cutoffBuffer.size - 1]++
-            stepCountBuffer[stepCountBuffer.size - 1]++
+            cutoffs[cutoffs.size - 1]++
+            counts[counts.size - 1]++
 
-            colorStepBuffer.add(Color.Black)
-            stepCountBuffer.add(1)
-            cutoffBuffer.add(1 + cutoffBuffer.last())
+            steps.add(Color.Black)
+            counts.add(1)
+            cutoffs.add(1 + cutoffs.last())
         }
 
         val fullFade = mutableListOf<FadeInfo>()
-        fullFade.add(FadeInfo(colorStepBuffer[0], 0.0, gradientData.getOrNull(0)?.smoothness == GradientSmoothness.Hold))
+        fullFade.add(FadeInfo(steps[0], 0.0, gradientData.getOrNull(0)?.smoothness == GradientSmoothness.Hold))
 
         var j = 0
-        for (i in 1 until colorStepBuffer.size) {
-            if (j + 1 < cutoffBuffer.size && cutoffBuffer[j + 1] == i) j++
+        for (i in 1 until steps.size) {
+            if (j + 1 < cutoffs.size && cutoffs[j + 1] == i) j++
 
             if (j < gradientData.size - 1) {
                 val prevTime = if (j != 0) gradientData[j].position.toDouble() * totalTime else 0.0
                 val currTime = (gradientData[j].position +
                     (gradientData[j + 1].position - gradientData[j].position) *
-                    (i - cutoffBuffer[j]).toDouble() / stepCountBuffer[j].coerceAtLeast(1)) * totalTime
+                    (i - cutoffs[j]).toDouble() / counts[j]) * totalTime
                 val nextTime = gradientData[j + 1].position.toDouble() * totalTime
 
                 val fadeType = gradientData[j].smoothness
                 val time = easeTime(fadeType, prevTime, nextTime, currTime)
 
-                fullFade.add(FadeInfo(colorStepBuffer[i], time, fadeType == GradientSmoothness.Hold))
+                fullFade.add(FadeInfo(steps[i], time, fadeType == GradientSmoothness.Hold))
             }
         }
 
@@ -550,10 +532,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             }
         }
 
-        fade.add(FadeInfo(colorStepBuffer.last(), totalTime.toDouble()))
-
-        cachedFadeSignature = signature
-        cachedFade = fade
+        fade.add(FadeInfo(steps.last(), totalTime.toDouble()))
 
         return fade
     }
@@ -564,13 +543,12 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
 
         n.forEach { signal ->
             if (signal.color != Color.Black) {
-                val ownerKey = "${signal.x},${signal.y}"
-                val signalOwner = Pair(this, ownerKey)
+                val signalOwner = Pair(this, "${signal.x},${signal.y}")
 
                 Heaven.cancelJobs { job ->
                     job.owner is Pair<*, *> &&
                             job.owner.first == this &&
-                            job.owner.second == ownerKey
+                            job.owner.second == "${signal.x},${signal.y}"
                 }
 
                 // Emit initial color immediately
