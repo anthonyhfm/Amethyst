@@ -567,12 +567,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                 val ownerKey = "${signal.x},${signal.y}"
                 val signalOwner = Pair(this, ownerKey)
 
-                Heaven.cancelJobs { job ->
-                    job.owner is Pair<*, *> &&
-                            job.owner.first == this &&
-                            job.owner.second == ownerKey
-                }
-
+                Heaven.cancelJobsForOwner(signalOwner)
                 // Emit initial color immediately
                 signalExit?.invoke(
                     listOf(signal.copy(color = fade[0].color))
@@ -590,16 +585,10 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                         }
                     }
                 } else {
-                    // Loop mode: schedule recursive looping
                     scheduleFadeLoop(signal, signalOwner, fade, 1)
                 }
             } else if (state.value.loop) {
-                // Key up in loop mode: cancel ongoing loops
-                Heaven.cancelJobs { job ->
-                    job.owner is Pair<*, *> &&
-                            job.owner.first == this &&
-                            job.owner.second == "${signal.x},${signal.y}"
-                }
+                Heaven.cancelJobsForOwner(Pair(this, "${signal.x},${signal.y}"))
             }
         }
     }
@@ -637,11 +626,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
     }
 
     override fun onChoke() {
-        // Cancel all scheduled Heaven tasks owned by this device
-        // The gradient device uses Pair(this, "${signal.x},${signal.y}") as owner
-        Heaven.cancelJobs { job ->
-            job.owner is Pair<*, *> && job.owner.first == this
-        }
+        Heaven.cancelJobsForOwner(this)
     }
 }
 

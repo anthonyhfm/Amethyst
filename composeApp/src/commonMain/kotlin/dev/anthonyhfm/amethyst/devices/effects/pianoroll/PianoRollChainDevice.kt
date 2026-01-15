@@ -110,17 +110,12 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        // When an LED signal enters, play the MIDI entry
         n.forEach { signal ->
             if (signal.color != Color.Black) {
-                // Cancel any previous scheduled jobs
                 Heaven.cancelJobsForOwner(this)
-
-                // Schedule all notes to play
                 state.value.midiEntry.notes.forEach { note ->
                     val (x, y) = pitchToXY(note.pitch)
-                    
-                    // Schedule note on
+
                     Heaven.schedule(note.startTimeMs.toDouble(), owner = this) {
                         val noteOnSignal = Signal.LED(
                             origin = this,
@@ -132,8 +127,7 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
                         )
                         signalExit?.invoke(listOf(noteOnSignal))
                     }
-                    
-                    // Schedule note off
+
                     Heaven.schedule(note.endTimeMs.toDouble(), owner = this) {
                         val noteOffSignal = Signal.LED(
                             origin = this,

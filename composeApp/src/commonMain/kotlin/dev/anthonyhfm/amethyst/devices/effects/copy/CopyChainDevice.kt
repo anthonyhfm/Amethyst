@@ -593,11 +593,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     }
 
     override fun onChoke() {
-        // Cancel all scheduled Heaven tasks owned by this device
-        // The copy device uses Pair(this, "${originalSignal.x},${originalSignal.y}") as owner
-        Heaven.cancelJobs { job ->
-            job.owner is Pair<*, *> && job.owner.first == this
-        }
+        Heaven.cancelJobsForOwner(this)
     }
 
 

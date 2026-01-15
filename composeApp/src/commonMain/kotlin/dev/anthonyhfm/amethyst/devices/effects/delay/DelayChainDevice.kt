@@ -18,7 +18,9 @@ import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
+import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -111,16 +113,31 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
     }
 
     override fun signalEnter(n: List<Signal>) {
-        Heaven.schedule(
-            delayInMs = state.value.delayMs.toDouble() * (state.value.gate * 2),
-            owner = this
-        ) {
-            signalExit?.invoke(n)
+        val bpm = WorkspaceRepository.bpm.value
+        n.forEach { signal ->
+            when (signal) {
+                is Signal.LED -> handleSignal(signal, bpm)
+                is Signal.Midi -> handleSignal(signal, bpm)
+                else -> return@forEach
+            }
+        }
+    }
+
+    private fun handleSignal(signal: Signal, bpm: Double) {
+        val owner = Pair(this, signal.hashCode())
+        Heaven.cancelJobsForOwner(owner)
+
+        if (signal is Signal.Midi && signal.velocity == 0) {
+            return
+        }
+
+        val delayMs = state.value.timing.toMsValue(bpm) * (state.value.gate * 2)
+        Heaven.schedule(delayMs.toDouble(), owner = owner) {
+            signalExit?.invoke(listOf(signal))
         }
     }
 
     override fun onChoke() {
-        // Cancel all scheduled Heaven tasks owned by this device
         Heaven.cancelJobsForOwner(this)
     }
 }

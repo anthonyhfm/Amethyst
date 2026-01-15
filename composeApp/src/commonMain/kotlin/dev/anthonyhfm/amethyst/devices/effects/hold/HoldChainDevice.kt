@@ -225,11 +225,9 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
             }) * (state.value.gate * 2)
 
             val updateSchedule: () -> Unit = {
-                Heaven.cancelJobs { job ->
-                    job.owner == signalOwner
-                }
+                Heaven.cancelJobsForOwner(signalOwner)
 
-                Heaven.schedule(baseDelayMs, signalOwner) {
+                Heaven.schedule(baseDelayMs, owner = signalOwner) {
                     if (signal is Signal.LED) {
                         signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
                     } else if (signal is Signal.Midi) {
@@ -255,7 +253,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                      return@forEach
                  }
 
-                Heaven.schedule(0.0) {
+                Heaven.schedule(0.0, owner = signalOwner) {
                     if (signal is Signal.LED) {
                         signalExit?.invoke(listOf(signal.copy(color = Color.White)))
                     } else if (signal is Signal.Midi) {
@@ -273,11 +271,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
      }
 
     override fun onChoke() {
-        // Cancel all scheduled Heaven tasks owned by this device
-        // The hold device uses Pair(this, "${signalX},${signalY}") as owner
-        Heaven.cancelJobs { job ->
-            job.owner is Pair<*, *> && job.owner.first == this
-        }
+        Heaven.cancelJobsForOwner(this)
     }
 }
 

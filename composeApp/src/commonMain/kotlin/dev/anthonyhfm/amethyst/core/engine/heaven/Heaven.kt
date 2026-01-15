@@ -4,7 +4,6 @@ import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.core.util.StopWatch
-import kotlinx.atomicfu.atomic
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -14,15 +13,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
-
-data class ScheduledJob(
-    val id: String,
-    val targetTime: Long,
-    val job: () -> Unit,
-    val owner: Any? = null
-)
 
 object Heaven {
     var devices: List<LaunchpadViewportElement> = emptyList()
@@ -31,11 +21,22 @@ object Heaven {
             wake()
         }
 
+    data class ScheduledJob(
+        val id: Long,
+        val targetTime: Long,
+        val owner: Any?,
+        val job: () -> Unit,
+        @Volatile var cancelled: Boolean = false,
+    )
+
+    private var nextJobId = 0L
+
     private val signalQueue = Channel<List<Signal.LED>>(UNLIMITED)
     private val jobQueue = Channel<ScheduledJob>(UNLIMITED)
 
     private val jobsMutex = Mutex()
     private val jobsList = mutableListOf<Pair<Long, MutableList<ScheduledJob>>>()
+    private val ownerIndex = mutableMapOf<Any, MutableSet<ScheduledJob>>()
 
     @Volatile
     private var prev: Long = 0L
@@ -63,43 +64,39 @@ object Heaven {
         wake()
     }
 
-    private val jobIdCounter = atomic(0)
-
-    @OptIn(ExperimentalTime::class)
-    fun schedule(delayInMs: Double, owner: Any? = null, job: () -> Unit): String {
-        val jobId = "job_${jobIdCounter.incrementAndGet()}_${Clock.System.now().toEpochMilliseconds()}"
-        val nowTicks = stopWatch.elapsedTicks()
-        if (!isAwake) {
-            prev = nowTicks
-        }
-        val targetTime = nowTicks + msToTicks(delayInMs)
-        val scheduledJob = ScheduledJob(jobId, targetTime, job, owner)
-
+    fun schedule(delayInMs: Double, owner: Any? = null, job: () -> Unit) {
+        val targetTime = prev + msToTicks(delayInMs)
+        val scheduledJob = ScheduledJob(nextJobId++, targetTime, owner, job)
         renderScope.launch {
             jobQueue.send(scheduledJob)
             cancel()
         }
         wake()
-        return jobId
     }
 
-    fun cancelJobs(filter: (ScheduledJob) -> Boolean) {
+    fun cancelJobsForOwner(owner: Any?) {
         renderScope.launch {
             jobsMutex.withLock {
-                jobsList.forEach { (_, jobs) ->
-                    jobs.removeAll(filter)
-                }
-                jobsList.removeAll { it.second.isEmpty() }
+                ownerIndex.remove(owner)?.forEach { it.cancelled = true }
             }
+            cancel()
         }
     }
 
-    fun cancelJobsForOwner(owner: Any) {
-        cancelJobs { it.owner == owner }
-    }
-
-    fun cancelJob(jobId: String) {
-        cancelJobs { it.id == jobId }
+    fun cancelJobs(predicate: (ScheduledJob) -> Boolean) {
+        renderScope.launch {
+            jobsMutex.withLock {
+                jobsList.forEach { (_, jobs) ->
+                    jobs.forEach { job ->
+                        if (predicate(job)) {
+                            job.cancelled = true
+                            job.owner?.let { ownerIndex[it]?.remove(job) }
+                        }
+                    }
+                }
+            }
+            cancel()
+        }
     }
 
     @Volatile private var renderJob: Job? = null
@@ -179,6 +176,10 @@ object Heaven {
                 } else {
                     jobsList.add(insertIndex, scheduledJob.targetTime to mutableListOf(scheduledJob))
                 }
+
+                scheduledJob.owner?.let { owner ->
+                    ownerIndex.getOrPut(owner) { mutableSetOf() }.add(scheduledJob)
+                }
             }
 
             processed = true
@@ -205,12 +206,20 @@ object Heaven {
 
     private suspend fun executeReadyJobs(currentTime: Long) {
         val jobsToExecute = jobsMutex.withLock {
-            val result = mutableListOf<ScheduledJob>()
+            val result = mutableListOf<() -> Unit>()
             var splitIndex = 0
 
             for (i in jobsList.indices) {
-                if (jobsList[i].first <= currentTime) {
-                    result.addAll(jobsList[i].second)
+                val (time, jobs) = jobsList[i]
+                if (time <= currentTime) {
+                    jobs.forEach { scheduledJob ->
+                        if (scheduledJob.cancelled) {
+                            scheduledJob.owner?.let { ownerIndex[it]?.remove(scheduledJob) }
+                        } else {
+                            result.add(scheduledJob.job)
+                            scheduledJob.owner?.let { ownerIndex[it]?.remove(scheduledJob) }
+                        }
+                    }
                     splitIndex++
                 } else {
                     break
@@ -224,11 +233,11 @@ object Heaven {
             result
         }
 
-        jobsToExecute.forEach { scheduledJob ->
+        jobsToExecute.forEach { job ->
             try {
-                scheduledJob.job.invoke()
+                job.invoke()
             } catch (e: Exception) {
-                println("Error executing job ${scheduledJob.id}: ${e.message}")
+                println("Error executing job: ${e.message}")
             }
         }
     }
@@ -241,6 +250,7 @@ object Heaven {
             val signals = signalQueue.tryReceive().getOrNull() ?: break
 
             data class MidiCall(val device: LaunchpadViewportElement, val signal: Signal.LED)
+
             val midiCalls = mutableListOf<MidiCall>()
 
             deviceMutex.withLock {
@@ -294,6 +304,7 @@ object Heaven {
 
             jobsMutex.withLock {
                 jobsList.clear()
+                ownerIndex.clear()
             }
 
             prev = 0L
