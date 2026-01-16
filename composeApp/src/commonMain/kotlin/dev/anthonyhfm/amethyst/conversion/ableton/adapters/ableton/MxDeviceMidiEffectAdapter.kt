@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.AutoPageAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
@@ -25,6 +26,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.nameWithoutExtension
 
@@ -160,7 +162,8 @@ class MxDeviceMidiEffectAdapter(
                     return MidiLauncherAdapter(device, offset).toDeviceStates()
                 }
 
-                "2d5d5420fea42678807d1569ce08b182" -> {
+                "2d5d5420fea42678807d1569ce08b182",
+                "34bcbf910a9985951a0dd6ead9f8fc4c" -> {
                     return MidiLauncherProAdapter(device, offset).toDeviceStates()
                 }
 
@@ -180,7 +183,7 @@ class MxDeviceMidiEffectAdapter(
                 else -> {
                     val maxFile = PlatformFile(path)
 
-                    if (!MULTI_HASHES.contains(hash)) { // Multi is handled in DrumGroupDeviceAdapter/MidiEffectGroupDeviceAdapter
+                    if (!MULTI_HASHES.contains(hash) && !KASKOBI_MULTI_HASHES.contains(hash)) { // Multi is handled in DrumGroupDeviceAdapter/MidiEffectGroupDeviceAdapter
                         println("Max device not supported: ${maxFile.nameWithoutExtension} - Hash: $hash")
                     }
 
