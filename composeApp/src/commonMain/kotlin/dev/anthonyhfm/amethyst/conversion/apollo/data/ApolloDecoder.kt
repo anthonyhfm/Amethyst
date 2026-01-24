@@ -33,6 +33,13 @@ class ApolloDecoder(
                         ApolloAdapter.resolveAdapter(deviceModel)
                     }
                 }
+            ),
+            launchpadDevices = listOf(
+                SavableWorkspaceData.SavableViewportLaunchpad(
+                    positionX = 0f,
+                    positionY = 0f,
+                    type = SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                )
             )
         )
     }

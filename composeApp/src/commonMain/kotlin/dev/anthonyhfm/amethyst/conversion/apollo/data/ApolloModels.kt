@@ -47,5 +47,11 @@ sealed interface ApolloModel {
         data class KeyFilter(
             val filters: List<Boolean>
         ) : Device
+
+        data class Group(
+            val chains: List<Chain>,
+            val expanded: Boolean,
+            val expandedIndex: Int
+        ) : Device
     }
 }

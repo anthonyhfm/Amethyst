@@ -51,6 +51,14 @@ class ApolloDataResolver {
                 filters = List(101) { reader.readBoolean() }
             )
 
+            ApolloTypes.Group -> ApolloModel.Device.Group(
+                chains = List(reader.readInt32()) {
+                    readNextType(reader) as ApolloModel.Chain
+                },
+                expanded = reader.readBoolean(),
+                expandedIndex = reader.readInt32()
+            )
+
             else -> {
                 error("Unknown type: $type")
             }
