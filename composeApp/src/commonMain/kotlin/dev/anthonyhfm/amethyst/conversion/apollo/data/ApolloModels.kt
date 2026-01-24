@@ -43,6 +43,12 @@ sealed interface ApolloModel {
         val size: Int
     ) : ApolloModel
 
+    data class Color(
+        val r: Byte,
+        val g: Byte,
+        val b: Byte
+    ) : ApolloModel
+
     sealed interface Device : ApolloModel {
         data class KeyFilter(
             val filters: List<Boolean>
@@ -52,6 +58,10 @@ sealed interface ApolloModel {
             val chains: List<Chain>,
             val expanded: Boolean,
             val expandedIndex: Int
+        ) : Device
+
+        data class Paint(
+            val color: Color
         ) : Device
     }
 }

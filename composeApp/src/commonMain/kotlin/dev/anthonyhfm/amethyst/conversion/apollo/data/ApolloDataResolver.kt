@@ -47,6 +47,12 @@ class ApolloDataResolver {
                 device = readNextType(reader) as ApolloModel.Device
             )
 
+            ApolloTypes.Color -> ApolloModel.Color(
+                r = reader.readByte(),
+                g = reader.readByte(),
+                b = reader.readByte()
+            )
+
             ApolloTypes.KeyFilter -> ApolloModel.Device.KeyFilter(
                 filters = List(101) { reader.readBoolean() }
             )
@@ -57,6 +63,10 @@ class ApolloDataResolver {
                 },
                 expanded = reader.readBoolean(),
                 expandedIndex = reader.readInt32()
+            )
+
+            ApolloTypes.Paint -> ApolloModel.Device.Paint(
+                color = readNextType(reader) as ApolloModel.Color
             )
 
             else -> {
