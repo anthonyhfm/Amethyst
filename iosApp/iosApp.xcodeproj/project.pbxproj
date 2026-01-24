@@ -189,7 +189,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "export JAVA_HOME=\"${CI_DERIVED_DATA_PATH}/JDK/Home\"\nexport PATH=\"$JAVA_HOME/bin:$PATH\"\nexport GRADLE_USER_HOME=\"${CI_DERIVED_DATA_PATH}/.gradle\"\n\njava -version || true\n\ncd \"$SRCROOT/..\"\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
+			shellScript = "set -e\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ] && [ -d \"$CI_DERIVED_DATA_PATH/JDK/Home\" ]; then\n  export JAVA_HOME=\"$CI_DERIVED_DATA_PATH/JDK/Home\"\n  export PATH=\"$JAVA_HOME/bin:$PATH\"\nfi\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ]; then\n  export GRADLE_USER_HOME=\"$CI_DERIVED_DATA_PATH/.gradle\"\nfi\n\necho \"JAVA_HOME=$JAVA_HOME\"\njava -version\n\ncd \"$SRCROOT/..\"\nchmod +x ./gradlew\n\nexport KOTLIN_FRAMEWORK_BUILD_TYPE=Release\n\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode --stacktrace --info\n";
 		};
 		F36B1CEB2AD83DDC00CB74D5 /* Compile Kotlin Framework */ = {
 			isa = PBXShellScriptBuildPhase;
