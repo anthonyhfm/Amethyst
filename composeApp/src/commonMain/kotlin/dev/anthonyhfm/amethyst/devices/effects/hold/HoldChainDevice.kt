@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
@@ -30,6 +31,9 @@ import kotlinx.serialization.Serializable
 
 class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(HoldChainDeviceState())
+
+    private val activeJobOwners = mutableSetOf<Any>()
+    private val isDown = mutableSetOf<Any>()
 
     @Composable
     override fun Content() {
@@ -64,7 +68,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
 
                         TimeDial(
                             headline = "Hold",
-                            text = if (deviceState.infinite) "Infinite" else null,
+                            text = if (deviceState.mode == HoldMode.Infinite) "Infinite" else null,
                             timing = deviceState.timing,
                             onStartValueChange = { t, ms ->
                                 beforeHold = Pair(t, ms)
@@ -86,13 +90,13 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                                     after = state.value
                                 )
                             },
-                            enabled = !deviceState.infinite
+                            enabled = deviceState.mode != HoldMode.Infinite
                         )
 
                         var beforeGate = deviceState.copy().gate
                         TextDial(
                             headline = "Gate",
-                            text = if (!deviceState.infinite) "${(deviceState.gate * 200).toInt()}%" else "Disabled",
+                            text = if (deviceState.mode != HoldMode.Infinite) "${(deviceState.gate * 200).toInt()}%" else "Disabled",
                             value = deviceState.gate,
                             onStartValueChange = {
                                 beforeGate = it
@@ -130,17 +134,36 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                                         it.copy(gate = 0.5f) // Reset gate to its original state
                                     }
                                 },
-                            enabled = !deviceState.infinite
+                            enabled = deviceState.mode != HoldMode.Infinite
                         )
                     }
 
                     Column(
                         horizontalAlignment = Alignment.Start,
-                        modifier = Modifier.offset(x = (-8).dp)
+                        modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.offset(y = 6.dp)
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                        ) {
+                            DropdownSelect(
+                                label = "Mode",
+                                options = HoldMode.entries,
+                                selectedOption = deviceState.mode,
+                                onOptionSelected = { mode ->
+                                    pushStateChange(
+                                        before = deviceState,
+                                        after = deviceState.copy(mode = mode)
+                                    )
+                                    state.update { it.copy(mode = mode) }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                         ) {
                             Checkbox(
                                 checked = deviceState.onRelease,
@@ -158,29 +181,6 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
 
                             Text(
                                 text = "On Release",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = deviceState.infinite,
-                                onCheckedChange = { checked ->
-                                    pushStateChange(
-                                        before = deviceState,
-                                        after = deviceState.copy(infinite = checked)
-                                    )
-
-                                    state.update {
-                                        it.copy(infinite = checked)
-                                    }
-                                },
-                            )
-
-                            Text(
-                                text = "Infinite",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -229,7 +229,14 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                     job.owner == signalOwner
                 }
 
+                activeJobOwners.add(signalOwner)
                 Heaven.schedule(baseDelayMs, signalOwner) {
+                    if (state.value.mode == HoldMode.Minimum && isDown.contains(signalOwner)) {
+                        activeJobOwners.remove(signalOwner)
+                        return@schedule
+                    }
+
+                    activeJobOwners.remove(signalOwner)
                     if (signal is Signal.LED) {
                         signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
                     } else if (signal is Signal.Midi) {
@@ -239,19 +246,39 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
              }
 
              if (down) {
+                 isDown.add(signalOwner)
                  if (state.value.onRelease) {
                      return@forEach
                  }
 
                 signalExit?.invoke(listOf(signal))
 
-                if (state.value.infinite) {
+                if (state.value.mode == HoldMode.Infinite) {
                      return@forEach
                  }
 
                 updateSchedule()
              } else {
+                 isDown.remove(signalOwner)
                  if (!state.value.onRelease) {
+                     if (state.value.mode == HoldMode.Minimum) {
+                         // In minimum mode, if the key is released, we might need to release the signal
+                         // if the minimum duration has already passed.
+                         // But the current implementation uses Heaven.schedule which will handle the release.
+                         // If the key is released BEFORE baseDelayMs, the scheduled job will handle it.
+                         // If the key is released AFTER baseDelayMs, the job already fired and released it.
+                         // Wait, if it's Minimum mode and key is released after baseDelayMs, 
+                         // we should release it immediately.
+                         
+                         val isScheduled = activeJobOwners.contains(signalOwner)
+                         if (!isScheduled) {
+                             if (signal is Signal.LED) {
+                                 signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
+                             } else if (signal is Signal.Midi) {
+                                 signalExit?.invoke(listOf(signal.copy(velocity = 0)))
+                             }
+                         }
+                     }
                      return@forEach
                  }
 
@@ -263,7 +290,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                     }
                 }
 
-                if (state.value.infinite) {
+                if (state.value.mode == HoldMode.Infinite) {
                      return@forEach
                  }
 
@@ -282,10 +309,17 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
 }
 
 @Serializable
+enum class HoldMode {
+    Trigger,
+    Minimum,
+    Infinite
+}
+
+@Serializable
 data class HoldChainDeviceState(
     val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
     val delayMs: Long = 0,
     val gate: Float = 0.5f, // 100% = 0.5f, 200% = 1.0f
-    val infinite: Boolean = false,
+    val mode: HoldMode = HoldMode.Trigger,
     val onRelease: Boolean = false,
 ) : DeviceState()

@@ -13,7 +13,7 @@ object Dual2LightLayoutScanner {
         val maxDevices = MidiChainReader.getAllDevicesOfType<MxDeviceMidiEffect>(track)
 
         maxDevices.forEach {
-            val path = it.patchSlot.value.patchRef.fileRef.resolvePath()
+            val path = it.patchSlot.value.patchRef?.fileRef?.resolvePath() ?: return@forEach
 
             val hash: String = fileHashMap[path].let {
                 if (it != null) {

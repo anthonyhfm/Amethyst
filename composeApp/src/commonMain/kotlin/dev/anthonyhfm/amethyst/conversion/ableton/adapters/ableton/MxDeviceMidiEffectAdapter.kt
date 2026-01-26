@@ -38,7 +38,7 @@ class MxDeviceMidiEffectAdapter(
     override fun toDeviceStates(): List<DeviceState> {
         val blob = device.decodeBlob()
 
-        val path = device.patchSlot.value.patchRef.fileRef.resolvePath()
+        val path = device.patchSlot.value.patchRef?.fileRef?.resolvePath() ?: return emptyList()
 
         val hash: String = fileHashMap[path].let {
             if (it != null) {

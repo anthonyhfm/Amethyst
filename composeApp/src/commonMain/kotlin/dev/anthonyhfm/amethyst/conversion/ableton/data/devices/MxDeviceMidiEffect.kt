@@ -97,7 +97,7 @@ data class MxDeviceMidiEffect(
         @Serializable
         data class Value(
             @XmlElement
-            val patchRef: MxDPatchRef
+            val patchRef: MxDPatchRef? = null
         ) {
             @Serializable
             data class MxDPatchRef(

@@ -38,13 +38,6 @@ import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -97,6 +90,7 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -132,7 +126,6 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
-        var showTypePicker: Boolean by remember { mutableStateOf(false) }
 
         Row(
             modifier = Modifier
@@ -175,66 +168,25 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
                         ) {
-                            DropdownMenu(
-                                expanded = showTypePicker,
-                                onDismissRequest = {
-                                    showTypePicker = false
-                                }
-                            ) {
-                                MultiGroupChainDeviceState.TYPE.entries.forEach { type ->
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            state.update {
-                                                it.copy(type = type)
-                                            }
-
-                                            showTypePicker = false
-                                        },
-                                        text = {
-                                            Text(
-                                                text = when (type) {
-                                                    MultiGroupChainDeviceState.TYPE.FORWARD -> "Forwards"
-                                                    MultiGroupChainDeviceState.TYPE.BACKWARD -> "Backwards"
-                                                    MultiGroupChainDeviceState.TYPE.RANDOM -> "Random"
-                                                }
-                                            )
-                                        },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = when (type) {
-                                                    MultiGroupChainDeviceState.TYPE.FORWARD -> Icons.Default.FastForward
-                                                    MultiGroupChainDeviceState.TYPE.BACKWARD -> Icons.Default.FastRewind
-                                                    MultiGroupChainDeviceState.TYPE.RANDOM -> Icons.Default.Shuffle
-                                                },
-                                                contentDescription = null
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-
-                            AssistChip(
-                                onClick = {
-                                    showTypePicker = true
+                            DropdownSelect(
+                                label = "Mode",
+                                options = MultiGroupChainDeviceState.TYPE.entries,
+                                selectedOption = deviceState.type,
+                                onOptionSelected = { type ->
+                                    state.update {
+                                        it.copy(type = type)
+                                    }
+                                },
+                                optionToString = { type ->
+                                    when (type) {
+                                        MultiGroupChainDeviceState.TYPE.FORWARD -> "Forwards"
+                                        MultiGroupChainDeviceState.TYPE.BACKWARD -> "Backwards"
+                                        MultiGroupChainDeviceState.TYPE.RANDOM -> "Random"
+                                    }
                                 },
                                 modifier = Modifier
+                                    .padding(8.dp)
                                     .fillMaxWidth()
-                                    .padding(horizontal = 8.dp),
-                                label = {
-                                    Text(
-                                        text = when (deviceState.type) {
-                                            MultiGroupChainDeviceState.TYPE.FORWARD -> "Forwards"
-                                            MultiGroupChainDeviceState.TYPE.BACKWARD -> "Backwards"
-                                            MultiGroupChainDeviceState.TYPE.RANDOM -> "Random"
-                                        }
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDropDown,
-                                        contentDescription = null
-                                    )
-                                },
                             )
                         }
                     }
