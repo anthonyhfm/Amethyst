@@ -49,11 +49,17 @@ sealed interface ApolloModel {
         val b: Byte
     ) : ApolloModel
 
-    sealed interface Device : ApolloModel {
-        data class KeyFilter(
-            val filters: List<Boolean>
-        ) : Device
+    data class Length(
+        val step: Int
+    ) : ApolloModel
 
+    data class Time(
+        val free: Boolean,
+        val length: Length,
+        val divisor: Int
+    ) : ApolloModel
+
+    sealed interface Device : ApolloModel {
         data class Group(
             val chains: List<Chain>,
             val expanded: Boolean,
@@ -65,8 +71,45 @@ sealed interface ApolloModel {
             val chain: Chain
         ) : Device
 
+        data class KeyFilter(
+            val filters: List<Boolean>
+        ) : Device
+
+        data class Delay(
+            val time: Time,
+            val gate: Double
+        ) : Device
+
+        data class Loop(
+            val time: Time,
+            val gate: Double,
+            val repeats: Int,
+            val hold: Boolean
+        ) : Device
+
+        data class Hold(
+            val time: Time,
+            val gate: Double,
+            val mode: Int,
+            val release: Boolean
+        ) : Device
+
         data class Paint(
             val color: Color
         ) : Device
+
+        data class Fade(
+            val time: Time,
+            val gate: Double,
+            val playMode: Int,
+            val count: Int,
+            val colors: List<Color>,
+            val positions: List<Double>,
+            val fadeTypes: List<Int>,
+            val hasExpanded: Boolean,
+            val expandedIndex: Int
+        ) : Device
+
+        data object Preview : Device
     }
 }
