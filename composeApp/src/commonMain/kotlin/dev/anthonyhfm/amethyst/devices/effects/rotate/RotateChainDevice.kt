@@ -3,9 +3,12 @@ package dev.anthonyhfm.amethyst.devices.effects.rotate
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.InputChip
+import androidx.compose.material3.HorizontalDivider
+import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,82 +44,47 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
             modifier = Modifier
                 .width(140.dp)
         ) {
-            Column {
-                InputChip(
-                    modifier = Modifier
-                        .width(100.dp),
-                    selected = deviceState.mode == RotateChainDeviceState.RotateMode.DEGREES_90,
-                    onClick = {
-                        pushStateChange(deviceState, state.value.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_90))
-
-                        state.update {
-                            it.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_90)
+            Column(
+                modifier = Modifier
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                DropdownSelect(
+                    label = "Mode",
+                    options = RotateChainDeviceState.RotateMode.entries,
+                    selectedOption = deviceState.mode,
+                    onOptionSelected = { mode ->
+                        val before = state.value
+                        state.update { it.copy(mode = mode) }
+                        pushStateChange(before, state.value)
+                    },
+                    optionToString = {
+                        when (it) {
+                            RotateChainDeviceState.RotateMode.DEGREES_90 -> "90°"
+                            RotateChainDeviceState.RotateMode.DEGREES_180 -> "180°"
+                            RotateChainDeviceState.RotateMode.DEGREES_270 -> "270°"
                         }
                     },
-                    label = {
-                        Text(
-                            text = "90°",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                InputChip(
-                    modifier = Modifier
-                        .width(100.dp),
-                    selected = deviceState.mode == RotateChainDeviceState.RotateMode.DEGREES_180,
-                    onClick = {
-                        pushStateChange(deviceState, state.value.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_180))
-
-                        state.update {
-                            it.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_180)
-                        }
-                    },
-                    label = {
-                        Text(
-                            text = "180°",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                )
-
-                InputChip(
-                    modifier = Modifier
-                        .width(100.dp),
-                    selected = deviceState.mode == RotateChainDeviceState.RotateMode.DEGREES_270,
-                    onClick = {
-                        pushStateChange(deviceState, state.value.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_270))
-
-                        state.update {
-                            it.copy(mode = RotateChainDeviceState.RotateMode.DEGREES_270)
-                        }
-                    },
-                    label = {
-                        Text(
-                            text = "270°",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                )
+                HorizontalDivider()
 
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AmethystCheckbox(
                         checked = deviceState.bypass,
                         onCheckedChange = { checked ->
-                            pushStateChange(deviceState, state.value.copy(bypass = checked))
-
+                            val before = state.value
                             state.update {
                                 it.copy(bypass = checked)
                             }
+
+                            pushStateChange(before, state.value)
                         },
                     )
 

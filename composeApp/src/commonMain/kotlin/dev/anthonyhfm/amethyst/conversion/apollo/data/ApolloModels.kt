@@ -89,6 +89,11 @@ sealed interface ApolloModel {
             val filters: List<Boolean>
         ) : Device
 
+        data class MacroFilter(
+            val macro: Int,
+            val filter: List<Boolean>
+        ) : Device
+
         data class Delay(
             val time: Time,
             val gate: Double
@@ -152,9 +157,30 @@ sealed interface ApolloModel {
 
         data object Preview : Device
 
+        data class Layer(
+            val target: Int,
+            val mode: Int,
+            val range: Int
+        ) : Device
+
         data class Switch(
             val target: Int,
             val value: Int
+        ) : Device
+
+        data class Flip(
+            val mode: Int,
+            val bypass: Boolean
+        ) : Device
+
+        data class Rotate(
+            val mode: Int,
+            val bypass: Boolean
+        ) : Device
+
+        data class LayerFilter(
+            val target: Int,
+            val range: Int
         ) : Device
     }
 }

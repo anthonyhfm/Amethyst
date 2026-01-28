@@ -119,6 +119,13 @@ class ApolloDataResolver {
                 filters = List(101) { reader.readBoolean() }
             )
 
+            ApolloTypes.MacroFilter -> ApolloModel.Device.MacroFilter(
+                macro = reader.readInt32(),
+                filter = List(100) {
+                    reader.readBoolean()
+                }
+            )
+
             ApolloTypes.Delay -> ApolloModel.Device.Delay(
                 time = readNextType(reader) as ApolloModel.Time,
                 gate = reader.readDouble()
@@ -161,6 +168,12 @@ class ApolloDataResolver {
 
             ApolloTypes.Preview -> ApolloModel.Device.Preview
 
+            ApolloTypes.Layer -> ApolloModel.Device.Layer(
+                target = reader.readInt32(),
+                mode = reader.readInt32(),
+                range = if (ApolloConverter.version >= 21) reader.readInt32() else 200
+            )
+
             ApolloTypes.Pattern -> {
                 var hasRootKey = false
                 ApolloModel.Device.Pattern(
@@ -190,6 +203,21 @@ class ApolloDataResolver {
             ApolloTypes.Switch -> ApolloModel.Device.Switch(
                 target = reader.readInt32(),
                 value = reader.readInt32()
+            )
+
+            ApolloTypes.Flip -> ApolloModel.Device.Flip(
+                mode = reader.readInt32(),
+                bypass = reader.readBoolean()
+            )
+
+            ApolloTypes.Rotate -> ApolloModel.Device.Rotate(
+                mode = reader.readInt32(),
+                bypass = reader.readBoolean()
+            )
+
+            ApolloTypes.LayerFilter -> ApolloModel.Device.LayerFilter(
+                target = reader.readInt32(),
+                range = reader.readInt32()
             )
 
             else -> {

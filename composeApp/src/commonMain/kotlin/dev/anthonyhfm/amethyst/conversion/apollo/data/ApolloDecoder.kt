@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.apollo.data
 
+import dev.anthonyhfm.amethyst.conversion.apollo.ApolloConverter
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
@@ -23,6 +24,8 @@ class ApolloDecoder(
         }
 
         val project = resolver.readNextType(reader) as ApolloModel.Project
+
+        ApolloConverter.version = version
 
         return SavableWorkspaceData(
             title = "Apollo converted project",

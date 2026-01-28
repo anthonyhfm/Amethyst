@@ -1,8 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.layer_filter
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,54 +31,102 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(120.dp)
+                .width(160.dp)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .fillMaxSize(),
-
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                var beforeLayer = deviceState.copy().layer
-                StepTextDial(
-                    headline = "Layer Filter",
-                    value = deviceState.layer,
-                    steps = IntArray(41) { -20 + it }.toList(),
-                    text = "${deviceState.layer}",
-                    onStartValueChange = {
-                        beforeLayer = it
-                    },
-                    onResolveTextValue = {
-                        val layerText = it.trim().toIntOrNull()
+                var beforeState = deviceState.copy()
 
-                        layerText?.let { layer ->
-                            if (layer in -20..20) {
-                                state.update {
-                                    it.copy(layer = layer)
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StepTextDial(
+                        headline = "Target",
+                        value = deviceState.layer,
+                        steps = IntArray(41) { -20 + it }.toList(),
+                        text = "${deviceState.layer}",
+                        onResolveTextValue = {
+                            val layerText = it.trim().toIntOrNull()
+
+                            layerText?.let { layer ->
+                                if (layer in -20..20) {
+                                    state.update {
+                                        it.copy(layer = layer)
+                                    }
                                 }
                             }
-                        }
-                    },
-                    onValueChange = { value ->
-                        state.update {
-                            it.copy(layer = value)
-                        }
-                    },
-                    onFinishValueChange = {
-                        pushStateChange(
-                            before = state.value.copy(layer = beforeLayer),
-                            after = state.value
-                        )
-                    }
-                )
+                        },
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
+                        onFinishValueChange = {
+                            pushStateChange(
+                                before = beforeState,
+                                after = state.value
+                            )
+                        },
+                        onValueChange = { value ->
+                            state.update {
+                                it.copy(layer = value)
+                            }
+                        },
+                    )
+
+                    VerticalDivider(
+                        modifier = Modifier.fillMaxHeight(0.5f)
+                    )
+
+                    StepTextDial(
+                        headline = "Range",
+                        value = deviceState.range,
+                        steps = IntArray(21) { it }.toList(),
+                        text = "${deviceState.range}",
+                        onResolveTextValue = {
+                            val rangeText = it.trim().toIntOrNull()
+                            rangeText?.let { range ->
+                                if (range in 0..20) {
+                                    state.update { it.copy(range = range) }
+                                }
+                            }
+                        },
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
+                        onFinishValueChange = {
+                            pushStateChange(
+                                before = beforeState,
+                                after = state.value
+                            )
+                        },
+                        onValueChange = { value ->
+                            state.update {
+                                it.copy(range = value)
+                            }
+                        },
+                    )
+                }
             }
         }
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
+        val target = state.value.layer
+        val range = state.value.range
+
         signalExit?.invoke(
             n.filter {
-                it.layer == state.value.layer
+                if (range == 0) {
+                    it.layer == target
+                } else {
+                    kotlin.math.abs(it.layer - target) <= range
+                }
             }
         )
     }
@@ -88,4 +135,5 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
 @Serializable
 data class LayerFilterChainDeviceState(
     val layer: Int = 0,
+    val range: Int = 0
 ) : DeviceState()
