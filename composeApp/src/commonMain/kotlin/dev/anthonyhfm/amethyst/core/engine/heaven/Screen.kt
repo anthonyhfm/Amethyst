@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.engine.heaven
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.utils.SortedList
+import kotlin.math.abs
 import kotlinx.atomicfu.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,21 +30,34 @@ class Screen : AutoCloseable {
             for (i in 0 until signals.size) {
                 val signal = signals.getValueAt(i)
 
-                if (signal.blendingMode != Signal.LED.BlendingMode.Normal &&
-                    (i == signals.size - 1 ||
-                     signal.layer - signals.getValueAt(i + 1).layer > signal.blendingRange)) {
-                    continue
+                if (signal.blendingMode != Signal.LED.BlendingMode.Normal) {
+                    val nextSignal = if (i + 1 < signals.size) signals.getValueAt(i + 1) else null
+                    
+                    if (nextSignal == null || abs(signal.layer - nextSignal.layer) > signal.blendingRange) {
+                        continue
+                    }
                 }
 
-                if (signal.blendingMode == Signal.LED.BlendingMode.Mask) break
-
-                val multiply = i > 0 &&
-                              signals.getValueAt(i - 1).blendingMode == Signal.LED.BlendingMode.Multiply &&
-                              signals.getValueAt(i - 1).layer - signal.layer <= signals.getValueAt(i - 1).blendingRange
-
-                ret = ret.mix(signal.color, multiply)
-
-                if (signal.blendingMode == Signal.LED.BlendingMode.Normal) break
+                when (signal.blendingMode) {
+                    Signal.LED.BlendingMode.Normal -> {
+                        ret = signal.color
+                        break
+                    }
+                    Signal.LED.BlendingMode.Mask -> {
+                        ret = Color.Black
+                        break
+                    }
+                    Signal.LED.BlendingMode.Multiply -> {
+                        val nextSignal = signals.getValueAt(i + 1)
+                        ret = nextSignal.color.mix(signal.color, signal.blendingMode)
+                        break
+                    }
+                    Signal.LED.BlendingMode.Screen -> {
+                        val nextSignal = signals.getValueAt(i + 1)
+                        ret = nextSignal.color.mix(signal.color, signal.blendingMode)
+                        break
+                    }
+                }
             }
 
             currentColor.value = ret
@@ -163,24 +177,34 @@ class Screen : AutoCloseable {
     }
 }
 
-fun Color.mix(other: Color, multiply: Boolean = false): Color {
-    return if (multiply) {
-        Color(
-            (red * other.red),
-            (green * other.green),
-            (blue * other.blue),
-            alpha
-        )
-    } else {
-        Color(
-            (red + other.red).coerceIn(0f, 1f),
-            (green + other.green).coerceIn(0f, 1f),
-            (blue + other.blue).coerceIn(0f, 1f),
-            alpha
-        )
+fun Color.mix(other: Color, mode: Signal.LED.BlendingMode = Signal.LED.BlendingMode.Normal): Color {
+    return when (mode) {
+        Signal.LED.BlendingMode.Multiply -> {
+            Color(
+                (red * other.red),
+                (green * other.green),
+                (blue * other.blue),
+                alpha
+            )
+        }
+        Signal.LED.BlendingMode.Screen -> {
+            // Screen formula: 1 - (1 - a) * (1 - b)
+            Color(
+                1f - (1f - red) * (1f - other.red),
+                1f - (1f - green) * (1f - other.green),
+                1f - (1f - blue) * (1f - other.blue),
+                alpha
+            )
+        }
+        else -> {
+            Color(
+                (red + other.red).coerceIn(0f, 1f),
+                (green + other.green).coerceIn(0f, 1f),
+                (blue + other.blue).coerceIn(0f, 1f),
+                alpha
+            )
+        }
     }
 }
 
 fun Color.isLit(): Boolean = red > 0f || green > 0f || blue > 0f
-
-val Signal.LED.blendingRange: Int get() = 1

@@ -12,10 +12,11 @@ sealed interface Signal {
         val y: Int,
         val color: Color,
         val layer: Int = 0,
-        val blendingMode: BlendingMode = BlendingMode.Normal
+        val blendingMode: BlendingMode = BlendingMode.Normal,
+        val blendingRange: Int = 1
     ) : Signal {
         enum class BlendingMode {
-            Normal, Multiply, Add, Mask
+            Normal, Multiply, Screen, Mask
         }
     }
 
