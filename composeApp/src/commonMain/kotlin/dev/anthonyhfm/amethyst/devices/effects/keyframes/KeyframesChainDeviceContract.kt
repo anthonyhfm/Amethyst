@@ -32,6 +32,15 @@ sealed interface KeyframesChainDeviceContract {
         data object OnTogglePinchBilateral : Event
 
         data object OnImportMidiFile : Event
+        data class OnChangeRepeats(val repeats: Int) : Event
+        data class OnChangePlaybackMode(val playbackMode: PlaybackMode) : Event
+        data class OnChangeRootKey(val rootKey: Int?) : Event
+        data class OnChangeWrap(val wrap: Boolean) : Event
+        data class OnChangeIsolate(val isolate: Boolean) : Event
+    }
+
+    enum class PlaybackMode {
+        Mono, Poly, Loop
     }
 
     @Serializable
@@ -43,7 +52,12 @@ sealed interface KeyframesChainDeviceContract {
                 timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
             )
         ),
+        val repeats: Int = 1,
+        val playbackMode: PlaybackMode = PlaybackMode.Mono,
+        val rootKey: Int? = null,
+        val wrap: Boolean = false,
         val infinity: Boolean = false,
+        val isolate: Boolean = false,
         val pinch: Float = 0f, // Range [-2,2]
         val bilateralPinch: Boolean = false,
         @Transient

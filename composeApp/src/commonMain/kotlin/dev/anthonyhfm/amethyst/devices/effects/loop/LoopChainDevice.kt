@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -28,6 +27,7 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
 import dev.anthonyhfm.amethyst.ui.components.StepTextDial
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
@@ -111,9 +111,10 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     ){
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.offset(x = -4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(start = 12.dp)
                         ) {
-                            Checkbox(
+                            AmethystCheckbox(
                                 checked = deviceState.onHold,
                                 onCheckedChange = { checked ->
                                     val before = state.value

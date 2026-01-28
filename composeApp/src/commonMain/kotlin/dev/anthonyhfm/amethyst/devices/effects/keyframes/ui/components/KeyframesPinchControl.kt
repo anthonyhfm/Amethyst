@@ -35,13 +35,7 @@ fun KeyframesPinchControl(
     bilateral: Boolean,
     onToggleBilateral: () -> Unit
 ) {
-    val clampedPinch = pinch.coerceIn(-2f, 2f)
-
-    val surfaceHigh = MaterialTheme.colorScheme.surfaceContainerHigh
     val onSurface = MaterialTheme.colorScheme.onSurface
-    val curveColor = if (bilateral) Color(0xFFFF9800) else Color(0xFF3D6BFF)
-
-    val pinchState = rememberUpdatedState(clampedPinch)
 
     Column(
         modifier = Modifier
@@ -56,7 +50,7 @@ fun KeyframesPinchControl(
                 interactionSource = null,
                 onClick = {  }
             ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -66,82 +60,15 @@ fun KeyframesPinchControl(
             ),
         )
 
-        Canvas(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .size(86.dp)
-                .background(surfaceHigh)
-                .rightClickable {
-                    onPinchChange(0f)
-                    onToggleBilateral()
-                }
-                .pointerInput(Unit) {
-                    var baselinePinch = 0f
-                    var accumulated = 0f
-                    detectDragGestures(
-                        onDragStart = {
-                            baselinePinch = pinchState.value
-                            accumulated = 0f
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val height = size.height
-                            if (height > 0f) {
-                                accumulated += (-dragAmount.y / height) * 4f
-                                val newValue = (baselinePinch + accumulated).coerceIn(-2f, 2f)
-                                if (newValue != pinchState.value) onPinchChange(newValue)
-                            }
-                        }
-                    )
-                },
-        ) {
-            val pScaled = (clampedPinch / 2f).coerceIn(-1f, 1f)
+        PinchGraph(
+            pinch = pinch,
+            onPinchChange = onPinchChange,
+            bilateral = bilateral,
+            onToggleBilateral = onToggleBilateral,
+            modifier = Modifier.size(72.dp)
+        )
 
-            val w = size.width
-            val h = size.height
-            val margin = 16.dp.toPx()
-            val start = Offset(margin, h - margin)
-            val end = Offset(w - margin, margin)
-            val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
-
-            val strokeWidth = 6.dp.toPx()
-
-            val path = Path().apply {
-                moveTo(start.x, start.y)
-                if (!bilateral || pScaled == 0f) {
-                    val horizontalIntensity = 0.75f
-                    val verticalIntensity = 0.75f
-                    val controlX = mid.x - horizontalIntensity * mid.x * pScaled
-                    val controlY = mid.y - (verticalIntensity * mid.y * pScaled)
-                    quadraticTo(controlX, controlY, end.x, end.y)
-                } else {
-                    val diag = end - start
-                    val len = kotlin.math.hypot(diag.x, diag.y).coerceAtLeast(1f)
-                    val norm = Offset(diag.x / len, diag.y / len)
-                    val perp = Offset(-norm.y, norm.x)
-
-                    val startMid = Offset((start.x + mid.x) / 2f, (start.y + mid.y) / 2f)
-                    val midEnd = Offset((mid.x + end.x) / 2f, (mid.y + end.y) / 2f)
-
-                    val halfLen = len / 2f
-                    val magnitude = halfLen * 0.5f * kotlin.math.abs(pScaled)
-                    val baseSign = if (pScaled >= 0f) 1f else -1f
-
-                    val control1 = startMid + perp * (-baseSign * magnitude)
-                    val control2 = midEnd + perp * (+baseSign * magnitude)
-
-                    quadraticTo(control1.x, control1.y, mid.x, mid.y)
-                    quadraticTo(control2.x, control2.y, end.x, end.y)
-                }
-            }
-
-            drawPath(
-                path = path,
-                color = curveColor,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-        }
-
+        val clampedPinch = pinch.coerceIn(-2f, 2f)
         val display = ((clampedPinch * 100f).roundToInt() / 100f).toString()
 
         Text(
@@ -152,6 +79,95 @@ fun KeyframesPinchControl(
         Text(
             text = "Drag ↑ / ↓  |  Right-Click Mode",
             style = MaterialTheme.typography.labelSmall.copy(color = onSurface.copy(alpha = 0.6f))
+        )
+    }
+}
+
+@Composable
+fun PinchGraph(
+    pinch: Float,
+    onPinchChange: (Float) -> Unit,
+    bilateral: Boolean,
+    onToggleBilateral: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val clampedPinch = pinch.coerceIn(-2f, 2f)
+    val surfaceHigh = MaterialTheme.colorScheme.surfaceContainerHigh
+    val curveColor = if (bilateral) Color(0xFFFF9800) else Color(0xFF3D6BFF)
+    val pinchState = rememberUpdatedState(clampedPinch)
+
+    Canvas(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(surfaceHigh)
+            .rightClickable {
+                onPinchChange(0f)
+                onToggleBilateral()
+            }
+            .pointerInput(Unit) {
+                var baselinePinch = 0f
+                var accumulated = 0f
+                detectDragGestures(
+                    onDragStart = {
+                        baselinePinch = pinchState.value
+                        accumulated = 0f
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        val height = size.height
+                        if (height > 0f) {
+                            accumulated += (-dragAmount.y / height) * 4f
+                            val newValue = (baselinePinch + accumulated).coerceIn(-2f, 2f)
+                            if (newValue != pinchState.value) onPinchChange(newValue)
+                        }
+                    }
+                )
+            },
+    ) {
+        val pScaled = (clampedPinch / 2f).coerceIn(-1f, 1f)
+
+        val w = size.width
+        val h = size.height
+        val margin = (w * 0.22f) // Relative margin
+        val start = Offset(margin, h - margin)
+        val end = Offset(w - margin, margin)
+        val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
+
+        val strokeWidth = (w * 0.08f) // Relative stroke width
+
+        val path = Path().apply {
+            moveTo(start.x, start.y)
+            if (!bilateral || pScaled == 0f) {
+                val horizontalIntensity = 0.75f
+                val verticalIntensity = 0.75f
+                val controlX = mid.x - horizontalIntensity * mid.x * pScaled
+                val controlY = mid.y - (verticalIntensity * mid.y * pScaled)
+                quadraticTo(controlX, controlY, end.x, end.y)
+            } else {
+                val diag = end - start
+                val len = kotlin.math.hypot(diag.x, diag.y).coerceAtLeast(1f)
+                val norm = Offset(diag.x / len, diag.y / len)
+                val perp = Offset(-norm.y, norm.x)
+
+                val startMid = Offset((start.x + mid.x) / 2f, (start.y + mid.y) / 2f)
+                val midEnd = Offset((mid.x + end.x) / 2f, (mid.y + end.y) / 2f)
+
+                val halfLen = len / 2f
+                val magnitude = halfLen * 0.5f * kotlin.math.abs(pScaled)
+                val baseSign = if (pScaled >= 0f) 1f else -1f
+
+                val control1 = startMid + perp * (-baseSign * magnitude)
+                val control2 = midEnd + perp * (+baseSign * magnitude)
+
+                quadraticTo(control1.x, control1.y, mid.x, mid.y)
+                quadraticTo(control2.x, control2.y, end.x, end.y)
+            }
+        }
+
+        drawPath(
+            path = path,
+            color = curveColor,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
         )
     }
 }

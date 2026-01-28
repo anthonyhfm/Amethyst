@@ -1,7 +1,6 @@
 package dev.anthonyhfm.amethyst.devices.effects.hold
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +18,7 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
 import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
@@ -163,9 +163,10 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                            modifier = Modifier.padding(start = 12.dp, top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Checkbox(
+                            AmethystCheckbox(
                                 checked = deviceState.onRelease,
                                 onCheckedChange = { checked ->
                                     pushStateChange(

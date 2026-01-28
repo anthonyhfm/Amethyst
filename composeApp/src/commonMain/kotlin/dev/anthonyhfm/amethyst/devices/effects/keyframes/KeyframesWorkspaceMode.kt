@@ -28,6 +28,8 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceCon
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Frame
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.InfinityCheckbox
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPinchControl
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PlaybackModePicker
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.RepeatsControl
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
@@ -80,6 +82,16 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     onPinchChange = { onEvent?.invoke(Event.OnChangePinch(it)) },
                     bilateral = state.bilateralPinch,
                     onToggleBilateral = { onEvent?.invoke(Event.OnTogglePinchBilateral) }
+                )
+
+                PlaybackModePicker(
+                    selectedMode = state.playbackMode,
+                    onModeSelected = { onEvent?.invoke(Event.OnChangePlaybackMode(it)) }
+                )
+
+                RepeatsControl(
+                    repeats = state.repeats,
+                    onRepeatsChange = { onEvent?.invoke(Event.OnChangeRepeats(it)) }
                 )
 
                 InfinityCheckbox(

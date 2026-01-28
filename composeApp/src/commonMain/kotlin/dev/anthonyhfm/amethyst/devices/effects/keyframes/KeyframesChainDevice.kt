@@ -485,6 +485,26 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 state.update { it.copy(bilateralPinch = !it.bilateralPinch) }
                 renderAnimation()
             }
+
+            is Event.OnChangeRepeats -> {
+                state.update { it.copy(repeats = event.repeats.coerceAtLeast(1)) }
+            }
+
+            is Event.OnChangePlaybackMode -> {
+                state.update { it.copy(playbackMode = event.playbackMode) }
+            }
+
+            is Event.OnChangeRootKey -> {
+                state.update { it.copy(rootKey = event.rootKey) }
+            }
+
+            is Event.OnChangeWrap -> {
+                state.update { it.copy(wrap = event.wrap) }
+            }
+
+            is Event.OnChangeIsolate -> {
+                state.update { it.copy(isolate = event.isolate) }
+            }
         }
     }
 
@@ -658,17 +678,113 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         layer = 0
     )
 
-    override fun ledSignalEnter(n: List<Signal.LED>) {
-        n.forEach {
-            if (it.color != Color.Black) {
-                Heaven.cancelJobsForOwner(this)
+    private val heldSignals = mutableSetOf<Int>() // Signals currently held in Loop mode
 
-                state.value.renderedAnimation.forEach {
-                    Heaven.schedule(it.first.toDouble(), owner = this) {
-                        signalExit?.invoke(it.second)
+    override fun ledSignalEnter(n: List<Signal.LED>) {
+        val state = state.value
+        if (state.isolate) {
+            Heaven.cancelJobsForOwner(this)
+        }
+        
+        n.forEach { signal ->
+            if (signal.color != Color.Black) {
+                val identifier = signal.x * 10 + signal.y
+                
+                when (state.playbackMode) {
+                    PlaybackMode.Mono -> {
+                        if (!state.isolate) {
+                            Heaven.cancelJobsForOwner(this)
+                        }
+                        startPlayback(signal)
+                    }
+                    PlaybackMode.Poly -> {
+                        startPlayback(signal)
+                    }
+                    PlaybackMode.Loop -> {
+                        if (heldSignals.add(identifier)) {
+                            Heaven.cancelJobsForOwner(this, identifier)
+                            startLoopPlayback(signal, identifier)
+                        }
+                    }
+                }
+            } else {
+                val identifier = signal.x * 10 + signal.y
+                if (state.playbackMode == PlaybackMode.Loop) {
+                    heldSignals.remove(identifier)
+                    Heaven.cancelJobsForOwner(this, identifier)
+                }
+            }
+        }
+    }
+
+    private fun startPlayback(triggerSignal: Signal.LED) {
+        val state = state.value
+        val repeats = state.repeats
+        val animation = state.renderedAnimation
+        val totalDuration = animation.lastOrNull()?.first ?: 0
+        val identifier = if (state.playbackMode == PlaybackMode.Poly) triggerSignal.x * 10 + triggerSignal.y else null
+
+        for (r in 0 until repeats) {
+            val offset = r * totalDuration
+            animation.forEach { (time, signals) ->
+                Heaven.schedule(offset + time.toDouble(), owner = this, identifier = identifier) {
+                    val transformed = transformSignals(signals, triggerSignal)
+                    signalExit?.invoke(transformed)
+                }
+            }
+        }
+    }
+
+    private fun startLoopPlayback(triggerSignal: Signal.LED, identifier: Int) {
+        val state = state.value
+        val animation = state.renderedAnimation
+        val totalDuration = (animation.lastOrNull()?.first ?: 0).toDouble()
+        if (totalDuration <= 0) return
+
+        fun playOnce(loopOffset: Double) {
+            if (!heldSignals.contains(identifier)) return
+
+            animation.forEach { (time, signals) ->
+                Heaven.schedule(loopOffset + time, owner = this, identifier = identifier) {
+                    val transformed = transformSignals(signals, triggerSignal)
+                    signalExit?.invoke(transformed)
+                    
+                    // If this is the last frame of the animation, schedule the next loop
+                    if (time.toDouble() == totalDuration && heldSignals.contains(identifier)) {
+                        playOnce(loopOffset + totalDuration)
                     }
                 }
             }
+        }
+
+        playOnce(0.0)
+    }
+
+    private fun transformSignals(signals: List<Signal>, triggerSignal: Signal.LED): List<Signal> {
+        val state = state.value
+        val rootKey = state.rootKey ?: return signals
+        
+        val dx = triggerSignal.x - (rootKey % 10)
+        val dy = triggerSignal.y - (rootKey / 10)
+        
+        if (dx == 0 && dy == 0) return signals
+
+        return signals.map { signal ->
+            if (signal is Signal.LED) {
+                var newX = signal.x + dx
+                var newY = signal.y + dy
+                
+                if (state.wrap) {
+                    newX = (newX % 10 + 10) % 10
+                    newY = (newY % 10 + 10) % 10
+                }
+                
+                if (newX in 0..9 && newY in 0..9) {
+                    signal.copy(x = newX, y = newY, origin = signal.origin)
+                } else {
+                    signal.copy(color = Color.Black, origin = signal.origin)
+                }
+            } else signal
         }
     }
 
@@ -759,5 +875,6 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     override fun onChoke() {
         // Cancel all scheduled Heaven tasks owned by this device
         Heaven.cancelJobsForOwner(this)
+        heldSignals.clear()
     }
 }

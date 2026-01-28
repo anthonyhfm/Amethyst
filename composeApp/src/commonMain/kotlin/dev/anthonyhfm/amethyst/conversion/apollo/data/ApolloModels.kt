@@ -53,10 +53,24 @@ sealed interface ApolloModel {
         val step: Int
     ) : ApolloModel
 
+    data class Offset(
+        val x: Int,
+        val y: Int,
+        val isAbsolute: Boolean,
+        val absoluteX: Int,
+        val absoluteY: Int,
+        val angle: Int
+    ) : ApolloModel
+
     data class Time(
         val free: Boolean,
         val length: Length,
         val divisor: Int
+    ) : ApolloModel
+
+    data class Frame(
+        val time: Time,
+        val colors: List<Color> // 101 items
     ) : ApolloModel
 
     sealed interface Device : ApolloModel {
@@ -87,6 +101,19 @@ sealed interface ApolloModel {
             val hold: Boolean
         ) : Device
 
+        data class Copy(
+            val time: Time,
+            val gate: Double,
+            val pinch: Double,
+            val bilateral: Boolean,
+            val reverse: Boolean,
+            val infinite: Boolean,
+            val mode: Int,
+            val gridMode: Int,
+            val wrap: Boolean,
+            val offsets: List<Offset>
+        ) : Device
+
         data class Hold(
             val time: Time,
             val gate: Double,
@@ -107,6 +134,19 @@ sealed interface ApolloModel {
             val positions: List<Double>,
             val fadeTypes: List<Int>,
             val hasExpanded: Boolean,
+            val expandedIndex: Int
+        ) : Device
+
+        data class Pattern(
+            val repeats: Int,
+            val gate: Double,
+            val pinch: Double,
+            val bilateral: Boolean,
+            val frames: List<Frame>,
+            val playbackMode: Int,
+            val infinite: Boolean,
+            val rootKey: Int?,
+            val wrap: Boolean,
             val expandedIndex: Int
         ) : Device
 

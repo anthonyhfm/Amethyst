@@ -17,9 +17,10 @@ fun TimingControls(
     onTimingChanged: (Timing) -> Unit,
     gate: Float,
     onGateChanged: (Float) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth(),
 
         horizontalArrangement = Arrangement.SpaceEvenly

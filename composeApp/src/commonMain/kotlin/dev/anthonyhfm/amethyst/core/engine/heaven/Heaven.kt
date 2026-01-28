@@ -21,7 +21,8 @@ data class ScheduledJob(
     val id: String,
     val targetTime: Long,
     val job: () -> Unit,
-    val owner: Any? = null
+    val owner: Any? = null,
+    val identifier: Any? = null
 )
 
 object Heaven {
@@ -66,14 +67,14 @@ object Heaven {
     private val jobIdCounter = atomic(0)
 
     @OptIn(ExperimentalTime::class)
-    fun schedule(delayInMs: Double, owner: Any? = null, job: () -> Unit): String {
+    fun schedule(delayInMs: Double, owner: Any? = null, identifier: Any? = null, job: () -> Unit): String {
         val jobId = "job_${jobIdCounter.incrementAndGet()}_${Clock.System.now().toEpochMilliseconds()}"
         val nowTicks = stopWatch.elapsedTicks()
         if (!isAwake) {
             prev = nowTicks
         }
         val targetTime = nowTicks + msToTicks(delayInMs)
-        val scheduledJob = ScheduledJob(jobId, targetTime, job, owner)
+        val scheduledJob = ScheduledJob(jobId, targetTime, job, owner, identifier)
 
         renderScope.launch {
             jobQueue.send(scheduledJob)
@@ -94,8 +95,8 @@ object Heaven {
         }
     }
 
-    fun cancelJobsForOwner(owner: Any) {
-        cancelJobs { it.owner == owner }
+    fun cancelJobsForOwner(owner: Any, identifier: Any? = null) {
+        cancelJobs { it.owner === owner && (identifier == null || it.identifier == identifier) }
     }
 
     fun cancelJob(jobId: String) {

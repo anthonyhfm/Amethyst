@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -39,6 +38,7 @@ import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.effects.gradient.ui.GradientEditorBar
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
 import dev.anthonyhfm.amethyst.ui.components.TextDial
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
@@ -315,8 +315,10 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(start = 12.dp)
                     ) {
-                        Checkbox(
+                        AmethystCheckbox(
                             checked = deviceState.loop,
                             onCheckedChange = { checked ->
                                 val before = state.value

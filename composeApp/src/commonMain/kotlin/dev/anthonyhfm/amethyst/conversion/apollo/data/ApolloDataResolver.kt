@@ -87,6 +87,34 @@ class ApolloDataResolver {
                 chain = readNextType(reader) as ApolloModel.Chain
             )
 
+            ApolloTypes.Offset -> ApolloModel.Offset(
+                x = reader.readInt32(),
+                y = reader.readInt32(),
+                isAbsolute = reader.readBoolean(),
+                absoluteX = reader.readInt32(),
+                absoluteY = reader.readInt32(),
+                angle = reader.readInt32()
+            )
+
+            ApolloTypes.Copy -> {
+                var offsetCount = 0
+                ApolloModel.Device.Copy(
+                    time = readNextType(reader) as ApolloModel.Time,
+                    gate = reader.readDouble(),
+                    pinch = reader.readDouble(),
+                    bilateral = reader.readBoolean(),
+                    reverse = reader.readBoolean(),
+                    infinite = reader.readBoolean(),
+                    mode = reader.readInt32(),
+                    gridMode = reader.readInt32(),
+                    wrap = reader.readBoolean(),
+                    offsets = reader.readInt32().let { count ->
+                        offsetCount = count
+                        List(count) { readNextType(reader) as ApolloModel.Offset }
+                    }
+                )
+            }
+
             ApolloTypes.KeyFilter -> ApolloModel.Device.KeyFilter(
                 filters = List(101) { reader.readBoolean() }
             )
@@ -132,6 +160,32 @@ class ApolloDataResolver {
             }
 
             ApolloTypes.Preview -> ApolloModel.Device.Preview
+
+            ApolloTypes.Pattern -> {
+                var hasRootKey = false
+                ApolloModel.Device.Pattern(
+                    repeats = reader.readInt32(),
+                    gate = reader.readDouble(),
+                    pinch = reader.readDouble(),
+                    bilateral = reader.readBoolean(),
+                    frames = List(reader.readInt32()) {
+                        readNextType(reader) as ApolloModel.Frame
+                    },
+                    playbackMode = reader.readInt32(),
+                    infinite = reader.readBoolean(),
+                    rootKey = reader.readBoolean().let {
+                        hasRootKey = it
+                        if (hasRootKey) reader.readInt32() else null
+                    },
+                    wrap = reader.readBoolean(),
+                    expandedIndex = reader.readInt32()
+                )
+            }
+
+            ApolloTypes.Frame -> ApolloModel.Frame(
+                time = readNextType(reader) as ApolloModel.Time,
+                colors = List(101) { readNextType(reader) as ApolloModel.Color }
+            )
 
             else -> {
                 error("Unknown type: $type")

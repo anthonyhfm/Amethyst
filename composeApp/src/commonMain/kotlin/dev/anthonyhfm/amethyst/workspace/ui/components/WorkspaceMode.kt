@@ -142,14 +142,23 @@ fun LargeLayout(
             }
         }
 
-        selectableModes.forEach { it ->
+        selectableModes.forEach { item ->
+            val isSelected = when {
+                mode is WorkspaceContract.WorkspaceMode.Layout && item.mode is WorkspaceContract.WorkspaceMode.Layout -> true
+                mode is WorkspaceContract.WorkspaceMode.Preview && item.mode is WorkspaceContract.WorkspaceMode.Preview -> true
+                mode is WorkspaceContract.WorkspaceMode.LightsChain && item.mode is WorkspaceContract.WorkspaceMode.LightsChain -> true
+                mode is WorkspaceContract.WorkspaceMode.SamplingChain && item.mode is WorkspaceContract.WorkspaceMode.SamplingChain -> true
+                mode is WorkspaceContract.WorkspaceMode.Timeline && item.mode is WorkspaceContract.WorkspaceMode.Timeline -> true
+                else -> false
+            }
+
             Row(
                 modifier = Modifier
                     .clip(CircleShape)
                     .height(44.dp)
                     .background(
                         animateColorAsState(
-                            targetValue = if (mode == it.mode) {
+                            targetValue = if (isSelected) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 Color.Transparent
@@ -157,20 +166,20 @@ fun LargeLayout(
                         ).value
                     )
                     .clickable {
-                        WorkspaceRepository.switchMode(it.mode)
+                        WorkspaceRepository.switchMode(item.mode)
                     },
 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = it.icon ?: Icons.Default.Close,
-                    contentDescription = it.text,
+                    imageVector = item.icon ?: Icons.Default.Close,
+                    contentDescription = item.text,
                     modifier = Modifier
                         .clip(CircleShape)
                         .padding(12.dp)
                         .size(22.dp),
                     tint = animateColorAsState(
-                        targetValue = if (mode == it.mode) {
+                        targetValue = if (isSelected) {
                             MaterialTheme.colorScheme.onPrimary
                         } else {
                             MaterialTheme.colorScheme.onSurface
@@ -179,12 +188,12 @@ fun LargeLayout(
                 )
 
                 AnimatedVisibility(
-                    visible = mode == it.mode,
+                    visible = isSelected,
                 ) {
                     Text(
-                        text = it.text,
+                        text = item.text,
                         color = animateColorAsState(
-                            targetValue = if (mode == it.mode) {
+                            targetValue = if (isSelected) {
                                 MaterialTheme.colorScheme.onPrimary
                             } else {
                                 MaterialTheme.colorScheme.onSurface
@@ -219,7 +228,16 @@ fun CompactLayout(
                     .background(MaterialTheme.colorScheme.surfaceContainer)
                     .border(1.dp, MaterialTheme.colorScheme.outline.copy(0.2f), RoundedCornerShape(22.dp))
             ) {
-                selectableModes.find { it.mode == mode }?.let { current ->
+                selectableModes.find { item ->
+                    when {
+                        mode is WorkspaceContract.WorkspaceMode.Layout && item.mode is WorkspaceContract.WorkspaceMode.Layout -> true
+                        mode is WorkspaceContract.WorkspaceMode.Preview && item.mode is WorkspaceContract.WorkspaceMode.Preview -> true
+                        mode is WorkspaceContract.WorkspaceMode.LightsChain && item.mode is WorkspaceContract.WorkspaceMode.LightsChain -> true
+                        mode is WorkspaceContract.WorkspaceMode.SamplingChain && item.mode is WorkspaceContract.WorkspaceMode.SamplingChain -> true
+                        mode is WorkspaceContract.WorkspaceMode.Timeline && item.mode is WorkspaceContract.WorkspaceMode.Timeline -> true
+                        else -> false
+                    }
+                }?.let { current ->
                     Row(
                         modifier = Modifier
                             .padding(2.dp)
@@ -271,7 +289,16 @@ fun CompactLayout(
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                     ) {
                         selectableModes
-                            .filterNot { it.mode == mode }
+                            .filterNot { item ->
+                                when {
+                                    mode is WorkspaceContract.WorkspaceMode.Layout && item.mode is WorkspaceContract.WorkspaceMode.Layout -> true
+                                    mode is WorkspaceContract.WorkspaceMode.Preview && item.mode is WorkspaceContract.WorkspaceMode.Preview -> true
+                                    mode is WorkspaceContract.WorkspaceMode.LightsChain && item.mode is WorkspaceContract.WorkspaceMode.LightsChain -> true
+                                    mode is WorkspaceContract.WorkspaceMode.SamplingChain && item.mode is WorkspaceContract.WorkspaceMode.SamplingChain -> true
+                                    mode is WorkspaceContract.WorkspaceMode.Timeline && item.mode is WorkspaceContract.WorkspaceMode.Timeline -> true
+                                    else -> false
+                                }
+                            }
                             .forEach { item ->
                                 Row(
                                     modifier = Modifier

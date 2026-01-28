@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -31,17 +31,14 @@ fun InfinityCheckbox(
             .width(220.dp)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp)
-            .padding(top = 4.dp),
+            .padding(horizontal = 12.dp),
 
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
-        Checkbox(
+        AmethystCheckbox(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            modifier = Modifier
-                .offset(x = (-8).dp)
         )
 
         Text(
@@ -49,8 +46,6 @@ fun InfinityCheckbox(
             style = MaterialTheme.typography.bodyLarge.copy(
                 lineHeight = MaterialTheme.typography.bodyLarge.fontSize
             ),
-            modifier = Modifier
-                .offset(x = (-8).dp)
         )
     }
 }

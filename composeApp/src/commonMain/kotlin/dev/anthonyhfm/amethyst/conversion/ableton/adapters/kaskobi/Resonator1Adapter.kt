@@ -34,10 +34,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(-steps, steps))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = -steps, y = -steps))
                                         )
                                     )
                                 )
@@ -53,10 +52,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(0, steps))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = 0, y = -steps))
                                         )
                                     )
                                 )
@@ -72,10 +70,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(steps, steps))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = steps, y = -steps))
                                         )
                                     )
                                 )
@@ -91,10 +88,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(-steps, 0))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = -steps, y = 0))
                                         )
                                     )
                                 )
@@ -110,10 +106,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(steps, 0))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = steps, y = 0))
                                         )
                                     )
                                 )
@@ -129,10 +124,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(-steps, -steps))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = -steps, y = steps))
                                         )
                                     )
                                 )
@@ -148,10 +142,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(0, -steps))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = 0, y = steps))
                                         )
                                     )
                                 )
@@ -167,10 +160,9 @@ class Resonator1Adapter(
                                     devices = listOf(
                                         CopyChainDeviceState(
                                             isolate = isolation,
-                                            type = CopyChainDeviceState.CopyType.INTERPOLATE,
+                                            mode = CopyChainDeviceState.CopyMode.INTERPOLATE,
                                             timing = Timing.Duration(stepDelayValue.milliseconds),
-                                            delayMs = stepDelayValue.roundToLong(),
-                                            offsets = listOf(Pair(steps, -steps))
+                                            offsets = listOf(CopyChainDeviceState.Offset(x = steps, y = steps))
                                         )
                                     )
                                 )
