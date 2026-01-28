@@ -151,5 +151,10 @@ sealed interface ApolloModel {
         ) : Device
 
         data object Preview : Device
+
+        data class Switch(
+            val target: Int,
+            val value: Int
+        ) : Device
     }
 }

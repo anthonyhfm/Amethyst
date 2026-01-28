@@ -187,6 +187,11 @@ class ApolloDataResolver {
                 colors = List(101) { readNextType(reader) as ApolloModel.Color }
             )
 
+            ApolloTypes.Switch -> ApolloModel.Device.Switch(
+                target = reader.readInt32(),
+                value = reader.readInt32()
+            )
+
             else -> {
                 error("Unknown type: $type")
             }

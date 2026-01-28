@@ -10,6 +10,7 @@ import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloKeyFilterAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloLoopAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloPaintAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloPatternAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloSwitchAdapter
 import dev.anthonyhfm.amethyst.devices.DeviceState
 
 abstract class ApolloAdapter<T: ApolloModel.Device>(
@@ -31,6 +32,7 @@ abstract class ApolloAdapter<T: ApolloModel.Device>(
                 is ApolloModel.Device.Paint -> ApolloPaintAdapter(model)
                 is ApolloModel.Device.Fade -> ApolloFadeAdapter(model)
                 is ApolloModel.Device.Pattern -> ApolloPatternAdapter(model)
+                is ApolloModel.Device.Switch -> ApolloSwitchAdapter(model)
 
                 else -> error("Apollo adapter missing for: ${model::class.simpleName}")
             }.toDeviceState()
