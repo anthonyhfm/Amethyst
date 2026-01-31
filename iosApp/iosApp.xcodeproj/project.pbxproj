@@ -103,11 +103,10 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7555FFA5242A565B00829871 /* Build configuration list for PBXNativeTarget "iosApp" */;
 			buildPhases = (
-				F36B1CEB2AD83DDC00CB74D5 /* Compile Kotlin Framework */,
 				7555FF77242A565900829871 /* Sources */,
 				B92378962B6B1156000C7307 /* Frameworks */,
 				7555FF79242A565900829871 /* Resources */,
-				92B8EA712F24EB5200CAFFC3 /* ShellScript */,
+				92B8EA712F24EB5200CAFFC3 /* Embed and Sign Kotlin Framework */,
 			);
 			buildRules = (
 			);
@@ -174,25 +173,9 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		92B8EA712F24EB5200CAFFC3 /* ShellScript */ = {
+		92B8EA712F24EB5200CAFFC3 /* Embed and Sign Kotlin Framework */ = {
 			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 12;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -e\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ] && [ -d \"$CI_DERIVED_DATA_PATH/JDK/Home\" ]; then\n  export JAVA_HOME=\"$CI_DERIVED_DATA_PATH/JDK/Home\"\n  export PATH=\"$JAVA_HOME/bin:$PATH\"\nfi\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ]; then\n  export GRADLE_USER_HOME=\"$CI_DERIVED_DATA_PATH/.gradle\"\nfi\n\necho \"JAVA_HOME=$JAVA_HOME\"\njava -version\n\ncd \"$SRCROOT/..\"\nchmod +x ./gradlew\n\nexport KOTLIN_FRAMEWORK_BUILD_TYPE=Release\n\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode --stacktrace --info\n";
-		};
-		F36B1CEB2AD83DDC00CB74D5 /* Compile Kotlin Framework */ = {
-			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -200,14 +183,14 @@
 			);
 			inputPaths = (
 			);
-			name = "Compile Kotlin Framework";
+			name = "Embed and Sign Kotlin Framework";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/..\"\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
+			shellScript = "set -e\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ] && [ -d \"$CI_DERIVED_DATA_PATH/JDK/Home\" ]; then\n  export JAVA_HOME=\"$CI_DERIVED_DATA_PATH/JDK/Home\"\n  export PATH=\"$JAVA_HOME/bin:$PATH\"\nfi\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ]; then\n  export GRADLE_USER_HOME=\"$CI_DERIVED_DATA_PATH/.gradle\"\nfi\n\n# Wenn wir nicht in CI sind, prüfen wir ob JAVA_HOME gesetzt ist,\n# ansonsten versuchen wir es über /usr/libexec/java_home zu finden.\nif [ -z \"$CI_PULL_REQUEST_NUMBER\" ] && [ -z \"$JAVA_HOME\" ]; then\n  if [ -x /usr/libexec/java_home ]; then\n    export JAVA_HOME=$(/usr/libexec/java_home)\n  fi\nfi\n\necho \"JAVA_HOME=$JAVA_HOME\"\njava -version\n\ncd \"$SRCROOT/..\"\nchmod +x ./gradlew\n\n# Bestimme den Build-Typ basierend auf der Xcode-Konfiguration\nif [ \"$CONFIGURATION\" = \"Release\" ]; then\n  export KOTLIN_FRAMEWORK_BUILD_TYPE=Release\nelse\n  export KOTLIN_FRAMEWORK_BUILD_TYPE=Debug\nfi\n\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

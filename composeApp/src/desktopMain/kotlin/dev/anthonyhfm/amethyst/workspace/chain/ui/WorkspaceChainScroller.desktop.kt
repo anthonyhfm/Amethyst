@@ -32,10 +32,10 @@ actual fun WorkspaceChainScroller(scrollState: ScrollState) {
         style = ScrollbarStyle(
             unhoverColor = MaterialTheme.colorScheme.onSurface.copy(0.2f),
             hoverColor = MaterialTheme.colorScheme.onSurface.copy(0.6f),
-            minimalHeight = 12.dp,
+            minimalHeight = 4.dp,
             hoverDurationMillis = 200,
             shape = RoundedCornerShape(8.dp),
-            thickness = 12.dp
+            thickness = 4.dp
         )
     )
 }

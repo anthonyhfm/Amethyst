@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.settings.ui.views.AudioSettingsView
 import dev.anthonyhfm.amethyst.settings.ui.views.DiscordSettingsView
 import dev.anthonyhfm.amethyst.settings.ui.views.ExperimentalSettingsView
@@ -57,7 +59,9 @@ fun Settings(
 
                 AudioSettingsView()
 
-                DiscordSettingsView()
+                if (platform !is Platform.Desktop) {
+                    DiscordSettingsView()
+                }
 
                 ExperimentalSettingsView()
             }

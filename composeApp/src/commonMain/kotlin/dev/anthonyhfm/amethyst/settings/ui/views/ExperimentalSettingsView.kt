@@ -44,7 +44,7 @@ fun ExperimentalSettingsView() {
         }
 
         SettingsItem(
-            title = "Extensions",
+            title = "Amethyst Gems",
         ) {
             Switch(
                 checked = enableExtension,
