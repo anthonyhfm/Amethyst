@@ -67,7 +67,6 @@ kotlin {
             implementation(libs.multiplatform.settings.no.arg)
             implementation("io.github.vinceglb:filekit-core:0.10.0")
             implementation("io.github.vinceglb:filekit-dialogs:0.10.0")
-            implementation(libs.dropdown)
             implementation("io.github.pdvrieze.xmlutil:core:1.0.0-rc1")
             implementation("io.github.pdvrieze.xmlutil:serialization:1.0.0-rc1")
             implementation("io.github.pdvrieze.xmlutil:serialutil:1.0.0-rc1")

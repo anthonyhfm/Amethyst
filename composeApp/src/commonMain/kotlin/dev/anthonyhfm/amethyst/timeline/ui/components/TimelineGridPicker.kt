@@ -24,21 +24,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.MenuItem
-import io.androidpoet.dropdown.dropDownMenu
-import io.androidpoet.dropdown.EnterAnimation
-import io.androidpoet.dropdown.ExitAnimation
-import io.androidpoet.dropdown.Easing
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 
 @Composable
 fun TimelineGridPicker() {
     val current by WorkspaceRepository.gridType.collectAsState()
     var open by remember { mutableStateOf(false) }
-
-    val menu = remember {
-        buildGridMenu()
-    }
 
     Box(
         modifier = Modifier
@@ -50,63 +42,35 @@ fun TimelineGridPicker() {
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.TwoTone.GridView, contentDescription = "Grid Type", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
+            Icon(
+                Icons.TwoTone.GridView,
+                contentDescription = "Grid Type",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 
-    Dropdown(
-        isOpen = open,
-        menu = menu,
-        onItemSelected = { key ->
-            open = false
-            if (key != null) {
-                menuToGridType(key)?.let { WorkspaceRepository.setGridType(it) }
-            }
-        },
-        onDismiss = { open = false },
-        enter = EnterAnimation.SharedAxisXForward,
-        exit = ExitAnimation.SharedAxisXBackward,
-        easing = Easing.FastOutSlowInEasing,
-        enterDuration = 300,
-        exitDuration = 300
-    )
-}
+    AmethystContextMenu(
+        expanded = open,
+        onDismissRequest = { open = false }
+    ) { _, _, _ ->
+        // Flexible
+        ContextMenuItem(label = "Flexible: Smallest", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Smallest); open = false })
+        ContextMenuItem(label = "Flexible: Small", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Small); open = false })
+        ContextMenuItem(label = "Flexible: Medium", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Medium); open = false })
+        ContextMenuItem(label = "Flexible: Large", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Large); open = false })
+        ContextMenuItem(label = "Flexible: Largest", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Largest); open = false })
 
-private fun buildGridMenu(): MenuItem<String> = dropDownMenu {
-    item("flex", "Flexible") {
-        item("flex_smallest", "Smallest") {}
-        item("flex_small", "Small") {}
-        item("flex_medium", "Medium") {}
-        item("flex_large", "Large") {}
-        item("flex_largest", "Largest") {}
+        // Fixed
+        ContextMenuItem(label = "Fixed: 1 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_1); open = false })
+        ContextMenuItem(label = "Fixed: 2 Bars", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_2); open = false })
+        ContextMenuItem(label = "Fixed: 4 Bars", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_4); open = false })
+        ContextMenuItem(label = "Fixed: 8 Bars", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_8); open = false })
+        ContextMenuItem(label = "Fixed: 1/2 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_2); open = false })
+        ContextMenuItem(label = "Fixed: 1/4 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_4); open = false })
+        ContextMenuItem(label = "Fixed: 1/8 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_8); open = false })
+        ContextMenuItem(label = "Fixed: 1/16 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_16); open = false })
+        ContextMenuItem(label = "Fixed: 1/32 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_32); open = false })
     }
-    item("fixed", "Fixed") {
-        item("fixed_bar1", "1 Bar") {}
-        item("fixed_bar2", "2 Bars") {}
-        item("fixed_bar4", "4 Bars") {}
-        item("fixed_bar8", "8 Bars") {}
-        item("fixed_1_2", "1/2 Bar") {}
-        item("fixed_1_4", "1/4 Bar") {}
-        item("fixed_1_8", "1/8 Bar") {}
-        item("fixed_1_16", "1/16 Bar") {}
-        item("fixed_1_32", "1/32 Bar") {}
-    }
-}
-
-private fun menuToGridType(key: String): GridUtils.GridType? = when (key) {
-    "flex_smallest" -> GridUtils.GridType.Flexible.Smallest
-    "flex_small" -> GridUtils.GridType.Flexible.Small
-    "flex_medium" -> GridUtils.GridType.Flexible.Medium
-    "flex_large" -> GridUtils.GridType.Flexible.Large
-    "flex_largest" -> GridUtils.GridType.Flexible.Largest
-    "fixed_bar1" -> GridUtils.GridType.Fixed.Bar_1
-    "fixed_bar2" -> GridUtils.GridType.Fixed.Bar_2
-    "fixed_bar4" -> GridUtils.GridType.Fixed.Bar_4
-    "fixed_bar8" -> GridUtils.GridType.Fixed.Bar_8
-    "fixed_1_2" -> GridUtils.GridType.Fixed._1_2
-    "fixed_1_4" -> GridUtils.GridType.Fixed._1_4
-    "fixed_1_8" -> GridUtils.GridType.Fixed._1_8
-    "fixed_1_16" -> GridUtils.GridType.Fixed._1_16
-    "fixed_1_32" -> GridUtils.GridType.Fixed._1_32
-    else -> null
 }

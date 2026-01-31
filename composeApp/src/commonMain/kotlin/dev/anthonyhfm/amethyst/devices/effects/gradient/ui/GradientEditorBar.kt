@@ -33,9 +33,9 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientSmoothness
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.dropDownMenu
 
 @Composable
 fun GradientEditorBar(
@@ -240,50 +240,68 @@ fun GradientEditorBar(
                         }
                 )
 
-                Dropdown(
-                    isOpen = showSmoothnessMenu,
-                    menu = dropDownMenu {
-                        item("linear", "Linear") {
-                            icon(Icons.Default.BlurLinear)
+                AmethystContextMenu(
+                    expanded = showSmoothnessMenu,
+                    onDismissRequest = { showSmoothnessMenu = false },
+                    offset = smoothnessMenuOffset
+                ) { _, _, _ ->
+                    ContextMenuItem(
+                        label = "Linear",
+                        icon = Icons.Default.BlurLinear,
+                        onClick = {
+                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Linear)
+                            showSmoothnessMenu = false
                         }
-                        item("smooth", "Smooth") {
-                            icon(Icons.Default.BlurLinear)
+                    )
+                    ContextMenuItem(
+                        label = "Smooth",
+                        icon = Icons.Default.BlurLinear,
+                        onClick = {
+                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Smooth)
+                            showSmoothnessMenu = false
                         }
-                        item("sharp", "Sharp") {
-                            icon(Icons.Default.BlurLinear)
+                    )
+                    ContextMenuItem(
+                        label = "Sharp",
+                        icon = Icons.Default.BlurLinear,
+                        onClick = {
+                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Sharp)
+                            showSmoothnessMenu = false
                         }
-                        item("fast", "Fast") {
-                            icon(Icons.Default.BlurLinear)
+                    )
+                    ContextMenuItem(
+                        label = "Fast",
+                        icon = Icons.Default.BlurLinear,
+                        onClick = {
+                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Fast)
+                            showSmoothnessMenu = false
                         }
-                        item("slow", "Slow") {
-                            icon(Icons.Default.BlurLinear)
+                    )
+                    ContextMenuItem(
+                        label = "Slow",
+                        icon = Icons.Default.BlurLinear,
+                        onClick = {
+                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Slow)
+                            showSmoothnessMenu = false
                         }
-                        item("hold", "Hold") {
-                            icon(Icons.Default.BlurLinear)
+                    )
+                    ContextMenuItem(
+                        label = "Hold",
+                        icon = Icons.Default.BlurLinear,
+                        onClick = {
+                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Hold)
+                            showSmoothnessMenu = false
                         }
-                        item("release", "Release") {
-                            icon(Icons.Default.BlurLinear)
+                    )
+                    ContextMenuItem(
+                        label = "Release",
+                        icon = Icons.Default.BlurLinear,
+                        onClick = {
+                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Release)
+                            showSmoothnessMenu = false
                         }
-                    },
-                    offset = smoothnessMenuOffset,
-                    onItemSelected = { item ->
-                        val smoothness = when (item) {
-                            "linear" -> GradientSmoothness.Linear
-                            "smooth" -> GradientSmoothness.Smooth
-                            "sharp" -> GradientSmoothness.Sharp
-                            "fast" -> GradientSmoothness.Fast
-                            "slow" -> GradientSmoothness.Slow
-                            "hold" -> GradientSmoothness.Hold
-                            "release" -> GradientSmoothness.Release
-                            else -> GradientSmoothness.Linear
-                        }
-                        onSmoothnessChange(color.selectionUUID, smoothness)
-                        showSmoothnessMenu = false
-                    },
-                    onDismiss = {
-                        showSmoothnessMenu = false
-                    }
-                )
+                    )
+                }
             }
         }
     }

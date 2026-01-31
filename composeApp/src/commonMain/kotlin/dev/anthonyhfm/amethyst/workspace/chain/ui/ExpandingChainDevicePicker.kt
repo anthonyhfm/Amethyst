@@ -56,12 +56,12 @@ import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.dropDownMenu
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -201,28 +201,17 @@ fun ExpandingChainDevicePicker(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (clipboard is ClipboardData.ChainDevice || clipboard is ClipboardData.TimelineAudioEntries || clipboard is ClipboardData.TimelineMidiEntries) {
-            Dropdown(
-                isOpen = showRightClickMenu,
+            AmethystContextMenu(
+                expanded = showRightClickMenu,
+                onDismissRequest = { showRightClickMenu = false },
                 offset = rightClickMenuOffset,
-                menu = dropDownMenu {
-                    if (clipboard is ClipboardData.ChainDevice) {
-                        val count = (clipboard as ClipboardData.ChainDevice).states.size
-                        item("paste", "Paste all ($count)") {
-                            icon(Icons.Default.ContentPaste)
-                        }
-                    } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
-                        item("paste_audio", "Paste Audio from Timeline") {
-                            icon(Icons.Default.ContentPaste)
-                        }
-                    } else if (clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
-                        item("paste_midi", "Paste Midi from Timeline") {
-                            icon(Icons.Default.ContentPaste)
-                        }
-                    }
-                },
-                onItemSelected = {
-                    when (it) {
-                        "paste" -> {
+            ) { _, _, _ ->
+                if (clipboard is ClipboardData.ChainDevice) {
+                    val count = (clipboard as ClipboardData.ChainDevice).states.size
+                    ContextMenuItem(
+                        label = "Paste all ($count)",
+                        icon = Icons.Default.ContentPaste,
+                        onClick = {
                             (clipboard as ClipboardData.ChainDevice).states.map {
                                 StateChain.unpackDevice(it)
                             }.fastForEachReversed {
@@ -231,9 +220,14 @@ fun ExpandingChainDevicePicker(
                                     atIndex = slotIndex
                                 )
                             }
+                            showRightClickMenu = false
                         }
-
-                        "paste_audio" -> {
+                    )
+                } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                    ContextMenuItem(
+                        label = "Paste Audio from Timeline",
+                        icon = Icons.Default.ContentPaste,
+                        onClick = {
                             (clipboard as ClipboardData.TimelineAudioEntries).entries.fastForEachReversed {
                                 destinationChain.add(
                                     device = StateChain.unpackDevice(
@@ -248,9 +242,14 @@ fun ExpandingChainDevicePicker(
                                     )
                                 )
                             }
+                            showRightClickMenu = false
                         }
-
-                        "paste_midi" -> {
+                    )
+                } else if (clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
+                    ContextMenuItem(
+                        label = "Paste Midi from Timeline",
+                        icon = Icons.Default.ContentPaste,
+                        onClick = {
                             (clipboard as ClipboardData.TimelineMidiEntries).entries.fastForEachReversed { midiEntry ->
                                 destinationChain.add(
                                     device = StateChain.unpackDevice(
@@ -261,15 +260,11 @@ fun ExpandingChainDevicePicker(
                                     atIndex = slotIndex
                                 )
                             }
+                            showRightClickMenu = false
                         }
-                    }
-
-                    showRightClickMenu = false
-                },
-                onDismiss = {
-                    showRightClickMenu = false
+                    )
                 }
-            )
+            }
         }
 
         Box(

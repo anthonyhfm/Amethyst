@@ -62,10 +62,11 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.ui.components.AddTrackButton
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.dropDownMenu
+import androidx.compose.material3.HorizontalDivider
 
 @Composable
 fun TrackListView(
@@ -258,52 +259,51 @@ fun TrackContextMenu(
     offset: DpOffset,
     onDismiss: () -> Unit
 ) {
-    Dropdown(
-        isOpen = visible,
-        menu = dropDownMenu {
-            item("duplicate", "Duplicate Track") {
-                icon(Icons.Default.ControlPointDuplicate)
-            }
-
-            horizontalDivider()
-
-            item("delete", "Delete Track") {
-                icon(Icons.Default.Delete)
-            }
-        },
-        offset = offset,
-        onItemSelected = {
-            when (it) {
-                "duplicate" -> {
-                    val duplicated = TimelineRepository.duplicateTrack(trackIndex)
-                    if (duplicated != null) {
-                        UndoManager.addAction(
-                            UndoableAction.TrackDuplication(
-                                originalIndex = trackIndex,
-                                duplicatedIndex = trackIndex + 1,
-                                duplicatedTrack = duplicated
-                            )
+    AmethystContextMenu(
+        expanded = visible,
+        onDismissRequest = onDismiss,
+        offset = offset
+    ) { _, _, _ ->
+        ContextMenuItem(
+            label = "Duplicate Track",
+            icon = Icons.Default.ControlPointDuplicate,
+            onClick = {
+                val duplicated = TimelineRepository.duplicateTrack(trackIndex)
+                if (duplicated != null) {
+                    UndoManager.addAction(
+                        UndoableAction.TrackDuplication(
+                            originalIndex = trackIndex,
+                            duplicatedIndex = trackIndex + 1,
+                            duplicatedTrack = duplicated
                         )
-                    }
+                    )
                 }
-                "delete" -> {
-                    val removed = TimelineRepository.tracks.value.getOrNull(trackIndex)
-                    if (removed != null) {
-                        UndoManager.addAction(
-                            UndoableAction.TrackRemoval(
-                                trackIndex = trackIndex,
-                                track = removed
-                            )
-                        )
-                        TimelineRepository.removeTrack(trackIndex)
-                        SelectionManager.clear()
-                    }
-                }
+                onDismiss()
             }
-            onDismiss()
-        },
-        onDismiss = {
-            onDismiss()
-        }
-    )
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
+
+        ContextMenuItem(
+            label = "Delete Track",
+            icon = Icons.Default.Delete,
+            onClick = {
+                val removed = TimelineRepository.tracks.value.getOrNull(trackIndex)
+                if (removed != null) {
+                    UndoManager.addAction(
+                        UndoableAction.TrackRemoval(
+                            trackIndex = trackIndex,
+                            track = removed
+                        )
+                    )
+                    TimelineRepository.removeTrack(trackIndex)
+                    SelectionManager.clear()
+                }
+                onDismiss()
+            }
+        )
+    }
 }

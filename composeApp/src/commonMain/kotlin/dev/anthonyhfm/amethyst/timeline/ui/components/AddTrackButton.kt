@@ -18,11 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.Easing
-import io.androidpoet.dropdown.EnterAnimation
-import io.androidpoet.dropdown.ExitAnimation
-import io.androidpoet.dropdown.dropDownMenu
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 
 @Composable
 fun AddTrackButton(
@@ -30,16 +27,7 @@ fun AddTrackButton(
     onAddAudioTrack: () -> Unit = {}
 ) {
     var showDropdown by remember { mutableStateOf(false) }
-    
-    val trackMenu = dropDownMenu {
-        item("track_midi", "Midi Track") {
-            icon(Icons.TwoTone.Lightbulb)
-        }
-        item("track_audio", "Audio Track") {
-            icon(Icons.TwoTone.Audiotrack)
-        }
-    }
-    
+
     Box(
         modifier = Modifier
             .width(200.dp)
@@ -57,25 +45,27 @@ fun AddTrackButton(
                 contentDescription = "Add Track"
             )
         }
-        
-        Dropdown(
-            isOpen = showDropdown,
-            menu = trackMenu,
-            onItemSelected = { selectedItem ->
-                showDropdown = false
-                when (selectedItem) {
-                    "track_midi" -> onAddLightsTrack()
-                    "track_audio" -> onAddAudioTrack()
+
+        AmethystContextMenu(
+            expanded = showDropdown,
+            onDismissRequest = { showDropdown = false }
+        ) { _, _, _ ->
+            ContextMenuItem(
+                label = "Midi Track",
+                icon = Icons.TwoTone.Lightbulb,
+                onClick = {
+                    onAddLightsTrack()
+                    showDropdown = false
                 }
-            },
-            onDismiss = {
-                showDropdown = false
-            },
-            enter = EnterAnimation.SharedAxisXForward,
-            exit = ExitAnimation.SharedAxisXBackward,
-            easing = Easing.FastOutSlowInEasing,
-            enterDuration = 400,
-            exitDuration = 400
-        )
+            )
+            ContextMenuItem(
+                label = "Audio Track",
+                icon = Icons.TwoTone.Audiotrack,
+                onClick = {
+                    onAddAudioTrack()
+                    showDropdown = false
+                }
+            )
+        }
     }
 }

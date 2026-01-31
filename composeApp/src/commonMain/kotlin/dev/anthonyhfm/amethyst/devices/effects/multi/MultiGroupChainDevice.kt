@@ -92,6 +92,8 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.chain.ui.AnimatedInsertedDevice
@@ -100,8 +102,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
 import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
 import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.dropDownMenu
+import androidx.compose.material3.HorizontalDivider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
@@ -373,48 +374,63 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
         }
 
         // Context menu
-        Dropdown(
-            isOpen = showRightClickMenu,
-            menu = dropDownMenu {
-                item("copy", "Copy") {
-                    icon(Icons.Default.ContentCopy)
+        AmethystContextMenu(
+            expanded = showRightClickMenu,
+            onDismissRequest = { showRightClickMenu = false },
+            offset = rightClickMenuOffset
+        ) { _, _, _ ->
+            ContextMenuItem(
+                label = "Copy",
+                icon = Icons.Default.ContentCopy,
+                onClick = {
+                    copyGroup(group)
+                    showRightClickMenu = false
                 }
+            )
 
-                if (hasGroupsInClipboard) {
-                    item("paste", "Paste") {
-                        icon(Icons.Default.ContentPaste)
+            if (hasGroupsInClipboard) {
+                ContextMenuItem(
+                    label = "Paste",
+                    icon = Icons.Default.ContentPaste,
+                    onClick = {
+                        pasteGroup(index)
+                        showRightClickMenu = false
                     }
-                }
-
-                item("duplicate", "Duplicate") {
-                    icon(Icons.Default.ControlPointDuplicate)
-                }
-
-                item("rename", "Rename") {
-                    icon(Icons.Default.Edit)
-                }
-
-                horizontalDivider()
-
-                item("delete", "Delete") {
-                    icon(Icons.Default.DeleteOutline)
-                }
-            },
-            offset = rightClickMenuOffset,
-            onItemSelected = {
-                when (it) {
-                    "copy" -> copyGroup(group)
-                    "paste" -> pasteGroup(index)
-                    "duplicate" -> duplicateGroup(index)
-                    "rename" -> onRenameChange(true)
-                    "delete" -> removeGroup(index)
-                }
-                showRightClickMenu = false
-            },
-            onDismiss = {
-                showRightClickMenu = false
+                )
             }
-        )
+
+            ContextMenuItem(
+                label = "Duplicate",
+                icon = Icons.Default.ControlPointDuplicate,
+                onClick = {
+                    duplicateGroup(index)
+                    showRightClickMenu = false
+                }
+            )
+
+            ContextMenuItem(
+                label = "Rename",
+                icon = Icons.Default.Edit,
+                onClick = {
+                    onRenameChange(true)
+                    showRightClickMenu = false
+                }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+
+            ContextMenuItem(
+                label = "Delete",
+                icon = Icons.Default.DeleteOutline,
+                onClick = {
+                    removeGroup(index)
+                    showRightClickMenu = false
+                }
+            )
+        }
 
         Row(
             modifier = Modifier
@@ -533,47 +549,41 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
         var showRightClickMenu by remember { mutableStateOf(false) }
         var rightClickMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
-        Dropdown(
-            isOpen = showRightClickMenu && hasDevicesInClipboard,
-            menu = dropDownMenu {
-                item("paste_as_group", "Paste as Group") {
-                    icon(Icons.Default.ContentPaste)
-                }
-            },
-            offset = rightClickMenuOffset,
-            onItemSelected = {
-                when (it) {
-                    "paste_as_group" -> {
-                        val clipData = clipboard as ClipboardData.ChainDevice
-                        val newGroup = Group(
-                            name = "Chain #",
-                            chain = Chain().apply {
-                                clipData.states.forEach { state ->
-                                    add(StateChain.unpackDevice(state))
-                                }
-                                signalExit = { signal ->
-                                    this@MultiGroupChainDevice.signalExit?.invoke(signal)
-                                }
+        AmethystContextMenu(
+            expanded = showRightClickMenu && hasDevicesInClipboard,
+            onDismissRequest = { showRightClickMenu = false },
+            offset = rightClickMenuOffset
+        ) { _, _, _ ->
+            ContextMenuItem(
+                label = "Paste as Group",
+                icon = Icons.Default.ContentPaste,
+                onClick = {
+                    val clipData = clipboard as ClipboardData.ChainDevice
+                    val newGroup = Group(
+                        name = "Chain #",
+                        chain = Chain().apply {
+                            clipData.states.forEach { state ->
+                                add(StateChain.unpackDevice(state))
                             }
-                        )
-                        
-                        val insertIndex = state.value.groups.size
-                        state.update {
-                            it.copy(
-                                groups = it.groups.toMutableList().apply {
-                                    add(newGroup)
-                                },
-                                openedGroupIndex = insertIndex
-                            )
+                            signalExit = { signal ->
+                                this@MultiGroupChainDevice.signalExit?.invoke(signal)
+                            }
                         }
+                    )
+
+                    val insertIndex = state.value.groups.size
+                    state.update {
+                        it.copy(
+                            groups = it.groups.toMutableList().apply {
+                                add(newGroup)
+                            },
+                            openedGroupIndex = insertIndex
+                        )
                     }
+                    showRightClickMenu = false
                 }
-                showRightClickMenu = false
-            },
-            onDismiss = {
-                showRightClickMenu = false
-            }
-        )
+            )
+        }
 
         Row(
             modifier = Modifier

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.ControlPointDuplicate
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.FindReplace
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -55,12 +56,12 @@ import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.dropDownMenu
 
 @Composable
 fun WorkspaceChainEditor(
@@ -318,58 +319,47 @@ fun ChainDeviceContextMenu(
 ) {
     val currentClipboard by ClipboardManager.clipboardData.collectAsState()
 
-    Dropdown(
-        isOpen = visible,
-        menu = dropDownMenu {
-            item("copy", "Copy") {
-                icon(Icons.Default.ContentCopy)
-            }
-
-            item("duplicate", "Duplicate") {
-                icon(Icons.Default.ControlPointDuplicate)
-            }
-
-            if (currentClipboard is ClipboardData.ChainDevice) {
-                item("paste", "Paste") {
-                    icon(Icons.Default.ContentPaste)
-                }
-
-                item("replace", "Paste Replace") {
-                    icon(Icons.Default.FindReplace)
-                }
-            }
-
-            horizontalDivider()
-
-            item("delete", "Delete") {
-                icon(Icons.Default.DeleteOutline)
-            }
-        },
-        offset = offset,
-        onItemSelected = {
-            when (it) {
-                "copy" -> {
-                    ClipboardManager.setClipboardData(
-                        ClipboardData.ChainDevice(
-                            states = listOf(device.state.value),
-                            type = when (WorkspaceRepository.mode.value) {
-                                is WorkspaceContract.WorkspaceMode.SamplingChain -> ClipboardData.ChainDevice.ChainType.Sampling
-                                else -> ClipboardData.ChainDevice.ChainType.Lights
-                            }
-                        )
+    AmethystContextMenu(
+        expanded = visible,
+        onDismissRequest = onDismiss,
+        offset = offset
+    ) { _, _, _ ->
+        ContextMenuItem(
+            label = "Copy",
+            icon = Icons.Default.ContentCopy,
+            onClick = {
+                ClipboardManager.setClipboardData(
+                    ClipboardData.ChainDevice(
+                        states = listOf(device.state.value),
+                        type = when (WorkspaceRepository.mode.value) {
+                            is WorkspaceContract.WorkspaceMode.SamplingChain -> ClipboardData.ChainDevice.ChainType.Sampling
+                            else -> ClipboardData.ChainDevice.ChainType.Lights
+                        }
                     )
-                }
+                )
+                onDismiss()
+            }
+        )
 
-                "duplicate" -> {
-                    val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
+        ContextMenuItem(
+            label = "Duplicate",
+            icon = Icons.Default.ControlPointDuplicate,
+            onClick = {
+                val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
 
-                    chain.add(
-                        device = StateChain.unpackDevice(StateChain.packDevice(device)),
-                        atIndex = index + 1
-                    )
-                }
+                chain.add(
+                    device = StateChain.unpackDevice(StateChain.packDevice(device)),
+                    atIndex = index + 1
+                )
+                onDismiss()
+            }
+        )
 
-                "paste" -> {
+        if (currentClipboard is ClipboardData.ChainDevice) {
+            ContextMenuItem(
+                label = "Paste",
+                icon = Icons.Default.ContentPaste,
+                onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
 
                     (currentClipboard as ClipboardData.ChainDevice).states.map {
@@ -380,9 +370,14 @@ fun ChainDeviceContextMenu(
                             atIndex = index + 1
                         )
                     }
+                    onDismiss()
                 }
+            )
 
-                "replace" -> {
+            ContextMenuItem(
+                label = "Paste Replace",
+                icon = Icons.Default.FindReplace,
+                onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
 
                     chain.remove(device.selectionUUID)
@@ -395,17 +390,23 @@ fun ChainDeviceContextMenu(
                             atIndex = index
                         )
                     }
+                    onDismiss()
                 }
-
-                "delete" -> {
-                    chain.remove(device.selectionUUID)
-                }
-            }
-
-            onDismiss()
-        },
-        onDismiss = {
-            onDismiss()
+            )
         }
-    )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
+
+        ContextMenuItem(
+            label = "Delete",
+            icon = Icons.Default.DeleteOutline,
+            onClick = {
+                chain.remove(device.selectionUUID)
+                onDismiss()
+            }
+        )
+    }
 }

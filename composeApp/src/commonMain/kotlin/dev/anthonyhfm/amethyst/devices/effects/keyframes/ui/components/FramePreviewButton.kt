@@ -40,8 +40,9 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import io.androidpoet.dropdown.Dropdown
-import io.androidpoet.dropdown.dropDownMenu
+import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
+import androidx.compose.material3.HorizontalDivider
 
 @Composable
 fun FramePreviewButton(
@@ -72,72 +73,78 @@ fun FramePreviewButton(
     val isLastFrame = index == totalFrames - 1
 
     // Context menu
-    Dropdown(
-        isOpen = showRightClickMenu,
-        menu = dropDownMenu {
-            item("addKeyframe", "Add Keyframe") {
-                icon(Icons.Default.Add)
+    AmethystContextMenu(
+        expanded = showRightClickMenu,
+        onDismissRequest = { showRightClickMenu = false },
+        offset = rightClickMenuOffset
+    ) { _, _, _ ->
+        ContextMenuItem(
+            label = "Add Keyframe",
+            icon = Icons.Default.Add,
+            onClick = {
+                onEvent(KeyframesChainDeviceContract.Event.OnAddFrame(index + 1))
+                showRightClickMenu = false
             }
+        )
 
-            item("duplicate", "Duplicate") {
-                icon(Icons.Default.ControlPointDuplicate)
+        ContextMenuItem(
+            label = "Duplicate",
+            icon = Icons.Default.ControlPointDuplicate,
+            onClick = {
+                onEvent(KeyframesChainDeviceContract.Event.OnDuplicateFrame(index))
+                showRightClickMenu = false
             }
+        )
 
-            item("copy", "Copy") {
-                icon(Icons.Default.ContentCopy)
-            }
-
-            if (hasFramesInClipboard) {
-                item("paste", "Paste") {
-                    icon(Icons.Default.ContentCopy)
-                }
-            }
-
-            horizontalDivider()
-
-            item("delete", "Delete") {
-                icon(Icons.Default.Delete)
-            }
-        },
-        offset = rightClickMenuOffset,
-        onItemSelected = {
-            when (it) {
-                "duplicate" -> {
-                    onEvent(KeyframesChainDeviceContract.Event.OnDuplicateFrame(index))
-                }
-                "delete" -> {
-                    if (totalFrames > 1) {
-                        onEvent(KeyframesChainDeviceContract.Event.OnDeleteFrame(index))
+        ContextMenuItem(
+            label = "Copy",
+            icon = Icons.Default.ContentCopy,
+            onClick = {
+                if (parent != null) {
+                    val framesToCopy = if (isSelectedInManager) {
+                        val selectedKeyframes = selections.filterIsInstance<Selectable.KeyframeItem>()
+                            .filter { it.parent == parent }
+                        selectedKeyframes.map { parent.state.value.frames[it.frameIndex] }
+                    } else {
+                        listOf(parent.state.value.frames[index])
                     }
+                    ClipboardManager.setClipboardData(ClipboardData.Keyframe(framesToCopy))
                 }
-                "addKeyframe" -> {
-                    onEvent(KeyframesChainDeviceContract.Event.OnAddFrame(index + 1))
-                }
-                "copy" -> {
-                    if (parent != null) {
-                        val framesToCopy = if (isSelectedInManager) {
-                            val selectedKeyframes = selections.filterIsInstance<Selectable.KeyframeItem>()
-                                .filter { it.parent == parent }
-                            selectedKeyframes.map { parent.state.value.frames[it.frameIndex] }
-                        } else {
-                            listOf(parent.state.value.frames[index])
-                        }
-                        ClipboardManager.setClipboardData(ClipboardData.Keyframe(framesToCopy))
-                    }
-                }
-                "paste" -> {
+                showRightClickMenu = false
+            }
+        )
+
+        if (hasFramesInClipboard) {
+            ContextMenuItem(
+                label = "Paste",
+                icon = Icons.Default.ContentCopy,
+                onClick = {
                     if (hasFramesInClipboard && parent != null) {
                         val framesToPaste = (clipboard as ClipboardData.Keyframe).frames
                         parent.pasteFrames(framesToPaste, index + 1)
                     }
+                    showRightClickMenu = false
                 }
-            }
-            showRightClickMenu = false
-        },
-        onDismiss = {
-            showRightClickMenu = false
+            )
         }
-    )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
+
+        ContextMenuItem(
+            label = "Delete",
+            icon = Icons.Default.Delete,
+            enabled = totalFrames > 1,
+            onClick = {
+                if (totalFrames > 1) {
+                    onEvent(KeyframesChainDeviceContract.Event.OnDeleteFrame(index))
+                }
+                showRightClickMenu = false
+            }
+        )
+    }
 
     Row(
         modifier = Modifier
