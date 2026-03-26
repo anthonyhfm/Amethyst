@@ -12,14 +12,10 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.extension
 import io.github.vinceglb.filekit.path
-import io.github.vinceglb.filekit.readBytes
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 
 class AbletonImportWizardViewModel: ViewModel() {
@@ -42,16 +38,19 @@ class AbletonImportWizardViewModel: ViewModel() {
     }
 
     fun startAbletonImport(path: String) {
-        val workspace = if (path.lowercase().endsWith(".zip")) {
-            val file = if (platform is Platform.Android || platform is Platform.iOS) {
-                FileHelper.indexedFiles[path] ?: return
-            } else {
-                PlatformFile(path)
-            }
-
-            AbletonConverter.convertZipToWorkspace(file)
+        val importedFile = if (platform is Platform.Android || platform is Platform.iOS) {
+            FileHelper.indexedFiles[path] ?: PlatformFile(path)
         } else {
-            AbletonConverter.convertToWorkspace(path, customPalettePath.value.takeIf { it.isNotEmpty() })
+            PlatformFile(path)
+        }
+
+        val workspace = if (importedFile.extension.equals("zip", ignoreCase = true)) {
+            AbletonConverter.convertZipToWorkspace(importedFile)
+        } else {
+            AbletonConverter.convertToWorkspace(
+                importedFile,
+                customPalettePath.value.takeIf { it.isNotEmpty() }
+            )
         }
 
         WorkspaceRepository.loadWorkspace(workspace)

@@ -94,6 +94,10 @@ object AbletonConverter : AmethystConverter {
 
         zipEntries.clear()
         val entries = Zip.getEntries(file)
+
+        entries.forEach { entry ->
+            println("Entry: ${entry.path}")
+        }
         FileHelper.clearCache()
 
         entries.filter {
@@ -138,14 +142,17 @@ object AbletonConverter : AmethystConverter {
         }
     }
 
-    override fun convertToWorkspace(path: String, palettePath: String?): SavableWorkspaceData {
+    override fun convertToWorkspace(path: String, palettePath: String?): SavableWorkspaceData =
+        convertToWorkspace(PlatformFile(path), palettePath)
+
+    fun convertToWorkspace(file: PlatformFile, palettePath: String?): SavableWorkspaceData {
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
         isZip = false
 
-        file = PlatformFile(path)
+        this.file = file
 
-        val file = Zip.decode(runBlocking { file?.readBytes() ?: ByteArray(0) }) // Decompresses the .als GZIP format
-        val sanitizedAlsString = file.decodeToString()
+        val liveSetBytes = Zip.decode(runBlocking { AbletonConverter.file?.readBytes() ?: ByteArray(0) }) // Decompresses the .als GZIP format
+        val sanitizedAlsString = liveSetBytes.decodeToString()
             .replace("> ", ">")
             .replace(" <", "<")
             .replace("\n", "")

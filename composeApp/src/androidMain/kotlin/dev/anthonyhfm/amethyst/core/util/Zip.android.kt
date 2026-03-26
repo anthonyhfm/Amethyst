@@ -1,18 +1,17 @@
 package dev.anthonyhfm.amethyst.core.util
 
-import android.os.Build
-import androidx.annotation.RequiresApi
+import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.absoluteFile
+import io.github.vinceglb.filekit.cacheDir
+import io.github.vinceglb.filekit.path
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
-import java.util.zip.ZipInputStream
+import java.util.zip.ZipFile
 
 actual object Zip {
     actual fun getEntries(
@@ -23,23 +22,27 @@ actual object Zip {
         }
 
         return try {
-            val zipFile = ZipInputStream(data.inputStream())
-            val entries = mutableListOf<ZipEntry>()
+            readZipFile(data) { zipFile ->
+                val entries = mutableListOf<ZipEntry>()
 
-            var entry = zipFile.nextEntry
-            while (entry != null) {
-                entries.add(
-                    ZipEntry(
-                        path = entry.name,
-                        data = zipFile.readBytes(),
-                        isDirectory = entry.isDirectory,
+                zipFile.entries().asSequence().forEach { entry ->
+                    val entryData = if (entry.isDirectory) {
+                        ByteArray(0)
+                    } else {
+                        zipFile.getInputStream(entry).use { it.readBytes() }
+                    }
+
+                    entries.add(
+                        ZipEntry(
+                            path = entry.name,
+                            data = entryData,
+                            isDirectory = entry.isDirectory,
+                        )
                     )
-                )
-                entry = zipFile.nextEntry
-            }
+                }
 
-            zipFile.close()
-            entries
+                entries
+            }
         } catch (e: Exception) {
             println("Error reading ZIP file: ${e.message}")
             emptyList()
@@ -52,17 +55,11 @@ actual object Zip {
         }
 
         return try {
-            val zipFile = ZipInputStream(data.inputStream())
-            val entries = mutableListOf<String>()
-
-            var entry = zipFile.nextEntry
-            while (entry != null) {
-                entries.add(entry.name)
-                entry = zipFile.nextEntry
+            readZipFile(data) { zipFile ->
+                zipFile.entries().asSequence()
+                    .map { it.name }
+                    .toList()
             }
-
-            zipFile.close()
-            entries
         } catch (e: Exception) {
             println("Error reading ZIP paths: ${e.message}")
             emptyList()
@@ -88,18 +85,17 @@ actual object Zip {
         // Check for ZIP header (PK\u0003\u0004 -> 0x50 0x4B 0x03 0x04)
         if (b0 == 0x50 && b1 == 0x4B && data[2].toInt() == 0x03 && data[3].toInt() == 0x04) {
             return try {
-                ZipInputStream(data.inputStream()).use { zipStream ->
-                    var entry = zipStream.nextEntry
-                    while (entry != null) {
+                val decodedEntryData = readZipFile(data) { zipFile ->
+                    zipFile.entries().asSequence().firstNotNullOfOrNull { entry ->
                         if (!entry.isDirectory && entry.name.endsWith(".als")) {
-                            val entryData = zipStream.readBytes()
-                            // Recursively decode to handle GZIP inside ZIP
-                            return decode(entryData)
+                            zipFile.getInputStream(entry).use { it.readBytes() }
+                        } else {
+                            null
                         }
-                        entry = zipStream.nextEntry
                     }
                 }
-                data
+
+                decodedEntryData?.let(::decode) ?: data
             } catch (e: Exception) {
                 println("ZIP extraction failed: ${e.message}")
                 data
@@ -116,6 +112,22 @@ actual object Zip {
             }
 
             return out.toByteArray()
+        }
+    }
+
+    private fun <T> readZipFile(data: ByteArray, block: (ZipFile) -> T): T {
+        val tempFile = File.createTempFile(
+            "amethyst-zip-",
+            ".zip",
+            File(FileKit.cacheDir.path)
+        )
+
+        return try {
+            tempFile.outputStream().use { it.write(data) }
+
+            ZipFile(tempFile).use(block)
+        } finally {
+            tempFile.delete()
         }
     }
 }
