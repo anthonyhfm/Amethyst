@@ -35,15 +35,45 @@ object UnipadConverter : AmethystConverter {
 
         println("Entries in zip: ${entries.size}")
 
-        val infoKey = entries.keys.first { it.endsWith("Info") || it.endsWith("info") }
+        // Detect root prefix: some ZIPs wrap everything in a subdirectory.
+        // Find the info file, then strip whatever leading path it lives under.
+        val rawInfoKey = entries.keys.firstOrNull { key ->
+            val lower = key.lowercase()
+            lower == "info" || lower.endsWith("/info")
+        } ?: throw IllegalArgumentException("UniPack is missing required 'info' file")
+        val rootPrefix = rawInfoKey.dropLast("info".length) // e.g. "MyProject/" or ""
+
+        if (rootPrefix.isNotEmpty()) {
+            println("Detected ZIP root prefix: '$rootPrefix' — re-indexing entries")
+            val reindexed = entries.values
+                .filter { it.path.startsWith(rootPrefix) }
+                .associateBy { it.path.removePrefix(rootPrefix) }
+            entries.clear()
+            entries.putAll(reindexed)
+            println("Entries after re-indexing: ${entries.size}")
+        }
+
+        val infoKey = entries.keys.firstOrNull { key ->
+            val lower = key.lowercase()
+            lower == "info" || lower.endsWith("/info")
+        } ?: throw IllegalArgumentException("UniPack is missing required 'info' file")
         val infoMap: Map<String, String> = entries[infoKey]?.data
             ?.decodeToString()
+            ?.replace("\r\n", "\n")
+            ?.replace("\r", "\n")
             ?.trim()
             ?.split("\n")
-            ?.map { it.trim() }?.associate {
-                it.split("=")
-                    .let { (key, value) -> key to value }
+            ?.map { it.trim() }
+            ?.filter { it.contains("=") }
+            ?.associate {
+                val idx = it.indexOf('=')
+                it.substring(0, idx).trim() to it.substring(idx + 1).trim()
             } ?: emptyMap()
+
+        val chain = infoMap["chain"]?.toIntOrNull() ?: 1
+        require(chain in 1..24) {
+            "UniPack 'chain' value is $chain, must be in range 1–24"
+        }
 
         println("Starting Audio-Clip Decoding")
 
@@ -56,19 +86,24 @@ object UnipadConverter : AmethystConverter {
         return SavableWorkspaceData(
             title = infoMap["title"] ?: "Untitled Workspace",
             author = infoMap["producerName"] ?: "Unknown",
-            lights = createLightsChain(infoMap["chain"]?.toInt() ?: 1),
-            sampling = createAudioChain(infoMap["chain"]?.toInt() ?: 1, clipMap),
-            autoPlay = if (entries["autoPlay"] != null) {
-                try {
-                    UnipadAutoPlay.getAutoPlayData(
-                        autoPlayString = entries["autoPlay"]?.data?.decodeToString() ?: ""
-                    )
-                } catch (e: Exception) {
-                    e.printStackTrace()
+            lights = createLightsChain(chain),
+            sampling = createAudioChain(chain, clipMap),
+            autoPlay = run {
+                val autoPlayEntry = entries.entries.firstOrNull {
+                    it.key.lowercase().endsWith("autoplay")
+                }
+                if (autoPlayEntry != null) {
+                    try {
+                        UnipadAutoPlay.getAutoPlayData(
+                            autoPlayString = autoPlayEntry.value.data.decodeToString()
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        AutoPlayData(emptyMap())
+                    }
+                } else {
                     AutoPlayData(emptyMap())
                 }
-            } else {
-                AutoPlayData(emptyMap())
             },
             launchpadDevices = listOf(
                 SavableWorkspaceData.SavableViewportLaunchpad(
@@ -88,7 +123,10 @@ object UnipadConverter : AmethystConverter {
     }
 
     private fun createAudioChain(pages: Int, clipMap: Map<String, DecodedAudioClip>): StateChain {
-        val keySound = entries.filter { it.key.startsWith("KeySound") }.values.firstOrNull()?.data ?: return StateChain()
+        val keySoundEntry = entries.entries.firstOrNull {
+            it.key.lowercase().endsWith("keysound")
+        } ?: return StateChain()
+        val keySound = keySoundEntry.value.data
 
         return StateChain(
             devices = listOf(
@@ -99,9 +137,11 @@ object UnipadConverter : AmethystConverter {
                             stateChain = KeySound.createChain(
                                 page = index,
                                 clipMap = clipMap,
-                                entries = keySound.decodeToString().trim().split("\n").filter {
-                                    it.startsWith("${index + 1}")
-                                }
+                                entries = keySound.decodeToString()
+                                    .replace("\r\n", "\n").replace("\r", "\n")
+                                    .trim().split("\n").filter {
+                                        it.startsWith("${index + 1} ")
+                                    }
                             )
                         )
                     }
@@ -111,7 +151,7 @@ object UnipadConverter : AmethystConverter {
     }
 
     private fun createLightsChain(pages: Int): StateChain {
-        val entries = entries.filter { it.key.startsWith("keyLED/") }
+        val entries = entries.filter { it.key.lowercase().startsWith("keyled/") }
 
         return StateChain(
             devices = listOf(
@@ -121,7 +161,10 @@ object UnipadConverter : AmethystConverter {
                             name = "Page ${index + 1}",
                             stateChain = KeyLED.createChain(
                                 page = index,
-                                entries = entries.filter { it.key.startsWith("keyLED/${index + 1}") }.map { it.key }
+                                entries = entries.filter {
+                                    it.key.lowercase().startsWith("keyled/${index + 1} ") ||
+                                    it.key.lowercase() == "keyled/${index + 1}"
+                                }.map { it.key }
                             )
                         ).also {
                             println("Created group ${it.name}")

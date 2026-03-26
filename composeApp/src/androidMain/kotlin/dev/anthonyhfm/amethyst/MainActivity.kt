@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
 
         FileKit.init(this)
 
-        platformMidiAccess = AndroidMidi2Access(this)
+        platformMidiAccess = AndroidMidiAccess(this)
 
         setContent {
             App()

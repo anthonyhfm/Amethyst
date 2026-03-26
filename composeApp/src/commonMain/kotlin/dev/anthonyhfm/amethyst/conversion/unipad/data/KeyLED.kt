@@ -5,7 +5,6 @@ import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
-import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -59,73 +58,125 @@ object KeyLED {
     )
 
     fun convertToKeyframes(data: ByteArray) : KeyframesChainDeviceContract.KeyframesChainDeviceState {
-        val events: List<String> = data.decodeToString().trim().split("\n")
+        val events: List<String> = data.decodeToString()
+            .replace("\r\n", "\n").replace("\r", "\n")
+            .trim().split("\n")
 
         val frames = mutableListOf<KeyframesChainDeviceContract.Frame>()
         var currentFrame: KeyframesChainDeviceContract.Frame = KeyframesChainDeviceContract.Frame(
             timing = Timing.Duration(100.milliseconds)
         )
 
-        events.forEach { event ->
-            event.split(" ").let { inst ->
-                if (inst[0] == "o") {
-                    if (inst.size == 4) {
-                        println("Unsupported instruction: $event")
-                        return@let
+        events.forEach { rawEvent ->
+            val event = rawEvent.trim()
+            if (event.isEmpty()) return@forEach
+            val inst = event.split(" ")
+            val cmd = inst[0].lowercase()
+
+            // on / o  — turn LED on
+            if (cmd == "on" || cmd == "o") {
+                if (inst.size < 4) {
+                    println("KeyLED: skipping malformed 'on' line: $event")
+                    return@forEach
+                }
+
+                val isMc = inst[1].lowercase() == "mc" || inst[1] == "*"
+                val colorToken = inst[3].trim().lowercase()
+
+                val color: Color = when {
+                    // auto + velocity  (5 tokens: on x y auto velocity)
+                    colorToken == "auto" || colorToken == "a" -> {
+                        if (inst.size < 5) {
+                            println("KeyLED: 'auto' color requires velocity token: $event")
+                            return@forEach
+                        }
+                        val velocity = inst[4].trim().toIntOrNull() ?: run {
+                            println("KeyLED: invalid velocity in: $event")
+                            return@forEach
+                        }
+                        val (r, g, b) = Palettes.novation[velocity]
+                        Color(r / 63f, g / 63f, b / 63f)
                     }
-
-                    val color: Color = Color(
-                        Palettes.novation[inst[4].trim().toInt()].first / 63f,
-                        Palettes.novation[inst[4].trim().toInt()].second / 63f,
-                        Palettes.novation[inst[4].trim().toInt()].third / 63f,
-                    )
-
-                    if (inst[1] == "mc") { // Side buttons
-                        currentFrame = currentFrame.copy(
-                            entries = currentFrame.entries.filter {
-                                (it.x != mcCoordinates[inst[2].toInt()].first || it.y != mcCoordinates[inst[2].toInt()].second)
-                            }.plus(
-                                KeyframesChainDeviceContract.KeyframesEntry(
-                                    x = mcCoordinates[inst[2].toInt()].first,
-                                    y = mcCoordinates[inst[2].toInt()].second,
-                                    r = color.red,
-                                    g = color.green,
-                                    b = color.blue,
-                                )
-                            )
-                        )
-                    } else { // Normal lights
-                        val x = inst[2].toInt()
-                        val y = inst[1].toInt()
-
-                        currentFrame = currentFrame.copy(
-                            entries = currentFrame.entries.filter {
-                                (it.x != x || it.y != y)
-                            }.plus(
-                                KeyframesChainDeviceContract.KeyframesEntry(
-                                    x = x,
-                                    y = y,
-                                    r = color.red,
-                                    g = color.green,
-                                    b = color.blue,
-                                )
-                            )
-                        )
+                    // 6-digit HEX  (4 tokens: on x y RRGGBB)
+                    colorToken.length == 6 && colorToken.all { it.isDigit() || it in 'a'..'f' } -> {
+                        val r = colorToken.substring(0, 2).toInt(16) / 255f
+                        val g = colorToken.substring(2, 4).toInt(16) / 255f
+                        val b = colorToken.substring(4, 6).toInt(16) / 255f
+                        Color(r, g, b)
+                    }
+                    else -> {
+                        println("KeyLED: unrecognised color token '$colorToken' in: $event")
+                        return@forEach
                     }
                 }
 
-                if (inst[0] == "d") {
+                if (isMc) {
+                    val idx = inst[2].toIntOrNull() ?: return@forEach
+                    if (idx < 0 || idx >= mcCoordinates.size) return@forEach
+                    val (cx, cy) = mcCoordinates[idx]
                     currentFrame = currentFrame.copy(
-                        timing = Timing.Duration((inst[1].trim().toInt()).milliseconds)
-                    )
-
-                    frames.add(currentFrame)
-
-                    currentFrame = KeyframesChainDeviceContract.Frame(
-                        timing = Timing.Duration(100.milliseconds),
                         entries = currentFrame.entries
+                            .filter { it.x != cx || it.y != cy }
+                            .plus(KeyframesChainDeviceContract.KeyframesEntry(x = cx, y = cy, r = color.red, g = color.green, b = color.blue))
+                    )
+                } else {
+                    // Docs: on x y color  → inst[1]=x, inst[2]=y
+                    val x = inst[1].toIntOrNull() ?: return@forEach
+                    val y = inst[2].toIntOrNull() ?: return@forEach
+                    currentFrame = currentFrame.copy(
+                        entries = currentFrame.entries
+                            .filter { it.x != x || it.y != y }
+                            .plus(KeyframesChainDeviceContract.KeyframesEntry(x = x, y = y, r = color.red, g = color.green, b = color.blue))
                     )
                 }
+            }
+
+            // off / f  — turn LED off
+            else if (cmd == "off" || cmd == "f") {
+                if (inst.size < 3) {
+                    println("KeyLED: skipping malformed 'off' line: $event")
+                    return@forEach
+                }
+                val isMc = inst[1].lowercase() == "mc" || inst[1] == "*"
+                if (isMc) {
+                    val idx = inst[2].toIntOrNull() ?: return@forEach
+                    if (idx < 0 || idx >= mcCoordinates.size) return@forEach
+                    val (cx, cy) = mcCoordinates[idx]
+                    currentFrame = currentFrame.copy(
+                        entries = currentFrame.entries
+                            .filter { it.x != cx || it.y != cy }
+                            .plus(KeyframesChainDeviceContract.KeyframesEntry(x = cx, y = cy, r = 0f, g = 0f, b = 0f))
+                    )
+                } else {
+                    val x = inst[1].toIntOrNull() ?: return@forEach
+                    val y = inst[2].toIntOrNull() ?: return@forEach
+                    currentFrame = currentFrame.copy(
+                        entries = currentFrame.entries
+                            .filter { it.x != x || it.y != y }
+                            .plus(KeyframesChainDeviceContract.KeyframesEntry(x = x, y = y, r = 0f, g = 0f, b = 0f))
+                    )
+                }
+            }
+
+            // delay / d  — advance time and commit frame
+            else if (cmd == "delay" || cmd == "d") {
+                val ms = inst.getOrNull(1)?.trim()?.toLongOrNull() ?: return@forEach
+                currentFrame = currentFrame.copy(timing = Timing.Duration(ms.milliseconds))
+                frames.add(currentFrame)
+                currentFrame = KeyframesChainDeviceContract.Frame(
+                    timing = Timing.Duration(100.milliseconds),
+                    entries = currentFrame.entries
+                )
+            }
+
+            // chain / c  — chain switch inside LED sequence (not renderable as keyframe, log)
+            else if (cmd == "chain" || cmd == "c") {
+                val chainNum = inst.getOrNull(1)?.trim()?.toIntOrNull()
+                println("KeyLED: 'chain $chainNum' inside LED sequence is not yet supported – skipping")
+            }
+
+            else {
+                println("KeyLED: unrecognised command '$cmd' in: $event")
             }
         }
 
@@ -152,69 +203,71 @@ object KeyLED {
     fun createChain(page: Int, entries: List<String>): StateChain {
         val groups = mutableListOf<Group>()
 
-        entries.filter { // Single Animation
-            it.split(" ").size == 4
-        }.forEachIndexed { index, entry ->
-            val x = entry.split(" ")[2].toInt()
-            val y = entry.split(" ")[1].toInt()
+        // Parse each entry path into its components.
+        // File name format (inside keyLED/): chain x y [loop]
+        // The full path is "keyLED/chain x y [loop]", so splitting the whole path by ' ' gives:
+        //   ["keyLED/chain", "x", "y"]          → no loop  (3 parts)
+        //   ["keyLED/chain", "x", "y", "loop"]  → with loop count (4 parts)
+        data class LedEntry(val path: String, val x: Int, val y: Int, val loop: Int)
 
-            val keyLED = UnipadConverter.entries[entry]?.data ?: return@forEachIndexed
-
-            println("Decoding KeyLED: ${entry}")
-
-            groups.add(
-                Group(
-                    name = "Single ${index + 1}",
-                    stateChain = StateChain(
-                        devices = listOf(
-                            CoordinateFilterChainDeviceState(
-                                filters = listOf(Pair(x, y))
-                            ),
-                            convertToKeyframes(keyLED)
-                        )
-                    )
-                )
-            )
+        val parsed = entries.mapNotNull { path ->
+            val parts = path.split(" ")
+            // parts[0] = "keyLED/<chain>", parts[1] = x, parts[2] = y, parts[3] = loop (opt)
+            val x = parts.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
+            val y = parts.getOrNull(2)?.toIntOrNull() ?: return@mapNotNull null
+            val loop = parts.getOrNull(3)?.toIntOrNull() ?: 1
+            LedEntry(path = path, x = x, y = y, loop = loop)
         }
 
-        entries.filter {
-            it.split(" ").size == 5
-        }.map {
-            it.removePrefix("keyLED/").trim().split(" ").let { inst ->
-                "${inst[0]} ${inst[1]} ${inst[2]} ${inst[3]}"
-            }
-        }.distinct().forEachIndexed { index, entry ->
-            val multiEntries = entries.filter {
-                it.removePrefix("keyLED/").startsWith(entry)
-            }.sortedBy { it.split(" ")[4].trim() }
+        // Group by coordinate — multiple entries at the same (x, y) → circular queue
+        parsed.groupBy { Pair(it.x, it.y) }.values.forEachIndexed { index, group ->
+            val x = group.first().x
+            val y = group.first().y
 
-            val x = entry.split(" ")[2].toInt()
-            val y = entry.split(" ")[1].toInt()
+            if (group.size > 1) {
+                // Multi animation (circular queue)
+                val multiGroups = group.mapNotNull { ledEntry ->
+                    val keyLED = UnipadConverter.entries[ledEntry.path]?.data ?: return@mapNotNull null
+                    println("Decoding KeyLED (multi): ${ledEntry.path}")
+                    Group(
+                        name = ledEntry.path,
+                        stateChain = StateChain(
+                            devices = listOf(convertToKeyframes(keyLED))
+                        )
+                    )
+                }
 
-            groups.add(
-                Group(
-                    name = "Multi ${index + 1}",
-                    stateChain = StateChain(
-                        devices = listOf(
-                            CoordinateFilterChainDeviceState(
-                                filters = listOf(Pair(x, y))
-                            ),
-                            MultiGroupChainDeviceState(
-                                groups = multiEntries.map {
-                                    Group(
-                                        name = it.split(" ")[4].trim(),
-                                        stateChain = StateChain(
-                                            devices = listOf(
-                                                convertToKeyframes(UnipadConverter.entries[it]?.data ?: return@forEachIndexed)
-                                            )
-                                        )
-                                    )
-                                }
+                if (multiGroups.isNotEmpty()) {
+                    groups.add(
+                        Group(
+                            name = "Multi ${index + 1}",
+                            stateChain = StateChain(
+                                devices = listOf(
+                                    CoordinateFilterChainDeviceState(filters = listOf(Pair(x, y))),
+                                    MultiGroupChainDeviceState(groups = multiGroups)
+                                )
+                            )
+                        )
+                    )
+                }
+            } else {
+                // Single animation
+                val ledEntry = group.first()
+                val keyLED = UnipadConverter.entries[ledEntry.path]?.data ?: return@forEachIndexed
+                println("Decoding KeyLED: ${ledEntry.path}")
+
+                groups.add(
+                    Group(
+                        name = "Single ${index + 1}",
+                        stateChain = StateChain(
+                            devices = listOf(
+                                CoordinateFilterChainDeviceState(filters = listOf(Pair(x, y))),
+                                convertToKeyframes(keyLED)
                             )
                         )
                     )
                 )
-            )
+            }
         }
 
         return StateChain(
