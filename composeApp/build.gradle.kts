@@ -165,7 +165,7 @@ compose.desktop {
 
         nativeDistributions {
             packageName = "Amethyst"
-            packageVersion = "0.4.0"
+            packageVersion = "1.0.0"
 
             targetFormats(TargetFormat.Pkg, TargetFormat.Msi, TargetFormat.Deb)
 
