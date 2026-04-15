@@ -1,0 +1,142 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-windows-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-windows-
+
+      - name: Build MSI
+        run: ./gradlew :composeApp:packageMsi
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amethyst-windows
+          path: composeApp/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+
+  build-macos:
+    name: Build (macOS Apple Silicon)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-macos-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-macos-
+
+      - name: Build PKG
+        run: ./gradlew :composeApp:packagePkg
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amethyst-macos
+          path: composeApp/build/compose/binaries/main/pkg/*.pkg
+          if-no-files-found: error
+
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-linux-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-linux-
+
+      - name: Build DEB
+        run: ./gradlew :composeApp:packageDeb
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amethyst-linux
+          path: composeApp/build/compose/binaries/main/deb/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Amethyst version
+        id: version
+        run: |
+          VERSION=$(grep 'val amethystVersion' composeApp/src/commonMain/kotlin/dev/anthonyhfm/amethyst/core/util/Version.kt \
+            | sed 's/.*Version(\([0-9]*\), \([0-9]*\), \([0-9]*\)).*/\1.\2.\3/')
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}+build.${{ github.run_number }}
+          name: ${{ github.event.head_commit.message }}
+          body: |
+            **Build #${{ github.run_number }}** · Amethyst ${{ steps.version.outputs.version }}
+
+            Commit: `${{ github.sha }}` · @${{ github.actor }}
+
+            ${{ github.event.head_commit.message }}
+          files: |
+            release-artifacts/amethyst-windows/*.msi
+            release-artifacts/amethyst-macos/*.pkg
+            release-artifacts/amethyst-linux/*.deb
+          fail_on_unmatched_files: true
