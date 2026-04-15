@@ -1,22 +1,39 @@
 package dev.anthonyhfm.amethyst.devices.effects.layer
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
-import dev.anthonyhfm.amethyst.ui.components.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -29,12 +46,13 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Layer",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(160.dp)
+                .width(160.dp),
+            titleBarModifier = LocalTitleBarModifier.current
         ) {
             Column(
                 modifier = Modifier
@@ -82,9 +100,9 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                         },
                     )
 
-                    VerticalDivider(
-                        modifier = Modifier.fillMaxHeight(0.5f)
-                    )
+                    Box(modifier = Modifier.fillMaxHeight(0.5f)) {
+                        Separator(orientation = SeparatorOrientation.Vertical)
+                    }
 
                     StepTextDial(
                         headline = "Range",
@@ -117,17 +135,50 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                     )
                 }
 
-                DropdownSelect(
-                    label = "Mode",
-                    options = Signal.LED.BlendingMode.entries,
-                    selectedOption = deviceState.mode,
-                    onOptionSelected = { mode ->
+                BlendingModeSelectField(
+                    selectedMode = deviceState.mode,
+                    onModeSelected = { mode ->
                         val before = state.value.copy()
                         state.update { it.copy(mode = mode) }
                         pushStateChange(before, state.value)
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
+            }
+        }
+    }
+
+    @Composable
+    private fun BlendingModeSelectField(
+        selectedMode: Signal.LED.BlendingMode,
+        onModeSelected: (Signal.LED.BlendingMode) -> Unit,
+        modifier: Modifier = Modifier,
+    ) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "Mode",
+                style = Theme[typography][small],
+                color = Theme[colors][mutedForeground],
+            )
+
+            Select(
+                value = selectedMode.name,
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                shape = SmallShape,
+                triggerHeight = 24.dp,
+                triggerContentPadding = PaddingValues(horizontal = 8.dp),
+            ) {
+                Signal.LED.BlendingMode.entries.forEach { mode ->
+                    SelectItem(
+                        text = mode.name,
+                        selected = mode == selectedMode,
+                        onClick = { onModeSelected(mode) },
+                    )
+                }
             }
         }
     }

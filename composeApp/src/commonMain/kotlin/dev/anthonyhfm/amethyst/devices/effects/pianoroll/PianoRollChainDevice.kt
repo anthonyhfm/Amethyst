@@ -2,9 +2,6 @@ package dev.anthonyhfm.amethyst.devices.effects.pianoroll
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -12,17 +9,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Music
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
+import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
-import dev.anthonyhfm.amethyst.timeline.data.MidiNote
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
+import dev.anthonyhfm.amethyst.timeline.data.isGradient
+import dev.anthonyhfm.amethyst.timeline.migration.LegacyPianoRollPath
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -74,36 +81,41 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
         }
     }
 
+    @LegacyPianoRollPath(
+        replacement = "TimelineViewModel.openPianoRollForEntry",
+        cutover = "Provide a TimelineClipContext-backed clip when opening the rebuilt piano roll from timeline data."
+    )
+    private fun openLegacyPianoRoll(entry: MidiEntry) {
+        customMode.bindLegacyEntry(entry)
+        WorkspaceRepository.switchMode(mode = customMode)
+    }
+
     @Composable
     override fun Content() {
         val currentState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Piano Roll",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(120.dp)
+                .width(120.dp),
+            titleBarModifier = LocalTitleBarModifier.current,
         ) {
-            FilledIconButton(
+            Button(
                 onClick = {
-                    // Set the current entry for editing
-                    customMode.currentEntry = currentState.midiEntry
-                    customMode.trackIndex = NO_TRACK_INDEX // Not from timeline
-                    customMode.entryStartMs = 0L
-                    
-                    // Switch to piano roll editing mode
-                    WorkspaceRepository.switchMode(mode = customMode)
+                    openLegacyPianoRoll(currentState.midiEntry)
                 },
-                modifier = Modifier
-                    .size(72.dp)
+                variant = ButtonVariant.Default,
+                size = ButtonSize.IconLarge,
             ) {
                 Icon(
-                    imageVector = Icons.Default.MusicNote,
+                    imageVector = Lucide.Music,
                     contentDescription = "Piano Roll",
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(36.dp),
+                    tint = Theme[colors][primaryForeground],
                 )
             }
         }
@@ -119,31 +131,52 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
                 // Schedule all notes to play
                 state.value.midiEntry.notes.forEach { note ->
                     val (x, y) = pitchToXY(note.pitch)
-                    
-                    // Schedule note on
-                    Heaven.schedule(note.startTimeMs.toDouble(), owner = this) {
-                        val noteOnSignal = Signal.LED(
-                            origin = this,
-                            x = x,
-                            y = y,
-                            color = Color(note.led.red, note.led.green, note.led.blue),
-                            layer = note.led.layer,
-                            blendingMode = note.led.blendingMode
-                        )
-                        signalExit?.invoke(listOf(noteOnSignal))
+
+                    if (note.isGradient) {
+                        // Schedule per-frame color signals across the note duration
+                        val gradient = note.led.gradient!!
+                        val frameIntervalMs = 1000.0 / Heaven.fps
+                        var t = note.startTimeMs.toDouble()
+                        while (t < note.endTimeMs.toDouble()) {
+                            val fraction = ((t - note.startTimeMs) / note.durationMs.toDouble()).toFloat().coerceIn(0f, 1f)
+                            val capturedFraction = fraction
+                            Heaven.schedule(t, owner = this) {
+                                val (r, g, b) = GradientInterpolator.interpolate(gradient, capturedFraction)
+                                signalExit?.invoke(listOf(Signal.LED(
+                                    origin = this,
+                                    x = x,
+                                    y = y,
+                                    color = Color(r, g, b),
+                                    layer = note.led.layer,
+                                    blendingMode = note.led.blendingMode
+                                )))
+                            }
+                            t += frameIntervalMs
+                        }
+                    } else {
+                        // Schedule note on (solid color)
+                        Heaven.schedule(note.startTimeMs.toDouble(), owner = this) {
+                            signalExit?.invoke(listOf(Signal.LED(
+                                origin = this,
+                                x = x,
+                                y = y,
+                                color = Color(note.led.red, note.led.green, note.led.blue),
+                                layer = note.led.layer,
+                                blendingMode = note.led.blendingMode
+                            )))
+                        }
                     }
-                    
-                    // Schedule note off
+
+                    // Schedule note off (always)
                     Heaven.schedule(note.endTimeMs.toDouble(), owner = this) {
-                        val noteOffSignal = Signal.LED(
+                        signalExit?.invoke(listOf(Signal.LED(
                             origin = this,
                             x = x,
                             y = y,
                             color = Color.Black,
                             layer = note.led.layer,
                             blendingMode = note.led.blendingMode
-                        )
-                        signalExit?.invoke(listOf(noteOffSignal))
+                        )))
                     }
                 }
             }

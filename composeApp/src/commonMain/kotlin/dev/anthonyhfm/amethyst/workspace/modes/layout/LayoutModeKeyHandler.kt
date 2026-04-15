@@ -11,7 +11,7 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 object LayoutModeKeyHandler {
     fun handleKeyInput(keyEvent: KeyEvent): Boolean {
-        if (keyEvent.type == KeyEventType.KeyUp) {
+        if (keyEvent.type == KeyEventType.KeyDown) {
             when (keyEvent.key) {
                 Key.Backspace, Key.Delete -> {
                     val devices = SelectionManager.selections.value.filterIsInstance<Selectable.VirtualViewportDevice>()

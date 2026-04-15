@@ -4,6 +4,10 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
+import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLaneKey
+import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote // hinzugefügt für PianoRollNote
 
@@ -69,4 +73,70 @@ interface Selectable {
         val trackIndex: Int,
         override val selectionUUID: String = UUID.randomUUID()
     ) : Selectable
+
+    data class TimelineAutomationLane(
+        val trackIndex: Int,
+        val target: TimelineTrackAutomationTarget,
+        val bindingId: String? = null,
+        override val selectionUUID: String = buildSelectionUUID(trackIndex, target, bindingId)
+    ) : Selectable {
+        val laneKey: TimelineAutomationLaneKey
+            get() = TimelineAutomationLaneKey(
+                target = target,
+                bindingId = bindingId
+            ).normalized()
+
+        companion object {
+            private fun buildSelectionUUID(
+                trackIndex: Int,
+                target: TimelineTrackAutomationTarget,
+                bindingId: String?
+            ): String {
+                val normalizedBindingId = target.normalizeBindingId(bindingId) ?: "_"
+                return "timeline-automation-lane:$trackIndex:${target.name}:$normalizedBindingId"
+            }
+        }
+    }
+
+    data class TimelineAutomationPoint(
+        val trackIndex: Int,
+        val target: TimelineTrackAutomationTarget,
+        val bindingId: String? = null,
+        val pointId: String,
+        override val selectionUUID: String = buildSelectionUUID(trackIndex, target, bindingId, pointId)
+    ) : Selectable {
+        val laneKey: TimelineAutomationLaneKey
+            get() = TimelineAutomationLaneKey(
+                target = target,
+                bindingId = bindingId
+            ).normalized()
+
+        companion object {
+            private fun buildSelectionUUID(
+                trackIndex: Int,
+                target: TimelineTrackAutomationTarget,
+                bindingId: String?,
+                pointId: String
+            ): String {
+                val normalizedBindingId = target.normalizeBindingId(bindingId) ?: "_"
+                return "timeline-automation-point:$trackIndex:${target.name}:$normalizedBindingId:$pointId"
+            }
+        }
+    }
+}
+
+fun Selectable.TimelineEntryItem.toClipKey(): TimelineClipKey {
+    return TimelineClipKey(trackIndex = trackIndex, entryStartMs = entryStartMs)
+}
+
+fun Selectable.PianoRollNote.toClipKey(): TimelineClipKey {
+    return TimelineClipKey(trackIndex = trackIndex, entryStartMs = entryStartMs)
+}
+
+fun TimelineClipKey.toTimelineEntrySelection(): Selectable.TimelineEntryItem {
+    return Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entryStartMs)
+}
+
+fun TimelineClipContext.toTimelineEntrySelection(): Selectable.TimelineEntryItem {
+    return clipKey.toTimelineEntrySelection()
 }

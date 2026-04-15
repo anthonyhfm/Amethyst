@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -33,12 +32,20 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.theme.chainBorder
+import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
+import dev.anthonyhfm.amethyst.ui.theme.chainSurface
+import dev.anthonyhfm.amethyst.ui.theme.chainSurfaceRaised
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.chain.ui.AnimatedInsertedDevice
 import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -104,15 +111,16 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
 
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
+                .clip(DefaultShape)
                 .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(Theme[chainColorTokens][chainSurface])
         ) {
-            AmethystDevice(
+            ChainDeviceShell(
                 title = "Choke",
                 isSelected = isSelected,
                 modifier = Modifier
                     .width(100.dp),
+                titleBarModifier = LocalTitleBarModifier.current
             ) {
                 StepTextDial(
                     headline = "Target",
@@ -158,18 +166,18 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
                     .fillMaxHeight()
                     .width(28.dp)
+                    .clip(DefaultShape)
                     .then(
                         if (isSelected) {
                             Modifier
-                                .background(MaterialTheme.colorScheme.primary)
-                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
+                                .background(Theme[colors][selectionSurface], DefaultShape)
+                                .border(1.dp, Theme[colors][selectionSurface], DefaultShape)
                         } else {
                             Modifier
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
-                                .border(1.dp, MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
+                                .background(Theme[chainColorTokens][chainSurfaceRaised], DefaultShape)
+                                .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape)
                         }
                     )
             )

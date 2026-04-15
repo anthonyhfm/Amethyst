@@ -273,7 +273,7 @@ object KeyLED {
         return StateChain(
             devices = listOf(
                 MacroFilterChainDeviceState(
-                    value = page
+                    allowedValues = setOf(page)
                 ),
                 GroupChainDeviceState(
                     groups = groups

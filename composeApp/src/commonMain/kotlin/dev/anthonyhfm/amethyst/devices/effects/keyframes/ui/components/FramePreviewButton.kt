@@ -6,32 +6,28 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ControlPointDuplicate
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ClipboardPaste
+import com.composables.icons.lucide.Copy
+import com.composables.icons.lucide.CopyPlus
+import com.composables.icons.lucide.GripVertical
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Trash2
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import com.mohamedrejeb.compose.dnd.reorder.ReorderableItemScope
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
@@ -39,20 +35,28 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
-import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
-import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
-import androidx.compose.material3.HorizontalDivider
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.theme.card
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
+import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 
 @Composable
-fun FramePreviewButton(
+fun ReorderableItemScope.FramePreviewButton(
     index: Int,
     selected: Boolean,
     timing: Timing,
     onEvent: (KeyframesChainDeviceContract.Event) -> Unit,
-    parent: dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice? = null
+    parent: dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice? = null,
 ) {
-    val density = LocalDensity.current.density
     val selections by SelectionManager.selections.collectAsState()
     val isSelectedInManager = parent?.let { parentDevice ->
         selections.any {
@@ -61,44 +65,95 @@ fun FramePreviewButton(
                     it.frameIndex == index
         }
     } ?: false
-    
+
     val clipboard by ClipboardManager.clipboardData.collectAsState()
     val hasFramesInClipboard = clipboard is ClipboardData.Keyframe
-    
-    var showRightClickMenu by remember { mutableStateOf(false) }
-    var rightClickMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
-    
+
     val totalFrames = parent?.state?.value?.frames?.size ?: 1
-    val isFirstFrame = index == 0
-    val isLastFrame = index == totalFrames - 1
+    val isHighlighted = selected || isSelectedInManager
 
-    // Context menu
-    AmethystContextMenu(
-        expanded = showRightClickMenu,
-        onDismissRequest = { showRightClickMenu = false },
-        offset = rightClickMenuOffset
-    ) { _, _, _ ->
-        ContextMenuItem(
-            label = "Add Keyframe",
-            icon = Icons.Default.Add,
-            onClick = {
-                onEvent(KeyframesChainDeviceContract.Event.OnAddFrame(index + 1))
-                showRightClickMenu = false
+    ContextMenu(
+        modifier = Modifier.fillMaxWidth(),
+        trigger = {
+            Row(
+                modifier = Modifier
+                    .clip(DefaultShape)
+                    .fillMaxWidth()
+                    .background(
+                        when {
+                            selected && isSelectedInManager -> Theme[colors][selectionSurface]
+                            isSelectedInManager -> Theme[colors][selectionSurface].copy(alpha = 0.5f)
+                            selected -> Theme[colors][selectionSurface]
+                            else -> Theme[colors][card]
+                        }
+                    )
+                    .clickable {
+                        onEvent(
+                            KeyframesChainDeviceContract.Event.OnSelectFrame(
+                                frameIndex = index,
+                                rangeSelect = ModifierKeysState.isShiftPressed,
+                                multiSelect = ModifierKeysState.isCtrlPressed
+                            )
+                        )
+                    }
+                    .padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Lucide.GripVertical,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .dragAnchor(),
+                    tint = if (isHighlighted) Theme[colors][selectionForeground].copy(alpha = 0.6f)
+                           else Theme[colors][mutedForeground],
+                )
+
+                Text(
+                    text = when (timing) {
+                        is Timing.Duration -> "${timing.duration.inWholeMilliseconds} ms"
+                        is Timing.Rythm -> timing.timing.text
+                    },
+                    modifier = Modifier
+                        .clip(SmallShape)
+                        .width(56.dp)
+                        .background(
+                            if (isHighlighted) Theme[colors][selectionForeground].copy(alpha = 0.15f)
+                            else Theme[colors][card]
+                        )
+                        .padding(vertical = 4.dp),
+                    style = Theme[typography][small],
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isHighlighted) Theme[colors][selectionForeground]
+                            else Theme[colors][foreground],
+                )
+
+                Text(
+                    text = "Frame ${index + 1}",
+                    style = Theme[typography][small],
+                    color = if (isHighlighted) Theme[colors][selectionForeground]
+                            else Theme[colors][foreground],
+                )
             }
-        )
+        }
+    ) {
+        ContextMenuItem(
+            onClick = { onEvent(KeyframesChainDeviceContract.Event.OnAddFrame(index + 1)) }
+        ) {
+            Icon(Lucide.Plus, null, modifier = Modifier.size(16.dp))
+            Text("Add Keyframe", modifier = Modifier.weight(1f))
+        }
 
         ContextMenuItem(
-            label = "Duplicate",
-            icon = Icons.Default.ControlPointDuplicate,
-            onClick = {
-                onEvent(KeyframesChainDeviceContract.Event.OnDuplicateFrame(index))
-                showRightClickMenu = false
-            }
-        )
+            onClick = { onEvent(KeyframesChainDeviceContract.Event.OnDuplicateFrame(index)) }
+        ) {
+            Icon(Lucide.CopyPlus, null, modifier = Modifier.size(16.dp))
+            Text("Duplicate", modifier = Modifier.weight(1f))
+        }
 
         ContextMenuItem(
-            label = "Copy",
-            icon = Icons.Default.ContentCopy,
             onClick = {
                 if (parent != null) {
                     val framesToCopy = if (isSelectedInManager) {
@@ -110,116 +165,38 @@ fun FramePreviewButton(
                     }
                     ClipboardManager.setClipboardData(ClipboardData.Keyframe(framesToCopy))
                 }
-                showRightClickMenu = false
             }
-        )
+        ) {
+            Icon(Lucide.Copy, null, modifier = Modifier.size(16.dp))
+            Text("Copy", modifier = Modifier.weight(1f))
+        }
 
         if (hasFramesInClipboard) {
             ContextMenuItem(
-                label = "Paste",
-                icon = Icons.Default.ContentCopy,
                 onClick = {
-                    if (hasFramesInClipboard && parent != null) {
+                    if (parent != null) {
                         val framesToPaste = (clipboard as ClipboardData.Keyframe).frames
                         parent.pasteFrames(framesToPaste, index + 1)
                     }
-                    showRightClickMenu = false
                 }
-            )
+            ) {
+                Icon(Lucide.ClipboardPaste, null, modifier = Modifier.size(16.dp))
+                Text("Paste", modifier = Modifier.weight(1f))
+            }
         }
 
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 4.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
+        ContextMenuSeparator()
 
         ContextMenuItem(
-            label = "Delete",
-            icon = Icons.Default.Delete,
             enabled = totalFrames > 1,
             onClick = {
                 if (totalFrames > 1) {
                     onEvent(KeyframesChainDeviceContract.Event.OnDeleteFrame(index))
                 }
-                showRightClickMenu = false
             }
-        )
-    }
-
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .fillMaxWidth()
-            .background(
-                when {
-                    selected && isSelectedInManager -> MaterialTheme.colorScheme.tertiary
-                    isSelectedInManager -> MaterialTheme.colorScheme.tertiary.copy(0.5f)
-                    selected -> MaterialTheme.colorScheme.tertiary
-                    else -> MaterialTheme.colorScheme.surfaceContainer
-                }
-            )
-            .clickable {
-                onEvent(
-                    KeyframesChainDeviceContract.Event.OnSelectFrame(
-                        frameIndex = index,
-                        rangeSelect = ModifierKeysState.isShiftPressed,
-                        multiSelect = ModifierKeysState.isCtrlPressed
-                    )
-                )
-            }
-            .rightClickable {
-                rightClickMenuOffset = DpOffset((it.x / density).dp, (it.y / density).dp)
-                showRightClickMenu = true
-            }
-            .padding(4.dp),
-
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = when (timing) {
-                is Timing.Duration -> {
-                    "${timing.duration.inWholeMilliseconds} ms"
-                }
-
-                is Timing.Rythm -> {
-                    timing.timing.text
-                }
-            },
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .width(56.dp)
-                .background(
-                    when {
-                        selected && isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
-                        isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
-                        selected -> MaterialTheme.colorScheme.onTertiary
-                        else -> MaterialTheme.colorScheme.onTertiary
-                    }
-                )
-                .padding(vertical = 4.dp),
-            style = MaterialTheme.typography.labelLarge,
-            textAlign = TextAlign.Center,
-            lineHeight = MaterialTheme.typography.labelLarge.fontSize,
-            fontWeight = FontWeight.Bold,
-            color = when {
-                selected && isSelectedInManager -> MaterialTheme.colorScheme.tertiary
-                isSelectedInManager -> MaterialTheme.colorScheme.tertiary
-                selected -> MaterialTheme.colorScheme.tertiary
-                else -> MaterialTheme.colorScheme.tertiary
-            },
-        )
-
-        Text(
-            text = "Frame ${index + 1}",
-            style = MaterialTheme.typography.labelLarge,
-            lineHeight = MaterialTheme.typography.labelLarge.fontSize,
-            color = when {
-                selected && isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
-                isSelectedInManager -> MaterialTheme.colorScheme.onTertiary
-                selected -> MaterialTheme.colorScheme.onTertiary
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-        )
+        ) {
+            Icon(Lucide.Trash2, null, modifier = Modifier.size(16.dp))
+            Text("Delete", modifier = Modifier.weight(1f))
+        }
     }
 }

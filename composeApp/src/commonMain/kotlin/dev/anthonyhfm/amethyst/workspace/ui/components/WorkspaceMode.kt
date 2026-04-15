@@ -1,48 +1,62 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Draw
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Preview
-import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.Text as MaterialText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import dev.anthonyhfm.amethyst.core.util.Platform
-import dev.anthonyhfm.amethyst.core.util.platform
+import com.composables.icons.lucide.AudioLines
+import com.composables.icons.lucide.ChartNoAxesGantt
+import com.composables.icons.lucide.LayoutGrid
+import com.composables.icons.lucide.Lightbulb
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Play
+import com.composeunstyled.UnstyledButton
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.Tabs
+import dev.anthonyhfm.amethyst.ui.components.primitives.TabsList
+import dev.anthonyhfm.amethyst.ui.theme.accent
+import dev.anthonyhfm.amethyst.ui.theme.accentForeground
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
@@ -50,292 +64,182 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 fun WorkspaceMode(
     mode: WorkspaceContract.WorkspaceMode,
 ) {
-    val compactMode = platform !is Platform.Desktop
-
     val selectableModes = listOf(
         WorkspaceModePickerItem(
-            mode = WorkspaceContract.WorkspaceMode.Layout(),
-            text = "Layout",
-            icon = Icons.Default.Draw
-        ),
-        WorkspaceModePickerItem(
+            key = "performance",
             mode = WorkspaceContract.WorkspaceMode.Performance(),
             text = "Performance",
-            icon = Icons.Default.Preview
+            icon = Lucide.Play,
         ),
         WorkspaceModePickerItem(
-            mode = WorkspaceContract.WorkspaceMode.LightsChain(),
-            text = "Lights Chain",
-            icon = Icons.Default.Lightbulb
-        ),
-        WorkspaceModePickerItem(
-            mode = WorkspaceContract.WorkspaceMode.SamplingChain(),
-            text = "Sampling Chain",
-            icon = Icons.Default.MusicNote
-        ),
-        WorkspaceModePickerItem(
+            key = "timeline",
             mode = WorkspaceContract.WorkspaceMode.Timeline(),
             text = "Timeline",
-            icon = Icons.Default.Timeline
-        )
+            icon = Lucide.ChartNoAxesGantt,
+        ),
+        WorkspaceModePickerItem(
+            key = "lights-chain",
+            mode = WorkspaceContract.WorkspaceMode.LightsChain(),
+            text = "Lights",
+            icon = Lucide.Lightbulb,
+        ),
+        WorkspaceModePickerItem(
+            key = "sampling-chain",
+            mode = WorkspaceContract.WorkspaceMode.SamplingChain(),
+            text = "Sampling",
+            icon = Lucide.AudioLines,
+        ),
+        WorkspaceModePickerItem(
+            key = "layout",
+            mode = WorkspaceContract.WorkspaceMode.Layout(),
+            text = "Layout",
+            icon = Lucide.LayoutGrid,
+        ),
     )
 
-    if (compactMode) {
-        CompactLayout(mode, selectableModes)
-    } else {
-        LargeLayout(mode, selectableModes)
-    }
-}
+    val selectedMode = selectableModes.firstOrNull { modeMatches(mode, it.mode) }
 
-@Composable
-fun LargeLayout(
-    mode: WorkspaceContract.WorkspaceMode,
-    selectableModes: List<WorkspaceModePickerItem>,
-) {
-    Row(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(0.2f), CircleShape)
-            .padding(2.dp),
-
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AnimatedVisibility(
-            visible = !mode.selectable,
+    if (!mode.selectable) {
+        val variant = ButtonVariant.Destructive
+        Button(
+            onClick = { WorkspaceRepository.switchToPreviousMode() },
+            variant = variant,
+            size = ButtonSize.Small,
         ) {
-            Row(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .height(44.dp)
-                    .background(MaterialTheme.colorScheme.error)
-                    .clickable {
-                        WorkspaceRepository.switchToPreviousMode()
-                    },
-
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = mode.displayName,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .padding(12.dp)
-                        .size(22.dp),
-                    tint = MaterialTheme.colorScheme.onError
-                )
-
-                Text(
-                    text = mode.displayName,
-                    color = MaterialTheme.colorScheme.onError,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        lineHeight = MaterialTheme.typography.bodyLarge.fontSize,
-                    ),
-                    modifier = Modifier
-                        .padding(end = 16.dp),
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = mode.displayName,
+                tint = workspaceToolbarContentColor(variant),
+            )
+            Text(mode.displayName)
         }
+        return
+    }
 
-        selectableModes.forEach { item ->
-            val isSelected = when {
-                mode is WorkspaceContract.WorkspaceMode.Layout && item.mode is WorkspaceContract.WorkspaceMode.Layout -> true
-                mode is WorkspaceContract.WorkspaceMode.Performance && item.mode is WorkspaceContract.WorkspaceMode.Performance -> true
-                mode is WorkspaceContract.WorkspaceMode.LightsChain && item.mode is WorkspaceContract.WorkspaceMode.LightsChain -> true
-                mode is WorkspaceContract.WorkspaceMode.SamplingChain && item.mode is WorkspaceContract.WorkspaceMode.SamplingChain -> true
-                mode is WorkspaceContract.WorkspaceMode.Timeline && item.mode is WorkspaceContract.WorkspaceMode.Timeline -> true
-                else -> false
-            }
-
-            Row(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .height(44.dp)
-                    .background(
-                        animateColorAsState(
-                            targetValue = if (isSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                Color.Transparent
-                            }
-                        ).value
-                    )
-                    .clickable {
-                        WorkspaceRepository.switchMode(item.mode)
-                    },
-
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = item.icon ?: Icons.Default.Close,
-                    contentDescription = item.text,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .padding(12.dp)
-                        .size(22.dp),
-                    tint = animateColorAsState(
-                        targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                    ).value
+    Tabs(
+        selectedTab = selectedMode?.key ?: selectableModes.first().key,
+        tabs = selectableModes.map { it.key },
+    ) {
+        TabsList(
+            modifier = Modifier.onPreviewKeyEvent { keyEvent ->
+                !keyEvent.isAltPressed && keyEvent.key in setOf(
+                    Key.DirectionLeft,
+                    Key.DirectionRight,
+                    Key.DirectionUp,
+                    Key.DirectionDown,
                 )
-
-                AnimatedVisibility(
-                    visible = isSelected,
-                ) {
-                    Text(
-                        text = item.text,
-                        color = animateColorAsState(
-                            targetValue = if (isSelected) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            }
-                        ).value,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            lineHeight = MaterialTheme.typography.bodyLarge.fontSize,
-                        ),
-                        modifier = Modifier
-                            .padding(end = 16.dp),
-                    )
-                }
+            },
+        ) {
+            selectableModes.forEach { item ->
+                WorkspaceModeTabButton(
+                    item = item,
+                    selected = selectedMode?.key == item.key,
+                    onClick = { WorkspaceRepository.switchMode(item.mode) },
+                )
             }
         }
     }
 }
 
 @Composable
-fun CompactLayout(
-    mode: WorkspaceContract.WorkspaceMode,
-    selectableModes: List<WorkspaceModePickerItem>,
+private fun WorkspaceModeTabButton(
+    item: WorkspaceModePickerItem,
+    selected: Boolean,
+    onClick: () -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val labelStyle = Theme[typography][small]
+    val labelWidth = remember(item.text, labelStyle) {
+        textMeasurer.measure(
+            text = AnnotatedString(item.text),
+            style = labelStyle,
+        ).size.width
+    }
+    val labelWidthDp = with(density) { labelWidth.toDp() }
 
-    Popup {
-        Box {
-            Column(
-                modifier = Modifier
-                    .padding(start = 54.dp)
-                    .width(IntrinsicSize.Max)
-                    .clip(RoundedCornerShape(23.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(0.2f), RoundedCornerShape(22.dp))
+    val animatedLabelWidth by animateDpAsState(
+        targetValue = if (selected) labelWidthDp else 0.dp,
+        animationSpec = tween(durationMillis = 180),
+        label = "workspace-mode-label-width",
+    )
+    val animatedGap by animateDpAsState(
+        targetValue = if (selected) 8.dp else 0.dp,
+        animationSpec = tween(durationMillis = 180),
+        label = "workspace-mode-label-gap",
+    )
+    val labelAlpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(durationMillis = 140),
+        label = "workspace-mode-label-alpha",
+    )
+
+    val backgroundColor = when {
+        selected -> Theme[colors][background]
+        hovered -> Theme[colors][accent]
+        else -> Color.Transparent
+    }
+    val contentColor = when {
+        selected -> Theme[colors][foreground]
+        hovered -> Theme[colors][accentForeground]
+        else -> Theme[colors][mutedForeground]
+    }
+
+    UnstyledButton(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        indication = null,
+        shape = SmallShape,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        modifier = Modifier
+            .clip(SmallShape)
+            .background(backgroundColor),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.text,
+                tint = contentColor,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(animatedGap))
+            Box(
+                modifier = Modifier.width(animatedLabelWidth),
+                contentAlignment = Alignment.CenterStart,
             ) {
-                selectableModes.find { item ->
-                    when {
-                        mode is WorkspaceContract.WorkspaceMode.Layout && item.mode is WorkspaceContract.WorkspaceMode.Layout -> true
-                        mode is WorkspaceContract.WorkspaceMode.Performance && item.mode is WorkspaceContract.WorkspaceMode.Performance -> true
-                        mode is WorkspaceContract.WorkspaceMode.LightsChain && item.mode is WorkspaceContract.WorkspaceMode.LightsChain -> true
-                        mode is WorkspaceContract.WorkspaceMode.SamplingChain && item.mode is WorkspaceContract.WorkspaceMode.SamplingChain -> true
-                        mode is WorkspaceContract.WorkspaceMode.Timeline && item.mode is WorkspaceContract.WorkspaceMode.Timeline -> true
-                        else -> false
-                    }
-                }?.let { current ->
-                    Row(
-                        modifier = Modifier
-                            .padding(2.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .height(44.dp)
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.primary),
-
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(22.dp))
-                                .clickable {
-                                    expanded = !expanded
-                                },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = current.icon ?: Icons.Default.Close,
-                                contentDescription = current.text,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .padding(12.dp)
-                                    .size(22.dp),
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
-
-                            Text(
-                                text = current.text,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    lineHeight = MaterialTheme.typography.bodyLarge.fontSize,
-                                ),
-                                modifier = Modifier.padding(end = 16.dp),
-                            )
-                        }
-                    }
-                }
-
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = fadeIn() + expandVertically(),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(horizontal = 6.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    ) {
-                        selectableModes
-                            .filterNot { item ->
-                                when {
-                                    mode is WorkspaceContract.WorkspaceMode.Layout && item.mode is WorkspaceContract.WorkspaceMode.Layout -> true
-                                    mode is WorkspaceContract.WorkspaceMode.Performance && item.mode is WorkspaceContract.WorkspaceMode.Performance -> true
-                                    mode is WorkspaceContract.WorkspaceMode.LightsChain && item.mode is WorkspaceContract.WorkspaceMode.LightsChain -> true
-                                    mode is WorkspaceContract.WorkspaceMode.SamplingChain && item.mode is WorkspaceContract.WorkspaceMode.SamplingChain -> true
-                                    mode is WorkspaceContract.WorkspaceMode.Timeline && item.mode is WorkspaceContract.WorkspaceMode.Timeline -> true
-                                    else -> false
-                                }
-                            }
-                            .forEach { item ->
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(22.dp))
-                                        .height(44.dp)
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            WorkspaceRepository.switchMode(item.mode)
-                                            expanded = false
-                                        }
-                                        .padding(horizontal = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        imageVector = item.icon ?: Icons.Default.Close,
-                                        contentDescription = item.text,
-                                        modifier = Modifier
-                                            .padding(10.dp)
-                                            .size(22.dp),
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-
-                                    Text(
-                                        text = item.text,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            lineHeight = MaterialTheme.typography.bodyLarge.fontSize,
-                                        ),
-                                    )
-
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                    }
-                }
+                MaterialText(
+                    text = item.text,
+                    style = labelStyle,
+                    color = contentColor,
+                    modifier = Modifier.alpha(labelAlpha),
+                    maxLines = 1,
+                )
             }
         }
+    }
+}
+
+private fun modeMatches(
+    currentMode: WorkspaceContract.WorkspaceMode,
+    candidate: WorkspaceContract.WorkspaceMode,
+): Boolean {
+    return when {
+        currentMode is WorkspaceContract.WorkspaceMode.Layout && candidate is WorkspaceContract.WorkspaceMode.Layout -> true
+        currentMode is WorkspaceContract.WorkspaceMode.Performance && candidate is WorkspaceContract.WorkspaceMode.Performance -> true
+        currentMode is WorkspaceContract.WorkspaceMode.LightsChain && candidate is WorkspaceContract.WorkspaceMode.LightsChain -> true
+        currentMode is WorkspaceContract.WorkspaceMode.SamplingChain && candidate is WorkspaceContract.WorkspaceMode.SamplingChain -> true
+        currentMode is WorkspaceContract.WorkspaceMode.Timeline && candidate is WorkspaceContract.WorkspaceMode.Timeline -> true
+        else -> false
     }
 }
 
 data class WorkspaceModePickerItem(
+    val key: String,
     val mode: WorkspaceContract.WorkspaceMode,
     val text: String,
-    val icon: ImageVector? = null,
+    val icon: ImageVector,
 )

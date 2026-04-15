@@ -154,6 +154,8 @@ class MxDeviceMidiEffectAdapter(
                 "4b74eea1e5ee0db42171418717c02561",
                 "4dd48ac60e858928fff89a28865ce735",
                 "f886850f9aba5cf8ae497f3e58231616",
+                "908c82a8eca07a56eaa35c1b6c6f72be",
+                "5aa613617ae0b0e24cbe715dbe3960e2",
                 "d53dcb292a173ab7853183f3cab7620c"-> {
                     return GenericMidiExtAdapter(device, offset).toDeviceStates()
                 }

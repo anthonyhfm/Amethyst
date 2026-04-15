@@ -13,15 +13,17 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.TextDial
-import dev.anthonyhfm.amethyst.ui.components.TimeDial
+import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kotlin.math.roundToInt
 
 class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(DelayChainDeviceState())
@@ -31,15 +33,16 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Delay",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(100.dp)
+                .width(100.dp),
+            titleBarModifier = LocalTitleBarModifier.current
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 var beforeDelay = deviceState.copy().let { (t, ms, _) ->
                     Pair(t, ms)
@@ -73,7 +76,7 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
                 var beforeGateDrag = deviceState.copy().gate
                 TextDial(
                     headline = "Gate",
-                    text = "${(deviceState.gate * 200).toInt()}%",
+                    text = "${(deviceState.gate * 200).roundToInt()}%",
                     value = deviceState.gate,
                     onStartValueChange = {
                         beforeGateDrag = deviceState.gate

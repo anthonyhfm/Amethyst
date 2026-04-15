@@ -9,61 +9,54 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.util.amethystVersion
+import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyH2
+import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyMuted
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun AboutView() {
-    Scaffold(
-        bottomBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Made with 💜 by anthonyhfm")
-            }
-        }
+    Box(
+        modifier = Modifier.fillMaxSize(),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize(),
-
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {
             Image(
                 painter = painterResource(Res.drawable.amethyst_studio_logo),
                 contentDescription = "Amethyst Logo",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .height(160.dp)
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.height(160.dp),
             )
 
-            Text(
+            TypographyH2(
                 text = "Amethyst Studio",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier
-                    .padding(top = 8.dp)
+                modifier = Modifier.padding(top = 8.dp),
             )
 
-            Text(
-                text = "Version ${amethystVersion.major}.${amethystVersion.minor}.${amethystVersion.hotfix}",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+            TypographyMuted(buildVersionLabel())
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(vertical = 20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            TypographyMuted("Made with love by anthonyhfm")
         }
     }
+}
+
+private fun buildVersionLabel(): String {
+    return "Version ${amethystVersion.major}.${amethystVersion.minor}.${amethystVersion.hotfix}"
 }

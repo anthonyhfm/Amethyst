@@ -8,6 +8,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.colors
 
 @Composable
 fun OSXTitleBar() {
@@ -15,6 +18,6 @@ fun OSXTitleBar() {
         modifier = Modifier
             .height(26.dp)
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Theme[colors][background])
     )
 }

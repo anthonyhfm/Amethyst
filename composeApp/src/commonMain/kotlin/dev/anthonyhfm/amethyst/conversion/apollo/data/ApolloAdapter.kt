@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.apollo.data
 
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloChokeAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloClearAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloColorFilterAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloCopyAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloDelayAdapter
@@ -13,10 +14,16 @@ import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloLayerAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloLayerFilterAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloLoopAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloMacroFilterAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloMoveAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloMultiAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloOutputAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloPaintAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloPatternAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloPreviewAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloRefreshAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloRotateAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloSwitchAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloToneAdapter
 import dev.anthonyhfm.amethyst.devices.DeviceState
 
 abstract class ApolloAdapter<T: ApolloModel.Device>(
@@ -45,8 +52,13 @@ abstract class ApolloAdapter<T: ApolloModel.Device>(
                 is ApolloModel.Device.Flip -> ApolloFlipAdapter(model)
                 is ApolloModel.Device.Rotate -> ApolloRotateAdapter(model)
                 is ApolloModel.Device.ColorFilter -> ApolloColorFilterAdapter(model)
-
-                else -> error("Apollo adapter missing for: ${model::class.simpleName}")
+                is ApolloModel.Device.Preview -> ApolloPreviewAdapter(model)
+                is ApolloModel.Device.Move -> ApolloMoveAdapter(model)
+                is ApolloModel.Device.Multi -> ApolloMultiAdapter(model)
+                is ApolloModel.Device.Output -> ApolloOutputAdapter(model)
+                is ApolloModel.Device.Tone -> ApolloToneAdapter(model)
+                is ApolloModel.Device.Clear -> ApolloClearAdapter(model)
+                is ApolloModel.Device.Refresh -> ApolloRefreshAdapter(model)
             }.toDeviceState()
         }
     }

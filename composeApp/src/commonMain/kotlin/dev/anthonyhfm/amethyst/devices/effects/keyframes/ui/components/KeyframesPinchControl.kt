@@ -10,9 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -26,6 +23,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.card
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.roundToInt
 
 @Composable
@@ -35,29 +44,26 @@ fun KeyframesPinchControl(
     bilateral: Boolean,
     onToggleBilateral: () -> Unit
 ) {
-    val onSurface = MaterialTheme.colorScheme.onSurface
-
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(DefaultShape)
             .width(220.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+            .background(Theme[colors][card])
+            .border(1.dp, Theme[colors][border], DefaultShape)
             .padding(horizontal = 12.dp)
             .padding(vertical = 8.dp)
             .clickable(
                 indication = null,
                 interactionSource = null,
-                onClick = {  }
+                onClick = { }
             ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Pinch",
-            style = MaterialTheme.typography.labelLarge.copy(
-                lineHeight = MaterialTheme.typography.labelLarge.fontSize
-            ),
+            style = Theme[typography][small],
+            color = Theme[colors][foreground],
         )
 
         PinchGraph(
@@ -65,7 +71,7 @@ fun KeyframesPinchControl(
             onPinchChange = onPinchChange,
             bilateral = bilateral,
             onToggleBilateral = onToggleBilateral,
-            modifier = Modifier.size(72.dp)
+            modifier = Modifier.size(64.dp)
         )
 
         val clampedPinch = pinch.coerceIn(-2f, 2f)
@@ -73,12 +79,14 @@ fun KeyframesPinchControl(
 
         Text(
             text = display,
-            style = MaterialTheme.typography.labelSmall
+            style = Theme[typography][small],
+            color = Theme[colors][foreground],
         )
 
         Text(
             text = "Drag ↑ / ↓  |  Right-Click Mode",
-            style = MaterialTheme.typography.labelSmall.copy(color = onSurface.copy(alpha = 0.6f))
+            style = Theme[typography][small],
+            color = Theme[colors][mutedForeground],
         )
     }
 }
@@ -92,13 +100,13 @@ fun PinchGraph(
     modifier: Modifier = Modifier
 ) {
     val clampedPinch = pinch.coerceIn(-2f, 2f)
-    val surfaceHigh = MaterialTheme.colorScheme.surfaceContainerHigh
+    val surfaceHigh = Theme[colors][secondary]
     val curveColor = if (bilateral) Color(0xFFFF9800) else Color(0xFF3D6BFF)
     val pinchState = rememberUpdatedState(clampedPinch)
 
     Canvas(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(DefaultShape)
             .background(surfaceHigh)
             .rightClickable {
                 onPinchChange(0f)

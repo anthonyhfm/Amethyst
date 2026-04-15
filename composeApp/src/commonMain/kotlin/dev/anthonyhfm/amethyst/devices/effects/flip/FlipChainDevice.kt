@@ -2,29 +2,35 @@ package dev.anthonyhfm.amethyst.devices.effects.flip
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
-import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -37,12 +43,13 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Flip",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(140.dp)
+                .width(140.dp),
+            titleBarModifier = LocalTitleBarModifier.current
         ) {
             Column(
                 modifier = Modifier
@@ -50,34 +57,24 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                DropdownSelect(
-                    label = "Mode",
-                    options = FlipChainDeviceState.FlipMode.entries,
-                    selectedOption = deviceState.mode,
-                    onOptionSelected = { mode ->
+                ModeSelectField(
+                    selectedMode = deviceState.mode,
+                    onModeSelected = { mode ->
                         val before = state.value
                         state.update { it.copy(mode = mode) }
                         pushStateChange(before, state.value)
                     },
-                    optionToString = {
-                        when (it) {
-                            FlipChainDeviceState.FlipMode.HORIZONTAL -> "Horizontal"
-                            FlipChainDeviceState.FlipMode.VERTICAL -> "Vertical"
-                            FlipChainDeviceState.FlipMode.DIAGONAL_PLUS -> "Diagonal+"
-                            FlipChainDeviceState.FlipMode.DIAGONAL_MINUS -> "Diagonal-"
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
-                HorizontalDivider()
+                Separator()
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AmethystCheckbox(
+                    Checkbox(
                         checked = deviceState.bypass,
                         onCheckedChange = { checked ->
                             val before = state.value
@@ -87,11 +84,14 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
 
                             pushStateChange(before, state.value)
                         },
+                        size = 18.dp,
+                        iconSize = 14.dp,
                     )
 
                     Text(
                         text = "Bypass",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = Theme[typography][small],
+                        color = Theme[colors][foreground]
                     )
                 }
             }
@@ -135,7 +135,50 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
 
         signalExit?.invoke(signals)
     }
+
+    @Composable
+    private fun ModeSelectField(
+        selectedMode: FlipChainDeviceState.FlipMode,
+        onModeSelected: (FlipChainDeviceState.FlipMode) -> Unit,
+        modifier: Modifier = Modifier,
+    ) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "Mode",
+                style = Theme[typography][small],
+                color = Theme[colors][mutedForeground],
+            )
+
+            Select(
+                value = selectedMode.label,
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                shape = SmallShape,
+                triggerHeight = 24.dp,
+                triggerContentPadding = PaddingValues(horizontal = 8.dp),
+            ) {
+                FlipChainDeviceState.FlipMode.entries.forEach { mode ->
+                    SelectItem(
+                        text = mode.label,
+                        selected = mode == selectedMode,
+                        onClick = { onModeSelected(mode) },
+                    )
+                }
+            }
+        }
+    }
 }
+
+private val FlipChainDeviceState.FlipMode.label: String
+    get() = when (this) {
+        FlipChainDeviceState.FlipMode.HORIZONTAL -> "Horizontal"
+        FlipChainDeviceState.FlipMode.VERTICAL -> "Vertical"
+        FlipChainDeviceState.FlipMode.DIAGONAL_PLUS -> "Diagonal+"
+        FlipChainDeviceState.FlipMode.DIAGONAL_MINUS -> "Diagonal-"
+    }
 
 @Serializable
 data class FlipChainDeviceState(

@@ -210,6 +210,22 @@ class WorkspaceViewModel(
                 }
             }
 
+            is WorkspaceContract.Event.OnDeleteDevice -> {
+                val element = state.value.viewportElements.find { it.selectionUUID == event.uuid }
+
+                element?.deviceConfig?.launchpadDevice?.midiOutput?.close()
+
+                SelectionManager.clear()
+
+                state.update {
+                    it.copy(
+                        viewportElements = it.viewportElements.filter { e -> e.selectionUUID != event.uuid }
+                    )
+                }
+
+                WorkspaceRepository.updateWorkspaceBounds()
+            }
+
             is WorkspaceContract.Event.AddChainDevice -> {
                 if (state.value.mode is WorkspaceContract.WorkspaceMode.LightsChain) {
                     WorkspaceRepository.lightsChain.add(event.device, event.atIndex)

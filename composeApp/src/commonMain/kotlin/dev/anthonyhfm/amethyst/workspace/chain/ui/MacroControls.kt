@@ -1,19 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,16 +11,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,10 +26,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.ui.components.Dial
-import dev.anthonyhfm.amethyst.ui.components.StepTextDial
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.theme.chainBorder
+import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
+import dev.anthonyhfm.amethyst.ui.theme.chainSurface
+import dev.anthonyhfm.amethyst.ui.theme.cardForeground
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.primary
+import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 
@@ -56,9 +51,10 @@ fun MacroControls() {
 
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer.compositeOver(MaterialTheme.colorScheme.surfaceColorAtElevation(24.dp)))
-            .border(1.dp, MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp)),
+            .clip(DefaultShape)
+            .background(Theme[chainColorTokens][chainSurface], DefaultShape)
+            .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (macrosVisible) {
             Row(
@@ -69,59 +65,42 @@ fun MacroControls() {
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(8.dp)
-                        .clip(CircleShape)
-                        .size(48.dp)
-                        .clickable {
-                            macrosVisible = !macrosVisible
-                        },
-
+                        .padding(start = 8.dp, end = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "Toggle Macros",
-                        modifier = Modifier
-                            .rotate(-90f)
-                    )
+                    Button(
+                        onClick = { macrosVisible = !macrosVisible },
+                        variant = ButtonVariant.Ghost,
+                        size = ButtonSize.Icon,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = "Toggle Macros",
+                            modifier = Modifier.rotate(-90f),
+                        )
+                    }
                 }
 
                 MacroList()
             }
         } else {
-            Row(
-                modifier = Modifier
-                    .clickable {
-                        macrosVisible = !macrosVisible
-                    }
+            Button(
+                onClick = { macrosVisible = !macrosVisible },
+                variant = ButtonVariant.Ghost,
+                size = ButtonSize.Small,
+                modifier = Modifier.padding(4.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp),
+                Icon(
+                    imageVector = Icons.Default.ChevronLeft,
+                    contentDescription = "Toggle Macros",
+                    modifier = Modifier.rotate(0f),
+                )
 
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "Toggle Macros",
-                        modifier = Modifier
-                            .rotate(0f)
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(32.dp)
-                        .padding(start = 6.dp, end = 12.dp),
-
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Global Macros",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                Text(
+                    text = "Global Macros",
+                    style = Theme[typography][small],
+                    color = Theme[colors][cardForeground],
+                )
             }
         }
     }
@@ -138,8 +117,10 @@ fun MacroList() {
             StepTextDial(
                 headline = "Macro ${index + 1}",
                 text = macro.value.toString(),
-                steps = IntArray(128) { it }.toList(),
+                steps = IntArray(100) { it }.toList(),
                 value = macro.value,
+                containerColor = Theme[colors][secondary],
+                dialColor = Theme[colors][primary],
                 onResolveTextValue = {
                     val valueText = it.trim().toIntOrNull()
 
@@ -170,13 +151,12 @@ fun MacroList() {
         modifier = Modifier
             .width(64.dp)
             .height(116.dp),
-
         contentAlignment = Alignment.Center
     ) {
-        IconButton(
-            onClick = {
-                WorkspaceRepository.addMacro(Macro(value = 0))
-            }
+        Button(
+            onClick = { WorkspaceRepository.addMacro(Macro(value = 0)) },
+            variant = ButtonVariant.Ghost,
+            size = ButtonSize.Icon,
         ) {
             Icon(
                 imageVector = Icons.Default.Add,

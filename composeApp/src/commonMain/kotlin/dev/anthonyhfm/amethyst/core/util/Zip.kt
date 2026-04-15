@@ -16,15 +16,14 @@ fun Zip.determineFormat(file: PlatformFile): ZippedProjectFormat {
     val paths = Zip.getPaths(file)
 
     return when {
-        paths.any { it.endsWith(".als") } -> ZippedProjectFormat.ABLETON
+        paths.any { it.endsWith(".als") } && paths.any { it.endsWith(".approj") } && GlobalSettings.experimentalApolloConversionSupport ->
+            ZippedProjectFormat.ABLETON_APOLLO
 
-        paths.any {
-            it.contains(".als")
-        } && paths.any {
-            it.contains(".approj") && GlobalSettings.experimentalApolloConversionSupport
-        } -> ZippedProjectFormat.ABLETON_APOLLO
+        paths.any { it.endsWith(".als") } ->
+            ZippedProjectFormat.ABLETON
 
-        else -> ZippedProjectFormat.UNIPAD
+        else ->
+            ZippedProjectFormat.UNIPAD
     }
 }
 

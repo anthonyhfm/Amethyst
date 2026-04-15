@@ -74,7 +74,7 @@ class MidiEffectGroupAdapter(
                                     add(
                                         MacroFilterChainDeviceState(
                                             macro = 0,
-                                            value = minMacro,
+                                            allowedValues = setOf(minMacro),
                                         )
                                     )
                                 } else if (maxMacro - minMacro != 127) {
@@ -87,7 +87,7 @@ class MidiEffectGroupAdapter(
                                                         devices = listOf(
                                                             MacroFilterChainDeviceState(
                                                                 macro = 0,
-                                                                value = key,
+                                                                allowedValues = setOf(key),
                                                             )
                                                         )
                                                     )

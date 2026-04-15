@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Event
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Frame
@@ -43,8 +44,8 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     lateinit var state: StateFlow<KeyframesChainDeviceContract.KeyframesChainDeviceState>
 
-    var onVirtualDeviceDragStart: ((x: Int, y: Int) -> Unit)? = null
-    var onVirtualDeviceDrag: ((x: Int, y: Int) -> Unit)? = null
+    var onVirtualDeviceDragStart: ((device: LaunchpadViewportElement, localX: Int, localY: Int) -> Unit)? = null
+    var onVirtualDeviceDrag: ((device: LaunchpadViewportElement, localX: Int, localY: Int) -> Unit)? = null
     var onVirtualDeviceDragEnd: (() -> Unit)? = null
     var onEvent: ((Event) -> Unit)? = null
     var modeWakeup: (() -> Unit)? = null
@@ -67,7 +68,7 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     .padding(horizontal = 12.dp)
                     .padding(bottom = 12.dp),
 
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 FrameListPanel(
                     state = state,
@@ -122,6 +123,20 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 Key.DirectionDown, Key.DirectionRight -> {
                     onEvent?.invoke(Event.OnSelectFrame(state.value.currentFrameIndex + 1))
                     return true
+                }
+
+                Key.MoveHome -> {
+                    if (state.value.frames.isNotEmpty()) {
+                        onEvent?.invoke(Event.OnSelectFrame(0))
+                        return true
+                    }
+                }
+
+                Key.MoveEnd -> {
+                    if (state.value.frames.isNotEmpty()) {
+                        onEvent?.invoke(Event.OnSelectFrame(state.value.frames.lastIndex))
+                        return true
+                    }
                 }
 
                 Key.A -> {
@@ -200,6 +215,18 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         return true
                     }
                 }
+
+                Key.Escape -> {
+                    modeClose?.invoke()
+                    return true
+                }
+
+                Key.W -> {
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        modeClose?.invoke()
+                        return true
+                    }
+                }
             }
         }
 
@@ -215,12 +242,12 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
         }
     }
 
-    fun virtualDeviceDragStart(x: Int, y: Int) {
-        onVirtualDeviceDragStart?.invoke(x, y)
+    fun virtualDeviceDragStart(device: LaunchpadViewportElement, localX: Int, localY: Int) {
+        onVirtualDeviceDragStart?.invoke(device, localX, localY)
     }
 
-    fun virtualDeviceDrag(x: Int, y: Int) {
-        onVirtualDeviceDrag?.invoke(x, y)
+    fun virtualDeviceDrag(device: LaunchpadViewportElement, localX: Int, localY: Int) {
+        onVirtualDeviceDrag?.invoke(device, localX, localY)
     }
 
     fun virtualDeviceDragEnd() {

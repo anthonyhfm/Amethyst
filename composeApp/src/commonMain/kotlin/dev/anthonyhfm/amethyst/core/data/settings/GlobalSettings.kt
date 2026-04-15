@@ -101,9 +101,4 @@ object GlobalSettings {
             settings.putString("localAuthor", value)
         }
 
-    var enableAnimations: Boolean
-        get() = settings.getBoolean("enableAnimations", true)
-        set(value) {
-            settings.putBoolean("enableAnimations", value)
-        }
 }

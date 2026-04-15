@@ -26,36 +26,63 @@ class Screen : AutoCloseable {
 
         private fun recomputeColorLocked(): Color {
             var ret = Color.Black
+            var remainingOpacity = 1f
 
-            for (i in 0 until signals.size) {
+            var i = 0
+            while (i < signals.size && remainingOpacity > 0f) {
                 val signal = signals.getValueAt(i)
+                val opacity = signal.opacity.coerceIn(0f, 1f)
 
                 if (signal.blendingMode != Signal.LED.BlendingMode.Normal) {
                     val nextSignal = if (i + 1 < signals.size) signals.getValueAt(i + 1) else null
-                    
+
                     if (nextSignal == null || abs(signal.layer - nextSignal.layer) > signal.blendingRange) {
+                        i++
                         continue
                     }
                 }
 
+                val contribution = opacity * remainingOpacity
+
                 when (signal.blendingMode) {
                     Signal.LED.BlendingMode.Normal -> {
-                        ret = signal.color
-                        break
+                        ret = Color(
+                            (ret.red + signal.color.red * contribution).coerceIn(0f, 1f),
+                            (ret.green + signal.color.green * contribution).coerceIn(0f, 1f),
+                            (ret.blue + signal.color.blue * contribution).coerceIn(0f, 1f),
+                            1f
+                        )
+                        remainingOpacity *= (1f - opacity)
+                        i++
                     }
                     Signal.LED.BlendingMode.Mask -> {
                         ret = Color.Black
-                        break
+                        remainingOpacity = 0f
+                        i++
                     }
                     Signal.LED.BlendingMode.Multiply -> {
                         val nextSignal = signals.getValueAt(i + 1)
-                        ret = nextSignal.color.mix(signal.color, signal.blendingMode)
-                        break
+                        val blended = nextSignal.color.mix(signal.color, signal.blendingMode)
+                        ret = Color(
+                            (ret.red + blended.red * contribution).coerceIn(0f, 1f),
+                            (ret.green + blended.green * contribution).coerceIn(0f, 1f),
+                            (ret.blue + blended.blue * contribution).coerceIn(0f, 1f),
+                            1f
+                        )
+                        remainingOpacity *= (1f - opacity)
+                        i += 2
                     }
                     Signal.LED.BlendingMode.Screen -> {
                         val nextSignal = signals.getValueAt(i + 1)
-                        ret = nextSignal.color.mix(signal.color, signal.blendingMode)
-                        break
+                        val blended = nextSignal.color.mix(signal.color, signal.blendingMode)
+                        ret = Color(
+                            (ret.red + blended.red * contribution).coerceIn(0f, 1f),
+                            (ret.green + blended.green * contribution).coerceIn(0f, 1f),
+                            (ret.blue + blended.blue * contribution).coerceIn(0f, 1f),
+                            1f
+                        )
+                        remainingOpacity *= (1f - opacity)
+                        i += 2
                     }
                 }
             }

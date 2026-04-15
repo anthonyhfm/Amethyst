@@ -9,11 +9,12 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.ColorPicker
 import dev.anthonyhfm.amethyst.ui.components.HexColorEditor
 import dev.anthonyhfm.amethyst.ui.components.HuePickerBar
 import dev.anthonyhfm.amethyst.ui.components.rememberColorPickerState
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
@@ -24,6 +25,7 @@ class ColorChainDevice : LEDChainDevice<ColorChainDeviceState>() {
     override fun Content() {
         val selections by SelectionManager.selections.collectAsState()
         val deviceState by state.collectAsState()
+        val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
         val colorPickerState = rememberColorPickerState(
             initialColor = Color(deviceState.r, deviceState.g, deviceState.b)
@@ -44,11 +46,12 @@ class ColorChainDevice : LEDChainDevice<ColorChainDeviceState>() {
             }
         }
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Color",
-            isSelected = selections.any { it.selectionUUID == this.selectionUUID },
+            isSelected = isSelected,
             isDragging = isDragging.value,
-            modifier = Modifier.width(220.dp),
+            modifier = Modifier.width(210.dp),
+            titleBarModifier = LocalTitleBarModifier.current,
         ) {
             Column(
                 modifier = Modifier

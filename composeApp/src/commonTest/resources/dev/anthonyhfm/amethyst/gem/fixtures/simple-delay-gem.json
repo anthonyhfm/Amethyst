@@ -1,0 +1,270 @@
+{
+    "schemaVersion": {
+        "major": 1,
+        "minor": 0,
+        "hotfix": 0
+    },
+    "metadata": {
+        "id": "gem://reference/simple-delay",
+        "name": "Simple Delay Gem",
+        "description": "Reference Phase 1 gem fixture that models a delayed number path.",
+        "category": {
+            "id": "reference",
+            "label": "Reference Gems"
+        },
+        "assetVersion": {
+            "major": 1,
+            "minor": 0,
+            "hotfix": 0
+        }
+    },
+    "definition": {
+        "rootGraph": {
+            "id": "root",
+            "kind": "ROOT",
+            "label": "Simple Delay Root",
+            "description": "",
+            "nodes": [
+                {
+                    "id": "source-value",
+                    "type": {
+                        "typeId": "amethyst.parameter.number.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Source Value",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "delay-time",
+                    "type": {
+                        "typeId": "amethyst.parameter.timing.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Delay Time",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "timing"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "delay-node",
+                    "type": {
+                        "typeId": "amethyst.timing.number.delay",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Delay Number",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "delay",
+                            "label": "Delay",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "timing"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "timing",
+                                "value": {
+                                    "kind": "dev.anthonyhfm.amethyst.core.util.Timing.Duration",
+                                    "duration": "PT0.100S"
+                                }
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                }
+            ],
+            "connections": [
+                {
+                    "id": "source-into-delay",
+                    "from": {
+                        "nodeId": "source-value",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "delay-node",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "timing-into-delay",
+                    "from": {
+                        "nodeId": "delay-time",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "delay-node",
+                        "pinId": "delay"
+                    }
+                }
+            ]
+        },
+        "subgraphs": [
+            {
+                "id": "preview",
+                "kind": "SUBGRAPH",
+                "label": "Delay Preview",
+                "description": "",
+                "nodes": [],
+                "connections": []
+            }
+        ],
+        "host": {
+            "assetShape": "PROCESSOR",
+            "supportedDomains": [
+                "AUDIO"
+            ],
+            "inputs": [],
+            "outputs": []
+        },
+        "exposedParameters": [
+            {
+                "id": "source-value",
+                "label": "Source Value",
+                "description": "",
+                "type": {
+                    "kind": "number"
+                },
+                "defaultValue": {
+                    "kind": "number",
+                    "value": 1.0
+                },
+                "groupId": "timing",
+                "sortOrder": 10,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "source-value",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            },
+            {
+                "id": "delay-time",
+                "label": "Delay Time",
+                "description": "",
+                "type": {
+                    "kind": "timing"
+                },
+                "defaultValue": {
+                    "kind": "timing",
+                    "value": {
+                        "kind": "dev.anthonyhfm.amethyst.core.util.Timing.Duration",
+                        "duration": "PT0.150S"
+                    }
+                },
+                "groupId": "timing",
+                "sortOrder": 20,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "delay-time",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            }
+        ],
+        "defaultState": {
+            "exposedParameterValues": {
+                "source-value": {
+                    "kind": "number",
+                    "value": 1.0
+                },
+                "delay-time": {
+                    "kind": "timing",
+                    "value": {
+                        "kind": "dev.anthonyhfm.amethyst.core.util.Timing.Duration",
+                        "duration": "PT0.150S"
+                    }
+                }
+            },
+            "hostDeviceDefaults": {}
+        }
+    },
+    "extensions": {}
+}

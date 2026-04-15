@@ -4,7 +4,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 
 class OriginalSimplerAdapter(
     private val device: OriginalSimpler,
@@ -16,7 +16,7 @@ class OriginalSimplerAdapter(
             AbletonConverter.audioMap[data]?.copy(
                 fadeInMs = convertWeirdFuckingFloatValues(device.volumeAndPan.oneShotEnvelope.fadeInTime.manual.value).toFloat(),
                 fadeOutMs = convertWeirdFuckingFloatValues(device.volumeAndPan.oneShotEnvelope.fadeOutTime.manual.value).toFloat()
-            ) ?: ClipChainDeviceState()
+            ) ?: SampleChainDeviceState()
         )
     }
 

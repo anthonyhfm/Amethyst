@@ -13,7 +13,8 @@ sealed interface Signal {
         val color: Color,
         val layer: Int = 0,
         val blendingMode: BlendingMode = BlendingMode.Normal,
-        val blendingRange: Int = 1
+        val blendingRange: Int = 1,
+        val opacity: Float = 1f
     ) : Signal {
         enum class BlendingMode {
             Normal, Multiply, Screen, Mask
@@ -34,6 +35,8 @@ sealed interface Signal {
         val channels: Int = 2,
         val bitDepth: Int = 16,
         val durationMs: Long = 0,
+        val gain: Float = 1f,
+        val pan: Float = 0f,
     ) : Signal {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -47,6 +50,8 @@ sealed interface Signal {
             if (channels != other.channels) return false
             if (bitDepth != other.bitDepth) return false
             if (durationMs != other.durationMs) return false
+            if (gain != other.gain) return false
+            if (pan != other.pan) return false
             return true
         }
 
@@ -57,6 +62,8 @@ sealed interface Signal {
             result = 31 * result + channels
             result = 31 * result + bitDepth
             result = 31 * result + durationMs.hashCode()
+            result = 31 * result + gain.hashCode()
+            result = 31 * result + pan.hashCode()
             return result
         }
     }

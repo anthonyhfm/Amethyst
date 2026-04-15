@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.unipad.data
 
 import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -133,7 +133,7 @@ object KeySound {
                                                 name = clipName,
                                                 stateChain = StateChain(
                                                     devices = listOf(
-                                                        ClipChainDeviceState(
+                                                        SampleChainDeviceState(
                                                             fileName = audioClip.name,
                                                             rawData = audioClip.rawData,
                                                             sampleRate = audioClip.sampleRate,
@@ -181,7 +181,7 @@ object KeySound {
                                     CoordinateFilterChainDeviceState(
                                         filters = listOf(Pair(x, y))
                                     ),
-                                    ClipChainDeviceState(
+                                    SampleChainDeviceState(
                                         fileName = audioClip.name,
                                         rawData = audioClip.rawData,
                                         sampleRate = audioClip.sampleRate,
@@ -204,7 +204,7 @@ object KeySound {
         return StateChain(
             devices = listOf(
                 MacroFilterChainDeviceState(
-                    value = page
+                    allowedValues = setOf(page)
                 ),
                 GroupChainDeviceState(
                     groups = groups

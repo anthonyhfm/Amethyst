@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlinx.coroutines.*
 import org.lwjgl.openal.*
+import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
@@ -19,13 +20,13 @@ actual object AudioOutput {
 
     private const val SAMPLE_RATE = 44100
 
-    private const val MAX_SOURCES = 16
+    private const val MAX_SOURCES = 64
 
     private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 
     private val updateFrequency = if (isWindows) 120 else 30
 
-    private val processingDelay = if (isWindows) 2L else 10L
+    private val processingDelay = 2L
 
     private val batchSize = if (isWindows) 12 else 4
 
@@ -33,6 +34,8 @@ actual object AudioOutput {
         val pcmData: ByteArray,
         val audioKey: String?,
         val origin: Any?,
+        @Volatile var gain: Float = 1f,
+        @Volatile var pan: Float = 0f,
         val priority: Int = 0,
         var format: Pair<Signal.AudioSignal, Int>? = null
     ) {
@@ -42,6 +45,8 @@ actual object AudioOutput {
             return pcmData.contentEquals(other.pcmData) &&
                    audioKey == other.audioKey &&
                    origin == other.origin &&
+                   gain == other.gain &&
+                   pan == other.pan &&
                    priority == other.priority &&
                    format == other.format
         }
@@ -50,6 +55,8 @@ actual object AudioOutput {
             var result = pcmData.contentHashCode()
             result = 31 * result + (audioKey?.hashCode() ?: 0)
             result = 31 * result + (origin?.hashCode() ?: 0)
+            result = 31 * result + gain.hashCode()
+            result = 31 * result + pan.hashCode()
             result = 31 * result + priority
             result = 31 * result + (format?.hashCode() ?: 0)
             return result
@@ -184,168 +191,136 @@ actual object AudioOutput {
     private fun processAudioQueue() {
         if (!isInitialized) return
 
-        // Windows processes more sources per cycle due to higher update frequency
-        repeat(batchSize) {
-            val queuedAudio = audioQueue.poll() ?: return
-
-            if (queuedAudio.format != null) {
+        // Drain the entire queue in one pass and start all sources atomically via alSourcePlayv.
+        // This ensures clips queued in the same playback tick start in the same OpenAL cycle.
+        val newAlSourceIds = mutableListOf<Int>()
+        while (true) {
+            val queuedAudio = audioQueue.poll() ?: break
+            val alSourceId = if (queuedAudio.format != null) {
                 val (audioSignal, openALFormat) = queuedAudio.format!!
-                createAndPlayAudioSourceWithFormat(queuedAudio, audioSignal, openALFormat)
+                createAudioSource(queuedAudio, audioSignal, openALFormat)
             } else {
-                createAndPlayAudioSourceLegacy(queuedAudio)
+                createAudioSourceLegacy(queuedAudio)
             }
+            if (alSourceId != null) newAlSourceIds.add(alSourceId)
+        }
+
+        if (newAlSourceIds.isNotEmpty()) {
+            startSourcesAtomically(newAlSourceIds)
         }
     }
 
-    private fun createAndPlayAudioSourceLegacy(queuedAudio: QueuedAudio) {
+    private fun startSourcesAtomically(alSourceIds: List<Int>) {
+        if (alSourceIds.isEmpty()) return
         try {
-            if (activeSources.size >= MAX_SOURCES) return
+            MemoryStack.stackPush().use { stack ->
+                val buf = stack.mallocInt(alSourceIds.size)
+                alSourceIds.forEach { buf.put(it) }
+                buf.flip()
+                AL10.alSourcePlayv(buf)
+            }
+            if (AL10.alGetError() != AL10.AL_NO_ERROR) {
+                // Fallback: play individually
+                alSourceIds.forEach { AL10.alSourcePlay(it) }
+            }
+        } catch (e: Exception) {
+            alSourceIds.forEach { AL10.alSourcePlay(it) }
+        }
+    }
 
-            val sourceId = AL10.alGenSources()
-            if (AL10.alGetError() != AL10.AL_NO_ERROR) return
+    // Creates and registers an OpenAL source but does NOT call alSourcePlay.
+    // Returns the OpenAL source integer ID, or null on failure.
+    private fun createAudioSourceLegacy(queuedAudio: QueuedAudio): Int? {
+        return try {
+            if (activeSources.size >= MAX_SOURCES) return null
+
+            val alSourceId = AL10.alGenSources()
+            if (AL10.alGetError() != AL10.AL_NO_ERROR) return null
 
             val bufferIds = IntArray(1)
             AL10.alGenBuffers(bufferIds)
             if (AL10.alGetError() != AL10.AL_NO_ERROR) {
-                AL10.alDeleteSources(sourceId)
-                return
+                AL10.alDeleteSources(alSourceId)
+                return null
             }
 
-            AL10.alSourcef(sourceId, AL10.AL_PITCH, 1.0f)
-            AL10.alSourcef(sourceId, AL10.AL_GAIN, 0.9f * GlobalSettings.masterVolume)
-            AL10.alSource3f(sourceId, AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
-            AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
+            AL10.alSourcef(alSourceId, AL10.AL_PITCH, 1.0f)
+            AL10.alSourcef(alSourceId, AL10.AL_GAIN, 0.9f * GlobalSettings.masterVolume)
+            AL10.alSource3f(alSourceId, AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
+            AL10.alSourcei(alSourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
 
             val pcmData = queuedAudio.pcmData
-
-            // Determine format from data size - assume 16-bit
-            // If data size / 2 is even, it's stereo; if odd, it's mono
             val samples = pcmData.size / 2
-            val format = if (samples % 2 == 0) {
-                AL10.AL_FORMAT_STEREO16
-            } else {
-                AL10.AL_FORMAT_MONO16
-            }
-
-            val validSize = if (format == AL10.AL_FORMAT_STEREO16) {
-                (pcmData.size / 4) * 4  // Stereo: 4 bytes per frame
-            } else {
-                (pcmData.size / 2) * 2  // Mono: 2 bytes per frame
-            }
-
-            val validData = if (validSize != pcmData.size) {
-                pcmData.sliceArray(0 until validSize)
-            } else {
-                pcmData
-            }
+            val format = if (samples % 2 == 0) AL10.AL_FORMAT_STEREO16 else AL10.AL_FORMAT_MONO16
+            val validSize = if (format == AL10.AL_FORMAT_STEREO16) (pcmData.size / 4) * 4 else (pcmData.size / 2) * 2
+            val validData = if (validSize != pcmData.size) pcmData.sliceArray(0 until validSize) else pcmData
 
             val buffer = MemoryUtil.memAlloc(validData.size)
             try {
                 buffer.put(validData)
                 buffer.flip()
-
                 AL10.alBufferData(bufferIds[0], format, buffer, SAMPLE_RATE)
-
                 if (AL10.alGetError() != AL10.AL_NO_ERROR) {
-                    AL10.alDeleteSources(sourceId)
-                    AL10.alDeleteBuffers(bufferIds)
-                    return
+                    AL10.alDeleteSources(alSourceId); AL10.alDeleteBuffers(bufferIds); return null
                 }
-
-                AL10.alSourcei(sourceId, AL10.AL_BUFFER, bufferIds[0])
-
-                val audioSource = AudioSource(sourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin)
-                val key = generateSourceKey(queuedAudio.audioKey, queuedAudio.origin)
-
-                activeSources[key]?.cleanup()
-                activeSources[key] = audioSource
-
-                AL10.alSourcePlay(sourceId)
-
-                if (AL10.alGetError() != AL10.AL_NO_ERROR) {
-                    audioSource.cleanup()
-                    activeSources.remove(key)
-                }
-
+                AL10.alSourcei(alSourceId, AL10.AL_BUFFER, bufferIds[0])
             } finally {
                 MemoryUtil.memFree(buffer)
             }
 
+            val audioSource = AudioSource(alSourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin)
+            val key = generateSourceKey(queuedAudio.audioKey, queuedAudio.origin)
+            activeSources[key]?.cleanup()
+            activeSources[key] = audioSource
+            alSourceId
         } catch (e: Exception) {
-            // Silent error handling
+            null
         }
     }
 
-    private fun createAndPlayAudioSourceWithFormat(
+    // Creates and registers an OpenAL source but does NOT call alSourcePlay.
+    // Returns the OpenAL source integer ID, or null on failure.
+    private fun createAudioSource(
         queuedAudio: QueuedAudio,
         audioSignal: Signal.AudioSignal,
         openALFormat: Int
-    ) {
-        try {
-            if (activeSources.size >= MAX_SOURCES) return
+    ): Int? {
+        return try {
+            if (activeSources.size >= MAX_SOURCES) return null
 
-            val sourceId = AL10.alGenSources()
-            if (AL10.alGetError() != AL10.AL_NO_ERROR) return
+            val alSourceId = AL10.alGenSources()
+            if (AL10.alGetError() != AL10.AL_NO_ERROR) return null
 
             val bufferIds = IntArray(1)
             AL10.alGenBuffers(bufferIds)
             if (AL10.alGetError() != AL10.AL_NO_ERROR) {
-                AL10.alDeleteSources(sourceId)
-                return
+                AL10.alDeleteSources(alSourceId); return null
             }
 
-            AL10.alSourcef(sourceId, AL10.AL_PITCH, 1.0f)
-            AL10.alSourcef(sourceId, AL10.AL_GAIN, 0.9f * GlobalSettings.masterVolume)
-            AL10.alSource3f(sourceId, AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
-            AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
-
-            if (isWindows) {
-                // Optimize for low-latency 2D audio on Windows:
-                // - Use relative positioning (no 3D calculations)
-                // - Disable distance attenuation
-                // - Set maximum distance to avoid culling
-                AL10.alSourcei(sourceId, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE)
-                AL10.alSourcef(sourceId, AL10.AL_REFERENCE_DISTANCE, 1.0f)
-                AL10.alSourcef(sourceId, AL10.AL_ROLLOFF_FACTOR, 0.0f)
-                AL10.alSourcef(sourceId, AL10.AL_MAX_DISTANCE, Float.MAX_VALUE)
-            }
+            applyPlaybackSettings(alSourceId, queuedAudio.gain, queuedAudio.pan)
+            AL10.alSourcei(alSourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
 
             val pcmData = queuedAudio.pcmData
             val buffer = MemoryUtil.memAlloc(pcmData.size)
-
             try {
                 buffer.put(pcmData)
                 buffer.flip()
-
                 AL10.alBufferData(bufferIds[0], openALFormat, buffer, audioSignal.sampleRate)
-
                 if (AL10.alGetError() != AL10.AL_NO_ERROR) {
-                    AL10.alDeleteSources(sourceId)
-                    AL10.alDeleteBuffers(bufferIds)
-                    return
+                    AL10.alDeleteSources(alSourceId); AL10.alDeleteBuffers(bufferIds); return null
                 }
-
-                AL10.alSourcei(sourceId, AL10.AL_BUFFER, bufferIds[0])
-
-                val audioSource = AudioSource(sourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin)
-                val key = generateSourceKey(queuedAudio.audioKey, queuedAudio.origin)
-
-                activeSources[key]?.cleanup()
-                activeSources[key] = audioSource
-
-                AL10.alSourcePlay(sourceId)
-
-                if (AL10.alGetError() != AL10.AL_NO_ERROR) {
-                    audioSource.cleanup()
-                    activeSources.remove(key)
-                }
-
+                AL10.alSourcei(alSourceId, AL10.AL_BUFFER, bufferIds[0])
             } finally {
                 MemoryUtil.memFree(buffer)
             }
 
+            val audioSource = AudioSource(alSourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin)
+            val key = generateSourceKey(queuedAudio.audioKey, queuedAudio.origin)
+            activeSources[key]?.cleanup()
+            activeSources[key] = audioSource
+            alSourceId
         } catch (e: Exception) {
-            // Silent error handling
+            null
         }
     }
 
@@ -382,18 +357,77 @@ actual object AudioOutput {
         val normalizedData = normalizeAudioForPlayback(rawData, audioSignal)
 
         val sourceId = "audio_${System.currentTimeMillis()}_${(0..999).random()}"
-        val queuedAudio = QueuedAudio(normalizedData, sourceId, audioSignal.origin, if (isWindows) 1 else 0)
+        val queuedAudio = QueuedAudio(
+            pcmData = normalizedData,
+            audioKey = sourceId,
+            origin = audioSignal.origin,
+            gain = audioSignal.gain,
+            pan = audioSignal.pan,
+            priority = 0
+        )
         queuedAudio.format = Pair(audioSignal, openALFormat)
-
-        if (isWindows && audioQueue.isEmpty() && activeSources.size < MAX_SOURCES) {
-            CoroutineScope(Dispatchers.Default).launch {
-                createAndPlayAudioSourceWithFormat(queuedAudio, audioSignal, openALFormat)
-            }
-        } else {
-            audioQueue.offer(queuedAudio)
-        }
+        audioQueue.offer(queuedAudio)
 
         return sourceId
+    }
+
+    actual fun playMultiple(signals: List<Signal.AudioSignal>): List<String?> {
+        if (!isInitialized || signals.isEmpty()) return signals.map { null }
+
+        val sourceIds = mutableListOf<String?>()
+        val newAlSourceIds = mutableListOf<Int>()
+
+        for (signal in signals) {
+            val rawData = signal.rawData
+            if (rawData == null || rawData.isEmpty()) { sourceIds.add(null); continue }
+            val openALFormat = determineOpenALFormat(signal)
+            if (openALFormat == -1) { sourceIds.add(null); continue }
+
+            val normalizedData = normalizeAudioForPlayback(rawData, signal)
+            val sourceId = "audio_${System.currentTimeMillis()}_${(0..999).random()}"
+            val queuedAudio = QueuedAudio(
+                pcmData = normalizedData,
+                audioKey = sourceId,
+                origin = signal.origin,
+                gain = signal.gain,
+                pan = signal.pan,
+                priority = 0
+            )
+            queuedAudio.format = Pair(signal, openALFormat)
+
+            val alSourceId = createAudioSource(queuedAudio, signal, openALFormat)
+            if (alSourceId != null) {
+                newAlSourceIds.add(alSourceId)
+                sourceIds.add(sourceId)
+            } else {
+                sourceIds.add(null)
+            }
+        }
+
+        startSourcesAtomically(newAlSourceIds)
+        return sourceIds
+    }
+
+    actual fun update(sourceId: String, gain: Float, pan: Float) {
+        activeSources[sourceId]?.let { audioSource ->
+            try {
+                applyPlaybackSettings(
+                    sourceId = audioSource.sourceId,
+                    gain = gain,
+                    pan = pan
+                )
+            } catch (_: Exception) {
+            }
+            return
+        }
+
+        audioQueue.forEach { queuedAudio ->
+            if (queuedAudio.audioKey == sourceId) {
+                queuedAudio.gain = gain
+                queuedAudio.pan = pan
+                return
+            }
+        }
     }
 
     actual fun stop(sourceId: String) {
@@ -425,6 +459,20 @@ actual object AudioOutput {
         if (origin == null) return
         val toRemove = activeSources.filter { it.value.origin == origin }.keys
         toRemove.forEach { stop(it) }
+    }
+
+    private fun applyPlaybackSettings(sourceId: Int, gain: Float, pan: Float) {
+        AL10.alSourcef(sourceId, AL10.AL_PITCH, 1.0f)
+        AL10.alSourcef(
+            sourceId,
+            AL10.AL_GAIN,
+            0.9f * GlobalSettings.masterVolume * gain.coerceAtLeast(0f)
+        )
+        AL10.alSourcei(sourceId, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE)
+        AL10.alSourcef(sourceId, AL10.AL_REFERENCE_DISTANCE, 1.0f)
+        AL10.alSourcef(sourceId, AL10.AL_ROLLOFF_FACTOR, 0.0f)
+        AL10.alSourcef(sourceId, AL10.AL_MAX_DISTANCE, Float.MAX_VALUE)
+        AL10.alSource3f(sourceId, AL10.AL_POSITION, pan.coerceIn(-1f, 1f), 0.0f, 0.0f)
     }
 
     private fun determineOpenALFormat(audioSignal: Signal.AudioSignal): Int {

@@ -6,7 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
 import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.isRegularFile
@@ -24,7 +24,7 @@ class OriginalSimplerPrerenderer {
         val totalFrames: Long
     )
 
-    fun decodeAll(tracksList: List<MidiTrack>): Map<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState> {
+    fun decodeAll(tracksList: List<MidiTrack>): Map<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState> {
         val simplers = tracksList
             .flatMap { MidiChainReader.getAllDevicesOfType<OriginalSimpler>(it) }
             .map { OriginalSimplerAdapter.getSimplerData(it) }
@@ -42,7 +42,7 @@ class OriginalSimplerPrerenderer {
                 val perPathJobs = groupedByPath.map { (path, pathSimplers) ->
                     async(limitedIO) {
                         gate.withPermit {
-                            val full = decodeFull(path) ?: return@async path to emptyMap<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState>()
+                            val full = decodeFull(path) ?: return@async path to emptyMap<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState>()
 
                             try {
                                 val states = pathSimplers.associateWith { simpler ->
@@ -118,16 +118,16 @@ class OriginalSimplerPrerenderer {
         full: FullAudio,
         sampleStart: Long,
         sampleEnd: Long
-    ): ClipChainDeviceState {
+    ): SampleChainDeviceState {
         val frameSize = full.channels * (full.bitDepth / 8)
-        if (frameSize <= 0) return ClipChainDeviceState(fileName = filePath, isLoaded = false)
+        if (frameSize <= 0) return SampleChainDeviceState(fileName = filePath, isLoaded = false)
 
         val startF = sampleStart.coerceAtLeast(0L)
         val endRaw = if (sampleEnd <= 0L) full.totalFrames else sampleEnd
         val endF = endRaw.coerceAtMost(full.totalFrames)
 
         if (startF >= endF) {
-            return ClipChainDeviceState(
+            return SampleChainDeviceState(
                 fileName = filePath,
                 rawData = ByteArray(0),
                 sampleRate = full.sampleRate,
@@ -140,13 +140,13 @@ class OriginalSimplerPrerenderer {
         val startByte = (startF * frameSize).toInt()
         val endByte = (endF * frameSize).toInt()
         if (startByte >= full.rawData.size) {
-            return ClipChainDeviceState(fileName = filePath, isLoaded = false)
+            return SampleChainDeviceState(fileName = filePath, isLoaded = false)
         }
         val safeEndByte = endByte.coerceAtMost(full.rawData.size)
         val slice = full.rawData.copyOfRange(startByte, safeEndByte)
 
 
-        return ClipChainDeviceState(
+        return SampleChainDeviceState(
             fileName = filePath,
             rawData = slice,
             sampleRate = full.sampleRate,

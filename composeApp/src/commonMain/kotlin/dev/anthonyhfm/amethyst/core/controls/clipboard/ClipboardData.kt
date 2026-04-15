@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceCon
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
 
 sealed interface ClipboardData {
     data class ChainDevice(
@@ -32,6 +33,13 @@ sealed interface ClipboardData {
 
     data class TimelineAudioEntries(
         val entries: List<AudioEntry>
+    ) : ClipboardData
+
+    data class TimelineAudioRange(
+        val entries: List<AudioEntry>,
+        val automationLanes: List<TimelineAutomationLane>,
+        val rangeStartMs: Long,
+        val rangeEndMs: Long
     ) : ClipboardData
 
     data class TimelineMidiEntries(

@@ -2,8 +2,11 @@ package dev.anthonyhfm.amethyst.core.engine.heaven
 
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.util.mainDispatcherOrDefault
+import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.core.util.StopWatch
+import dev.anthonyhfm.amethyst.core.util.platform
 import kotlinx.atomicfu.atomic
 
 import kotlinx.coroutines.*
@@ -12,7 +15,6 @@ import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -26,6 +28,34 @@ data class ScheduledJob(
 )
 
 object Heaven {
+    private fun Throwable.isRecoverablePlatformInitFailure(): Boolean {
+        val typeName = this::class.simpleName.orEmpty()
+        return this is IllegalStateException ||
+            this is NullPointerException ||
+            typeName == "ExceptionInInitializerError" ||
+            typeName == "NoClassDefFoundError"
+    }
+
+    private fun defaultFps(): Int {
+        return if (platform is Platform.iOS || platform is Platform.Android) {
+            90
+        } else {
+            120
+        }
+    }
+
+    private fun loadInitialFps(): Int {
+        return try {
+            GlobalSettings.performanceFPS
+        } catch (exception: Throwable) {
+            if (!exception.isRecoverablePlatformInitFailure()) throw exception
+            println(
+                "Heaven: settings unavailable during initialization, using default FPS (${exception.message ?: exception::class.simpleName})"
+            )
+            defaultFps()
+        }
+    }
+
     var devices: List<LaunchpadViewportElement> = emptyList()
         set(value) {
             field = value
@@ -49,10 +79,12 @@ object Heaven {
 
     private val deviceMutex = Mutex()
 
-    var fps: Int = GlobalSettings.performanceFPS
+    var fps: Int = loadInitialFps()
 
     private val stopWatch = StopWatch()
-    private val renderScope = CoroutineScope(Dispatchers.Main.limitedParallelism(1) + SupervisorJob())
+    private val renderScope = CoroutineScope(
+        mainDispatcherOrDefault(owner = "Heaven", parallelism = 1) + SupervisorJob()
+    )
 
     private fun msToTicks(ms: Double): Long = (ms / 1000 * stopWatch.frequency).toLong()
 
@@ -250,8 +282,10 @@ object Heaven {
                 signals.forEach { signal ->
                     currentDevices.forEach { device ->
                         if (isSignalInDevice(signal, device)) {
-                            val posX = signal.x - device.position.value.x.toInt() + device.layout.offsetX
-                            val posY = abs(signal.y - 9 - device.position.value.y.toInt()) - device.layout.offsetY
+                            val localX = signal.x - device.position.value.x.toInt()
+                            val localY = signal.y - device.position.value.y.toInt()
+                            val posX = localX + device.layout.offsetX
+                            val posY = (device.layout.rows - 1 - localY) + device.layout.offsetY
 
                             midiCalls.add(MidiCall(
                                 device,

@@ -1,7 +1,7 @@
 package dev.anthonyhfm.amethyst.desktop
 
 import com.formdev.flatlaf.FlatDarkLaf
-import dev.anthonyhfm.amethyst.ui.theme.AMETHYST_THEME
+import dev.anthonyhfm.amethyst.ui.theme.MATERIAL_AMETHYST_THEME
 import javax.swing.UIManager
 
 class FlatUtilityLaf : FlatDarkLaf() {
@@ -11,27 +11,27 @@ class FlatUtilityLaf : FlatDarkLaf() {
         UIManager.put(
             "RootPane.background",
             java.awt.Color(
-                AMETHYST_THEME.surface.red,
-                AMETHYST_THEME.surface.green,
-                AMETHYST_THEME.surface.blue,
+                MATERIAL_AMETHYST_THEME.surface.red,
+                MATERIAL_AMETHYST_THEME.surface.green,
+                MATERIAL_AMETHYST_THEME.surface.blue,
             )
         )
 
         UIManager.put(
             "TitlePane.buttonHoverBackground",
             java.awt.Color(
-                AMETHYST_THEME.surfaceVariant.red,
-                AMETHYST_THEME.surfaceVariant.green,
-                AMETHYST_THEME.surfaceVariant.blue,
+                MATERIAL_AMETHYST_THEME.surfaceVariant.red,
+                MATERIAL_AMETHYST_THEME.surfaceVariant.green,
+                MATERIAL_AMETHYST_THEME.surfaceVariant.blue,
             )
         )
 
         UIManager.put(
             "TitlePane.closeHoverBackground",
             java.awt.Color(
-                AMETHYST_THEME.errorContainer.red,
-                AMETHYST_THEME.errorContainer.green,
-                AMETHYST_THEME.errorContainer.blue,
+                MATERIAL_AMETHYST_THEME.errorContainer.red,
+                MATERIAL_AMETHYST_THEME.errorContainer.green,
+                MATERIAL_AMETHYST_THEME.errorContainer.blue,
             )
         )
 
@@ -39,9 +39,9 @@ class FlatUtilityLaf : FlatDarkLaf() {
             UIManager.put(
                 it,
                 java.awt.Color(
-                    AMETHYST_THEME.onSurface.red,
-                    AMETHYST_THEME.onSurface.green,
-                    AMETHYST_THEME.onSurface.blue,
+                    MATERIAL_AMETHYST_THEME.onSurface.red,
+                    MATERIAL_AMETHYST_THEME.onSurface.green,
+                    MATERIAL_AMETHYST_THEME.onSurface.blue,
                 )
             )
         }

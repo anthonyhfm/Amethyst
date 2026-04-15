@@ -38,6 +38,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -46,64 +50,89 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
+import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
+import dev.anthonyhfm.amethyst.timeline.TimelineEditCommand
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
-import dev.anthonyhfm.amethyst.ui.components.WaveformView
+import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
+import dev.anthonyhfm.amethyst.timeline.data.msToUs
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.ui.components.WaveformView
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
+import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
+import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isShiftPressed
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.ScrollState
-import dev.anthonyhfm.amethyst.timeline.utils.computeStrictGridTime
-import kotlin.math.round
 
 @Composable
 fun AudioClip(
     audioEntry: AudioEntry,
-    zoomLevel: Float,
+    viewport: EditorViewportState,
     isSelected: Boolean,
     onSelectEntry: () -> Unit,
     onMoveEntry: (newStartMs: Long) -> Unit,
     gridIntervalMs: Long,
     trackIndex: Int,
     entryStartMs: Long,
-    scrollState: ScrollState,
     bpm: Double,
     gridType: GridUtils.GridType
 ) {
+    val zoomLevel = viewport.zoomX
+    val scrollOffsetPx = viewport.scrollX
+    val timelineDimensions = TimelineTheme.dimensions
+    val timelinePalette = TimelineTheme.palette
+    val clipColors = TimelineTheme.clipColors(
+        role = TimelineClipRole.Audio,
+        selected = isSelected
+    )
+    val clipShape = RoundedCornerShape(timelineDimensions.clipCornerRadius)
+    val clipHeaderShape = RoundedCornerShape(
+        topStart = timelineDimensions.clipCornerRadius,
+        topEnd = timelineDimensions.clipCornerRadius
+    )
+
     var rangeActive by remember { mutableStateOf(false) }
     var rangeStartMs by remember { mutableStateOf<Long?>(null) }
     var rangeEndMs by remember { mutableStateOf<Long?>(null) }
 
-    // Konsistente Pixel-Mapping-Strategie: Start via floor, Breite via ceil
-    val startOffsetPx = kotlin.math.floor(audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).toInt()
-    val widthPx = kotlin.math.ceil(audioEntry.durationMs.toDouble() * zoomLevel.toDouble()).toInt()
-    val widthDp = with(LocalDensity.current) { widthPx.toDp() }
-    val borderColor = if (isSelected) Color.White else Color(0xFF3C3CBA)
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF5656EF)
-    val foregroundColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
+    fun timeUsToPx(timeUs: Long): Int =
+        ((timeUs.toDouble() / 1000.0) * zoomLevel.toDouble()).roundToInt()
+
+    // Project the exact audio bounds and derive width from the projected end to keep the
+    // visual clip edge stable across split/zoom operations.
+    val startOffsetPx = timeUsToPx(audioEntry.startTimeUs)
+    val endOffsetPx = timeUsToPx(audioEntry.endTimeUs)
+    val fullWidthPx = (endOffsetPx - startOffsetPx).coerceAtLeast(1)
+
+    // State that must be declared before any early return so Compose hook order is stable.
     val dragOffsetPx = remember(audioEntry.startTimeMs) { mutableStateOf(0f) }
     var snapEnabled by remember { mutableStateOf(true) }
+
+    // Screen-space left edge of the clip (can be negative when scrolled past clip start).
+    val viewportWidthPx = viewport.viewportWidth.coerceAtLeast(1f).toInt()
+    val screenLeftPx = startOffsetPx - scrollOffsetPx.roundToInt() + dragOffsetPx.value.roundToInt()
+    val screenRightPx = screenLeftPx + fullWidthPx
     
     // Rename support
     val displayName = if (audioEntry.name.isNotEmpty()) audioEntry.name else audioEntry.fileName.substringBeforeLast('.')
+    val selections by SelectionManager.selections.collectAsState()
+    val contextEntryTargets = TimelineCommandSurface.entryTargetsForContext(trackIndex, entryStartMs, selections)
+    val renameTarget = contextEntryTargets.singleOrNull()
     val renamingEntryIndex = remember { mutableStateOf<Pair<Int, Long>?>(null) }
     val renaming = renamingEntryIndex.value == Pair(trackIndex, entryStartMs)
     
-    val renameRequest = SelectionManager.renameRequest.collectAsState().value
-    LaunchedEffect(renameRequest) {
-        renameRequest?.let { req ->
-            if (req is SelectionManager.RenameTarget.TimelineEntry && 
-                req.trackIndex == trackIndex && 
+    LaunchedEffect(trackIndex, entryStartMs) {
+        SelectionManager.renameRequest.collect { req ->
+            if (req is SelectionManager.RenameTarget.TimelineEntry &&
+                req.trackIndex == trackIndex &&
                 req.entryStartMs == entryStartMs) {
                 renamingEntryIndex.value = Pair(trackIndex, entryStartMs)
-                SelectionManager.renameRequest.value = null
             }
         }
     }
@@ -139,22 +168,37 @@ fun AudioClip(
             } else round(nonNegativeCandidate).toLong()
         }
     }
+    
+    // Visibility culling: skip layout entirely if clip is off-screen.
+    // All state above must be declared before this return so Compose hook order stays stable.
+    if (screenRightPx < -100 || screenLeftPx > viewportWidthPx + 100) return
 
-    Column(
+    // Dynamic width cap: render at most enough pixels to cover the visible portion
+    // plus a small overflow buffer. Compose's hard layout limit is 262 143 px.
+    val overflowLeft = maxOf(0, -screenLeftPx)
+    val widthPx = minOf(fullWidthPx, viewportWidthPx + overflowLeft + 200).coerceAtMost(260_000)
+    val widthDp = with(LocalDensity.current) { widthPx.toDp() }
+
+    ContextMenu(
         modifier = Modifier
-            .offset { IntOffset(startOffsetPx + dragOffsetPx.value.roundToInt(), 0) }
-            .clip(RoundedCornerShape(6.dp))
-            .height(120.dp)
-            .width(widthDp)
-            .background(backgroundColor.copy(alpha = if (isSelected) 0.96f else 0.90f))
-            .then(if (isSelected) Modifier.border(1.5.dp, borderColor) else Modifier)
-    ) {
+            .offset { IntOffset(screenLeftPx, 0) }
+            .height(timelineDimensions.laneHeight)
+            .width(widthDp),
+        trigger = {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(clipShape)
+                    .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
+                    .border(if (isSelected) 1.5.dp else 1.dp, clipColors.border, clipShape)
+            ) {
         if (!renaming) {
             Text(
                 text = displayName,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(borderColor)
+                    .height(timelineDimensions.clipHeaderHeight)
+                    .background(clipColors.header, clipHeaderShape)
                     .pointerInput(audioEntry.startTimeMs) {
                         awaitPointerEventScope {
                             while (true) {
@@ -196,13 +240,13 @@ fun AudioClip(
                     }
                     .padding(4.dp),
                 style = MaterialTheme.typography.labelSmall.copy(lineHeight = MaterialTheme.typography.labelSmall.fontSize),
-                color = if (isSelected) Color.Black else Color.White,
+                color = clipColors.content,
                 maxLines = 1
             )
         } else {
             val customTextSelectionColors = TextSelectionColors(
-                handleColor = MaterialTheme.colorScheme.secondaryContainer,
-                backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                handleColor = timelinePalette.selectionStroke,
+                backgroundColor = timelinePalette.selectionFill
             )
 
             CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
@@ -212,12 +256,19 @@ fun AudioClip(
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(borderColor)
+                        .height(timelineDimensions.clipHeaderHeight)
+                        .background(clipColors.header, clipHeaderShape)
                         .focusRequester(focusRequester)
                         .onFocusSelectAll(textValue)
                         .onKeyEvent { ev ->
                             if (ev.key == Key.Enter) {
-                                audioEntry.name = textValue.value.text
+                                TimelineCommandExecutor.execute(
+                                    TimelineEditCommand.RenameEntry(
+                                        trackIndex = trackIndex,
+                                        entryStartTime = entryStartMs,
+                                        newName = textValue.value.text
+                                    )
+                                )
                                 renamingEntryIndex.value = null
                                 return@onKeyEvent true
                             }
@@ -239,9 +290,9 @@ fun AudioClip(
                     ),
                     textStyle = MaterialTheme.typography.labelSmall.copy(
                         lineHeight = MaterialTheme.typography.labelSmall.fontSize,
-                        color = if (isSelected) Color.Black else Color.White
+                        color = clipColors.content
                     ),
-                    cursorBrush = SolidColor(if (isSelected) Color.Black else Color.White),
+                    cursorBrush = SolidColor(clipColors.content),
                 )
             }
         }
@@ -252,19 +303,22 @@ fun AudioClip(
                 .pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            // Calculate absolute position considering scroll and clip offset
-                            val clipStartPx = audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
-                            val absoluteX = (clipStartPx + offset.x - scrollState.value.toDouble()).toFloat()
-                            val startMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
+                            // offset.x is clip-relative (0..clipWidth). Convert to timeline ms
+                            // via the content-space position: clipStart_contentX + offset.x.
+                            val startMs = GridUtils.snapToGrid(
+                                viewport.contentXToTimeMs(startOffsetPx + offset.x).roundToLong().coerceAtLeast(0L),
+                                zoomLevel, bpm, gridType
+                            )
                             rangeStartMs = startMs
                             rangeEndMs = startMs
                             rangeActive = true
                         },
                         onDrag = { change, _ ->
                             if (rangeActive && rangeStartMs != null) {
-                                val clipStartPx = audioEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
-                                val absoluteX = (clipStartPx + change.position.x - scrollState.value.toDouble()).toFloat()
-                                val currentMs = computeStrictGridTime(absoluteX + scrollState.value.toFloat(), scrollState, zoomLevel, bpm, gridType)
+                                val currentMs = GridUtils.snapToGrid(
+                                    viewport.contentXToTimeMs(startOffsetPx + change.position.x).roundToLong().coerceAtLeast(0L),
+                                    zoomLevel, bpm, gridType
+                                )
                                 if (currentMs != rangeEndMs) {
                                     rangeEndMs = currentMs
                                 }
@@ -306,21 +360,21 @@ fun AudioClip(
                         val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
 
                         // Convert to clip-relative coordinates
-                        val clipStartMs = audioEntry.startTimeMs
-                        val clipEndMs = audioEntry.startTimeMs + audioEntry.durationMs
+                        val clipStartUs = audioEntry.startTimeUs
+                        val clipEndUs = audioEntry.endTimeUs
 
                         // Clip the range to visible portion
-                        val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
-                        val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
+                        val visibleStartUs = msToUs(start).coerceIn(clipStartUs, clipEndUs)
+                        val visibleEndUs = msToUs(end).coerceIn(clipStartUs, clipEndUs)
 
-                        if (visibleEnd > visibleStart) {
-                            val relStartMs = visibleStart - clipStartMs
-                            val relEndMs = visibleEnd - clipStartMs
-                            val startX = relStartMs * zoomLevel
-                            val width = (relEndMs - relStartMs) * zoomLevel
+                        if (visibleEndUs > visibleStartUs) {
+                            val localStartPx = timeUsToPx(visibleStartUs) - startOffsetPx
+                            val localEndPx = timeUsToPx(visibleEndUs) - startOffsetPx
+                            val startX = localStartPx.toFloat()
+                            val width = (localEndPx - localStartPx).coerceAtLeast(1).toFloat()
 
                             drawRect(
-                                color = Color(0x5533AAFF),
+                                color = timelinePalette.selectionFill,
                                 topLeft = Offset(startX, 0f),
                                 size = Size(width, size.height)
                             )
@@ -330,19 +384,45 @@ fun AudioClip(
         ) {
             WaveformView(
                 modifier = Modifier.fillMaxSize().padding(vertical = 4.dp),
-                waveColor = foregroundColor,
-                signal = Signal.AudioSignal(
-                    origin = null,
-                    rawData = audioEntry.rawData,
-                    bitDepth = audioEntry.bitDepth,
-                    channels = audioEntry.channels,
-                    sampleRate = audioEntry.sampleRate
-                ),
-                totalDurationMs = audioEntry.durationMs,
-                startMs = 0L,
-                durationMs = audioEntry.durationMs,
+                waveColor = clipColors.content,
+                rawData = audioEntry.source()?.rawData,
+                sampleRate = audioEntry.sampleRate,
+                channels = audioEntry.channels,
+                bitDepth = audioEntry.bitDepth,
+                timelineStartUs = audioEntry.startTimeUs,
+                startSample = audioEntry.clipStartSample,
+                endSample = audioEntry.clipEndSample,
+                renderWidthPx = widthPx,
                 zoomLevel = zoomLevel
             )
         }
+            }
+        }
+    ) {
+        TimelineContextMenuAction(
+            label = "Rename Clip",
+            shortcut = "⌘/Ctrl+R",
+            enabled = renameTarget != null,
+            onClick = {
+                renameTarget?.let {
+                    TimelineCommandSurface.requestEntryRename(
+                        trackIndex = it.trackIndex,
+                        entryStartMs = it.entryStartMs
+                    )
+                }
+            }
+        )
+        TimelineContextMenuAction(
+            label = if (contextEntryTargets.size > 1) "Duplicate Clips" else "Duplicate Clip",
+            shortcut = "⌘/Ctrl+D",
+            onClick = { TimelineCommandSurface.duplicateEntries(contextEntryTargets) }
+        )
+        ContextMenuSeparator()
+        TimelineContextMenuAction(
+            label = if (contextEntryTargets.size > 1) "Delete Clips" else "Delete Clip",
+            shortcut = "Delete",
+            destructive = true,
+            onClick = { TimelineCommandSurface.deleteEntries(contextEntryTargets) }
+        )
     }
 }

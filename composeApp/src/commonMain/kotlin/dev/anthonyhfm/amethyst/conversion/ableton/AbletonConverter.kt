@@ -3,6 +3,9 @@ package dev.anthonyhfm.amethyst.conversion.ableton
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
+import dev.anthonyhfm.amethyst.conversion.apollo.ApolloConverter
+import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
+import dev.anthonyhfm.amethyst.core.util.determineFormat
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.Ableton
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
@@ -19,7 +22,7 @@ import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -58,7 +61,7 @@ object AbletonConverter : AmethystConverter {
     var palette: Array<Triple<Int, Int, Int>> = Palettes.novation
         private set
 
-    var audioMap: Map<OriginalSimplerAdapter.OriginalSimplerData, ClipChainDeviceState> = emptyMap()
+    var audioMap: Map<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState> = emptyMap()
         private set
 
     var isZip: Boolean = false
@@ -115,6 +118,8 @@ object AbletonConverter : AmethystConverter {
             entries.associateBy { it.path }
         )
 
+        val format = Zip.determineFormat(file)
+
         val alsEntry = entries
             .filter { it.path.endsWith(".als") }
             .minBy { it.path.length }
@@ -122,21 +127,37 @@ object AbletonConverter : AmethystConverter {
         val projectName = alsEntry.path.substringAfterLast("/").removeSuffix(".als")
 
         val decodedAlsBytes = Zip.decode(alsEntry.data)
-        val sanitizedAlsString = decodedAlsBytes.decodeToString()
-            .replace("> ", ">")
-            .replace(" <", "<")
-            .replace("\n", "")
-            .replace("\r", "")
-            .replace("\t", "")
+        val sanitizedAlsString = sanitizeAlsXml(decodedAlsBytes.decodeToString())
 
         val abletonData = xml.decodeFromString<Ableton>(sanitizedAlsString)
 
         zipEntries.remove(alsEntry.path)
 
-        return runLiveConversion(
+        val abletonWorkspace = runLiveConversion(
             name = projectName,
             abletonData = abletonData
-        ).also {
+        )
+
+        if (format == ZippedProjectFormat.ABLETON_APOLLO) {
+            val approjEntry = entries.firstOrNull { it.path.endsWith(".approj") }
+            if (approjEntry != null) {
+                return try {
+                    val apolloWorkspace = ApolloConverter.convertBytesToWorkspace(approjEntry.data)
+                    abletonWorkspace.copy(
+                        lights = apolloWorkspace.lights,
+                        launchpadDevices = apolloWorkspace.launchpadDevices.ifEmpty { abletonWorkspace.launchpadDevices }
+                    )
+                } catch (e: Exception) {
+                    println("Apollo conversion failed, falling back to Ableton lights: ${e.message}")
+                    abletonWorkspace
+                } finally {
+                    isZip = false
+                    zipEntries.clear()
+                }
+            }
+        }
+
+        return abletonWorkspace.also {
             isZip = false
             zipEntries.clear()
         }
@@ -152,12 +173,7 @@ object AbletonConverter : AmethystConverter {
         this.file = file
 
         val liveSetBytes = Zip.decode(runBlocking { AbletonConverter.file?.readBytes() ?: ByteArray(0) }) // Decompresses the .als GZIP format
-        val sanitizedAlsString = liveSetBytes.decodeToString()
-            .replace("> ", ">")
-            .replace(" <", "<")
-            .replace("\n", "")
-            .replace("\r", "")
-            .replace("\t", "")
+        val sanitizedAlsString = sanitizeAlsXml(liveSetBytes.decodeToString())
         val abletonData = xml.decodeFromString<Ableton>(sanitizedAlsString)
 
         if (palettePath == null) {
@@ -366,9 +382,18 @@ object AbletonConverter : AmethystConverter {
     }
 
     enum class LiveVersion {
-        LIVE_12, // Bro who uses Live 12 fr
+        LIVE_12,
         LIVE_11,
         LIVE_10,
         LIVE_9
     }
+
+    private fun sanitizeAlsXml(raw: String): String = raw
+        .replace("> ", ">")
+        .replace(" <", "<")
+        .replace("\n", "")
+        .replace("\r", "")
+        .replace("\t", "")
+        .replace("<MainTrack", "<MasterTrack")
+        .replace("</MainTrack>", "</MasterTrack>")
 }

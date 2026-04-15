@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Draw
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
@@ -22,11 +22,19 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.*
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,14 +50,16 @@ import io.github.vinceglb.filekit.dialogs.openFilePicker
 import kotlinx.coroutines.runBlocking
 import kotlin.math.pow
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import io.github.vinceglb.filekit.readBytes
+import androidx.compose.runtime.snapshotFlow
 
 class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(KeyframesChainDeviceState())
 
     private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
     private var lastSelectedFrameIndex: Int? = null
-    private val dragVisitedPads: MutableSet<Pair<Int, Int>> = mutableSetOf()
+    private val dragVisitedPads: MutableSet<Triple<String, Int, Int>> = mutableSetOf()
     private var dragEraseMode: Boolean = false
     private var stateBeforeDrag: KeyframesChainDeviceState? = null
     private var lastObservedFrameEntries: List<KeyframesEntry>? = null
@@ -73,20 +83,22 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             }
         }
 
-        customMode.onVirtualDeviceDragStart = { x, y ->
-            beginVirtualDrag(x, y)
+        customMode.onVirtualDeviceDragStart = { device, localX, localY ->
+            beginVirtualDrag(device, localX, localY)
         }
 
-        customMode.onVirtualDeviceDrag = { x, y ->
-            continueVirtualDrag(x, y)
+        customMode.onVirtualDeviceDrag = { device, localX, localY ->
+            continueVirtualDrag(device, localX, localY)
         }
 
         customMode.onVirtualDeviceDragEnd = {
             endVirtualDrag()
         }
         
-        // Observe state changes to refresh virtual devices when state is restored (e.g., undo/redo)
-        // This ensures the UI updates correctly when state changes externally
+        // Observe state changes to refresh virtual devices when state is restored (e.g., undo/redo).
+        // Only refresh when the keyframes editor mode is active — refreshVirtualDevices() is a
+        // direct-preview feature of that mode, and calling it outside the mode (e.g. during project
+        // load) causes the current keyframe to flash briefly on virtual devices before playback starts.
         stateObserverScope.launch {
             state.collect { newState ->
                 // Check if frame entries changed (but only when not actively dragging)
@@ -94,9 +106,25 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     val currentFrameEntries = newState.frames.getOrNull(newState.currentFrameIndex)?.entries
                     if (currentFrameEntries != lastObservedFrameEntries) {
                         lastObservedFrameEntries = currentFrameEntries
-                        refreshVirtualDevices()
+                        // Only refresh virtual devices when the keyframes editor mode is active.
+                        // refreshVirtualDevices() is a direct-preview feature of that mode; calling
+                        // it outside (e.g. during project load) causes the current keyframe to flash
+                        // briefly on virtual devices before playback starts.
+                        if (WorkspaceRepository.mode.value === customMode) {
+                            refreshVirtualDevices()
+                        }
                     }
                 }
+            }
+        }
+
+        // Re-render the pre-computed animation whenever any device is repositioned, so that
+        // device-anchored entries continue to resolve to the correct global coordinates.
+        stateObserverScope.launch {
+            snapshotFlow {
+                Heaven.devices.map { it.position.value }
+            }.drop(1).collect {
+                renderAnimation()
             }
         }
     }
@@ -111,48 +139,50 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             renderAnimation()
         }
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Keyframes",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(120.dp)
+                .width(120.dp),
+            titleBarModifier = LocalTitleBarModifier.current,
         ) {
-            FilledIconButton(
+            Button(
                 onClick = {
                     WorkspaceRepository.switchMode(mode = customMode)
                 },
-                modifier = Modifier
-                    .size(72.dp)
+                variant = ButtonVariant.Default,
+                size = ButtonSize.IconLarge,
             ) {
                 Icon(
                     imageVector = Icons.Default.Draw,
                     contentDescription = "Draw",
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(36.dp),
+                    tint = Theme[colors][primaryForeground],
                 )
             }
         }
     }
 
-    private fun beginVirtualDrag(x: Int, y: Int) {
+    private fun beginVirtualDrag(device: LaunchpadViewportElement, localX: Int, localY: Int) {
         isDragging.value = true
         dragVisitedPads.clear()
-        dragEraseMode = padMatchesSelectedColor(x, y)
+        dragEraseMode = padMatchesSelectedColor(device.launchpadId, localX, localY)
         
         // Capture the state before drawing starts
         stateBeforeDrag = state.value
 
-        applyDragAt(x, y)
+        applyDragAt(device, localX, localY)
     }
 
-    private fun continueVirtualDrag(x: Int, y: Int) {
+    private fun continueVirtualDrag(device: LaunchpadViewportElement, localX: Int, localY: Int) {
         if (!isDragging.value) {
-            beginVirtualDrag(x, y)
+            beginVirtualDrag(device, localX, localY)
             return
         }
 
-        applyDragAt(x, y)
+        applyDragAt(device, localX, localY)
     }
 
     private fun endVirtualDrag() {
@@ -167,23 +197,23 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         dragVisitedPads.clear()
     }
 
-    private fun applyDragAt(x: Int, y: Int) {
-        if (!dragVisitedPads.add(Pair(x, y))) return
+    private fun applyDragAt(device: LaunchpadViewportElement, localX: Int, localY: Int) {
+        if (!dragVisitedPads.add(Triple(device.launchpadId, localX, localY))) return
 
         if (dragEraseMode) {
-            applyColorAt(x, y, Triple(0f, 0f, 0f), addToRecent = false)
+            applyColorAt(device, localX, localY, Triple(0f, 0f, 0f), addToRecent = false)
         } else {
-            applyColorAt(x, y, state.value.selectedColor, addToRecent = true)
+            applyColorAt(device, localX, localY, state.value.selectedColor, addToRecent = true)
         }
     }
 
-    private fun padMatchesSelectedColor(x: Int, y: Int): Boolean {
-        return currentEntryColor(x, y) == state.value.selectedColor
+    private fun padMatchesSelectedColor(launchpadId: String, localX: Int, localY: Int): Boolean {
+        return currentEntryColor(launchpadId, localX, localY) == state.value.selectedColor
     }
 
-    private fun currentEntryColor(x: Int, y: Int): Triple<Float, Float, Float> {
+    private fun currentEntryColor(launchpadId: String, localX: Int, localY: Int): Triple<Float, Float, Float> {
         val frame = state.value.frames[state.value.currentFrameIndex]
-        val entry = frame.entries.firstOrNull { it.x == x && it.y == y }
+        val entry = frame.entries.firstOrNull { it.launchpadId == launchpadId && it.localX == localX && it.localY == localY }
 
         return if (entry != null) {
             Triple(entry.r, entry.g, entry.b)
@@ -193,14 +223,19 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun applyColorAt(
-        x: Int,
-        y: Int,
+        device: LaunchpadViewportElement,
+        localX: Int,
+        localY: Int,
         color: Triple<Float, Float, Float>,
         addToRecent: Boolean
     ) {
         if (addToRecent) {
             WorkspaceRepository.addRecentColor(color)
         }
+
+        val launchpadId = device.launchpadId
+        val globalX = localX + device.position.value.x.toInt()
+        val globalY = localY + device.position.value.y.toInt()
 
         state.update { currentState ->
             currentState.copy(
@@ -209,15 +244,18 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                         index = currentState.currentFrameIndex,
                         element = currentState.frames[currentState.currentFrameIndex].copy(
                             entries = currentState.frames[currentState.currentFrameIndex].entries.toMutableList().apply {
-                                val index = indexOfFirst { it.x == x && it.y == y }
+                                val index = indexOfFirst { it.launchpadId == launchpadId && it.localX == localX && it.localY == localY }
                                 if (index != -1) removeAt(index)
                                 add(
                                     KeyframesEntry(
-                                        x = x,
-                                        y = y,
+                                        x = globalX,
+                                        y = globalY,
                                         r = color.first,
                                         g = color.second,
-                                        b = color.third
+                                        b = color.third,
+                                        launchpadId = launchpadId,
+                                        localX = localX,
+                                        localY = localY,
                                     )
                                 )
                             }
@@ -231,8 +269,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             listOf(
                 Signal.LED(
                     origin = this,
-                    x = x,
-                    y = y,
+                    x = globalX,
+                    y = globalY,
                     color = Color(
                         red = color.first,
                         green = color.second,
@@ -247,20 +285,34 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     fun onEvent(event: Event) {
         when (event) {
             is Event.OnPaintButton -> {
-                val selectedColor = state.value.selectedColor
-                val currentColor = currentEntryColor(event.x, event.y)
-                val targetColor = if (currentColor == selectedColor) {
-                    Triple(0f, 0f, 0f)
-                } else {
-                    selectedColor
+                val globalX = event.x
+                val globalY = event.y
+
+                // Resolve global coords to a specific device + local coords
+                val device = Heaven.devices.firstOrNull { d ->
+                    val lx = globalX - d.position.value.x.toInt()
+                    val ly = globalY - d.position.value.y.toInt()
+                    lx in 0 until d.layout.cols && ly in 0 until d.layout.rows
                 }
 
-                applyColorAt(
-                    x = event.x,
-                    y = event.y,
-                    color = targetColor,
-                    addToRecent = targetColor != Triple(0f, 0f, 0f)
-                )
+                if (device != null) {
+                    val localX = globalX - device.position.value.x.toInt()
+                    val localY = globalY - device.position.value.y.toInt()
+                    val selectedColor = state.value.selectedColor
+                    val currentColor = currentEntryColor(device.launchpadId, localX, localY)
+                    val targetColor = if (currentColor == selectedColor) {
+                        Triple(0f, 0f, 0f)
+                    } else {
+                        selectedColor
+                    }
+                    applyColorAt(
+                        device = device,
+                        localX = localX,
+                        localY = localY,
+                        color = targetColor,
+                        addToRecent = targetColor != Triple(0f, 0f, 0f)
+                    )
+                }
             }
 
             is Event.OnColorUpdate -> {
@@ -597,15 +649,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         Heaven.clear()
 
         Heaven.midiEnter(
-            state.value.frames[state.value.currentFrameIndex].entries.map {
-                Signal.LED(
-                    origin = this,
-                    x = it.x,
-                    y = it.y,
-                    color = Color(it.r, it.g, it.b),
-                    layer = 0
-                )
-            }
+            state.value.frames[state.value.currentFrameIndex].entries.mapNotNull { it.resolveToSignal(Color(it.r, it.g, it.b)) }
         )
     }
 
@@ -625,14 +669,14 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 animationMs += deltaMs
 
                 val signals = buildList {
-                    addAll(frame.entries.filter { !(previousFrame?.entries?.contains(it) ?: false) }.map { it.toSignal() })
+                    addAll(frame.entries.filter { !(previousFrame?.entries?.contains(it) ?: false) }.mapNotNull { it.toSignal() })
 
                     if (previousFrame != null) {
                         if (state.value.infinity && index == frames.lastIndex) return@buildList
 
                         val cleared = previousFrame.entries.filter { prev ->
-                            frame.entries.none { it.x == prev.x && it.y == prev.y }
-                        }.map { it.toOffSignal() }
+                            frame.entries.none { it.samePosition(prev) }
+                        }.mapNotNull { it.toOffSignal() }
 
                         addAll(cleared)
                     }
@@ -662,21 +706,33 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         state.update { it.copy(renderedAnimation = processed) }
     }
 
-    private fun KeyframesEntry.toSignal() = Signal.LED(
-        origin = this,
-        x = x,
-        y = y,
-        color = Color(r, g, b),
-        layer = 0
-    )
+    /** Resolves the entry's coordinates to global and returns a coloured signal, or null if
+     *  the anchored device is not currently in [Heaven.devices]. */
+    private fun KeyframesEntry.resolveGlobal(): Pair<Int, Int>? {
+        if (isDeviceAnchored) {
+            val device = Heaven.devices.firstOrNull { it.launchpadId == launchpadId } ?: return null
+            return Pair(localX!! + device.position.value.x.toInt(), localY!! + device.position.value.y.toInt())
+        }
+        return Pair(x, y)
+    }
 
-    private fun KeyframesEntry.toOffSignal() = Signal.LED(
-        origin = this,
-        x = x,
-        y = y,
-        color = Color.Black,
-        layer = 0
-    )
+    private fun KeyframesEntry.resolveToSignal(color: Color): Signal.LED? {
+        val (gx, gy) = resolveGlobal() ?: return null
+        return Signal.LED(origin = this, x = gx, y = gy, color = color, layer = 0)
+    }
+
+    /** Returns true when [other] occupies the same physical position as this entry. */
+    private fun KeyframesEntry.samePosition(other: KeyframesEntry): Boolean {
+        return if (isDeviceAnchored && other.isDeviceAnchored) {
+            launchpadId == other.launchpadId && localX == other.localX && localY == other.localY
+        } else {
+            x == other.x && y == other.y
+        }
+    }
+
+    private fun KeyframesEntry.toSignal(): Signal.LED? = resolveToSignal(Color(r, g, b))
+
+    private fun KeyframesEntry.toOffSignal(): Signal.LED? = resolveToSignal(Color.Black)
 
     private val heldSignals = mutableSetOf<Int>() // Signals currently held in Loop mode
 

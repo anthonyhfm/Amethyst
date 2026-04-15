@@ -47,6 +47,7 @@ class Chain : SignalReceiver() {
         val insertIndex = atIndex?.coerceIn(0, current.size) ?: current.size
         current.add(insertIndex, device)
         devices.value = current
+        device.onAddedToChain(parentChain = this)
 
         if (fromUser) {
             UndoManager.addAction(
@@ -73,6 +74,7 @@ class Chain : SignalReceiver() {
                 )
             }
             devices.value = devices.value.toMutableList().apply { removeAt(index) }
+            deviceToRemove.onRemovedFromChain()
         }
         reroute()
     }
@@ -91,6 +93,7 @@ class Chain : SignalReceiver() {
                 )
             }
             devices.value = devices.value.toMutableList().apply { removeAll { it.selectionUUID == uuid } }
+            deviceToRemove.onRemovedFromChain()
         } else {
             devices.value.forEach {
                 when (it) {

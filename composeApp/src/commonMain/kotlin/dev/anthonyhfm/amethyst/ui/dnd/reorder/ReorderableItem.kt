@@ -18,12 +18,15 @@ package com.mohamedrejeb.compose.dnd.reorder
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import com.mohamedrejeb.compose.dnd.annotation.ExperimentalDndApi
 import com.mohamedrejeb.compose.dnd.drag.CoreDraggableItem
+import com.mohamedrejeb.compose.dnd.drag.DraggableItemState
 import com.mohamedrejeb.compose.dnd.drag.DraggedItemState
 import com.mohamedrejeb.compose.dnd.drag.DropStrategy
 import com.mohamedrejeb.compose.dnd.drop.dropTarget
@@ -50,6 +53,7 @@ import com.mohamedrejeb.compose.dnd.drop.dropTarget
  * @param dropAnimationSpec - animation spec for the drop animation
  * @param sizeDropAnimationSpec - animation spec for the size drop animation
  * @param draggableContent The content of the draggable item, if null, the content of the item will be used.
+ * @param useDragAnchor if true, the entire item won't be draggable and you must use dragAnchor() modifier within the content
  * @param content The content of the item.
  */
 @OptIn(ExperimentalDndApi::class)
@@ -71,12 +75,38 @@ fun <T> ReorderableItem(
     dropAnimationSpec: AnimationSpec<Offset> = SpringSpec(),
     sizeDropAnimationSpec: AnimationSpec<Size> = SpringSpec(),
     draggableContent: (@Composable () -> Unit)? = null,
+    useDragAnchor: Boolean = false,
     content: @Composable ReorderableItemScope.() -> Unit,
 ) {
-    val reorderableItemScopeImpl = remember(key, state) {
+    val draggableItemState = remember(key) {
+        DraggableItemState(
+            key = key,
+            data = data,
+            positionInRoot = Offset.Zero,
+            size = Size.Zero,
+            dropTargets = dropTargets,
+            dropStrategy = dropStrategy,
+            dropAnimationSpec = dropAnimationSpec,
+            sizeDropAnimationSpec = sizeDropAnimationSpec,
+            content = draggableContent ?: {},
+        )
+    }
+
+    val reorderableItemScopeImpl = remember(
+        key,
+        state,
+        draggableItemState,
+        enabled,
+        dragAfterLongPress,
+        requireFirstDownUnconsumed,
+    ) {
         ReorderableItemScopeImpl(
             key = key,
             state = state.dndState,
+            draggableItemState = draggableItemState,
+            enabled = enabled,
+            dragAfterLongPress = dragAfterLongPress,
+            requireFirstDownUnconsumed = requireFirstDownUnconsumed,
         )
     }
 
@@ -84,6 +114,42 @@ fun <T> ReorderableItem(
         ReorderableItemScopeShadowImpl(
             key = key,
         )
+    }
+
+    LaunchedEffect(draggableItemState, data) {
+        draggableItemState.data = data
+    }
+
+    LaunchedEffect(draggableItemState, dropTargets) {
+        draggableItemState.dropTargets = dropTargets
+    }
+
+    LaunchedEffect(draggableItemState, dropStrategy) {
+        draggableItemState.dropStrategy = dropStrategy
+    }
+
+    LaunchedEffect(draggableItemState, dropAnimationSpec) {
+        draggableItemState.dropAnimationSpec = dropAnimationSpec
+    }
+
+    LaunchedEffect(draggableItemState, sizeDropAnimationSpec) {
+        draggableItemState.sizeDropAnimationSpec = sizeDropAnimationSpec
+    }
+
+    LaunchedEffect(draggableItemState, draggableContent) {
+        draggableItemState.content = draggableContent ?: {
+            with(reorderableItemScopeShadowImpl) {
+                content()
+            }
+        }
+    }
+
+    DisposableEffect(key, state, draggableItemState) {
+        state.dndState.addDraggableItem(draggableItemState)
+
+        onDispose {
+            state.dndState.removeDraggableItem(key)
+        }
     }
 
     CoreDraggableItem(
@@ -99,7 +165,7 @@ fun <T> ReorderableItem(
         key = key,
         data = data,
         state = state.dndState,
-        enabled = enabled,
+        enabled = enabled && !useDragAnchor,
         dragAfterLongPress = dragAfterLongPress,
         requireFirstDownUnconsumed = requireFirstDownUnconsumed,
         dropTargets = dropTargets,

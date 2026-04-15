@@ -43,7 +43,8 @@ actual object AudioOutput {
         val pcm: ByteArray,
         var frameCursor: Int,
         val totalFrames: Int,
-        val gain: Float = 1f,
+        var gain: Float = 1f,
+        var pan: Float = 0f,
         val done: AtomicBoolean = AtomicBoolean(false),
         val origin: Any? = null
     )
@@ -188,9 +189,12 @@ actual object AudioOutput {
                             val fadeInMul = (frameIdx.toFloat() / fadeFrames).coerceIn(0f, 1f)
                             val fadeOutMul = ((src.totalFrames - frameIdx).toFloat() / fadeFrames).coerceIn(0f, 1f)
                             val fadeMul = min(fadeInMul, fadeOutMul)
-                            val g = (src.gain * fadeMul * headroom * GlobalSettings.masterVolume).toFloat()
-                            accum[mixIdx] = accum[mixIdx] + (l * g).toInt()
-                            accum[mixIdx + 1] = accum[mixIdx + 1] + (r * g).toInt()
+                            val g = (src.gain.coerceAtLeast(0f) * fadeMul * headroom * GlobalSettings.masterVolume).toFloat()
+                            val pan = src.pan.coerceIn(-1f, 1f)
+                            val leftGain = if (pan >= 0f) 1f - pan else 1f
+                            val rightGain = if (pan <= 0f) 1f + pan else 1f
+                            accum[mixIdx] = accum[mixIdx] + (l * g * leftGain).toInt()
+                            accum[mixIdx + 1] = accum[mixIdx + 1] + (r * g * rightGain).toInt()
                             byteOff += 4
                             mixIdx += 2
                             f++
@@ -292,9 +296,33 @@ actual object AudioOutput {
         val totalFrames = stereo16.size / bytesPerFrame
         if (totalFrames <= 0) return null
         val id = "aud_${System.nanoTime()}"
-        val src = Source(id, stereo16, 0, totalFrames, 1f, AtomicBoolean(false), audioSignal.origin)
+        val src = Source(
+            id = id,
+            pcm = stereo16,
+            frameCursor = 0,
+            totalFrames = totalFrames,
+            gain = audioSignal.gain,
+            pan = audioSignal.pan,
+            done = AtomicBoolean(false),
+            origin = audioSignal.origin
+        )
         synchronized(lock) { sources[id] = src }
         return id
+    }
+
+    actual fun playMultiple(signals: List<Signal.AudioSignal>): List<String?> {
+        // Android uses a software mixer: adding sources to the mix map synchronises them
+        // within the next mixing chunk (~5 ms), so sequential play() calls are sufficient.
+        return signals.map { play(it) }
+    }
+
+    actual fun update(sourceId: String, gain: Float, pan: Float) {
+        synchronized(lock) {
+            sources[sourceId]?.let { source ->
+                source.gain = gain.coerceAtLeast(0f)
+                source.pan = pan.coerceIn(-1f, 1f)
+            }
+        }
     }
 
     actual fun stop(sourceId: String) { synchronized(lock) { sources.remove(sourceId)?.done?.set(true) } }

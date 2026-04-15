@@ -17,29 +17,51 @@ package com.mohamedrejeb.compose.dnd.reorder
 
 import androidx.compose.ui.Modifier
 import com.mohamedrejeb.compose.dnd.DragAndDropState
+import com.mohamedrejeb.compose.dnd.drag.DraggableItemScopeImpl
+import com.mohamedrejeb.compose.dnd.drag.DraggableItemScopeShadowImpl
+import com.mohamedrejeb.compose.dnd.drag.DraggableItemState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItemScope
 
 interface ReorderableItemScope : DraggableItemScope
 
 internal class ReorderableItemScopeImpl<T>(
-    val state: DragAndDropState<T>,
     override val key: Any,
+    state: DragAndDropState<T>,
+    draggableItemState: DraggableItemState<T>,
+    enabled: Boolean,
+    dragAfterLongPress: Boolean,
+    requireFirstDownUnconsumed: Boolean,
 ) : ReorderableItemScope {
+    private val delegate = DraggableItemScopeImpl(
+        state = state,
+        key = key,
+        draggableItemState = draggableItemState,
+        enabled = enabled,
+        dragAfterLongPress = dragAfterLongPress,
+        requireFirstDownUnconsumed = requireFirstDownUnconsumed,
+    )
+
     override val isDragging: Boolean
-        get() = state.draggedItem?.key == key
+        get() = delegate.isDragging
 
     override fun Modifier.dragAnchor(): Modifier {
-        return this
+        return with(delegate) {
+            this@dragAnchor.dragAnchor()
+        }
     }
 }
 
 internal class ReorderableItemScopeShadowImpl(
     override val key: Any,
 ) : ReorderableItemScope {
+    private val delegate = DraggableItemScopeShadowImpl(key)
+
     override val isDragging: Boolean
-        get() = false
+        get() = delegate.isDragging
 
     override fun Modifier.dragAnchor(): Modifier {
-        return this
+        return with(delegate) {
+            this@dragAnchor.dragAnchor()
+        }
     }
 }

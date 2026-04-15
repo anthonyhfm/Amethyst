@@ -1,31 +1,35 @@
 package dev.anthonyhfm.amethyst.devices.effects.color_filter
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
     override val state = MutableStateFlow(ColorFilterChainDeviceState())
@@ -35,12 +39,15 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Color Filter",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
-            modifier = Modifier.width(280.dp)
+            modifier = Modifier.width(280.dp),
+            titleBarModifier = LocalTitleBarModifier.current
         ) {
+            var beforeState = deviceState.copy()
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -54,38 +61,50 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                         text = "${deviceState.hue}°",
                         steps = List(361) { -180 + it },
                         value = deviceState.hue,
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(hue = value)
                             }
                         },
                         onResolveTextValue = { text ->
-                            text.toIntOrNull()?.coerceIn(-180, 180)
+                            text.parseHueValue()?.let { value ->
+                                applyResolvedState { it.copy(hue = value) }
+                            }
                         },
-                        onFinishValueChange = {
-
+                        onFinishValueChange = { value ->
+                            pushStateChange(beforeState, state.value.copy(hue = value))
                         }
                     )
 
                     TextDial(
                         headline = "Tolerance",
-                        text = "${(deviceState.hueTolerance * 100).toInt()}%",
+                        text = "${(deviceState.hueTolerance * 100).roundToInt()}%",
                         value = deviceState.hueTolerance,
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(hueTolerance = value)
                             }
                         },
                         onResolveTextValue = {
-
+                            it.parsePercentValue()?.let { value ->
+                                applyResolvedState { state -> state.copy(hueTolerance = value) }
+                            }
                         },
-                        onFinishValueChange = {
-
+                        onFinishValueChange = { value ->
+                            pushStateChange(beforeState, state.value.copy(hueTolerance = value))
                         }
                     )
                 }
 
-                VerticalDivider(Modifier.fillMaxHeight(0.8f))
+                Box(modifier = Modifier.fillMaxHeight(0.8f)) {
+                    Separator(orientation = SeparatorOrientation.Vertical)
+                }
 
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -94,40 +113,52 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                 ) {
                     TextDial(
                         headline = "Saturation",
-                        text = "${(deviceState.saturation * 100).toInt()}%",
+                        text = "${(deviceState.saturation * 100).roundToInt()}%",
                         value = deviceState.saturation,
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(saturation = value)
                             }
                         },
                         onResolveTextValue = {
-
+                            it.parsePercentValue()?.let { value ->
+                                applyResolvedState { state -> state.copy(saturation = value) }
+                            }
                         },
-                        onFinishValueChange = {
-
+                        onFinishValueChange = { value ->
+                            pushStateChange(beforeState, state.value.copy(saturation = value))
                         }
                     )
 
                     TextDial(
                         headline = "Tolerance",
-                        text = "${(deviceState.saturationTolerance * 100).toInt()}%",
+                        text = "${(deviceState.saturationTolerance * 100).roundToInt()}%",
                         value = deviceState.saturationTolerance,
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(saturationTolerance = value)
                             }
                         },
                         onResolveTextValue = {
-
+                            it.parsePercentValue()?.let { value ->
+                                applyResolvedState { state -> state.copy(saturationTolerance = value) }
+                            }
                         },
-                        onFinishValueChange = {
-
+                        onFinishValueChange = { value ->
+                            pushStateChange(beforeState, state.value.copy(saturationTolerance = value))
                         }
                     )
                 }
 
-                VerticalDivider(Modifier.fillMaxHeight(0.8f))
+                Box(modifier = Modifier.fillMaxHeight(0.8f)) {
+                    Separator(orientation = SeparatorOrientation.Vertical)
+                }
 
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -136,40 +167,60 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                 ) {
                     TextDial(
                         headline = "Value",
-                        text = "${(deviceState.value * 100).toInt()}%",
+                        text = "${(deviceState.value * 100).roundToInt()}%",
                         value = deviceState.value,
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(value = value)
                             }
                         },
                         onResolveTextValue = {
-
+                            it.parsePercentValue()?.let { value ->
+                                applyResolvedState { state -> state.copy(value = value) }
+                            }
                         },
-                        onFinishValueChange = {
-
+                        onFinishValueChange = { value ->
+                            pushStateChange(beforeState, state.value.copy(value = value))
                         }
                     )
 
                     TextDial(
                         headline = "Tolerance",
-                        text = "${(deviceState.valueTolerance * 100).toInt()}%",
+                        text = "${(deviceState.valueTolerance * 100).roundToInt()}%",
                         value = deviceState.valueTolerance,
+                        onStartValueChange = {
+                            beforeState = state.value.copy()
+                        },
                         onValueChange = { value ->
                             state.update {
                                 it.copy(valueTolerance = value)
                             }
                         },
                         onResolveTextValue = {
-
+                            it.parsePercentValue()?.let { value ->
+                                applyResolvedState { state -> state.copy(valueTolerance = value) }
+                            }
                         },
-                        onFinishValueChange = {
-
+                        onFinishValueChange = { value ->
+                            pushStateChange(beforeState, state.value.copy(valueTolerance = value))
                         }
                     )
                 }
             }
         }
+    }
+
+    private fun applyResolvedState(
+        transform: (ColorFilterChainDeviceState) -> ColorFilterChainDeviceState
+    ) {
+        val before = state.value
+        val after = transform(before)
+
+        state.value = after
+        pushStateChange(before, after)
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
@@ -216,6 +267,17 @@ private fun Color.toHsv(): Triple<Float, Float, Float> {
 
     return Triple(h, s, v)
 }
+
+private fun String.parseHueValue(): Int? = removeSuffix("°")
+    .trim()
+    .toIntOrNull()
+    ?.takeIf { it in -180..180 }
+
+private fun String.parsePercentValue(): Float? = removeSuffix("%")
+    .trim()
+    .toIntOrNull()
+    ?.takeIf { it in 0..100 }
+    ?.div(100f)
 
 @Serializable
 data class ColorFilterChainDeviceState(

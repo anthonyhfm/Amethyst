@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.workspace.chain.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,18 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.ControlPointDuplicate
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.FindReplace
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,14 +22,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachReversed
+import com.composables.icons.lucide.ClipboardPaste
+import com.composables.icons.lucide.Copy
+import com.composables.icons.lucide.CopyPlus
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Replace
+import com.composables.icons.lucide.Trash2
 import com.mohamedrejeb.compose.dnd.DragAndDropContainer
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
@@ -51,14 +44,19 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
-import dev.anthonyhfm.amethyst.core.util.Platform
-import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
-import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollBarOrientation
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.ui.theme.chainBorder
+import dev.anthonyhfm.amethyst.ui.theme.chainCanvas
+import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
+import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -70,7 +68,6 @@ fun WorkspaceChainEditor(
 ) {
     val density = LocalDensity.current.density
     val dragAndDropState = rememberDragAndDropState<GenericChainDevice<*>>()
-    val scrollState = rememberScrollState()
     var chain: Chain? by remember { mutableStateOf(null) }
 
     LaunchedEffect(WorkspaceRepository.mode.collectAsState().value) {
@@ -95,57 +92,58 @@ fun WorkspaceChainEditor(
     ) {
         MacroControls()
 
-        Box(
+        ScrollArea(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(DefaultShape)
                 .height(280.dp)
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer.compositeOver(MaterialTheme.colorScheme.surfaceColorAtElevation(24.dp)))
-                .border(1.dp, MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
-                .padding(vertical = 12.dp)
-                .horizontalScroll(scrollState)
+                .background(Theme[chainColorTokens][chainCanvas], DefaultShape)
+                .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape)
+                .padding(bottom = 10.dp),
+            orientation = ScrollBarOrientation.Horizontal,
         ) {
-            key(devices) {
-                if (devices.isNotEmpty()) {
-                    DragAndDropContainer(
-                        state = dragAndDropState,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
+            Row(
+                modifier = Modifier.padding(top = 12.dp, end = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                key(devices) {
+                    if (devices.isNotEmpty()) {
+                        DragAndDropContainer(
+                            state = dragAndDropState,
                         ) {
-                            ExpandingChainDevicePicker(
-                                destinationChain = when (WorkspaceRepository.mode.value) {
-                                    is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-                                    else -> WorkspaceRepository.lightsChain
-                                },
-                                slotIndex = 0,
-                                dragAndDropState = dragAndDropState,
-                                expanded = false,
-                                onAddComponent = {
-                                    onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
-                                },
-                                onDropDevice = { device, (originalIndex, _), originChain ->
-                                    DeviceInsertionAnimator.register(device.selectionUUID)
-                                    val insertionIndex = 0
-                                    val finalIndex = if (originChain === chain) {
-                                        if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                                    } else insertionIndex
-                                    val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
-                                    chain!!.add(device, safeIndex, fromUser = false)
-
-                                    UndoManager.addAction(
-                                        UndoableAction.MovedChainDevice(
-                                            chainBefore = originChain,
-                                            chainAfter = chain!!,
-                                            device = device,
-                                            fromIndex = originalIndex,
-                                            toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
-                                        )
-                                    )
-                                }
-                            )
-
                             Row {
+                                ExpandingChainDevicePicker(
+                                    destinationChain = when (WorkspaceRepository.mode.value) {
+                                        is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                        else -> WorkspaceRepository.lightsChain
+                                    },
+                                    slotIndex = 0,
+                                    dragAndDropState = dragAndDropState,
+                                    expanded = false,
+                                    onAddComponent = {
+                                        onEvent(WorkspaceContract.Event.AddChainDevice(it, 0))
+                                    },
+                                    onDropDevice = { device, (originalIndex, _), originChain ->
+                                        DeviceInsertionAnimator.register(device.selectionUUID)
+                                        val insertionIndex = 0
+                                        val finalIndex = if (originChain === chain) {
+                                            if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                                        } else insertionIndex
+                                        val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                                        chain!!.add(device, safeIndex, fromUser = false)
+
+                                        UndoManager.addAction(
+                                            UndoableAction.MovedChainDevice(
+                                                chainBefore = originChain,
+                                                chainAfter = chain!!,
+                                                device = device,
+                                                fromIndex = originalIndex,
+                                                toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
+                                            )
+                                        )
+                                    }
+                                )
+
                                 devices.forEachIndexed { index, device ->
                                     DraggableItem(
                                         state = dragAndDropState,
@@ -166,7 +164,7 @@ fun WorkspaceChainEditor(
                                                         },
                                                         device = device
                                                     )
-                                                    
+
                                                     when {
                                                         ModifierKeysState.isShiftPressed -> {
                                                             SelectionManager.selectRangeInChain(
@@ -264,47 +262,41 @@ fun WorkspaceChainEditor(
                                 }
                             }
                         }
-                    }
-                } else {
-                    ExpandingChainDevicePicker(
-                        destinationChain = when (WorkspaceRepository.mode.value) {
-                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
-                            else -> WorkspaceRepository.lightsChain
-                        },
-                        slotIndex = 0,
-                        dragAndDropState = dragAndDropState,
-                        expanded = true,
-                        onAddComponent = {
-                            onEvent(WorkspaceContract.Event.AddChainDevice(it))
-                        },
-                        onDropDevice = { device, (originalIndex, _), originChain ->
-                            DeviceInsertionAnimator.register(device.selectionUUID)
-                            val insertionIndex = 0
-                            val finalIndex = if (originChain === chain) {
-                                if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                            } else insertionIndex
-                            val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
-                            chain!!.add(device, safeIndex, fromUser = false)
+                    } else {
+                        ExpandingChainDevicePicker(
+                            destinationChain = when (WorkspaceRepository.mode.value) {
+                                is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                else -> WorkspaceRepository.lightsChain
+                            },
+                            slotIndex = 0,
+                            dragAndDropState = dragAndDropState,
+                            expanded = true,
+                            onAddComponent = {
+                                onEvent(WorkspaceContract.Event.AddChainDevice(it))
+                            },
+                            onDropDevice = { device, (originalIndex, _), originChain ->
+                                DeviceInsertionAnimator.register(device.selectionUUID)
+                                val insertionIndex = 0
+                                val finalIndex = if (originChain === chain) {
+                                    if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
+                                } else insertionIndex
+                                val safeIndex = finalIndex.coerceIn(0, chain!!.devices.value.size)
+                                chain!!.add(device, safeIndex, fromUser = false)
 
-                            UndoManager.addAction(
-                                UndoableAction.MovedChainDevice(
-                                    chainBefore = originChain,
-                                    chainAfter = chain!!,
-                                    device = device,
-                                    fromIndex = originalIndex,
-                                    toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
+                                UndoManager.addAction(
+                                    UndoableAction.MovedChainDevice(
+                                        chainBefore = originChain,
+                                        chainAfter = chain!!,
+                                        device = device,
+                                        fromIndex = originalIndex,
+                                        toIndex = chain!!.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
+                                    )
                                 )
-                            )
-                        }
-                    )
+                            }
+                        )
+                    }
                 }
             }
-        }
-
-        if (platform is Platform.Desktop) {
-            WorkspaceChainScroller(
-                scrollState = scrollState
-            )
         }
     }
 }
@@ -319,14 +311,14 @@ fun ChainDeviceContextMenu(
 ) {
     val currentClipboard by ClipboardManager.clipboardData.collectAsState()
 
-    AmethystContextMenu(
+    ChainContextMenu(
         expanded = visible,
         onDismissRequest = onDismiss,
         offset = offset
-    ) { _, _, _ ->
-        ContextMenuItem(
+    ) {
+        ChainContextMenuItem(
             label = "Copy",
-            icon = Icons.Default.ContentCopy,
+            icon = Lucide.Copy,
             onClick = {
                 ClipboardManager.setClipboardData(
                     ClipboardData.ChainDevice(
@@ -341,9 +333,9 @@ fun ChainDeviceContextMenu(
             }
         )
 
-        ContextMenuItem(
+        ChainContextMenuItem(
             label = "Duplicate",
-            icon = Icons.Default.ControlPointDuplicate,
+            icon = Lucide.CopyPlus,
             onClick = {
                 val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
 
@@ -356,9 +348,9 @@ fun ChainDeviceContextMenu(
         )
 
         if (currentClipboard is ClipboardData.ChainDevice) {
-            ContextMenuItem(
+            ChainContextMenuItem(
                 label = "Paste",
-                icon = Icons.Default.ContentPaste,
+                icon = Lucide.ClipboardPaste,
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
 
@@ -374,9 +366,9 @@ fun ChainDeviceContextMenu(
                 }
             )
 
-            ContextMenuItem(
+            ChainContextMenuItem(
                 label = "Paste Replace",
-                icon = Icons.Default.FindReplace,
+                icon = Lucide.Replace,
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
 
@@ -395,14 +387,12 @@ fun ChainDeviceContextMenu(
             )
         }
 
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 4.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
+        ContextMenuSeparator()
 
-        ContextMenuItem(
+        ChainContextMenuItem(
             label = "Delete",
-            icon = Icons.Default.DeleteOutline,
+            icon = Lucide.Trash2,
+            variant = ContextMenuItemVariant.Destructive,
             onClick = {
                 chain.remove(device.selectionUUID)
                 onDismiss()

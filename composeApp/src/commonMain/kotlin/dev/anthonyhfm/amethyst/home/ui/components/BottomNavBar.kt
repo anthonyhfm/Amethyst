@@ -43,28 +43,7 @@ fun BottomNavBar(
         HomeNavRoute.Settings to NavBarItem.SETTINGS,
     )
 
-    NavigationBar {
-        navItemMap.forEach { (route, item) ->
-            NavigationBarItem(
-                selected = currentNavigation == route,
-                label = {
-                    Text(item.label)
-                },
-                icon = item.icon,
-                onClick = {
-                    if (currentNavigation != route) {
-                        navigator.navigate(route) {
-                            popUpTo(navigator.graph.startDestinationId) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                },
-            )
-        }
-    }
+
 }
 
 private data class NavBarItem(

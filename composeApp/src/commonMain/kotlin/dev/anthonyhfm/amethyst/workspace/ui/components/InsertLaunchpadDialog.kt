@@ -1,41 +1,51 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
-import amethyst.composeapp.generated.resources.Res
-import amethyst.composeapp.generated.resources.novation
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LeadingIconTab
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.rememberDialogState
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialog
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogCancel
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogDescription
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.p
+import dev.anthonyhfm.amethyst.ui.theme.primary
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
@@ -44,154 +54,228 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
-import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
-import kotlin.collections.listOf
-import kotlin.collections.mapOf
-import kotlin.to
+
+private data class VirtualLaunchpadOption(
+    val category: LaunchpadCategory,
+    val title: String,
+    val device: LaunchpadViewportElement,
+)
+
+private enum class LaunchpadCategory(
+    val displayName: String,
+) {
+    Novation("Novation"),
+    Other("Other"),
+}
 
 @Composable
 fun InsertLaunchpadDialog(
-    onEvent: (WorkspaceContract.Event) -> Unit
+    onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
-    val virtualDevices: Map<LaunchpadTab, List<LaunchpadViewportElement>> by remember {
-        mutableStateOf(
-            mapOf(
-                LaunchpadTab.Novation to listOf(
-                    ViewportLaunchpadPro(interactive = false),
-                    ViewportLaunchpadX(interactive = false),
-                    ViewportLaunchpadProMk3(interactive = false),
-                    ViewportLaunchpadMk2(interactive = false)
-                ),
-                LaunchpadTab.Other to listOf(
-                    ViewportMystrix(interactive = false),
-                    ViewportMidiFighter64(interactive = false)
-                ),
-            )
+    val dialogState = rememberDialogState(initiallyVisible = true)
+    val options = remember {
+        listOf(
+            VirtualLaunchpadOption(
+                category = LaunchpadCategory.Novation,
+                title = "Launchpad Pro",
+                device = ViewportLaunchpadPro(interactive = false),
+            ),
+            VirtualLaunchpadOption(
+                category = LaunchpadCategory.Novation,
+                title = "Launchpad X",
+                device = ViewportLaunchpadX(interactive = false),
+            ),
+            VirtualLaunchpadOption(
+                category = LaunchpadCategory.Novation,
+                title = "Launchpad Pro Mk3",
+                device = ViewportLaunchpadProMk3(interactive = false),
+            ),
+            VirtualLaunchpadOption(
+                category = LaunchpadCategory.Novation,
+                title = "Launchpad Mk2",
+                device = ViewportLaunchpadMk2(interactive = false),
+            ),
+            VirtualLaunchpadOption(
+                category = LaunchpadCategory.Other,
+                title = "Mystrix",
+                device = ViewportMystrix(interactive = false),
+            ),
+            VirtualLaunchpadOption(
+                category = LaunchpadCategory.Other,
+                title = "Midi Fighter 64",
+                device = ViewportMidiFighter64(interactive = false),
+            ),
         )
     }
 
-    var selectedTabIndex by remember { mutableStateOf(0) }
+    var selectedCategory by remember { mutableStateOf(LaunchpadCategory.Novation) }
+    var selectedOptionTitle by remember { mutableStateOf(options.first().title) }
+    val filteredOptions = remember(options, selectedCategory) {
+        options.filter { it.category == selectedCategory }
+    }
+    val optionRows = remember(filteredOptions) {
+        filteredOptions.chunked(2)
+    }
+    val selectedOption = remember(filteredOptions, selectedOptionTitle) {
+        filteredOptions.firstOrNull { it.title == selectedOptionTitle } ?: filteredOptions.first()
+    }
 
     AlertDialog(
-        onDismissRequest = {
+        state = dialogState,
+        modifier = Modifier
+            .width(540.dp)
+            .height(720.dp),
+        onDismiss = {
             onEvent(WorkspaceContract.Event.DismissVirtualDevicePicker)
         },
-        title = {
-            Text("Add a virtual Launchpad device")
-        },
-        dismissButton = {
-            Button(
-                onClick = {
-                    onEvent(WorkspaceContract.Event.DismissVirtualDevicePicker)
-                }
-            ) {
-                Text("Cancel")
-            }
-        },
-        confirmButton = { },
-        text = {
-            Column(
-                modifier = Modifier
-                    .width(400.dp)
-                    .height(450.dp),
-            ) {
-                LaunchpadTabs(
-                    selectedTabIndex = selectedTabIndex,
-                    onTabSelected = {
-                        selectedTabIndex = it
-                    }
-                )
+    ) {
+        AlertDialogHeader {
+            AlertDialogTitle("Add Virtual Launchpad Device")
+            AlertDialogDescription("Compare the layouts at a comfortable size, then add the controller that fits this workspace best.")
+        }
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LaunchpadCategory.entries.forEach { category ->
+                    Button(
+                        onClick = {
+                            selectedCategory = category
+                            selectedOptionTitle = options.first { it.category == category }.title
+                        },
+                        variant = if (selectedCategory == category) ButtonVariant.Default else ButtonVariant.Outline,
+                        size = ButtonSize.Small,
+                    ) {
+                        Text(category.displayName)
+                    }
+                }
+            }
+
+            ScrollArea(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
+                Column(
                     modifier = Modifier
-                        .fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .fillMaxWidth()
+                        .padding(end = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    items(virtualDevices[LaunchpadTab.entries[selectedTabIndex]] ?: emptyList()) { device ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .weight(1f)
+                    optionRows.forEach { rowOptions ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                contentAlignment = Alignment.Center,
-                                propagateMinConstraints = true
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .aspectRatio(1f)
-                                        .clickable {
-                                            onEvent(WorkspaceContract.Event.AddDeviceToViewport(device))
-                                        }
-                                ) {
-                                    device.Content()
-                                }
+                            rowOptions.forEach { option ->
+                                VirtualLaunchpadGridTile(
+                                    option = option,
+                                    isSelected = selectedOptionTitle == option.title,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        selectedOptionTitle = option.title
+                                    },
+                                )
                             }
 
-                            Text(
-                                text = device.name,
-                                style = MaterialTheme.typography.labelLarge,
-                                lineHeight = MaterialTheme.typography.labelLarge.fontSize,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                    .padding(vertical = 4.dp, horizontal = 8.dp)
-                            )
+                            repeat(2 - rowOptions.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
                     }
                 }
             }
         }
-    )
-}
 
-enum class LaunchpadTab(val displayName: String, val icon: DrawableResource) {
-    Novation(
-        displayName = "Novation",
-        icon = Res.drawable.novation
-    ),
-    Other(
-        displayName = "Other",
-        icon = Res.drawable.novation
-    )
-}
-
-@Composable
-fun LaunchpadTabs(
-    selectedTabIndex: Int,
-    onTabSelected: (Int) -> Unit,
-) {
-    TabRow(
-        selectedTabIndex = selectedTabIndex,
-        containerColor = Color.Transparent,
-    ) {
-        LaunchpadTab.entries.forEachIndexed { index, tab ->
-            LeadingIconTab(
-                selected = selectedTabIndex == index,
+        AlertDialogFooter(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            AlertDialogCancel(
                 onClick = {
-                    onTabSelected(index)
+                    onEvent(WorkspaceContract.Event.DismissVirtualDevicePicker)
                 },
-                text = {
-                    Text(tab.displayName)
+            ) {
+                Text("Cancel")
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    onEvent(WorkspaceContract.Event.AddDeviceToViewport(selectedOption.device))
                 },
-                icon = {
-                    Icon(
-                        painter = painterResource(tab.icon),
-                        contentDescription = tab.displayName,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            )
+                size = ButtonSize.Small,
+            ) {
+                Text("Add to Workspace")
+            }
         }
     }
 }
 
+@Composable
+private fun VirtualLaunchpadGridTile(
+    option: VirtualLaunchpadOption,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val borderColor = if (isSelected) {
+        Theme[colors][primary]
+    } else {
+        Theme[colors][border]
+    }
 
+    val cardBackground = if (isSelected) {
+        Theme[colors][primary].copy(alpha = 0.08f)
+    } else {
+        Theme[colors][background]
+    }
+
+    Column(
+        modifier = modifier
+            .clip(DefaultShape)
+            .border(1.dp, borderColor, DefaultShape)
+            .background(cardBackground)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier.graphicsLayer(
+                    scaleX = 0.8f,
+                    scaleY = 0.8f,
+                ),
+            ) {
+                option.device.Content()
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = option.title,
+                style = Theme[typography][p],
+                color = Theme[colors][foreground],
+            )
+        }
+    }
+}

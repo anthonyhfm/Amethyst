@@ -1,36 +1,18 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Anchor
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonColors
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -41,53 +23,88 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
-import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
+import com.composables.icons.lucide.Anchor
+import com.composables.icons.lucide.ChevronDown
+import com.composables.icons.lucide.ChevronLeft
+import com.composables.icons.lucide.Eraser
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.MousePointer
+import com.composables.icons.lucide.Pencil
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Settings
+import com.composeunstyled.Text
+import com.composeunstyled.UnstyledButton
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.SettingsDialog
-import dev.anthonyhfm.amethyst.timeline.ui.components.TimelinePlaybackControls
+import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
+import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineEditorTool
 import dev.anthonyhfm.amethyst.timeline.ui.components.TimelineGridPicker
-import dev.anthonyhfm.amethyst.ui.icons.AmethystIcons
-import dev.anthonyhfm.amethyst.ui.icons.outlined.Metronome
+import dev.anthonyhfm.amethyst.timeline.ui.components.TimelinePlaybackControls
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenuContent
+import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenuRadioItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
+import dev.anthonyhfm.amethyst.ui.theme.accent
+import dev.anthonyhfm.amethyst.ui.theme.accentForeground
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import kotlinx.coroutines.flow.update
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun WorkspaceTopAppBar(
     onBack: () -> Unit,
     mode: WorkspaceContract.WorkspaceMode,
-    onEvent: (WorkspaceContract.Event) -> Unit
+    onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
+    val automappingState by AutomappingManager.state.collectAsState()
     var showSettingsDialog by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
             .statusBarsPadding()
-            .padding(16.dp)
-            .fillMaxWidth(),
-
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (platform !is Platform.Desktop) {
-            BackButton(
-                onBack = onBack
-            )
+            BackButton(onBack = onBack)
         }
 
         WorkspaceMode(mode)
 
+        if (automappingState.isActive) {
+            AutomappingStatusIndicator(
+                armed = automappingState.isTriggerHeld,
+            )
+        }
+
         Spacer(Modifier.weight(1f))
+
+        if (mode is PianoRollWorkspaceMode) {
+            PianoRollOptions(mode)
+        }
 
         if (platform is Platform.Desktop) {
             if (mode is WorkspaceContract.WorkspaceMode.Timeline) {
@@ -99,25 +116,69 @@ fun WorkspaceTopAppBar(
                 KeyframesOptions(mode)
             }
 
-            BPMChanger()
+            if (mode is GemEditorWorkspaceMode) {
+                GemEditorOptions(mode)
+            }
 
+            BPMChanger()
             CleanupButtons()
         }
 
-        FilledIconButton(
-            onClick = {
-                showSettingsDialog = true
-            }
-        ) {
-            Icon(Icons.Default.Settings, null)
+        WorkspaceToolbarSurface(contentPadding = PaddingValues(4.dp)) {
+            WorkspaceToolbarIconButton(
+                onClick = { showSettingsDialog = true },
+                imageVector = Lucide.Settings,
+                contentDescription = "Open settings",
+            )
         }
     }
 
-    // Settings dialog - platform implementations handle visibility appropriately
     SettingsDialog(
         visible = showSettingsDialog,
-        onDismiss = { showSettingsDialog = false }
+        onDismiss = { showSettingsDialog = false },
     )
+}
+
+@Composable
+private fun AutomappingStatusIndicator(
+    armed: Boolean,
+) {
+    val backgroundColor = if (armed) Theme[colors][accent] else Theme[colors][secondary]
+    val contentColor = if (armed) Theme[colors][accentForeground] else Theme[colors][foreground]
+
+    Row(
+        modifier = Modifier
+            .clip(SmallShape)
+            .background(backgroundColor)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "AUTOMAPPING ACTIVE!",
+            color = contentColor,
+            style = Theme[typography][small],
+        )
+    }
+}
+
+@Composable
+fun GemEditorOptions(mode: GemEditorWorkspaceMode) {
+    WorkspaceToolbarSurface {
+        Button(
+            onClick = { mode.openNodePalette() },
+            variant = ButtonVariant.Secondary,
+            size = ButtonSize.Small,
+            enabled = mode.canOpenNodePalette,
+        ) {
+            Icon(
+                imageVector = Lucide.Plus,
+                contentDescription = null,
+                tint = workspaceToolbarContentColor(ButtonVariant.Secondary),
+                modifier = Modifier.size(16.dp),
+            )
+            Text("Add Node")
+        }
+    }
 }
 
 @Composable
@@ -140,8 +201,10 @@ fun KeyframesOptions(mode: KeyframesWorkspaceMode) {
                 }
             }
 
-            mode.onVirtualDeviceDragStart = { x, y ->
-                val key = y * 10 + x
+            mode.onVirtualDeviceDragStart = { device, localX, localY ->
+                val globalX = localX + device.position.value.x.toInt()
+                val globalY = localY + device.position.value.y.toInt()
+                val key = globalY * 10 + globalX
                 mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeRootKey(key))
                 pickingRootKey = false
             }
@@ -151,163 +214,198 @@ fun KeyframesOptions(mode: KeyframesWorkspaceMode) {
                 mode.onVirtualDeviceDragStart = originalOnDragStart
             }
         } else {
-            onDispose {}
+            onDispose { }
         }
     }
 
-    Row(
-        modifier = Modifier
-            .clip(CircleShape)
-            .height(44.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(0.2f), CircleShape),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        val rootKeyText = when {
-            pickingRootKey -> "Press Pad..."
-            state.rootKey != null -> {
-                val x = state.rootKey!! % 10
-                val y = state.rootKey!! / 10
-                "Root: X$x Y$y"
-            }
-            else -> "Set Root Key"
+    val rootKeyText = when {
+        pickingRootKey -> "Press Pad..."
+        state.rootKey != null -> {
+            val x = state.rootKey!! % 10
+            val y = state.rootKey!! / 10
+            "Root: X$x Y$y"
         }
+        else -> "Set Root Key"
+    }
 
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .fillMaxHeight()
-                .background(
-                    if (pickingRootKey) MaterialTheme.colorScheme.primaryContainer
-                    else if (state.rootKey != null) MaterialTheme.colorScheme.secondaryContainer
-                    else Color.Transparent
-                )
-                .clickable {
-                    if (state.rootKey != null && !pickingRootKey) {
-                        mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeRootKey(null))
-                    } else {
-                        pickingRootKey = !pickingRootKey
-                    }
-                }
-                .rightClickable {
+    val rootVariant = when {
+        pickingRootKey -> ButtonVariant.Default
+        state.rootKey != null -> ButtonVariant.Secondary
+        else -> ButtonVariant.Ghost
+    }
+
+    WorkspaceToolbarSurface {
+        Button(
+            onClick = {
+                if (state.rootKey != null && !pickingRootKey) {
                     mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeRootKey(null))
-                    pickingRootKey = false
+                } else {
+                    pickingRootKey = !pickingRootKey
                 }
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            },
+            variant = rootVariant,
+            size = ButtonSize.Small,
+            modifier = Modifier.rightClickable {
+                mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeRootKey(null))
+                pickingRootKey = false
+            },
         ) {
             Icon(
-                imageVector = Icons.Outlined.Anchor,
+                imageVector = Lucide.Anchor,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = if (pickingRootKey) MaterialTheme.colorScheme.onPrimaryContainer
-                else if (state.rootKey != null) MaterialTheme.colorScheme.onSecondaryContainer
-                else MaterialTheme.colorScheme.onSurface
+                tint = workspaceToolbarContentColor(rootVariant),
+                modifier = Modifier.size(16.dp),
             )
-
-            Text(
-                text = rootKeyText,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (pickingRootKey) MaterialTheme.colorScheme.onPrimaryContainer
-                else if (state.rootKey != null) MaterialTheme.colorScheme.onSecondaryContainer
-                else MaterialTheme.colorScheme.onSurface
-            )
+            Text(rootKeyText)
         }
 
-        VerticalDivider(
-            modifier = Modifier
-                .padding(vertical = 8.dp)
-                .width(1.dp),
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        Separator(
+            modifier = Modifier.height(20.dp),
+            orientation = SeparatorOrientation.Vertical,
         )
 
-        // Wrap Toggle
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .fillMaxHeight()
-                .clickable {
-                    mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeWrap(!state.wrap))
-                }
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Wrap",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        KeyframesToggleOption(
+            label = "Wrap",
+            checked = state.wrap,
+            onCheckedChange = {
+                mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeWrap(it))
+            },
+        )
 
-            AmethystCheckbox(
-                checked = state.wrap,
-                onCheckedChange = {
-                    mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeWrap(it))
-                }
+        Separator(
+            modifier = Modifier.height(20.dp),
+            orientation = SeparatorOrientation.Vertical,
+        )
+
+        KeyframesToggleOption(
+            label = "Isolate",
+            checked = state.isolate,
+            onCheckedChange = {
+                mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeIsolate(it))
+            },
+        )
+    }
+}
+
+@Composable
+private fun KeyframesToggleOption(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val variant = if (checked) ButtonVariant.Secondary else ButtonVariant.Ghost
+
+    Button(
+        onClick = { onCheckedChange(!checked) },
+        variant = variant,
+        size = ButtonSize.Small,
+    ) {
+        Text(label)
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}
+
+@Composable
+fun PianoRollOptions(mode: PianoRollWorkspaceMode) {
+    // Tool switcher: SELECT / DRAW / ERASE
+    WorkspaceToolbarSurface {
+        listOf(
+            TimelineEditorTool.SELECT to Lucide.MousePointer,
+            TimelineEditorTool.DRAW   to Lucide.Pencil,
+            TimelineEditorTool.ERASE  to Lucide.Eraser,
+        ).forEach { (tool, icon) ->
+            val variant = if (mode.activeTool == tool) ButtonVariant.Default else ButtonVariant.Ghost
+            WorkspaceToolbarIconButton(
+                onClick = { mode.activeTool = tool },
+                imageVector = icon,
+                contentDescription = tool.name.lowercase().replaceFirstChar { it.uppercase() },
+                variant = variant,
             )
         }
+    }
 
-        VerticalDivider(
-            modifier = Modifier
-                .padding(vertical = 8.dp)
-                .width(1.dp),
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-        )
+    // Grid resolution dropdown
+    var gridMenuExpanded by remember { mutableStateOf(false) }
+    val gridLabel = when {
+        !mode.gridResolutionLocked -> "Auto"
+        mode.gridResolution == GridResolution.Quarter      -> "1/4"
+        mode.gridResolution == GridResolution.Eighth       -> "1/8"
+        mode.gridResolution == GridResolution.Sixteenth    -> "1/16"
+        mode.gridResolution == GridResolution.ThirtySecond -> "1/32"
+        else -> "Auto"
+    }
 
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .fillMaxHeight()
-                .clickable {
-                    mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeIsolate(!state.isolate))
-                }
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+    WorkspaceToolbarSurface {
+        DropdownMenu(
+            expanded = gridMenuExpanded,
+            onExpandRequest = { gridMenuExpanded = true },
+            onDismissRequest = { gridMenuExpanded = false },
         ) {
-            Text(
-                text = "Isolate",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            val interactionSource = remember { MutableInteractionSource() }
+            val hovered by interactionSource.collectIsHoveredAsState()
+            val contentColor = if (hovered) Theme[colors][accentForeground] else Theme[colors][foreground]
 
-            AmethystCheckbox(
-                checked = state.isolate,
-                onCheckedChange = {
-                    mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeIsolate(it))
+            UnstyledButton(
+                onClick = { gridMenuExpanded = !gridMenuExpanded },
+                shape = SmallShape,
+                interactionSource = interactionSource,
+                indication = null,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier
+                    .clip(SmallShape)
+                    .background(if (hovered) Theme[colors][accent] else Color.Transparent),
+            ) {
+                Text(gridLabel, style = Theme[typography][small].copy(color = contentColor))
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = Lucide.ChevronDown,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(10.dp),
+                )
+            }
+
+            DropdownMenuContent(
+                expanded = gridMenuExpanded,
+                onDismissRequest = { gridMenuExpanded = false },
+            ) {
+                DropdownMenuRadioItem(
+                    selected = !mode.gridResolutionLocked,
+                    onClick = { mode.gridResolutionLocked = false; gridMenuExpanded = false },
+                ) { Text("Auto") }
+
+                listOf(
+                    GridResolution.Quarter      to "1/4",
+                    GridResolution.Eighth       to "1/8",
+                    GridResolution.Sixteenth    to "1/16",
+                    GridResolution.ThirtySecond to "1/32",
+                ).forEach { (res, label) ->
+                    DropdownMenuRadioItem(
+                        selected = mode.gridResolutionLocked && mode.gridResolution == res,
+                        onClick = {
+                            mode.gridResolution = res
+                            mode.gridResolutionLocked = true
+                            gridMenuExpanded = false
+                        },
+                    ) { Text(label) }
                 }
-            )
+            }
         }
     }
 }
 
 @Composable
 fun BackButton(
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .size(44.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(0.2f), CircleShape)
-            .clickable {
-                onBack()
-            }
-            .padding(2.dp),
-
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Default.ArrowBackIosNew,
-            contentDescription = "Back button directing to home screen",
-            modifier = Modifier
-                .clip(CircleShape)
-                .padding(12.dp)
-                .size(22.dp),
-            tint = MaterialTheme.colorScheme.onSurface
+    WorkspaceToolbarSurface(contentPadding = PaddingValues(4.dp)) {
+        WorkspaceToolbarIconButton(
+            onClick = onBack,
+            imageVector = Lucide.ChevronLeft,
+            contentDescription = "Back to home",
         )
     }
 }

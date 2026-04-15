@@ -2,6 +2,8 @@ package dev.anthonyhfm.amethyst.core.controls.undo
 
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.editor.currentGroupsForDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.editor.restoreGroupSelectionForDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
@@ -14,6 +16,19 @@ object UndoManager {
     private val redoStack: MutableList<UndoableAction> = mutableListOf()
 
     fun addAction(action: UndoableAction) {
+        if (action is UndoableAction.TrackStateChange && action.mergeable) {
+            val previous = undoStack.lastOrNull()
+            if (
+                previous is UndoableAction.TrackStateChange &&
+                previous.mergeable &&
+                previous.trackIndex == action.trackIndex
+            ) {
+                undoStack[undoStack.lastIndex] = previous.copy(afterTrack = action.afterTrack)
+                redoStack.clear()
+                return
+            }
+        }
+
         undoStack.add(action)
         redoStack.clear()
     }
@@ -51,6 +66,17 @@ object UndoManager {
                         val safeIndex = removedInfo.originalIndex.coerceIn(0, action.parent.devices.value.size)
                         action.parent.add(removedInfo.device, atIndex = safeIndex, fromUser = false)
                     }
+
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.ChainDeviceUngrouping -> {
+                    // Undo of ungroup = re-insert group device, remove extracted devices
+                    action.extractedDevices.sortedByDescending { it.originalIndex }.forEach { info ->
+                        action.parent.remove(info.device.selectionUUID, fromUser = false)
+                    }
+                    val safeIndex = action.groupIndex.coerceIn(0, action.parent.devices.value.size)
+                    action.parent.add(action.groupDevice, atIndex = safeIndex, fromUser = false)
 
                     redoStack.add(action)
                 }
@@ -142,6 +168,20 @@ object UndoManager {
                     }
                     redoStack.add(action)
                 }
+
+                is UndoableAction.GroupEditorStateChange<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<DeviceState>
+                    device.state.value = action.beforeState
+                    device.onStateRestored()
+                    restoreGroupSelectionForDevice(
+                        device = action.device,
+                        groups = currentGroupsForDevice(action.device),
+                        groupIds = action.beforeSelectedGroupIds,
+                    )
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.TimelineChange -> {
                     TimelineRepository.setTrackEntries(action.trackIndex, action.beforeEntries)
 
@@ -226,6 +266,7 @@ object UndoManager {
                     val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<dev.anthonyhfm.amethyst.devices.DeviceState>
                     // Zustand wiederherstellen
                     (device.state as kotlinx.coroutines.flow.MutableStateFlow<dev.anthonyhfm.amethyst.devices.DeviceState>).value = action.beforeState
+                    device.onStateRestored()
                     redoStack.add(action)
                 }
 
@@ -376,6 +417,64 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
+                is UndoableAction.PianoRollNoteGradientChange -> {
+                    // Undo: Revert notes to original gradient
+                    action.notesAfter.zip(action.notesBefore).forEach { (after, before) ->
+                        action.onNoteUpdate(after, before)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesBefore.forEach { beforeNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                beforeNote
+                            ),
+                            single = false
+                        )
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteTransform -> {
+                    // Undo: Revert notes to original state before transform
+                    action.notesAfter.zip(action.notesBefore).forEach { (after, before) ->
+                        action.onNoteUpdate(after, before)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesBefore.forEach { beforeNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                beforeNote
+                            ),
+                            single = false
+                        )
+                    }
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.TrackAddition -> {
                     TimelineRepository.removeTrack(action.trackIndex)
                     redoStack.add(action)
@@ -388,6 +487,16 @@ object UndoManager {
 
                 is UndoableAction.TrackDuplication -> {
                     TimelineRepository.removeTrack(action.duplicatedIndex)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.TrackRename -> {
+                    TimelineRepository.renameTrack(action.trackIndex, action.oldName)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.TrackStateChange -> {
+                    TimelineRepository.replaceTrack(action.trackIndex, action.beforeTrack)
                     redoStack.add(action)
                 }
             }
@@ -426,6 +535,16 @@ object UndoManager {
                     }
 
                     action.parent.add(action.groupDevice, atIndex = action.insertionIndex, fromUser = false)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.ChainDeviceUngrouping -> {
+                    // Redo of ungroup = remove group, re-insert extracted devices
+                    action.parent.remove(action.groupDevice.selectionUUID, fromUser = false)
+                    action.extractedDevices.sortedBy { it.originalIndex }.forEach { info ->
+                        val safeIndex = info.originalIndex.coerceIn(0, action.parent.devices.value.size)
+                        action.parent.add(info.device, atIndex = safeIndex, fromUser = false)
+                    }
                     undoStack.add(action)
                 }
 
@@ -535,6 +654,19 @@ object UndoManager {
                     undoStack.add(action)
                 }
 
+                is UndoableAction.GroupEditorStateChange<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<DeviceState>
+                    device.state.value = action.afterState
+                    device.onStateRestored()
+                    restoreGroupSelectionForDevice(
+                        device = action.device,
+                        groups = currentGroupsForDevice(action.device),
+                        groupIds = action.afterSelectedGroupIds,
+                    )
+                    undoStack.add(action)
+                }
+
                 is UndoableAction.TimelineChange -> {
                     TimelineRepository.setTrackEntries(action.trackIndex, action.afterEntries)
                     undoStack.add(action)
@@ -586,6 +718,7 @@ object UndoManager {
                     @Suppress("UNCHECKED_CAST")
                     val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<DeviceState>
                     device.state.value = action.afterState
+                    device.onStateRestored()
                     undoStack.add(action)
                 }
 
@@ -744,6 +877,64 @@ object UndoManager {
                     undoStack.add(action)
                 }
 
+                is UndoableAction.PianoRollNoteGradientChange -> {
+                    // Redo: Apply gradient change again
+                    action.notesBefore.zip(action.notesAfter).forEach { (before, after) ->
+                        action.onNoteUpdate(before, after)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesAfter.forEach { afterNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                afterNote
+                            ),
+                            single = false
+                        )
+                    }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.PianoRollNoteTransform -> {
+                    // Redo: Re-apply the transform
+                    action.notesBefore.zip(action.notesAfter).forEach { (before, after) ->
+                        action.onNoteUpdate(before, after)
+                    }
+                    val currentEntry = action.currentEntryGetter()
+                    if (currentEntry != null) {
+                        action.currentEntrySetter(
+                            currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                }
+                            )
+                        )
+                    }
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    action.notesAfter.forEach { afterNote ->
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.PianoRollNote(
+                                action.trackIndex,
+                                action.entryStartMs,
+                                afterNote
+                            ),
+                            single = false
+                        )
+                    }
+                    undoStack.add(action)
+                }
+
                 is UndoableAction.TrackAddition -> {
                     TimelineRepository.insertTrack(action.trackIndex, action.track)
                     undoStack.add(action)
@@ -756,6 +947,16 @@ object UndoManager {
 
                 is UndoableAction.TrackDuplication -> {
                     TimelineRepository.insertTrack(action.duplicatedIndex, action.duplicatedTrack)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.TrackRename -> {
+                    TimelineRepository.renameTrack(action.trackIndex, action.newName)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.TrackStateChange -> {
+                    TimelineRepository.replaceTrack(action.trackIndex, action.afterTrack)
                     undoStack.add(action)
                 }
             }

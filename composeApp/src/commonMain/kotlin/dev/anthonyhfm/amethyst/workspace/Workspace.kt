@@ -9,13 +9,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,10 +21,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.gem.ui.GemSelectionWorkspaceMode
 import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.Timeline
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
@@ -45,8 +52,8 @@ fun Workspace(onBack: () -> Unit = {}) {
         modifier = Modifier
             .fillMaxSize(),
 
-        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(0.5.dp),
-        contentColor = MaterialTheme.colorScheme.onBackground,
+        containerColor = Theme[colors][background],
+        contentColor = Theme[colors][foreground],
 
         topBar = {
             WorkspaceTopAppBar(
@@ -56,21 +63,6 @@ fun Workspace(onBack: () -> Unit = {}) {
                     viewModel.onEvent(it)
                 },
             )
-        },
-        floatingActionButton = {
-            AnimatedVisibility(
-                visible = state.mode is WorkspaceContract.WorkspaceMode.Layout,
-                enter = scaleIn() + fadeIn(),
-                exit = scaleOut() + fadeOut()
-            ) {
-                FloatingActionButton(
-                    onClick = {
-                        viewModel.onEvent(Event.OpenVirtualDevicePicker)
-                    }
-                ) {
-                    Icon(Icons.Default.Add, null)
-                }
-            }
         }
     ) { paddingValues ->
         if (state.showDeviceConfigurator != null) {
@@ -99,6 +91,29 @@ fun Workspace(onBack: () -> Unit = {}) {
                     viewModel.onEvent(it)
                 }
             )
+
+            AnimatedVisibility(
+                visible = state.mode is WorkspaceContract.WorkspaceMode.Layout,
+                enter = scaleIn() + fadeIn(),
+                exit = scaleOut() + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(24.dp),
+            ) {
+                Button(
+                    onClick = {
+                        viewModel.onEvent(Event.OpenVirtualDevicePicker)
+                    },
+                    variant = ButtonVariant.Default,
+                    size = ButtonSize.Icon,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = Theme[colors][primaryForeground],
+                    )
+                }
+            }
 
             AnimatedVisibility(
                 visible = state.mode is WorkspaceContract.WorkspaceMode.Performance,
@@ -152,6 +167,10 @@ fun Workspace(onBack: () -> Unit = {}) {
 
             if (state.mode is GemEditorWorkspaceMode) {
                 (state.mode as GemEditorWorkspaceMode).ModeContent(paddingValues)
+            }
+
+            if (state.mode is GemSelectionWorkspaceMode) {
+                (state.mode as GemSelectionWorkspaceMode).ModeContent(paddingValues)
             }
 
             if (state.mode is PianoRollWorkspaceMode) {

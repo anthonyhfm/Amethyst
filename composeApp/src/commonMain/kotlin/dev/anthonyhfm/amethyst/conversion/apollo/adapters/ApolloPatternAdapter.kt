@@ -30,7 +30,7 @@ class ApolloPatternAdapter(
 
             KeyframesChainDeviceContract.Frame(
                 timing = apolloFrame.time.toTiming(),
-                gate = 1f, // Apollo pattern frames usually represent the full duration
+                gate = 0.5f, // 100% gate in Amethyst = 0.5f (Amethyst stores gate as 0..1 where 0.5=100%)
                 entries = entries
             )
         }

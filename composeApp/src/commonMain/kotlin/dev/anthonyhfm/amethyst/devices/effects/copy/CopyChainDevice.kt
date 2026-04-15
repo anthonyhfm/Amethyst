@@ -1,48 +1,41 @@
 package dev.anthonyhfm.amethyst.devices.effects.copy
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.DividerDefaults
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
+import com.composeunstyled.Icon
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
@@ -50,28 +43,34 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
-import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
-import dev.anthonyhfm.amethyst.ui.components.TextDial
-import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.secondaryForeground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PinchGraph
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.TimingControls
-import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.hypot
-import kotlin.math.max
-import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(CopyChainDeviceState())
@@ -80,156 +79,134 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
         val leftPanelWidth = 240.dp
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Copy",
-            isSelected = selections.any { it.selectionUUID == this.selectionUUID },
+            isSelected = isSelected,
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(leftPanelWidth + 52.dp + (deviceState.offsets.size * 130.dp) + DividerDefaults.Thickness)
+                .width(leftPanelWidth + 52.dp + (deviceState.offsets.size * 130.dp) + 1.dp),
+            titleBarModifier = LocalTitleBarModifier.current,
         ) {
             Row {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(leftPanelWidth)
-                        .padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    DropdownSelect(
-                        label = "Mode",
-                        options = CopyChainDeviceState.CopyMode.entries,
-                        selectedOption = deviceState.mode,
-                        onOptionSelected = { mode ->
-                            pushStateChange(
-                                before = deviceState,
-                                after = deviceState.copy(mode = mode)
-                            )
-                            state.update { it.copy(mode = mode) }
-                        },
-                        optionToString = {
-                            when (it) {
-                                CopyChainDeviceState.CopyMode.STATIC -> "Static"
-                                CopyChainDeviceState.CopyMode.ANIMATE -> "Animate"
-                                CopyChainDeviceState.CopyMode.INTERPOLATE -> "Interpolate"
-                                CopyChainDeviceState.CopyMode.RANDOM_SINGLE -> "Random Single"
-                                CopyChainDeviceState.CopyMode.RANDOM_LOOP -> "Random Loop"
-                            }
-                        },
-                        modifier = Modifier.padding(top = 4.dp).fillMaxWidth()
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CopySelectField(
+                            label = "Mode",
+                            options = CopyChainDeviceState.CopyMode.entries,
+                            selectedOption = deviceState.mode,
+                            onOptionSelected = { mode ->
+                                pushStateChange(
+                                    before = deviceState,
+                                    after = deviceState.copy(mode = mode)
+                                )
+                                state.update { it.copy(mode = mode) }
+                            },
+                            optionToString = ::copyModeLabel,
+                            modifier = Modifier.weight(1f)
+                        )
 
-                    DropdownSelect(
-                        label = "Grid Mode",
-                        options = CopyChainDeviceState.GridMode.entries,
-                        selectedOption = deviceState.gridMode,
-                        onOptionSelected = { mode ->
-                            pushStateChange(
-                                before = deviceState,
-                                after = deviceState.copy(gridMode = mode)
-                            )
-                            state.update { it.copy(gridMode = mode) }
-                        },
-                        optionToString = {
-                            when (it) {
-                                CopyChainDeviceState.GridMode.NONE -> "None"
-                                CopyChainDeviceState.GridMode.EDGELESS -> "Edgeless"
-                                CopyChainDeviceState.GridMode.FULL -> "Full"
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        CopySelectField(
+                            label = "Grid Mode",
+                            options = CopyChainDeviceState.GridMode.entries,
+                            selectedOption = deviceState.gridMode,
+                            onOptionSelected = { mode ->
+                                pushStateChange(
+                                    before = deviceState,
+                                    after = deviceState.copy(gridMode = mode)
+                                )
+                                state.update { it.copy(gridMode = mode) }
+                            },
+                            optionToString = ::gridModeLabel,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            AmethystCheckbox(
-                                checked = deviceState.wrap,
-                                onCheckedChange = { wrap ->
-                                    pushStateChange(before = deviceState, after = deviceState.copy(wrap = wrap))
-                                    state.update { it.copy(wrap = wrap) }
-                                }
-                            )
-                            Text("Wrap", style = MaterialTheme.typography.labelSmall)
-                        }
+                        ToggleOption(
+                            label = "Wrap",
+                            checked = deviceState.wrap,
+                            onCheckedChange = { wrap ->
+                                pushStateChange(before = deviceState, after = deviceState.copy(wrap = wrap))
+                                state.update { it.copy(wrap = wrap) }
+                            }
+                        )
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            AmethystCheckbox(
-                                checked = deviceState.reverse,
-                                onCheckedChange = { reverse ->
-                                    pushStateChange(before = deviceState, after = deviceState.copy(reverse = reverse))
-                                    state.update { it.copy(reverse = reverse) }
-                                }
-                            )
-                            Text("Reverse", style = MaterialTheme.typography.labelSmall)
-                        }
+                        ToggleOption(
+                            label = "Reverse",
+                            checked = deviceState.reverse,
+                            onCheckedChange = { reverse ->
+                                pushStateChange(before = deviceState, after = deviceState.copy(reverse = reverse))
+                                state.update { it.copy(reverse = reverse) }
+                            }
+                        )
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            AmethystCheckbox(
-                                checked = deviceState.infinite,
-                                onCheckedChange = { infinite ->
-                                    pushStateChange(before = deviceState, after = deviceState.copy(infinite = infinite))
-                                    state.update { it.copy(infinite = infinite) }
-                                }
-                            )
-                            Text("Infinite", style = MaterialTheme.typography.labelSmall)
-                        }
+                        ToggleOption(
+                            label = "Infinite",
+                            checked = deviceState.infinite,
+                            onCheckedChange = { infinite ->
+                                pushStateChange(before = deviceState, after = deviceState.copy(infinite = infinite))
+                                state.update { it.copy(infinite = infinite) }
+                            }
+                        )
                     }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                TimingControls(
-                    modifier = Modifier.weight(1f),
-                    timing = deviceState.timing,
-                    onTimingChanged = { timing ->
-                        val before = state.value
-                        state.update { it.copy(timing = timing) }
-                        pushStateChange(before, state.value)
-                    },
-                    gate = deviceState.gate,
-                    onGateChanged = { gate ->
-                        val before = state.value
-                        state.update { it.copy(gate = gate) }
-                        pushStateChange(before, state.value)
-                    }
-                )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        TimingControls(
+                            modifier = Modifier.weight(1f),
+                            timing = deviceState.timing,
+                            onTimingChanged = { timing ->
+                                val before = state.value
+                                state.update { it.copy(timing = timing) }
+                                pushStateChange(before, state.value)
+                            },
+                            gate = deviceState.gate,
+                            onGateChanged = { gate ->
+                                val before = state.value
+                                state.update { it.copy(gate = gate) }
+                                pushStateChange(before, state.value)
+                            }
+                        )
 
-                PinchGraph(
-                    pinch = deviceState.pinch,
-                    onPinchChange = { pinch ->
-                        val before = state.value
-                        state.update { it.copy(pinch = pinch) }
-                        pushStateChange(before, state.value)
-                    },
-                    bilateral = deviceState.bilateral,
-                    onToggleBilateral = {
-                        val before = state.value
-                        state.update { it.copy(bilateral = !it.bilateral) }
-                        pushStateChange(before, state.value)
-                    },
-                    modifier = Modifier.size(52.dp)
-                )
-            }
+                        PinchGraph(
+                            pinch = deviceState.pinch,
+                            onPinchChange = { pinch ->
+                                val before = state.value
+                                state.update { it.copy(pinch = pinch) }
+                                pushStateChange(before, state.value)
+                            },
+                            bilateral = deviceState.bilateral,
+                            onToggleBilateral = {
+                                val before = state.value
+                                state.update { it.copy(bilateral = !it.bilateral) }
+                                pushStateChange(before, state.value)
+                            },
+                            modifier = Modifier.size(52.dp)
+                        )
+                    }
                 }
 
-                VerticalDivider()
+                Separator(orientation = SeparatorOrientation.Vertical)
 
                 Row {
                     deviceState.offsets.forEachIndexed { index, offset ->
@@ -262,6 +239,110 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     }
 
     @Composable
+    private fun <T> CopySelectField(
+        label: String,
+        options: List<T>,
+        selectedOption: T,
+        onOptionSelected: (T) -> Unit,
+        modifier: Modifier = Modifier,
+        optionToString: (T) -> String = { it.toString() },
+    ) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = label,
+                style = Theme[typography][small],
+                color = Theme[colors][mutedForeground],
+            )
+
+            Select(
+                value = optionToString(selectedOption),
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                shape = SmallShape,
+                triggerHeight = 24.dp,
+                triggerContentPadding = PaddingValues(horizontal = 8.dp),
+            ) {
+                options.forEach { option ->
+                    SelectItem(
+                        text = optionToString(option),
+                        selected = option == selectedOption,
+                        onClick = { onOptionSelected(option) },
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun ToggleOption(
+        label: String,
+        checked: Boolean,
+        onCheckedChange: (Boolean) -> Unit,
+        modifier: Modifier = Modifier,
+    ) {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+            )
+            Text(
+                text = label,
+                style = Theme[typography][small],
+                color = Theme[colors][foreground],
+            )
+        }
+    }
+
+    @Composable
+    private fun IconActionButton(
+        icon: ImageVector,
+        contentDescription: String,
+        onClick: () -> Unit,
+        modifier: Modifier = Modifier,
+        variant: ButtonVariant = ButtonVariant.Secondary,
+    ) {
+        val tint = when (variant) {
+            ButtonVariant.Secondary -> Theme[colors][secondaryForeground]
+            else -> Theme[colors][foreground]
+        }
+
+        Button(
+            onClick = onClick,
+            modifier = modifier,
+            variant = variant,
+            size = ButtonSize.Icon,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+
+    private fun copyModeLabel(mode: CopyChainDeviceState.CopyMode): String = when (mode) {
+        CopyChainDeviceState.CopyMode.STATIC -> "Static"
+        CopyChainDeviceState.CopyMode.ANIMATE -> "Animate"
+        CopyChainDeviceState.CopyMode.INTERPOLATE -> "Interpolate"
+        CopyChainDeviceState.CopyMode.RANDOM_SINGLE -> "Random Single"
+        CopyChainDeviceState.CopyMode.RANDOM_LOOP -> "Random Loop"
+    }
+
+    private fun gridModeLabel(mode: CopyChainDeviceState.GridMode): String = when (mode) {
+        CopyChainDeviceState.GridMode.NONE -> "None"
+        CopyChainDeviceState.GridMode.EDGELESS -> "Edgeless"
+        CopyChainDeviceState.GridMode.FULL -> "Full"
+    }
+
+    @Composable
     fun AddOffsetButton(
         onClick: () -> Unit
     ) {
@@ -272,14 +353,12 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
             contentAlignment = Alignment.Center
         ) {
-            IconButton(
-                onClick = onClick
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add a new device"
-                )
-            }
+            IconActionButton(
+                icon = Icons.Default.Add,
+                contentDescription = "Add Offset",
+                onClick = onClick,
+                variant = ButtonVariant.Outline,
+            )
         }
     }
 
@@ -295,23 +374,27 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                 .width(130.dp)
                 .fillMaxHeight()
                 .padding(start = 4.dp)
-                .padding(vertical = 4.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(color = MaterialTheme.colorScheme.surfaceVariant)
+                .padding(vertical = 2.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(color = Theme[colors][secondary])
+                .border(1.dp, Theme[colors][border], RoundedCornerShape(6.dp))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 2.dp),
+                    .padding(top = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "Offset",
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = Theme[typography][small],
+                    color = Theme[colors][foreground],
                 )
 
-                IconButton(
+                IconActionButton(
+                    icon = Icons.Default.Remove,
+                    contentDescription = "Remove Offset",
                     onClick = {
                         val before = state.value
                         val after = before.copy(
@@ -322,15 +405,9 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                     },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 4.dp)
-                        .size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Remove,
-                        contentDescription = "Remove Offset",
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                        .padding(end = 4.dp),
+                    variant = ButtonVariant.Ghost,
+                )
             }
 
             Row(
@@ -345,14 +422,14 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
             ) {
                 Text(
                     text = if (offset.isAbsolute) "AbsX: ${offset.absoluteX}" else "X: ${offset.x}",
-                    style = MaterialTheme.typography.labelMedium,
-                    lineHeight = MaterialTheme.typography.labelMedium.fontSize
+                    style = Theme[typography][small],
+                    color = Theme[colors][mutedForeground],
                 )
 
                 Text(
                     text = if (offset.isAbsolute) "AbsY: ${offset.absoluteY}" else "Y: ${offset.y}",
-                    style = MaterialTheme.typography.labelMedium,
-                    lineHeight = MaterialTheme.typography.labelMedium.fontSize
+                    style = Theme[typography][small],
+                    color = Theme[colors][mutedForeground],
                 )
             }
 
@@ -361,82 +438,62 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .size(30.dp)
-                            .clickable {
-                                if (offset.isAbsolute) {
-                                    onChangeOffset(offset.copy(absoluteY = offset.absoluteY + 1))
-                                } else {
-                                    onChangeOffset(offset.copy(y = offset.y + 1))
-                                }
-                            },
+                    IconActionButton(
+                        icon = Icons.Default.ArrowUpward,
+                        contentDescription = "Move up",
+                        onClick = {
+                            if (offset.isAbsolute) {
+                                onChangeOffset(offset.copy(absoluteY = offset.absoluteY + 1))
+                            } else {
+                                onChangeOffset(offset.copy(y = offset.y + 1))
+                            }
+                        },
+                    )
 
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.ArrowUpward, contentDescription = "up", modifier = Modifier.size(20.dp))
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .size(30.dp)
-                            .clickable {
-                                if (offset.isAbsolute) {
-                                    onChangeOffset(offset.copy(absoluteY = offset.absoluteY - 1))
-                                } else {
-                                    onChangeOffset(offset.copy(y = offset.y - 1))
-                                }
-                            },
-
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.ArrowDownward, contentDescription = "down", modifier = Modifier.size(20.dp))
-                    }
+                    IconActionButton(
+                        icon = Icons.Default.ArrowDownward,
+                        contentDescription = "Move down",
+                        onClick = {
+                            if (offset.isAbsolute) {
+                                onChangeOffset(offset.copy(absoluteY = offset.absoluteY - 1))
+                            } else {
+                                onChangeOffset(offset.copy(y = offset.y - 1))
+                            }
+                        },
+                    )
                 }
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth(),
 
-                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .size(30.dp)
-                            .clickable {
-                                if (offset.isAbsolute) {
-                                    onChangeOffset(offset.copy(absoluteX = offset.absoluteX - 1))
-                                } else {
-                                    onChangeOffset(offset.copy(x = offset.x - 1))
-                                }
-                            },
+                    IconActionButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Move left",
+                        onClick = {
+                            if (offset.isAbsolute) {
+                                onChangeOffset(offset.copy(absoluteX = offset.absoluteX - 1))
+                            } else {
+                                onChangeOffset(offset.copy(x = offset.x - 1))
+                            }
+                        },
+                    )
 
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "left", modifier = Modifier.size(20.dp))
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .size(30.dp)
-                            .clickable {
-                                if (offset.isAbsolute) {
-                                    onChangeOffset(offset.copy(absoluteX = offset.absoluteX + 1))
-                                } else {
-                                    onChangeOffset(offset.copy(x = offset.x + 1))
-                                }
-                            },
-
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.ArrowForward, contentDescription = "right", modifier = Modifier.size(20.dp))
-                    }
+                    IconActionButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Move right",
+                        onClick = {
+                            if (offset.isAbsolute) {
+                                onChangeOffset(offset.copy(absoluteX = offset.absoluteX + 1))
+                            } else {
+                                onChangeOffset(offset.copy(x = offset.x + 1))
+                            }
+                        },
+                    )
                 }
             }
 
@@ -472,121 +529,27 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         }
     }
 
-    private fun bresenhamLine(x0: Int, y0: Int, x1: Int, y1: Int): List<Pair<Int, Int>> {
-        val points = mutableListOf<Pair<Int, Int>>()
-
-        var x = x0
-        var y = y0
-
-        val dx = abs(x1 - x0)
-        val dy = abs(y1 - y0)
-
-        val sx = if (x0 < x1) 1 else -1
-        val sy = if (y0 < y1) 1 else -1
-
-        var err = dx - dy
-
-        while (true) {
-            points.add(Pair(x, y))
-
-            if (x == x1 && y == y1) break
-
-            val e2 = 2 * err
-
-            if (e2 > -dy) {
-                err -= dy
-                x += sx
-            }
-
-            if (e2 < dx) {
-                err += dx
-                y += sy
-            }
-        }
-
-        return points
+    private fun transformSignal(signal: Signal.LED, offset: CopyChainDeviceState.Offset): Signal.LED? {
+        val (targetX, targetY) = resolveCopyTarget(signal, offset)
+        return transformSignal(signal, targetX, targetY)
     }
 
-    private fun animateSignalThroughOffsetsWithIsolation(originalSignal: Signal.LED, offsets: List<CopyChainDeviceState.Offset>) {
-        val signalOwner = Pair(this, "${originalSignal.x},${originalSignal.y}")
-        val stepDelayMs = (state.value.timing.toMsValue(WorkspaceRepository.bpm.value) * (state.value.gate * 2)).toLong()
-
-        val targets = mutableListOf<CopyChainDeviceState.Offset>()
-        targets.add(CopyChainDeviceState.Offset(0, 0))
-        targets.addAll(offsets)
-
-        var globalStepIndex = 0
-
-        for (i in 0 until targets.size - 1) {
-            val startOffset = targets[i]
-            val endOffset = targets[i + 1]
-
-            val interpolationPoints = bresenhamLine(
-                startOffset.x, startOffset.y,
-                endOffset.x, endOffset.y
-            )
-
-            interpolationPoints.forEachIndexed { stepIndex, offset ->
-                val copiedSignal = originalSignal.copy(
-                    x = originalSignal.x + offset.first,
-                    y = originalSignal.y - offset.second
-                )
-
-                if (isSignalWithinDeviceBounds(copiedSignal, state.value.gridMode)) {
-                    Heaven.schedule(
-                        delayInMs = (stepDelayMs * globalStepIndex).toDouble(),
-                        owner = signalOwner
-                    ) {
-                        signalExit?.invoke(listOf(copiedSignal))
-                    }
-                }
-                globalStepIndex++
-            }
-
-            if (i < targets.size - 2) {
-                globalStepIndex--
-            }
+    private fun transformSignal(signal: Signal.LED, targetX: Int, targetY: Int): Signal.LED? {
+        val state = state.value
+        val wrapBounds = if (state.wrap) {
+            resolveCopyCoordinateBounds(signal.origin, state.gridMode.toBoundsMode())
+        } else {
+            null
         }
-    }
+        val isolateBounds = resolveCopyCoordinateBounds(signal.origin, state.isolate.toBoundsMode())
 
-    private fun isSignalWithinDeviceBounds(signal: Signal.LED, gridMode: CopyChainDeviceState.GridMode): Boolean {
-        if (gridMode == CopyChainDeviceState.GridMode.NONE) {
-            return true
-        }
-
-        val originDevice = signal.origin as? LaunchpadViewportElement ?: return true
-
-        val absoluteX = signal.x
-        val absoluteY = signal.y
-
-        val layout = originDevice.layout
-        val deviceStartX = originDevice.position.value.x.toInt()
-        val deviceStartY = originDevice.position.value.y.toInt()
-        val deviceEndX = deviceStartX + originDevice.layout.cols
-        val deviceEndY = deviceStartY + originDevice.layout.rows
-
-        return when (gridMode) {
-            CopyChainDeviceState.GridMode.EDGELESS -> {
-                val mainGridStartX = deviceStartX + layout.mainOffsetX + layout.offsetX
-                val mainGridStartY = deviceStartY + layout.mainOffsetY + layout.offsetY
-                val mainGridEndX = mainGridStartX + layout.mainGridMaxX
-                val mainGridEndY = mainGridStartY + layout.mainGridMaxY
-
-                absoluteX in mainGridStartX until mainGridEndX &&
-                absoluteY in mainGridStartY until mainGridEndY
-            }
-
-            CopyChainDeviceState.GridMode.FULL -> {
-                absoluteX in deviceStartX until deviceEndX &&
-                absoluteY in deviceStartY until deviceEndY
-            }
-        }
-    }
-
-    private fun filterSignalsForIsolation(signals: List<Signal.LED>): List<Signal> {
-        return signals.filter { signal ->
-            isSignalWithinDeviceBounds(signal, state.value.gridMode)
-        }
+        return applyCopyCoordinatePolicy(
+            signal = signal,
+            rawX = targetX,
+            rawY = targetY,
+            wrapBounds = wrapBounds,
+            isolateBounds = isolateBounds,
+        )
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
@@ -599,8 +562,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
             CopyChainDeviceState.CopyMode.STATIC -> {
                 state.offsets.forEach { offset ->
                     val transformed = transformSignals(n, offset)
-                    val filtered = filterSignalsForIsolation(transformed)
-                    if (filtered.isNotEmpty()) signalExit?.invoke(filtered.map { it as Signal.LED })
+                    if (transformed.isNotEmpty()) signalExit?.invoke(transformed)
                 }
             }
 
@@ -618,8 +580,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                 val allPossible = listOf(CopyChainDeviceState.Offset(0, 0)) + state.offsets
                 val picked = allPossible.random()
                 val transformed = transformSignals(n, picked)
-                val filtered = filterSignalsForIsolation(transformed)
-                if (filtered.isNotEmpty()) signalExit?.invoke(filtered.map { it as Signal.LED })
+                if (transformed.isNotEmpty()) signalExit?.invoke(transformed)
             }
 
             CopyChainDeviceState.CopyMode.RANDOM_LOOP -> {
@@ -634,8 +595,9 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
                         if (lastOffset != null) {
                             val offSignals = transformSignals(listOf(signal), lastOffset)
-                            val filtered = filterSignalsForIsolation(offSignals)
-                            signalExit?.invoke(filtered.map { it as Signal.LED })
+                            if (offSignals.isNotEmpty()) {
+                                signalExit?.invoke(offSignals)
+                            }
                         }
                     }
                 }
@@ -658,9 +620,10 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                 if (state.infinite && index == animation.lastIndex && triggerSignals.any { it.color == Color.Black }) {
                     return@schedule
                 }
-                
-                val filtered = filterSignalsForIsolation(signals)
-                signalExit?.invoke(filtered.map { it as Signal.LED })
+
+                if (signals.isNotEmpty()) {
+                    signalExit?.invoke(signals)
+                }
             }
         }
     }
@@ -683,14 +646,14 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
             Heaven.schedule(loopOffset, owner = this, identifier = identifier) {
                 if (heldSignals.containsKey(identifier)) {
                     val transformed = transformSignals(listOf(triggerSignal), picked)
-                    val filtered = filterSignalsForIsolation(transformed)
-                    
                     val offSignals = if (lastOffset != null) {
-                        val lastTransformed = transformSignals(listOf(triggerSignal.copy(color = Color.Black)), lastOffset)
-                        filterSignalsForIsolation(lastTransformed)
+                        transformSignals(listOf(triggerSignal.copy(color = Color.Black)), lastOffset)
                     } else emptyList()
 
-                    signalExit?.invoke((offSignals + filtered).map { it as Signal.LED })
+                    val frame = offSignals + transformed
+                    if (frame.isNotEmpty()) {
+                        signalExit?.invoke(frame)
+                    }
                     
                     playStep(loopOffset + stepDelayMs)
                 }
@@ -701,17 +664,8 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     }
 
     private fun transformSignals(signals: List<Signal.LED>, offset: CopyChainDeviceState.Offset): List<Signal.LED> {
-        val state = state.value
-        return signals.map { signal ->
-            var newX = if (offset.isAbsolute) offset.absoluteX else signal.x + offset.x
-            var newY = if (offset.isAbsolute) offset.absoluteY else signal.y - offset.y
-
-            if (state.wrap) {
-                newX = (newX % 10 + 10) % 10
-                newY = (newY % 10 + 10) % 10
-            }
-
-            signal.copy(x = newX, y = newY, origin = signal.origin)
+        return signals.mapNotNull { signal ->
+            transformSignal(signal, offset)
         }
     }
 
@@ -751,106 +705,16 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     private fun renderInterpolatedAnimation(triggerSignals: List<Signal.LED>): List<Pair<Int, List<Signal.LED>>> {
         val state = state.value
         val stepDelayMs = (state.timing.toMsValue(WorkspaceRepository.bpm.value) * (state.gate * 2)).toInt()
-        val targets = mutableListOf(CopyChainDeviceState.Offset(0, 0))
-        targets.addAll(state.offsets)
-        
-        if (state.reverse) {
-            targets.reverse()
-        }
-
-        val raw = buildList {
-            var globalStepIndex = 0
-            for (i in 0 until targets.size - 1) {
-                val start = targets[i]
-                val end = targets[i + 1]
-                
-                // When reversing, the angle should probably be inverted if it's associated with the 'end' point?
-                // Apollo code: double angle = Angles[i] / 90.0 * Math.PI;
-                // It uses the angle at index 'i'. 
-                // If we reverse targets, we also need to reverse/adjust angles.
-                
-                // Actually, in Amethyst, angle is part of the Offset object.
-                // If we have [T0, T1, T2] with angles [A0, A1, A2] (A0 is usually ignored as it's the start)
-                // Normal: T0 -> T1 (angle A1), T1 -> T2 (angle A2)
-                // Reversed: T2 -> T1 (angle ?), T1 -> T0 (angle ?)
-                
-                // Let's re-examine Apollo's Angle logic.
-                // It has a list of Offsets and a list of Angles.
-                // Insert(index, offset, angle) inserts at same index.
-                // CopyCalc loop:
-                // for (int i = 0; i < Offsets.Count; i++) {
-                //    if (CopyMode == CopyType.Interpolate) {
-                //        double angle = Angles[i] ...
-                //        ... interpolation from 'source' to 'target' (Offsets[i])
-                //    }
-                //    px = _x; py = _y; (update source for next iteration)
-                // }
-                
-                // So Angles[i] is the angle for the transition TO Offsets[i].
-                // If we reverse validOffsets (which includes Origin at index 0), 
-                // we should also probably reverse the angles but be careful with indices.
-
-                val points = if (end.angle != 0) {
-                    // If we are reversing, the arc should be flipped to maintain the same shape?
-                    // Actually, if we go from B to A instead of A to B, and use the same center, the angle is -radAngle.
-                    calculateArcPoints(start.x, start.y, end.x, end.y, if (state.reverse) -end.angle else end.angle)
-                } else {
-                    bresenhamLine(start.x, start.y, end.x, end.y)
-                }
-                
-                points.forEachIndexed { stepIndex, point ->
-                    if (i > 0 && stepIndex == 0) return@forEachIndexed
-                    val offset = CopyChainDeviceState.Offset(point.first, point.second)
-                    add(globalStepIndex * stepDelayMs to transformSignals(triggerSignals, offset))
-                    globalStepIndex++
-                }
-            }
+        val raw = buildInterpolatedCopyFrames(
+            triggerSignals = triggerSignals,
+            offsets = state.offsets,
+            reverse = state.reverse,
+            transformSignal = ::transformSignal,
+        ).mapIndexed { index, signals ->
+            index * stepDelayMs to signals
         }
         
         return applyPinchToAnimation(raw)
-    }
-
-    private fun calculateArcPoints(x0: Int, y0: Int, x1: Int, y1: Int, angle: Int): List<Pair<Int, Int>> {
-        val points = mutableListOf<Pair<Int, Int>>()
-        val radAngle = angle.toDouble() * (kotlin.math.PI / 180.0)
-
-        val dx = (x1 - x0).toDouble()
-        val dy = (y1 - y0).toDouble()
-        val dist = sqrt(dx * dx + dy * dy)
-        if (dist < 0.001) return listOf(x0 to y0)
-
-        // dist = 2 * R * sin(abs(angle) / 2)
-        val r = dist / (2.0 * sin(abs(radAngle) / 2.0))
-        val h = r * cos(abs(radAngle) / 2.0)
-
-        val midX = (x0 + x1) / 2.0
-        val midY = (y0 + y1) / 2.0
-
-        // Perpendicular vector
-        val vx = -(dy / dist)
-        val vy = dx / dist
-
-        // Center of arc
-        // If angle > 0, center is to the left of the vector (x0,y0) -> (x1,y1)
-        val sign = if (angle > 0) 1.0 else -1.0
-        val cx = midX + sign * h * vx
-        val cy = midY + sign * h * vy
-
-        // Angles from center to start and end
-        val startAngle = atan2(y0.toDouble() - cy, x0.toDouble() - cx)
-
-        // Number of points based on distance (Bresenham-like density)
-        val steps = max(abs(dx), abs(dy)).toInt() * 2 // Increase density for curves
-
-        for (i in 0..steps) {
-            val t = i.toDouble() / steps
-            val currentAngle = startAngle + t * radAngle
-            val px = (cx + r * cos(currentAngle)).roundToInt()
-            val py = (cy + r * sin(currentAngle)).roundToInt()
-            points.add(px to py)
-        }
-
-        return points.distinct()
     }
 
     private fun applyPinchToAnimation(raw: List<Pair<Int, List<Signal.LED>>>): List<Pair<Int, List<Signal.LED>>> {
