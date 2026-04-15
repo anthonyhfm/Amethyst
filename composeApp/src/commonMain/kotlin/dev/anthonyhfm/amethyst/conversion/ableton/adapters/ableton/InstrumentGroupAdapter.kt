@@ -66,7 +66,7 @@ class InstrumentGroupAdapter(
                                     add(
                                         MacroFilterChainDeviceState(
                                             macro = 0,
-                                            value = minMacro,
+                                            allowedValues = setOf(minMacro),
                                         )
                                     )
                                 } else if (maxMacro - minMacro != 127) {
@@ -79,7 +79,7 @@ class InstrumentGroupAdapter(
                                                         devices = listOf(
                                                             MacroFilterChainDeviceState(
                                                                 macro = 0,
-                                                                value = key,
+                                                                allowedValues = setOf(key),
                                                             )
                                                         )
                                                     )

@@ -15,10 +15,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import dev.anthonyhfm.amethyst.home.Home
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatUtilityLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
-import dev.anthonyhfm.amethyst.home.Home
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import dev.anthonyhfm.amethyst.home.HomeCommandSurface
+import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import org.jetbrains.compose.resources.painterResource
 import javax.swing.UIManager
 import kotlin.system.exitProcess
@@ -47,6 +55,15 @@ fun StartWindow(
             DesktopPlatform.Linux -> painterResource(Res.drawable.amethyst_linux)
 
             else -> null
+        },
+        onKeyEvent = { event ->
+            if (event.type == KeyEventType.KeyDown && (event.isCtrlPressed || event.isMetaPressed)) {
+                when (event.key) {
+                    Key.N -> { HomeCommandSurface.emit(HomeCommandSurface.HomeCommand.NewProject); true }
+                    Key.O -> { HomeCommandSurface.emit(HomeCommandSurface.HomeCommand.OpenProject); true }
+                    else -> false
+                }
+            } else false
         }
     ) {
         if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
@@ -54,24 +71,17 @@ fun StartWindow(
             window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
         }
 
-        MaterialTheme(
-            colorScheme = darkColorScheme()
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-            ) {
-                Column {
-                    if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
-                        OSXTitleBar()
-                    }
-
-                    Home(
-                        onOpenWorkspace = {
-                            onOpenEditor()
-                        }
-                    )
+        AmethystTheme {
+            Column {
+                if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
+                    OSXTitleBar()
                 }
+
+                Home(
+                    onOpenWorkspace = {
+                        onOpenEditor()
+                    }
+                )
             }
         }
     }

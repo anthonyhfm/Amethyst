@@ -10,17 +10,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,10 +37,6 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.effects.gradient.ui.GradientEditorBar
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
-import dev.anthonyhfm.amethyst.ui.components.TextDial
-import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -48,10 +44,22 @@ import dev.anthonyhfm.amethyst.ui.components.ColorPicker
 import dev.anthonyhfm.amethyst.ui.components.HuePickerBar
 import dev.anthonyhfm.amethyst.ui.components.HexColorEditor
 import dev.anthonyhfm.amethyst.ui.components.rememberColorPickerState
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 @Serializable
 enum class GradientSmoothness {
@@ -83,6 +91,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
         val selectedColor: String? = selections.filterIsInstance<Selectable.GradientStep>()
             .find { it.parent == this }
@@ -94,6 +103,12 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             selectedGradientColor?.let {
                 rememberColorPickerState(initialColor = Color(it.r, it.g, it.b))
             }
+        }
+        val beforeColorGradientSnapshot = remember(selectedColor) {
+            mutableStateOf<List<GradientChainDeviceState.GradientColor>?>(null)
+        }
+        val beforeGradientData = remember(deviceState.gradientData.map { it.selectionUUID }) {
+            mutableStateOf<List<GradientChainDeviceState.GradientColor>?>(null)
         }
 
         LaunchedEffect(selectedGradientColor?.r, selectedGradientColor?.g, selectedGradientColor?.b) {
@@ -107,9 +122,6 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                 cp.setColor(Color(grad.r, grad.g, grad.b))
             }
         }
-
-        // Track color changes for undo
-        var beforeColorGradientSnapshot: List<GradientChainDeviceState.GradientColor>? = null
 
         LaunchedEffect(colorPickerState?.color) {
             val cp = colorPickerState ?: return@LaunchedEffect
@@ -131,9 +143,9 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             }
         }
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Gradient",
-            isSelected = selections.any { it.selectionUUID == this.selectionUUID },
+            isSelected = isSelected,
             isDragging = isDragging.value,
             modifier = Modifier
                 .width(
@@ -142,7 +154,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                     } else {
                         300.dp
                     }
-                )
+                ),
+            titleBarModifier = LocalTitleBarModifier.current,
         ) {
             Row(
                 modifier = Modifier
@@ -157,7 +170,6 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                     Spacer(Modifier.height(16.dp))
 
                     key(deviceState.gradientData.size) {
-                        var beforeGradientData: List<GradientChainDeviceState.GradientColor>? = null
                         GradientEditorBar(
                             selectedColor = selectedColor,
                             onSelectionChange = { selectionUUID ->
@@ -204,14 +216,12 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                 pushStateChange(before, state.value)
                             },
                             onGradientDragStart = {
-                                // Merke Zustand vor Drag
-                                beforeGradientData = state.value.gradientData.map { it.copy() }
+                                beforeGradientData.value = state.value.gradientData.map { it.copy() }
                             },
                             onGradientDragFinish = {
-                                val before = beforeGradientData
+                                val before = beforeGradientData.value
                                 if (before != null) {
                                     val after = state.value.gradientData
-                                    // Prüfe Positionsänderungen
                                     val positionsChanged = before.map { it.selectionUUID to it.position } != after.map { it.selectionUUID to it.position }
                                     if (positionsChanged) {
                                         pushStateChange(
@@ -220,7 +230,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                         )
                                     }
                                 }
-                                beforeGradientData = null
+                                beforeGradientData.value = null
                             },
                             onSmoothnessChange = { selectionUUID, smoothness ->
                                 val before = state.value
@@ -271,7 +281,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                         var beforeGate = deviceState.gate
                         TextDial(
                             headline = "Gate",
-                            text = "${(deviceState.gate * 200).toInt()}%",
+                            text = "${(deviceState.gate * 200).roundToInt()}%",
                             value = deviceState.gate,
                             onStartValueChange = { v ->
                                 beforeGate = v
@@ -318,7 +328,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(start = 12.dp)
                     ) {
-                        AmethystCheckbox(
+                        Checkbox(
                             checked = deviceState.loop,
                             onCheckedChange = { checked ->
                                 val before = state.value
@@ -329,13 +339,14 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
 
                         Text(
                             text = "Loop",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = Theme[typography][small],
+                            color = Theme[colors][foreground],
                         )
                     }
                 }
 
                 if (selectedColor != null && colorPickerState != null) {
-                    VerticalDivider()
+                    Separator(orientation = SeparatorOrientation.Vertical)
 
                     Column(
                         modifier = Modifier
@@ -357,11 +368,11 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                     .aspectRatio(1f),
                                 state = colorPickerState,
                                 onSelectionStart = {
-                                    beforeColorGradientSnapshot = state.value.gradientData.map { it.copy() }
+                                    beforeColorGradientSnapshot.value = state.value.gradientData.map { it.copy() }
                                 },
                                 onSelectionFinish = { c ->
                                     val grad = selectedGradientColor
-                                    val beforeSnapshot = beforeColorGradientSnapshot
+                                    val beforeSnapshot = beforeColorGradientSnapshot.value
                                     if (grad != null && beforeSnapshot != null) {
                                         val before = state.value.copy(gradientData = beforeSnapshot)
                                         val afterItem = state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
@@ -370,7 +381,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                             pushStateChange(before, state.value)
                                         }
                                     }
-                                    beforeColorGradientSnapshot = null
+                                    beforeColorGradientSnapshot.value = null
                                 }
                             )
 
@@ -378,11 +389,11 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                 vertical = true,
                                 state = colorPickerState,
                                 onSelectionStart = {
-                                    beforeColorGradientSnapshot = state.value.gradientData.map { it.copy() }
+                                    beforeColorGradientSnapshot.value = state.value.gradientData.map { it.copy() }
                                 },
                                 onSelectionFinish = { c ->
                                     val grad = selectedGradientColor
-                                    val beforeSnapshot = beforeColorGradientSnapshot
+                                    val beforeSnapshot = beforeColorGradientSnapshot.value
                                     if (grad != null && beforeSnapshot != null) {
                                         val before = state.value.copy(gradientData = beforeSnapshot)
                                         val afterItem = state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
@@ -391,7 +402,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                             pushStateChange(before, state.value)
                                         }
                                     }
-                                    beforeColorGradientSnapshot = null
+                                    beforeColorGradientSnapshot.value = null
                                 }
                             )
                         }

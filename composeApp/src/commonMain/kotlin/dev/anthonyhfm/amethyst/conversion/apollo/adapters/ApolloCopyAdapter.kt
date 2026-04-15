@@ -33,14 +33,14 @@ class ApolloCopyAdapter(
             reverse = model.reverse,
             infinite = model.infinite,
             isolate = CopyChainDeviceState.IsolationType.NONE,
-            offsets = model.offsets.map {
+            offsets = model.offsets.mapIndexed { index, it ->
                 CopyChainDeviceState.Offset(
                     x = it.x,
                     y = it.y,
                     isAbsolute = it.isAbsolute,
                     absoluteX = it.absoluteX,
                     absoluteY = it.absoluteY,
-                    angle = it.angle
+                    angle = model.angles.getOrElse(index) { 0 }
                 )
             }
         )

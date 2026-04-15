@@ -1,8 +1,8 @@
 package dev.anthonyhfm.amethyst.devices.effects.hold
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,14 +17,22 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
-import dev.anthonyhfm.amethyst.ui.components.DropdownSelect
-import dev.anthonyhfm.amethyst.ui.components.TextDial
-import dev.anthonyhfm.amethyst.ui.components.TimeDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -39,13 +47,15 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Hold",
-            isSelected = selections.any { it.selectionUUID == this.selectionUUID },
+            isSelected = isSelected,
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(160.dp)
+                .width(160.dp),
+            titleBarModifier = LocalTitleBarModifier.current
         ) {
             Column (
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -146,18 +156,16 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
                         ) {
-                            DropdownSelect(
-                                label = "Mode",
-                                options = HoldMode.entries,
-                                selectedOption = deviceState.mode,
-                                onOptionSelected = { mode ->
+                            ModeSelectField(
+                                selectedMode = deviceState.mode,
+                                onModeSelected = { mode ->
                                     pushStateChange(
                                         before = deviceState,
                                         after = deviceState.copy(mode = mode)
                                     )
                                     state.update { it.copy(mode = mode) }
                                 },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
 
@@ -166,7 +174,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                             modifier = Modifier.padding(start = 12.dp, top = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            AmethystCheckbox(
+                            Checkbox(
                                 checked = deviceState.onRelease,
                                 onCheckedChange = { checked ->
                                     pushStateChange(
@@ -182,11 +190,47 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
 
                             Text(
                                 text = "On Release",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = Theme[typography][small],
+                                color = Theme[colors][foreground],
                             )
                         }
                     }
 
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun ModeSelectField(
+        selectedMode: HoldMode,
+        onModeSelected: (HoldMode) -> Unit,
+        modifier: Modifier = Modifier,
+    ) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "Mode",
+                style = Theme[typography][small],
+                color = Theme[colors][mutedForeground],
+            )
+
+            Select(
+                value = selectedMode.name,
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                shape = SmallShape,
+                triggerHeight = 24.dp,
+                triggerContentPadding = PaddingValues(horizontal = 8.dp),
+            ) {
+                HoldMode.entries.forEach { mode ->
+                    SelectItem(
+                        text = mode.name,
+                        selected = mode == selectedMode,
+                        onClick = { onModeSelected(mode) },
+                    )
                 }
             }
         }

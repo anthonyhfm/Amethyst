@@ -71,7 +71,13 @@ kotlin {
             implementation("io.github.pdvrieze.xmlutil:serialization:1.0.0-rc1")
             implementation("io.github.pdvrieze.xmlutil:serialutil:1.0.0-rc1")
             implementation("com.squareup.okio:okio:3.9.0")
+            implementation("com.composables:composeunstyled:1.49.6")
+            implementation("com.composables:icons-lucide-cmp:2.2.1")
+
             kotlin("stdlib")
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs) {

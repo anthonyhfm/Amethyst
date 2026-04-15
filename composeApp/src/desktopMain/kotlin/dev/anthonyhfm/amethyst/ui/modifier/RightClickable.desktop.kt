@@ -13,7 +13,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 actual fun Modifier.rightClickable(onRightClick: (position: Offset) -> Unit): Modifier = this.then(
-    Modifier.pointerInput(Unit) {
+    Modifier.pointerInput(onRightClick) {
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent()

@@ -1,0 +1,2929 @@
+{
+    "schemaVersion": {
+        "major": 1,
+        "minor": 0,
+        "hotfix": 0
+    },
+    "metadata": {
+        "id": "gem://reference/large-graph",
+        "name": "Large Graph Gem",
+        "description": "Phase 5 reference fixture stress-testing compiler, validator, canvas, and persistence with a large multi-subgraph asset.",
+        "category": {
+            "id": "reference",
+            "label": "Reference Gems"
+        },
+        "assetVersion": {
+            "major": 1,
+            "minor": 0,
+            "hotfix": 0
+        }
+    },
+    "definition": {
+        "rootGraph": {
+            "id": "root",
+            "kind": "ROOT",
+            "label": "Large Graph Root",
+            "description": "",
+            "nodes": [
+                {
+                    "id": "root-base-color",
+                    "type": {
+                        "typeId": "amethyst.parameter.color.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Base Color",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "color"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-intensity",
+                    "type": {
+                        "typeId": "amethyst.parameter.number.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Intensity",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-speed",
+                    "type": {
+                        "typeId": "amethyst.parameter.number.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Speed",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-enabled",
+                    "type": {
+                        "typeId": "amethyst.parameter.boolean.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Enabled",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-delay-time",
+                    "type": {
+                        "typeId": "amethyst.parameter.timing.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Delay Time",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "timing"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-hold",
+                    "type": {
+                        "typeId": "amethyst.parameter.boolean.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Hold",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-const-1",
+                    "type": {
+                        "typeId": "amethyst.constant.number",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Const 1",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {
+                        "value": {
+                            "kind": "number",
+                            "value": 1.0
+                        }
+                    }
+                },
+                {
+                    "id": "root-const-0-5",
+                    "type": {
+                        "typeId": "amethyst.constant.number",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Const 0.5",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {
+                        "value": {
+                            "kind": "number",
+                            "value": 0.5
+                        }
+                    }
+                },
+                {
+                    "id": "root-const-0-25",
+                    "type": {
+                        "typeId": "amethyst.constant.number",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Const 0.25",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {
+                        "value": {
+                            "kind": "number",
+                            "value": 0.25
+                        }
+                    }
+                },
+                {
+                    "id": "root-const-fallback",
+                    "type": {
+                        "typeId": "amethyst.constant.number",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Fallback",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {
+                        "value": {
+                            "kind": "number",
+                            "value": 0.0
+                        }
+                    }
+                },
+                {
+                    "id": "root-scale-1",
+                    "type": {
+                        "typeId": "amethyst.transform.number.scale",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Scale 1",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "scale",
+                            "label": "Scale",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 1.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "bias",
+                            "label": "Bias",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-scale-2",
+                    "type": {
+                        "typeId": "amethyst.transform.number.scale",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Scale 2",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "scale",
+                            "label": "Scale",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 1.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "bias",
+                            "label": "Bias",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-scale-3",
+                    "type": {
+                        "typeId": "amethyst.transform.number.scale",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Scale 3",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "scale",
+                            "label": "Scale",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 1.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "bias",
+                            "label": "Bias",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-final-scale",
+                    "type": {
+                        "typeId": "amethyst.transform.number.scale",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Final Scale",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "scale",
+                            "label": "Scale",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 1.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "bias",
+                            "label": "Bias",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-output-scale",
+                    "type": {
+                        "typeId": "amethyst.transform.number.scale",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Output Scale",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "scale",
+                            "label": "Scale",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 1.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "bias",
+                            "label": "Bias",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-gate-1",
+                    "type": {
+                        "typeId": "amethyst.control.number.gate",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Gate 1",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "open",
+                            "label": "Open",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "closedValue",
+                            "label": "Closed Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-gate-2",
+                    "type": {
+                        "typeId": "amethyst.control.number.gate",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Gate 2",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "open",
+                            "label": "Open",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "closedValue",
+                            "label": "Closed Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-final-gate",
+                    "type": {
+                        "typeId": "amethyst.control.number.gate",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Final Gate",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "open",
+                            "label": "Open",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "closedValue",
+                            "label": "Closed Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-select-1",
+                    "type": {
+                        "typeId": "amethyst.branch.number.select",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Select 1",
+                    "pins": [
+                        {
+                            "id": "condition",
+                            "label": "Condition",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "whenTrue",
+                            "label": "When True",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "whenFalse",
+                            "label": "When False",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-select-2",
+                    "type": {
+                        "typeId": "amethyst.branch.number.select",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Select 2",
+                    "pins": [
+                        {
+                            "id": "condition",
+                            "label": "Condition",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "whenTrue",
+                            "label": "When True",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "whenFalse",
+                            "label": "When False",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-final-select",
+                    "type": {
+                        "typeId": "amethyst.branch.number.select",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Final Select",
+                    "pins": [
+                        {
+                            "id": "condition",
+                            "label": "Condition",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "whenTrue",
+                            "label": "When True",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "whenFalse",
+                            "label": "When False",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-hold-1",
+                    "type": {
+                        "typeId": "amethyst.control.number.hold",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Hold 1",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "capture",
+                            "label": "Capture",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "reset",
+                            "label": "Reset",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "boolean",
+                                "value": false
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "root-sg-a-call",
+                    "type": {
+                        "typeId": "amethyst.structure.subgraph.call",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Color Mix Call",
+                    "pins": [
+                        {
+                            "id": "mix-in",
+                            "label": "Mix Ratio In",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "gate-in",
+                            "label": "Gate In",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "mix-out",
+                            "label": "Mix Out",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {},
+                    "subgraphId": "sg-color-mix"
+                },
+                {
+                    "id": "root-sg-b-call",
+                    "type": {
+                        "typeId": "amethyst.structure.subgraph.call",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Timing Call",
+                    "pins": [
+                        {
+                            "id": "value-in",
+                            "label": "Value In",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "delay-in",
+                            "label": "Delay In",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "timing"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "hold-in",
+                            "label": "Hold In",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "value-out",
+                            "label": "Value Out",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {},
+                    "subgraphId": "sg-timing"
+                }
+            ],
+            "connections": [
+                {
+                    "id": "root-c01",
+                    "from": {
+                        "nodeId": "root-intensity",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-scale-1",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c02",
+                    "from": {
+                        "nodeId": "root-const-0-5",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-scale-1",
+                        "pinId": "scale"
+                    }
+                },
+                {
+                    "id": "root-c03",
+                    "from": {
+                        "nodeId": "root-scale-1",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-scale-2",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c04",
+                    "from": {
+                        "nodeId": "root-speed",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-scale-2",
+                        "pinId": "scale"
+                    }
+                },
+                {
+                    "id": "root-c05",
+                    "from": {
+                        "nodeId": "root-scale-2",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-scale-3",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c06",
+                    "from": {
+                        "nodeId": "root-const-0-25",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-scale-3",
+                        "pinId": "scale"
+                    }
+                },
+                {
+                    "id": "root-c07",
+                    "from": {
+                        "nodeId": "root-enabled",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-gate-1",
+                        "pinId": "open"
+                    }
+                },
+                {
+                    "id": "root-c08",
+                    "from": {
+                        "nodeId": "root-scale-3",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-gate-1",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c09",
+                    "from": {
+                        "nodeId": "root-enabled",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-gate-2",
+                        "pinId": "open"
+                    }
+                },
+                {
+                    "id": "root-c10",
+                    "from": {
+                        "nodeId": "root-gate-1",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-gate-2",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c11",
+                    "from": {
+                        "nodeId": "root-gate-2",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-hold-1",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c12",
+                    "from": {
+                        "nodeId": "root-hold",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-hold-1",
+                        "pinId": "capture"
+                    }
+                },
+                {
+                    "id": "root-c13",
+                    "from": {
+                        "nodeId": "root-enabled",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-select-1",
+                        "pinId": "condition"
+                    }
+                },
+                {
+                    "id": "root-c14",
+                    "from": {
+                        "nodeId": "root-hold-1",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-select-1",
+                        "pinId": "whenTrue"
+                    }
+                },
+                {
+                    "id": "root-c15",
+                    "from": {
+                        "nodeId": "root-const-1",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-select-1",
+                        "pinId": "whenFalse"
+                    }
+                },
+                {
+                    "id": "root-c16",
+                    "from": {
+                        "nodeId": "root-select-1",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-sg-a-call",
+                        "pinId": "mix-in"
+                    }
+                },
+                {
+                    "id": "root-c17",
+                    "from": {
+                        "nodeId": "root-enabled",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-sg-a-call",
+                        "pinId": "gate-in"
+                    }
+                },
+                {
+                    "id": "root-c18",
+                    "from": {
+                        "nodeId": "root-sg-a-call",
+                        "pinId": "mix-out"
+                    },
+                    "to": {
+                        "nodeId": "root-sg-b-call",
+                        "pinId": "value-in"
+                    }
+                },
+                {
+                    "id": "root-c19",
+                    "from": {
+                        "nodeId": "root-delay-time",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-sg-b-call",
+                        "pinId": "delay-in"
+                    }
+                },
+                {
+                    "id": "root-c20",
+                    "from": {
+                        "nodeId": "root-hold",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-sg-b-call",
+                        "pinId": "hold-in"
+                    }
+                },
+                {
+                    "id": "root-c21",
+                    "from": {
+                        "nodeId": "root-sg-b-call",
+                        "pinId": "value-out"
+                    },
+                    "to": {
+                        "nodeId": "root-final-scale",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c22",
+                    "from": {
+                        "nodeId": "root-const-0-5",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-final-scale",
+                        "pinId": "scale"
+                    }
+                },
+                {
+                    "id": "root-c23",
+                    "from": {
+                        "nodeId": "root-enabled",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-final-gate",
+                        "pinId": "open"
+                    }
+                },
+                {
+                    "id": "root-c24",
+                    "from": {
+                        "nodeId": "root-final-scale",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-final-gate",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c25",
+                    "from": {
+                        "nodeId": "root-enabled",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-final-select",
+                        "pinId": "condition"
+                    }
+                },
+                {
+                    "id": "root-c26",
+                    "from": {
+                        "nodeId": "root-final-gate",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-final-select",
+                        "pinId": "whenTrue"
+                    }
+                },
+                {
+                    "id": "root-c27",
+                    "from": {
+                        "nodeId": "root-const-fallback",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-final-select",
+                        "pinId": "whenFalse"
+                    }
+                },
+                {
+                    "id": "root-c28",
+                    "from": {
+                        "nodeId": "root-final-select",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-output-scale",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "root-c29",
+                    "from": {
+                        "nodeId": "root-const-1",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-output-scale",
+                        "pinId": "scale"
+                    }
+                },
+                {
+                    "id": "root-c30",
+                    "from": {
+                        "nodeId": "root-enabled",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-select-2",
+                        "pinId": "condition"
+                    }
+                },
+                {
+                    "id": "root-c31",
+                    "from": {
+                        "nodeId": "root-output-scale",
+                        "pinId": "result"
+                    },
+                    "to": {
+                        "nodeId": "root-select-2",
+                        "pinId": "whenTrue"
+                    }
+                },
+                {
+                    "id": "root-c32",
+                    "from": {
+                        "nodeId": "root-const-fallback",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "root-select-2",
+                        "pinId": "whenFalse"
+                    }
+                }
+            ]
+        },
+        "subgraphs": [
+            {
+                "id": "sg-color-mix",
+                "kind": "SUBGRAPH",
+                "label": "Color Mix",
+                "description": "",
+                "nodes": [
+                    {
+                        "id": "sg-a-const-one",
+                        "type": {
+                            "typeId": "amethyst.constant.number",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Const 1.0",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {
+                            "value": {
+                                "kind": "number",
+                                "value": 1.0
+                            }
+                        }
+                    },
+                    {
+                        "id": "sg-a-scale-ratio",
+                        "type": {
+                            "typeId": "amethyst.transform.number.scale",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Scale Ratio",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "scale",
+                                "label": "Scale",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "number",
+                                    "value": 1.0
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "bias",
+                                "label": "Bias",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "number",
+                                    "value": 0.0
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "result",
+                                "label": "Result",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {}
+                    },
+                    {
+                        "id": "sg-a-gate",
+                        "type": {
+                            "typeId": "amethyst.control.number.gate",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Gate",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "open",
+                                "label": "Open",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "boolean"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "closedValue",
+                                "label": "Closed Value",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "number",
+                                    "value": 0.0
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "result",
+                                "label": "Result",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {}
+                    },
+                    {
+                        "id": "sg-a-select-out",
+                        "type": {
+                            "typeId": "amethyst.branch.number.select",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Select Output",
+                        "pins": [
+                            {
+                                "id": "condition",
+                                "label": "Condition",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "boolean"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "whenTrue",
+                                "label": "When True",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "whenFalse",
+                                "label": "When False",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "result",
+                                "label": "Result",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {}
+                    },
+                    {
+                        "id": "sg-a-const-zero",
+                        "type": {
+                            "typeId": "amethyst.constant.number",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Const 0.0",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {
+                            "value": {
+                                "kind": "number",
+                                "value": 0.0
+                            }
+                        }
+                    }
+                ],
+                "connections": [
+                    {
+                        "id": "sg-a-c1",
+                        "from": {
+                            "nodeId": "sg-a-const-one",
+                            "pinId": "value"
+                        },
+                        "to": {
+                            "nodeId": "sg-a-scale-ratio",
+                            "pinId": "scale"
+                        }
+                    },
+                    {
+                        "id": "sg-a-c2",
+                        "from": {
+                            "nodeId": "sg-a-scale-ratio",
+                            "pinId": "result"
+                        },
+                        "to": {
+                            "nodeId": "sg-a-gate",
+                            "pinId": "value"
+                        }
+                    },
+                    {
+                        "id": "sg-a-c3",
+                        "from": {
+                            "nodeId": "sg-a-gate",
+                            "pinId": "result"
+                        },
+                        "to": {
+                            "nodeId": "sg-a-select-out",
+                            "pinId": "whenTrue"
+                        }
+                    },
+                    {
+                        "id": "sg-a-c4",
+                        "from": {
+                            "nodeId": "sg-a-const-zero",
+                            "pinId": "value"
+                        },
+                        "to": {
+                            "nodeId": "sg-a-select-out",
+                            "pinId": "whenFalse"
+                        }
+                    }
+                ],
+                "subgraphInterface": {
+                    "inputs": [
+                        {
+                            "id": "mix-in",
+                            "label": "Mix Ratio In",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "bindings": [
+                                {
+                                    "nodeId": "sg-a-scale-ratio",
+                                    "pinId": "value"
+                                }
+                            ],
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "gate-in",
+                            "label": "Gate In",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "bindings": [
+                                {
+                                    "nodeId": "sg-a-gate",
+                                    "pinId": "open"
+                                },
+                                {
+                                    "nodeId": "sg-a-select-out",
+                                    "pinId": "condition"
+                                }
+                            ],
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "id": "mix-out",
+                            "label": "Mix Out",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "binding": {
+                                "nodeId": "sg-a-select-out",
+                                "pinId": "result"
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "sg-timing",
+                "kind": "SUBGRAPH",
+                "label": "Timing Chain",
+                "description": "",
+                "nodes": [
+                    {
+                        "id": "sg-b-delay1",
+                        "type": {
+                            "typeId": "amethyst.timing.number.delay",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Delay 1",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "delay",
+                                "label": "Delay",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "timing"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "timing",
+                                    "value": {
+                                        "kind": "dev.anthonyhfm.amethyst.core.util.Timing.Duration",
+                                        "duration": "PT0.100S"
+                                    }
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "result",
+                                "label": "Result",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {}
+                    },
+                    {
+                        "id": "sg-b-delay2",
+                        "type": {
+                            "typeId": "amethyst.timing.number.delay",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Delay 2",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "delay",
+                                "label": "Delay",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "timing"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "timing",
+                                    "value": {
+                                        "kind": "dev.anthonyhfm.amethyst.core.util.Timing.Duration",
+                                        "duration": "PT0.100S"
+                                    }
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "result",
+                                "label": "Result",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {}
+                    },
+                    {
+                        "id": "sg-b-hold",
+                        "type": {
+                            "typeId": "amethyst.control.number.hold",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Hold",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "capture",
+                                "label": "Capture",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "boolean"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "reset",
+                                "label": "Reset",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "boolean"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "boolean",
+                                    "value": false
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "result",
+                                "label": "Result",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {}
+                    },
+                    {
+                        "id": "sg-b-const-half",
+                        "type": {
+                            "typeId": "amethyst.constant.number",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Half Factor",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {
+                            "value": {
+                                "kind": "number",
+                                "value": 0.5
+                            }
+                        }
+                    },
+                    {
+                        "id": "sg-b-attenuate",
+                        "type": {
+                            "typeId": "amethyst.transform.number.scale",
+                            "version": {
+                                "major": 1,
+                                "minor": 0,
+                                "hotfix": 0
+                            }
+                        },
+                        "label": "Attenuate",
+                        "pins": [
+                            {
+                                "id": "value",
+                                "label": "Value",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": true,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "scale",
+                                "label": "Scale",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "number",
+                                    "value": 1.0
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "bias",
+                                "label": "Bias",
+                                "direction": "INPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": {
+                                    "kind": "number",
+                                    "value": 0.0
+                                },
+                                "groupId": null,
+                                "sortOrder": null
+                            },
+                            {
+                                "id": "result",
+                                "label": "Result",
+                                "direction": "OUTPUT",
+                                "type": {
+                                    "kind": "value",
+                                    "valueType": {
+                                        "kind": "number"
+                                    },
+                                    "family": "VALUE"
+                                },
+                                "required": false,
+                                "defaultValue": null,
+                                "groupId": null,
+                                "sortOrder": null
+                            }
+                        ],
+                        "serializedState": {}
+                    }
+                ],
+                "connections": [
+                    {
+                        "id": "sg-b-c1",
+                        "from": {
+                            "nodeId": "sg-b-delay1",
+                            "pinId": "result"
+                        },
+                        "to": {
+                            "nodeId": "sg-b-delay2",
+                            "pinId": "value"
+                        }
+                    },
+                    {
+                        "id": "sg-b-c2",
+                        "from": {
+                            "nodeId": "sg-b-delay2",
+                            "pinId": "result"
+                        },
+                        "to": {
+                            "nodeId": "sg-b-hold",
+                            "pinId": "value"
+                        }
+                    },
+                    {
+                        "id": "sg-b-c3",
+                        "from": {
+                            "nodeId": "sg-b-hold",
+                            "pinId": "result"
+                        },
+                        "to": {
+                            "nodeId": "sg-b-attenuate",
+                            "pinId": "value"
+                        }
+                    },
+                    {
+                        "id": "sg-b-c4",
+                        "from": {
+                            "nodeId": "sg-b-const-half",
+                            "pinId": "value"
+                        },
+                        "to": {
+                            "nodeId": "sg-b-attenuate",
+                            "pinId": "scale"
+                        }
+                    }
+                ],
+                "subgraphInterface": {
+                    "inputs": [
+                        {
+                            "id": "value-in",
+                            "label": "Value In",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "bindings": [
+                                {
+                                    "nodeId": "sg-b-delay1",
+                                    "pinId": "value"
+                                }
+                            ],
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "delay-in",
+                            "label": "Delay In",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "timing"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "bindings": [
+                                {
+                                    "nodeId": "sg-b-delay1",
+                                    "pinId": "delay"
+                                },
+                                {
+                                    "nodeId": "sg-b-delay2",
+                                    "pinId": "delay"
+                                }
+                            ],
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "hold-in",
+                            "label": "Hold In",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "boolean"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "bindings": [
+                                {
+                                    "nodeId": "sg-b-hold",
+                                    "pinId": "capture"
+                                }
+                            ],
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "id": "value-out",
+                            "label": "Value Out",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "binding": {
+                                "nodeId": "sg-b-attenuate",
+                                "pinId": "result"
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ]
+                }
+            }
+        ],
+        "host": {
+            "assetShape": "PROCESSOR",
+            "supportedDomains": [
+                "LED"
+            ],
+            "inputs": [],
+            "outputs": []
+        },
+        "exposedParameters": [
+            {
+                "id": "intensity",
+                "label": "Intensity",
+                "description": "",
+                "type": {
+                    "kind": "number"
+                },
+                "defaultValue": {
+                    "kind": "number",
+                    "value": 0.8
+                },
+                "groupId": "mix",
+                "sortOrder": 10,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "root-intensity",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            },
+            {
+                "id": "speed",
+                "label": "Speed",
+                "description": "",
+                "type": {
+                    "kind": "number"
+                },
+                "defaultValue": {
+                    "kind": "number",
+                    "value": 1.0
+                },
+                "groupId": "mix",
+                "sortOrder": 20,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "root-speed",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            },
+            {
+                "id": "enabled",
+                "label": "Enabled",
+                "description": "",
+                "type": {
+                    "kind": "boolean"
+                },
+                "defaultValue": {
+                    "kind": "boolean",
+                    "value": true
+                },
+                "groupId": "control",
+                "sortOrder": 30,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "root-enabled",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            },
+            {
+                "id": "delay-time",
+                "label": "Delay Time",
+                "description": "",
+                "type": {
+                    "kind": "timing"
+                },
+                "defaultValue": {
+                    "kind": "timing",
+                    "value": {
+                        "kind": "dev.anthonyhfm.amethyst.core.util.Timing.Duration",
+                        "duration": "PT0.120S"
+                    }
+                },
+                "groupId": "timing",
+                "sortOrder": 40,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "root-delay-time",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            },
+            {
+                "id": "hold",
+                "label": "Hold",
+                "description": "",
+                "type": {
+                    "kind": "boolean"
+                },
+                "defaultValue": {
+                    "kind": "boolean",
+                    "value": false
+                },
+                "groupId": "timing",
+                "sortOrder": 50,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "root-hold",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            }
+        ],
+        "defaultState": {
+            "exposedParameterValues": {
+                "intensity": {
+                    "kind": "number",
+                    "value": 0.8
+                },
+                "speed": {
+                    "kind": "number",
+                    "value": 1.0
+                },
+                "enabled": {
+                    "kind": "boolean",
+                    "value": true
+                },
+                "delay-time": {
+                    "kind": "timing",
+                    "value": {
+                        "kind": "dev.anthonyhfm.amethyst.core.util.Timing.Duration",
+                        "duration": "PT0.120S"
+                    }
+                },
+                "hold": {
+                    "kind": "boolean",
+                    "value": false
+                }
+            },
+            "hostDeviceDefaults": {}
+        }
+    },
+    "extensions": {}
+}

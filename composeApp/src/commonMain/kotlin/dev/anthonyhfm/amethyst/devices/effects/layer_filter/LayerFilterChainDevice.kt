@@ -1,7 +1,13 @@
 package dev.anthonyhfm.amethyst.devices.effects.layer_filter
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -12,8 +18,11 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -26,12 +35,13 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Layer Filter",
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(160.dp)
+                .width(160.dp),
+            titleBarModifier = LocalTitleBarModifier.current
         ) {
             Column(
                 modifier = Modifier
@@ -79,9 +89,9 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
                         },
                     )
 
-                    VerticalDivider(
-                        modifier = Modifier.fillMaxHeight(0.5f)
-                    )
+                    Box(modifier = Modifier.fillMaxHeight(0.5f)) {
+                        Separator(orientation = SeparatorOrientation.Vertical)
+                    }
 
                     StepTextDial(
                         headline = "Range",

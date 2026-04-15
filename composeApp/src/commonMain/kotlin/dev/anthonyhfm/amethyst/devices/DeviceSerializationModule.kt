@@ -1,6 +1,6 @@
 package dev.anthonyhfm.amethyst.devices
 
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
@@ -23,8 +23,12 @@ import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.opacity.OpacityChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDeviceState
+import dev.anthonyhfm.amethyst.gem.host.GemDeviceState
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
@@ -48,13 +52,18 @@ val DeviceSerializationModule = SerializersModule {
         subclass(LoopChainDeviceState::class)
         subclass(OffsetChainDeviceState::class)
         subclass(RotateChainDeviceState::class)
-        subclass(ClipChainDeviceState::class)
+        subclass(SampleChainDeviceState::class)
         subclass(MacroFilterChainDeviceState::class)
         subclass(MacroControlChainDeviceState::class)
         subclass(BlurChainDeviceState::class)
+        subclass(OpacityChainDeviceState::class)
         subclass(PreviewChainDeviceState::class)
         subclass(ShiftChainDeviceState::class)
+        subclass(AdjustChainDeviceState::class)
         subclass(TransmitChainDeviceState::class)
         subclass(ColorFilterChainDeviceState::class)
+        subclass(GemDeviceState::class)
+        
+        subclass(ClearChainDeviceState::class)
     }
 }

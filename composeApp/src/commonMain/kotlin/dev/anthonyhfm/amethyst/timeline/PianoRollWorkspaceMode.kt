@@ -1,33 +1,27 @@
 package dev.anthonyhfm.amethyst.timeline
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -40,12 +34,13 @@ import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -54,61 +49,106 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.ColorControls
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPinchControl
+import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineActiveEditorContext
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineEditorSurface
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineEditorTool
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineTimingContext
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.NoteGradientStop
+import dev.anthonyhfm.amethyst.timeline.migration.LegacyPianoRollPath
+import dev.anthonyhfm.amethyst.timeline.migration.PianoRollCutoverSupport
+import dev.anthonyhfm.amethyst.timeline.transforms.PianoRollTransforms
+import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.Tabs
+import dev.anthonyhfm.amethyst.ui.components.primitives.TabsContent
+import dev.anthonyhfm.amethyst.ui.components.primitives.TabsList
+import dev.anthonyhfm.amethyst.ui.components.primitives.TabsTrigger
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
+import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.input
+import dev.anthonyhfm.amethyst.ui.theme.muted
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.p
+import dev.anthonyhfm.amethyst.ui.theme.primary
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
+import dev.anthonyhfm.amethyst.timeline.data.isGradient
+import dev.anthonyhfm.amethyst.timeline.ui.NoteGradientEditorBar
+import dev.anthonyhfm.amethyst.ui.theme.timelineColorTokens
+import dev.anthonyhfm.amethyst.ui.theme.timelineSelectionCursor
+import androidx.compose.material3.Icon
+import com.composables.icons.lucide.ArrowDown
+import com.composables.icons.lucide.ArrowLeft
+import com.composables.icons.lucide.ArrowRight
+import com.composables.icons.lucide.ArrowUp
+import com.composables.icons.lucide.Blend
+import com.composables.icons.lucide.Droplet
+import com.composables.icons.lucide.Expand
+import com.composables.icons.lucide.FlipHorizontal2
+import com.composables.icons.lucide.FlipVertical2
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Minimize2
+import com.composables.icons.lucide.Rabbit
+import com.composables.icons.lucide.RefreshCw
+import com.composables.icons.lucide.RotateCcw
+import com.composables.icons.lucide.RotateCw
+import com.composables.icons.lucide.Snail
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PinchGraph
 
-private const val MS_PER_BEAT: Long = 500L
-
-enum class GridResolution(val snapDivisionsPerBeat: Int, val subBeatsPerBeat: Int) {
-    Quarter(snapDivisionsPerBeat = 4, subBeatsPerBeat = 1),
-    Eighth(snapDivisionsPerBeat = 8, subBeatsPerBeat = 2),
-    Sixteenth(snapDivisionsPerBeat = 16, subBeatsPerBeat = 4),
-    ThirtySecond(snapDivisionsPerBeat = 32, subBeatsPerBeat = 8),
-    SixtyFourth(snapDivisionsPerBeat = 64, subBeatsPerBeat = 16),
-    OneTwentyEighth(snapDivisionsPerBeat = 128, subBeatsPerBeat = 32),
-}
-
-private class PianoRollMetrics(
-    val totalPitches: Int,
-    val noteHeightDp: Dp,
-    val pixelsPerBeatDp: Dp,
-    private val density: Density,
-    private val gridResolution: GridResolution
-) {
-    val noteHeightPx: Float = with(density) { noteHeightDp.toPx() }
-    val pixelsPerBeatPx: Float = with(density) { pixelsPerBeatDp.toPx() }
-    val noteRenderHeightPx: Float = noteHeightPx - 4f
-
-    fun pitchToYPx(pitch: Int): Float = (totalPitches - 1 - pitch) * noteHeightPx
-    fun yPxToPitch(y: Float): Int = (totalPitches - 1 - (y / noteHeightPx).toInt()).coerceIn(0, totalPitches - 1)
-
-    fun timeMsToXPx(startTimeMs: Long): Float = (startTimeMs / MS_PER_BEAT.toFloat()) * pixelsPerBeatPx
-    fun durationMsToWidthPx(durationMs: Long): Float = (durationMs / MS_PER_BEAT.toFloat()) * pixelsPerBeatPx
-
-    fun xPxToTimeMs(x: Float): Long {
-        val beatTime = x / pixelsPerBeatPx
-        val snappedBeatTime = (beatTime * gridResolution.snapDivisionsPerBeat).roundToInt() / gridResolution.snapDivisionsPerBeat.toFloat()
-        return (snappedBeatTime * MS_PER_BEAT).toLong().coerceAtLeast(0L)
-    }
-}
+private fun currentCellDurationMs(currentResolution: GridResolution, bpm: Double): Long =
+    ((60000.0 / bpm).toLong() / currentResolution.snapDivisionsPerBeat).coerceAtLeast(1L)
 
 class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     override val displayName: String = "Piano Roll"
     override val selectable: Boolean = false
     override val claimInputs: Boolean = true
 
+    var activeTool by mutableStateOf(TimelineEditorTool.SELECT)
+    var clipContext by mutableStateOf<TimelineClipContext?>(null)
+        private set
+    var timingContextProvider: (() -> TimelineTimingContext)? = null
+
     var currentEntry by mutableStateOf<MidiEntry?>(null)
-    var trackIndex: Int = -1
-    var entryStartMs: Long = 0L
+    val trackIndex: Int
+        get() = clipContext?.trackIndex ?: -1
+    val entryStartMs: Long
+        get() = clipContext?.entryStartMs ?: currentEntry?.startTimeMs ?: 0L
+    val cutoverMarker
+        get() = PianoRollCutoverSupport.marker(
+            clipContext = clipContext,
+            legacySource = if (clipContext == null) {
+                "PianoRollWorkspaceMode callback bridge"
+            } else {
+                null
+            }
+        )
+    private val isTimelineBackedEditing: Boolean
+        get() = cutoverMarker.usesTimelineCommandSurface
 
     var onNoteAdd: ((MidiNote) -> Unit)? = null
     var onNoteUpdate: ((MidiNote, MidiNote) -> Unit)? = null
@@ -121,49 +161,521 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     val pressedKeysState = MutableStateFlow<Map<Pair<Int, Int>, Boolean>>(emptyMap())
 
     var selectedColor by mutableStateOf(Color(0xFFFF6B35))
+    var gradientMode by mutableStateOf(false)
+    var workingGradient by mutableStateOf<List<NoteGradientStop>?>(null)
     var selectedTimeMs by mutableStateOf<Long?>(null)
     var gridResolution by mutableStateOf(GridResolution.Quarter)
+    /** When true, zoom changes no longer override [gridResolution]. */
+    var gridResolutionLocked by mutableStateOf(false)
 
     var multiSelectModifierDown by mutableStateOf(false)
 
-    @OptIn(kotlin.time.ExperimentalTime::class)
+    val activeEditorContext: TimelineActiveEditorContext?
+        get() = clipContext?.let { context ->
+            TimelineActiveEditorContext(
+                clipContext = context,
+                surface = TimelineEditorSurface(
+                    activeTool = activeTool,
+                    timingContext = timingContextProvider?.invoke(),
+                    gridResolution = gridResolution
+                )
+            )
+        }
+
+    fun bindClipContext(context: TimelineClipContext, entry: MidiEntry) {
+        clipContext = context
+        syncCurrentEntry(entry)
+    }
+
+    @LegacyPianoRollPath(
+        replacement = "bindClipContext",
+        cutover = "Provide a TimelineClipContext-backed entry whenever this mode edits a persisted piano roll clip."
+    )
+    fun bindLegacyEntry(entry: MidiEntry) {
+        clipContext = null
+        syncCurrentEntry(entry)
+    }
+
+    fun syncCurrentEntry(entry: MidiEntry?) {
+        currentEntry = entry
+        if (entry != null && clipContext?.entryStartMs != entry.startTimeMs) {
+            clipContext = clipContext?.withEntryStart(entry.startTimeMs)
+        }
+    }
+
+    fun syncClipEntryStart(newEntryStartMs: Long) {
+        clipContext = clipContext?.withEntryStart(newEntryStartMs)
+    }
+
+    fun isEditingClip(trackIndex: Int, entryStartMs: Long): Boolean {
+        return clipContext?.trackIndex == trackIndex && clipContext?.entryStartMs == entryStartMs
+    }
+
+    private fun currentBpm(): Double {
+        return timingContextProvider?.invoke()?.bpm ?: WorkspaceRepository.bpm.value
+    }
+
+    private fun timelineEntrySnapshot(): MidiEntry? {
+        val context = clipContext ?: return null
+        val track = TimelineRepository.tracks.value.getOrNull(context.trackIndex) as? MidiTimelineTrack ?: return null
+        return track.entries[context.entryStartMs]
+    }
+
     @Composable
     fun ModeContent(paddingValues: PaddingValues) {
         val entry = currentEntry ?: return
         val launchpads = Heaven.devices
         val selections by SelectionManager.selections.collectAsState()
 
-        LaunchedEffect(selections) {
-            val selectedNotes = selections.filterIsInstance<Selectable.PianoRollNote>()
+        var selectedGradientStopUUID by remember { mutableStateOf<String?>(null) }
+        // Snapshot of gradient state at drag start; used to build a single undo action on drag end.
+        var gradientBeforeDrag by remember { mutableStateOf<List<NoteGradientStop>?>(null) }
+
+        // Key on note *identity* (time+pitch) only, so gradient state isn't reset when
+        // the same notes are re-selected with updated content (e.g. after gradient edit).
+        val selectedNoteIdentities = remember(selections) {
+            selections.filterIsInstance<Selectable.PianoRollNote>()
+                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                .map { it.note.startTimeMs to it.note.pitch }
+                .toSet()
+        }
+
+        LaunchedEffect(selectedNoteIdentities) {
+            val selectedNotes = SelectionManager.selections.value
+                .filterIsInstance<Selectable.PianoRollNote>()
                 .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
 
             if (selectedNotes.size == 1) {
                 val note = selectedNotes.first().note
                 selectedColor = Color(note.led.red, note.led.green, note.led.blue)
+                gradientMode = note.isGradient
+                workingGradient = note.led.gradient
+                // Do NOT reset selectedGradientStopUUID here — the user may have a stop
+                // selected and just changed position/speed; keep the gradient stop selection alive.
+                // Only clear it when selection becomes empty.
+            } else if (selectedNotes.size > 1) {
+                // Show gradient editor when ALL selected notes have gradients — regardless of
+                // whether the gradient values are identical. Use the first note's gradient as the
+                // working copy; all edits are broadcast to every selected note via applyGradientToNotes.
+                val allAreGradient = selectedNotes.all { it.note.isGradient }
+
+                if (allAreGradient) {
+                    val referenceGradient = selectedNotes.first().note.led.gradient
+                    gradientMode = true
+                    workingGradient = referenceGradient
+                    // Keep selectedGradientStopUUID only if it still refers to a stop in the
+                    // reference gradient; otherwise clear it to avoid dangling selection.
+                    if (selectedGradientStopUUID != null &&
+                        referenceGradient != null &&
+                        referenceGradient.none { it.selectionUUID == selectedGradientStopUUID }
+                    ) {
+                        selectedGradientStopUUID = null
+                    }
+                } else {
+                    gradientMode = false
+                    workingGradient = null
+                    selectedGradientStopUUID = null
+                }
+            } else if (selectedNotes.isEmpty()) {
+                gradientMode = false
+                workingGradient = null
+                selectedGradientStopUUID = null
             }
         }
 
         var zoomFactor by remember { mutableStateOf(1f) }
 
-        fun resolutionForZoom(z: Float): GridResolution = when {
-            z < 1.5f -> GridResolution.Quarter
-            z < 2.5f -> GridResolution.Eighth
-            z < 4f -> GridResolution.Sixteenth
-            z < 6f -> GridResolution.ThirtySecond
-            z < 9f -> GridResolution.SixtyFourth
-            else -> GridResolution.OneTwentyEighth
+        // ── Viewport: single source of truth for time-axis scroll and zoom ─────────────────────
+        val density = LocalDensity.current
+        val basePixelsPerBeatPx = remember(density) { with(density) { 80.dp.toPx() } }
+        var viewport by remember {
+            val initialZoomX = basePixelsPerBeatPx / MS_PER_BEAT.toFloat()
+            mutableStateOf(
+                EditorViewportState(
+                    zoomX = initialZoomX,
+                    minZoomX = 0.75f * initialZoomX,
+                    maxZoomX = 12f * initialZoomX,
+                )
+            )
+        }
+
+        // When Auto mode is re-enabled (gridResolutionLocked → false), immediately snap
+        // gridResolution to the resolution that matches the current zoom level.  Without this,
+        // the grid stays frozen at the previously-locked value until the next zoom event.
+        LaunchedEffect(this@PianoRollWorkspaceMode.gridResolutionLocked) {
+            if (!this@PianoRollWorkspaceMode.gridResolutionLocked) {
+                val currentZoomFactor = viewport.zoomX * MS_PER_BEAT.toFloat() / basePixelsPerBeatPx
+                val targetRes = GridResolution.fromZoomFactor(currentZoomFactor)
+                if (targetRes != this@PianoRollWorkspaceMode.gridResolution) {
+                    this@PianoRollWorkspaceMode.gridResolution = targetRes
+                }
+            }
+        }
+
+        val createNotes: (List<MidiNote>) -> TimelineCommandResult = { notes ->
+            when {
+                notes.isEmpty() -> TimelineCommandResult()
+                isTimelineBackedEditing -> {
+                    TimelineCommandSurface.createNotes(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs,
+                        notes = notes
+                    ).also { result ->
+                        if (result.didChange) {
+                            syncCurrentEntry(timelineEntrySnapshot())
+                        }
+                    }
+                }
+
+                else -> {
+                    notes.forEach { note ->
+                        onNoteAdd?.invoke(note)
+                        UndoManager.addAction(
+                            UndoableAction.PianoRollNoteCreation(
+                                trackIndex = trackIndex,
+                                entryStartMs = entryStartMs,
+                                note = note,
+                                onNoteAdd = { createdNote: MidiNote -> onNoteAdd?.invoke(createdNote) },
+                                onNoteDelete = { deletedNote: MidiNote -> onNoteDelete?.invoke(deletedNote) },
+                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                currentEntrySetter = { updatedEntry: MidiEntry -> this@PianoRollWorkspaceMode.currentEntry = updatedEntry }
+                            )
+                        )
+                    }
+                    currentEntry = currentEntry?.copy(notes = currentEntry?.notes.orEmpty() + notes)
+                    TimelineCommandResult(didChange = true)
+                }
+            }
+        }
+        val moveNotes: (List<TimelineEditedNote>) -> TimelineCommandResult = { changes ->
+            val effectiveChanges = changes.filter { it.before != it.after }
+            when {
+                effectiveChanges.isEmpty() -> TimelineCommandResult()
+                isTimelineBackedEditing -> {
+                    TimelineCommandSurface.moveNotes(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs,
+                        changes = effectiveChanges
+                    ).also { result ->
+                        if (result.didChange) {
+                            syncCurrentEntry(timelineEntrySnapshot())
+                        }
+                    }
+                }
+
+                else -> {
+                    UndoManager.addAction(
+                        UndoableAction.PianoRollNoteMove(
+                            trackIndex = trackIndex,
+                            entryStartMs = entryStartMs,
+                            notesBefore = effectiveChanges.map(TimelineEditedNote::before),
+                            notesAfter = effectiveChanges.map(TimelineEditedNote::after),
+                            onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                            currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                            currentEntrySetter = { updatedEntry -> this@PianoRollWorkspaceMode.currentEntry = updatedEntry }
+                        )
+                    )
+                    effectiveChanges.forEach { change ->
+                        onNoteUpdate?.invoke(change.before, change.after)
+                    }
+                    currentEntry = currentEntry?.copy(
+                        notes = currentEntry?.notes.orEmpty().map { note ->
+                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                        }
+                    )
+                    TimelineCommandResult(didChange = true)
+                }
+            }
+        }
+        val resizeNotes: (List<TimelineEditedNote>) -> TimelineCommandResult = { changes ->
+            val effectiveChanges = changes.filter { it.before != it.after }
+            when {
+                effectiveChanges.isEmpty() -> TimelineCommandResult()
+                isTimelineBackedEditing -> {
+                    TimelineCommandSurface.resizeNotes(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs,
+                        changes = effectiveChanges
+                    ).also { result ->
+                        if (result.didChange) {
+                            syncCurrentEntry(timelineEntrySnapshot())
+                        }
+                    }
+                }
+
+                else -> {
+                    UndoManager.addAction(
+                        UndoableAction.PianoRollNoteResize(
+                            trackIndex = trackIndex,
+                            entryStartMs = entryStartMs,
+                            notesBefore = effectiveChanges.map(TimelineEditedNote::before),
+                            notesAfter = effectiveChanges.map(TimelineEditedNote::after),
+                            onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                            currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                            currentEntrySetter = { updatedEntry -> this@PianoRollWorkspaceMode.currentEntry = updatedEntry }
+                        )
+                    )
+                    effectiveChanges.forEach { change ->
+                        onNoteUpdate?.invoke(change.before, change.after)
+                    }
+                    currentEntry = currentEntry?.copy(
+                        notes = currentEntry?.notes.orEmpty().map { note ->
+                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                        }
+                    )
+                    TimelineCommandResult(didChange = true)
+                }
+            }
+        }
+        val deleteNotes: (List<MidiNote>) -> TimelineCommandResult = { notes ->
+            val notesToDelete = notes.distinct()
+            when {
+                notesToDelete.isEmpty() -> TimelineCommandResult()
+                isTimelineBackedEditing -> {
+                    TimelineCommandSurface.deleteNotes(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs,
+                        notes = notesToDelete
+                    ).also { result ->
+                        if (result.didChange) {
+                            syncCurrentEntry(timelineEntrySnapshot())
+                        }
+                    }
+                }
+
+                else -> {
+                    UndoManager.addAction(
+                        UndoableAction.PianoRollNoteDeletion(
+                            trackIndex = trackIndex,
+                            entryStartMs = entryStartMs,
+                            notes = notesToDelete,
+                            onNoteAdd = { note -> onNoteAdd?.invoke(note) },
+                            onNoteDelete = { note -> onNoteDelete?.invoke(note) },
+                            currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                            currentEntrySetter = { updatedEntry -> this@PianoRollWorkspaceMode.currentEntry = updatedEntry }
+                        )
+                    )
+                    notesToDelete.forEach { note ->
+                        onNoteDelete?.invoke(note)
+                    }
+                    currentEntry = currentEntry?.copy(
+                        notes = currentEntry?.notes.orEmpty().filter { note -> note !in notesToDelete }
+                    )
+                    TimelineCommandResult(didChange = true)
+                }
+            }
+        }
+
+        // Atomically update note content inside PianoRollNote selectables without clearing selection.
+        // A single replaceSelections() call avoids the transient-empty-state that would fire
+        // LaunchedEffect(selectedNoteIdentities) and reset gradient/color panel state.
+        val updateNoteSelections: (List<TimelineEditedNote>) -> Unit = { changes ->
+            val beforeToAfter = changes.associate { it.before to it.after }
+            SelectionManager.replaceSelections(
+                SelectionManager.selections.value.map { sel ->
+                    if (sel is Selectable.PianoRollNote &&
+                        sel.entryStartMs == entryStartMs &&
+                        sel.trackIndex == trackIndex) {
+                        beforeToAfter[sel.note]?.let { updated -> sel.copy(note = updated) } ?: sel
+                    } else sel
+                }
+            )
+        }
+
+        val applyColorToSelection: (Color) -> Unit = { newColor ->
+            selectedColor = newColor
+            WorkspaceRepository.addRecentColor(Triple(newColor.red, newColor.green, newColor.blue))
+
+            val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
+                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+
+            if (selected.isNotEmpty()) {
+                val noteChanges = selected.map { sel ->
+                    TimelineEditedNote(
+                        before = sel.note,
+                        after = sel.note.copy(
+                            led = sel.note.led.copy(
+                                red = newColor.red,
+                                green = newColor.green,
+                                blue = newColor.blue
+                            )
+                        )
+                    )
+                }
+                val updatedNotes = noteChanges.map(TimelineEditedNote::after)
+                // Update selections BEFORE calling updateNotes so that pruneTimelineSelections
+                // (which fires synchronously inside updateNotes via Main.immediate dispatch) sees
+                // the new note references and preserves the selection state.
+                updateNoteSelections(noteChanges)
+                if (isTimelineBackedEditing) {
+                    TimelineCommandSurface.updateNotes(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs,
+                        changes = noteChanges
+                    ).also { commandResult ->
+                        if (commandResult.didChange) {
+                            syncCurrentEntry(timelineEntrySnapshot())
+                        }
+                    }
+                } else {
+                    noteChanges.forEach { change ->
+                        onNoteUpdate?.invoke(change.before, change.after)
+                    }
+                    UndoManager.addAction(
+                        UndoableAction.PianoRollNoteColorChange(
+                            trackIndex = trackIndex,
+                            entryStartMs = entryStartMs,
+                            notesBefore = noteChanges.map(TimelineEditedNote::before),
+                            notesAfter = updatedNotes,
+                            onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                            currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                            currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                        )
+                    )
+                    val replacements = noteChanges.associate { it.before to it.after }
+                    currentEntry = currentEntry?.copy(
+                        notes = currentEntry?.notes?.map { note ->
+                            replacements[note] ?: note
+                        } ?: emptyList()
+                    )
+                }
+            }
+        }
+
+        val applyNoteChanges: (List<TimelineEditedNote>) -> Unit = { changes ->
+            val effectiveChanges = changes.filter { it.before != it.after }
+            if (effectiveChanges.isNotEmpty()) {
+                // Update selections BEFORE calling updateNotes so that pruneTimelineSelections
+                // (which fires synchronously inside updateNotes via Main.immediate dispatch) sees
+                // the new note references and preserves the selection state.
+                updateNoteSelections(effectiveChanges)
+                if (isTimelineBackedEditing) {
+                    TimelineCommandSurface.updateNotes(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs,
+                        changes = effectiveChanges
+                    ).also { result ->
+                        if (result.didChange) {
+                            syncCurrentEntry(timelineEntrySnapshot())
+                        }
+                    }
+                } else {
+                    val notesBefore = effectiveChanges.map(TimelineEditedNote::before)
+                    val notesAfter = effectiveChanges.map(TimelineEditedNote::after)
+                    notesBefore.zip(notesAfter).forEach { (before, after) ->
+                        onNoteUpdate?.invoke(before, after)
+                    }
+                    UndoManager.addAction(
+                        UndoableAction.PianoRollNoteGradientChange(
+                            trackIndex = trackIndex,
+                            entryStartMs = entryStartMs,
+                            notesBefore = notesBefore,
+                            notesAfter = notesAfter,
+                            onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                            currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                            currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                        )
+                    )
+                    currentEntry = currentEntry?.copy(
+                        notes = currentEntry?.notes?.map { note ->
+                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                        } ?: emptyList()
+                    )
+                }
+            }
+        }
+
+        val applyGradientToNotes: (List<NoteGradientStop>, Boolean) -> Unit = { gradient, withUndo ->
+            val selectedNotes = SelectionManager.selections.value
+                .filterIsInstance<Selectable.PianoRollNote>()
+                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+            val changes = selectedNotes.map { sel ->
+                TimelineEditedNote(
+                    before = sel.note,
+                    after = sel.note.copy(led = sel.note.led.copy(gradient = gradient))
+                )
+            }
+            if (withUndo) {
+                applyNoteChanges(changes)
+            } else {
+                val effectiveChanges = changes.filter { it.before != it.after }
+                if (effectiveChanges.isNotEmpty()) {
+                    // Update selections FIRST so that pruneTimelineSelections (triggered
+                    // synchronously inside onNoteUpdate → publishTrackSnapshot in timeline mode)
+                    // sees the new note references and does not clear the selection.
+                    updateNoteSelections(effectiveChanges)
+                    effectiveChanges.forEach { change -> onNoteUpdate?.invoke(change.before, change.after) }
+                    currentEntry = currentEntry?.copy(
+                        notes = currentEntry?.notes?.map { note ->
+                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                        } ?: emptyList()
+                    )
+                }
+            }
+        }
+
+        val selectedPianoNotes = selections.filterIsInstance<Selectable.PianoRollNote>()
+            .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+
+        val applyTransform: ((List<MidiNote>) -> List<MidiNote>) -> Unit = { transformFn ->
+            val selected = SelectionManager.selections.value
+                .filterIsInstance<Selectable.PianoRollNote>()
+                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+            if (selected.isNotEmpty()) {
+                val notesBefore = selected.map { it.note }
+                val notesAfter = transformFn(notesBefore)
+                val noteChanges = notesBefore.zip(notesAfter).map { (before, after) ->
+                    TimelineEditedNote(before = before, after = after)
+                }
+                val effectiveChanges = noteChanges.filter { it.before != it.after }
+                if (effectiveChanges.isNotEmpty()) {
+                    // Update selections BEFORE calling updateNotes so that pruneTimelineSelections
+                    // (which fires synchronously inside updateNotes via Main.immediate dispatch) sees
+                    // the new note references and preserves the selection state.
+                    updateNoteSelections(noteChanges)
+                    if (isTimelineBackedEditing) {
+                        TimelineCommandSurface.updateNotes(
+                            trackIndex = trackIndex,
+                            entryStartMs = entryStartMs,
+                            changes = effectiveChanges
+                        ).also { commandResult ->
+                            if (commandResult.didChange) syncCurrentEntry(timelineEntrySnapshot())
+                        }
+                    } else {
+                        effectiveChanges.forEach { change ->
+                            onNoteUpdate?.invoke(change.before, change.after)
+                        }
+                        UndoManager.addAction(
+                            UndoableAction.PianoRollNoteTransform(
+                                trackIndex = trackIndex,
+                                entryStartMs = entryStartMs,
+                                notesBefore = effectiveChanges.map(TimelineEditedNote::before),
+                                notesAfter = effectiveChanges.map(TimelineEditedNote::after),
+                                onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                            )
+                        )
+                        val replacements = effectiveChanges.associate { it.before to it.after }
+                        currentEntry = currentEntry?.copy(
+                            notes = currentEntry?.notes?.map { note -> replacements[note] ?: note } ?: emptyList()
+                        )
+                    }
+                }
+            }
         }
 
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(Theme[colors][background])
                 .padding(paddingValues)
         ) {
             Column(
                 modifier = Modifier
                     .width(300.dp)
                     .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp)
                     .padding(bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -172,77 +684,439 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+                        .background(Theme[colors][muted])
+                        .border(1.dp, Theme[colors][border], RoundedCornerShape(12.dp))
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    ColorControls(
-                        color = selectedColor,
-                        onColorChange = { newColor ->
-                            selectedColor = newColor
-                            WorkspaceRepository.addRecentColor(
-                                Triple(newColor.red, newColor.green, newColor.blue)
-                            )
-
-                            val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
+                    val solidOnSelected: () -> Unit = {
+                        if (gradientMode) {
+                            val selectedNotes = SelectionManager.selections.value
+                                .filterIsInstance<Selectable.PianoRollNote>()
                                 .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
-
-                            if (selected.isNotEmpty()) {
-                                val notesBefore = selected.map { it.note }
-                                val updatedNotes = mutableListOf<MidiNote>()
-
-                                selected.forEach { sel ->
-                                    val updatedNote = sel.note.copy(
-                                        led = sel.note.led.copy(
-                                            red = newColor.red,
-                                            green = newColor.green,
-                                            blue = newColor.blue
-                                        )
+                            if (selectedNotes.isNotEmpty()) {
+                                val changes = selectedNotes.map { sel ->
+                                    val solidColor = if (sel.note.isGradient) {
+                                        val (r, g, b) = GradientInterpolator.interpolate(sel.note.led.gradient!!, 0f)
+                                        Triple(r, g, b)
+                                    } else Triple(sel.note.led.red, sel.note.led.green, sel.note.led.blue)
+                                    TimelineEditedNote(
+                                        before = sel.note,
+                                        after = sel.note.copy(led = sel.note.led.copy(
+                                            red = solidColor.first,
+                                            green = solidColor.second,
+                                            blue = solidColor.third,
+                                            gradient = null
+                                        ))
                                     )
-                                    updatedNotes.add(updatedNote)
-                                    onNoteUpdate?.invoke(sel.note, updatedNote)
                                 }
+                                applyNoteChanges(changes)
+                            }
+                            gradientMode = false
+                            workingGradient = null
+                        }
+                    }
+                    val gradientOnSelected: () -> Unit = {
+                        if (!gradientMode) {
+                            val selectedNotes = SelectionManager.selections.value
+                                .filterIsInstance<Selectable.PianoRollNote>()
+                                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                            if (selectedNotes.isNotEmpty()) {
+                                // Only convert notes that don't already have a gradient.
+                                // Notes that already have gradients keep their existing gradient.
+                                val solidNotes = selectedNotes.filter { !it.note.isGradient }
+                                if (solidNotes.isNotEmpty()) {
+                                    val changes = solidNotes.map { sel ->
+                                        val twoStopGradient = listOf(
+                                            NoteGradientStop(0f, sel.note.led.red, sel.note.led.green, sel.note.led.blue),
+                                            NoteGradientStop(1f, 0f, 0f, 0f)
+                                        )
+                                        TimelineEditedNote(
+                                            before = sel.note,
+                                            after = sel.note.copy(led = sel.note.led.copy(gradient = twoStopGradient))
+                                        )
+                                    }
+                                    applyNoteChanges(changes)
+                                }
+                                // Use the first gradient note's gradient as the working copy.
+                                // After the changes above, every selected note now has a gradient.
+                                val firstGradientNote = selectedNotes.firstOrNull { it.note.isGradient }
+                                    ?: SelectionManager.selections.value
+                                        .filterIsInstance<Selectable.PianoRollNote>()
+                                        .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                                        .firstOrNull()
+                                workingGradient = firstGradientNote?.note?.led?.gradient
+                            }
+                            gradientMode = true
+                        }
+                    }
 
-                                UndoManager.addAction(
-                                    UndoableAction.PianoRollNoteColorChange(
-                                        trackIndex = trackIndex,
-                                        entryStartMs = entryStartMs,
-                                        notesBefore = notesBefore,
-                                        notesAfter = updatedNotes,
-                                        onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
-                                        currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                        currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
-                                    )
-                                )
-
-                                currentEntry = currentEntry?.copy(
-                                    notes = currentEntry?.notes?.map { note ->
-                                        if (selected.any { it.note == note }) {
-                                            note.copy(
-                                                led = note.led.copy(
-                                                    red = newColor.red,
-                                                    green = newColor.green,
-                                                    blue = newColor.blue
-                                                )
-                                            )
-                                        } else note
-                                    } ?: emptyList()
-                                )
-
-                                SelectionManager.clear()
-
-                                updatedNotes.forEach { updatedNote ->
-                                    SelectionManager.select(
-                                        Selectable.PianoRollNote(trackIndex, entryStartMs, updatedNote),
-                                        single = false
-                                    )
+                    Tabs(
+                        selectedTab = if (gradientMode) "gradient" else "solid",
+                        tabs = listOf("solid", "gradient"),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        TabsList(modifier = Modifier.fillMaxWidth()) {
+                            TabsTrigger(
+                                key = "solid",
+                                selected = !gradientMode,
+                                onSelected = solidOnSelected,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Lucide.Droplet, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Text("Solid")
+                                }
+                            }
+                            TabsTrigger(
+                                key = "gradient",
+                                selected = gradientMode,
+                                onSelected = gradientOnSelected,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Lucide.Blend, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Text("Gradient")
                                 }
                             }
                         }
+                        TabsContent("solid") {
+                            ColorControls(
+                                color = selectedColor,
+                                onColorChange = applyColorToSelection
+                            )
+                        }
+                        TabsContent("gradient") {
+                            val currentGradient = workingGradient
+                            if (currentGradient != null) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    NoteGradientEditorBar(
+                                        selectedStopUUID = selectedGradientStopUUID,
+                                        onSelectionChange = { uuid ->
+                                            selectedGradientStopUUID = uuid
+                                            val stop = currentGradient.find { it.selectionUUID == uuid }
+                                            if (stop != null) selectedColor = Color(stop.r, stop.g, stop.b)
+                                        },
+                                        stops = currentGradient,
+                                        onStopMoved = { uuid, newPos ->
+                                            val updatedGradient = currentGradient.map { s ->
+                                                if (s.selectionUUID == uuid) s.copy(position = newPos) else s
+                                            }
+                                            workingGradient = updatedGradient
+                                            applyGradientToNotes(updatedGradient, false)
+                                        },
+                                        onAddStop = { position ->
+                                            val (r, g, b) = GradientInterpolator.interpolate(currentGradient, position)
+                                            val newStop = NoteGradientStop(position, r, g, b)
+                                            val updatedGradient = (currentGradient + newStop).sortedBy { it.position }
+                                            workingGradient = updatedGradient
+                                            selectedGradientStopUUID = newStop.selectionUUID
+                                            selectedColor = Color(r, g, b)
+                                            applyGradientToNotes(updatedGradient, true)
+                                        },
+                                        onDeleteStop = { uuid ->
+                                            if (currentGradient.size > 2) {
+                                                val updatedGradient = currentGradient.filter { it.selectionUUID != uuid }
+                                                workingGradient = updatedGradient
+                                                applyGradientToNotes(updatedGradient, true)
+                                            }
+                                        },
+                                        onSmoothnessChange = { uuid, smoothness ->
+                                            val updatedGradient = currentGradient.map { s ->
+                                                if (s.selectionUUID == uuid) s.copy(smoothness = smoothness) else s
+                                            }
+                                            workingGradient = updatedGradient
+                                            applyGradientToNotes(updatedGradient, true)
+                                        },
+                                        onDragStart = {
+                                            gradientBeforeDrag = workingGradient
+                                        },
+                                        onDragFinish = {
+                                            val before = gradientBeforeDrag
+                                            val after = workingGradient
+                                            if (before != null && after != null && before != after) {
+                                                // Build explicit undo: current selections hold the final (post-drag) note.
+                                                // Construct the before-note by restoring the pre-drag gradient.
+                                                val selectedNotes = SelectionManager.selections.value
+                                                    .filterIsInstance<Selectable.PianoRollNote>()
+                                                    .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                                                val changes = selectedNotes.map { sel ->
+                                                    TimelineEditedNote(
+                                                        before = sel.note.copy(led = sel.note.led.copy(gradient = before)),
+                                                        after = sel.note
+                                                    )
+                                                }
+                                                applyNoteChanges(changes)
+                                            }
+                                            gradientBeforeDrag = null
+                                        }
+                                    )
+                                    if (selectedGradientStopUUID != null) {
+                                        ColorControls(
+                                            color = selectedColor,
+                                            onColorChange = { newColor ->
+                                                selectedColor = newColor
+                                                val updatedGradient = currentGradient.map { s ->
+                                                    if (s.selectionUUID == selectedGradientStopUUID)
+                                                        s.copy(r = newColor.red, g = newColor.green, b = newColor.blue)
+                                                    else s
+                                                }
+                                                workingGradient = updatedGradient
+                                                applyGradientToNotes(updatedGradient, false)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Transform section
+                var pinchValue by remember { mutableStateOf(0f) }
+                var pinchBilateral by remember { mutableStateOf(false) }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Transform",
+                        style = Theme[typography][small].copy(color = Theme[colors][foreground])
                     )
+
+                    val enabled = selectedPianoNotes.isNotEmpty()
+                    val contentColor = Theme[colors][foreground]
+
+                    @Composable
+                    fun SectionLabel(label: String) {
+                        Text(
+                            label,
+                            style = Theme[typography][small].copy(
+                                color = Theme[colors][mutedForeground],
+                                fontSize = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp)
+                            )
+                        )
+                    }
+
+                    @Composable
+                    fun RowScope.LabeledIconButton(
+                        icon: androidx.compose.ui.graphics.vector.ImageVector,
+                        label: String? = null,
+                        description: String,
+                        onClick: () -> Unit
+                    ) {
+                        Button(
+                            onClick = onClick,
+                            modifier = Modifier.weight(1f),
+                            variant = ButtonVariant.Ghost,
+                            size = if (label != null) ButtonSize.Small else ButtonSize.Icon,
+                            enabled = enabled
+                        ) {
+                            if (label != null) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(icon, contentDescription = description, modifier = Modifier.size(13.dp), tint = contentColor)
+                                    Text(label, style = Theme[typography][small].copy(color = contentColor))
+                                }
+                            } else {
+                                Icon(icon, contentDescription = description, modifier = Modifier.size(14.dp), tint = contentColor)
+                            }
+                        }
+                    }
+
+                    @Composable
+                    fun Separator() {
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(Theme[colors][border]))
+                    }
+
+                    @Composable
+                    fun ButtonRow(content: @Composable RowScope.() -> Unit) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                                .clip(SmallShape)
+                                .border(1.dp, Theme[colors][border], SmallShape),
+                            content = content
+                        )
+                    }
+
+                    // Shift — moves notes in the 10×10 XY grid (pitch = x + y*10)
+                    SectionLabel("Shift in XY Grid")
+                    ButtonRow {
+                        LabeledIconButton(Lucide.ArrowUp, description = "Shift Up") {
+                            applyTransform { PianoRollTransforms.shiftUp(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.ArrowDown, description = "Shift Down") {
+                            applyTransform { PianoRollTransforms.shiftDown(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.ArrowLeft, description = "Shift Left") {
+                            applyTransform { PianoRollTransforms.shiftLeft(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.ArrowRight, description = "Shift Right") {
+                            applyTransform { PianoRollTransforms.shiftRight(it) }
+                        }
+                    }
+
+                    // Speed
+                    SectionLabel("Speed")
+                    ButtonRow {
+                        LabeledIconButton(Lucide.Rabbit, "×2", "Double Speed") {
+                            applyTransform { PianoRollTransforms.doubleSpeed(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.Snail, "÷2", "Halve Speed") {
+                            applyTransform { PianoRollTransforms.halveSpeed(it) }
+                        }
+                    }
+
+                    // Note Length
+                    SectionLabel("Note Length")
+                    ButtonRow {
+                        LabeledIconButton(Lucide.Expand, "×2", "Double Length") {
+                            applyTransform { PianoRollTransforms.doubleLength(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.Minimize2, "÷2", "Halve Length") {
+                            applyTransform { PianoRollTransforms.halveLength(it) }
+                        }
+                    }
+
+                    // Pinch — uses the same PinchGraph visual as the Keyframes device
+                    SectionLabel("Pinch")
+                    Row(
+                        modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.4f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        PinchGraph(
+                            pinch = pinchValue,
+                            onPinchChange = { pinchValue = it },
+                            bilateral = pinchBilateral,
+                            onToggleBilateral = { pinchBilateral = !pinchBilateral },
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                "${(pinchValue * 100f).toInt() / 100f}",
+                                style = Theme[typography][small].copy(color = contentColor)
+                            )
+                            Button(
+                                onClick = {
+                                    if (pinchValue != 0f) {
+                                        applyTransform { notes -> PianoRollTransforms.pinch(notes, pinchValue, pinchBilateral) }
+                                        pinchValue = 0f
+                                    }
+                                },
+                                variant = ButtonVariant.Secondary,
+                                size = ButtonSize.Small,
+                                enabled = enabled && pinchValue != 0f
+                            ) { Text("Apply", style = Theme[typography][small].copy(color = contentColor)) }
+                        }
+                    }
+
+                    // Rotate
+                    SectionLabel("Rotate")
+                    ButtonRow {
+                        LabeledIconButton(Lucide.RotateCcw, "−90°", "Rotate Counter-Clockwise") {
+                            applyTransform { PianoRollTransforms.rotateCCW(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.RefreshCw, "180°", "Rotate 180°") {
+                            applyTransform { PianoRollTransforms.rotate180(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.RotateCw, "+90°", "Rotate Clockwise") {
+                            applyTransform { PianoRollTransforms.rotateCW(it) }
+                        }
+                    }
+
+                    // Mirror
+                    SectionLabel("Mirror")
+                    ButtonRow {
+                        LabeledIconButton(Lucide.FlipHorizontal2, "Horiz", "Mirror Horizontal") {
+                            applyTransform { PianoRollTransforms.mirrorHorizontal(it) }
+                        }
+                        Separator()
+                        LabeledIconButton(Lucide.FlipVertical2, "Vert", "Mirror Vertical") {
+                            applyTransform { PianoRollTransforms.mirrorVertical(it) }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Theme[colors][border])
+                    )
+
+                    // Gradient Spread: apply gradient across notes sorted by time
+                    Button(
+                        onClick = {
+                            val sel = SelectionManager.selections.value
+                                .filterIsInstance<Selectable.PianoRollNote>()
+                                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                            if (sel.size >= 2) {
+                                val sorted = sel.sortedBy { it.note.startTimeMs }
+                                val first = sorted.first()
+                                val last = sorted.last()
+                                val stops = listOf(
+                                    NoteGradientStop(0f, first.note.led.red, first.note.led.green, first.note.led.blue),
+                                    NoteGradientStop(1f, last.note.led.red, last.note.led.green, last.note.led.blue)
+                                )
+                                val changes = sorted.mapIndexed { i, selectable ->
+                                    val t = i.toFloat() / (sorted.size - 1).toFloat()
+                                    val (r, g, b) = GradientInterpolator.interpolate(stops, t)
+                                    TimelineEditedNote(
+                                        before = selectable.note,
+                                        after = selectable.note.copy(led = selectable.note.led.copy(red = r, green = g, blue = b, gradient = null))
+                                    )
+                                }
+                                applyNoteChanges(changes)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = ButtonVariant.Secondary,
+                        size = ButtonSize.Small,
+                        enabled = selectedPianoNotes.size >= 2
+                    ) { Text("Gradient Spread", style = Theme[typography][small].copy(color = contentColor)) }
+
+                    Button(
+                        onClick = {
+                            val sel = SelectionManager.selections.value
+                                .filterIsInstance<Selectable.PianoRollNote>()
+                                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                            val colorPool = listOf(
+                                Triple(1f, 0f, 0f), Triple(0f, 1f, 0f), Triple(0f, 0f, 1f),
+                                Triple(1f, 1f, 0f), Triple(0f, 1f, 1f), Triple(1f, 0f, 1f)
+                            )
+                            val changes = sel.map { selectable ->
+                                val (r, g, b) = colorPool.random()
+                                TimelineEditedNote(
+                                    before = selectable.note,
+                                    after = selectable.note.copy(led = selectable.note.led.copy(red = r, green = g, blue = b, gradient = null))
+                                )
+                            }
+                            if (changes.isNotEmpty()) applyNoteChanges(changes)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = ButtonVariant.Secondary,
+                        size = ButtonSize.Small,
+                        enabled = selectedPianoNotes.isNotEmpty()
+                    ) { Text("Randomize Colors", style = Theme[typography][small].copy(color = contentColor)) }
                 }
             }
 
@@ -254,20 +1128,27 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 multiSelectModifierDown = multiSelectModifierDown,
                 shiftModifierDown = ModifierKeysState.isShiftPressed,
                 selectedColor = selectedColor,
-                onNoteAdd = onNoteAdd,
-                onNoteUpdate = onNoteUpdate,
-                onNoteDelete = onNoteDelete,
-                zoomFactorState = zoomFactor,
-                onZoomFactorChange = { newZoom ->
-                    val clamped = newZoom.coerceIn(0.75f, 12f)
-
-                    zoomFactor = clamped
-                    val targetRes = resolutionForZoom(zoomFactor)
-                    if (targetRes != this@PianoRollWorkspaceMode.gridResolution) {
-                        this@PianoRollWorkspaceMode.gridResolution = targetRes
+                gradientMode = gradientMode,
+                workingGradient = workingGradient,
+                activeTool = this@PianoRollWorkspaceMode.activeTool,
+                onCreateNotes = createNotes,
+                onMoveNotes = moveNotes,
+                onResizeNotes = resizeNotes,
+                onDeleteNotes = deleteNotes,
+                viewport = viewport,
+                onViewportChange = { newViewport ->
+                    viewport = newViewport
+                    val newZoomFactor = newViewport.zoomX * MS_PER_BEAT.toFloat() / basePixelsPerBeatPx
+                    zoomFactor = newZoomFactor
+                    if (!this@PianoRollWorkspaceMode.gridResolutionLocked) {
+                        val targetRes = GridResolution.fromZoomFactor(newZoomFactor)
+                        if (targetRes != this@PianoRollWorkspaceMode.gridResolution) {
+                            this@PianoRollWorkspaceMode.gridResolution = targetRes
+                        }
                     }
                 },
                 gridResolution = this@PianoRollWorkspaceMode.gridResolution,
+                currentBpm = ::currentBpm,
                 pressedKeysState = pressedKeysState,
                 selectedTimeMs = selectedTimeMs,
                 onSelectedTimeMsChange = { selectedTimeMs = it }
@@ -290,6 +1171,65 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
             when (event.key) {
                 Key.Escape -> { modeClose?.invoke(); return true }
 
+                Key.S -> {
+                    if (!event.isCtrlPressed && !event.isMetaPressed) {
+                        activeTool = TimelineEditorTool.SELECT; return true
+                    }
+                }
+                Key.D -> {
+                    if (!event.isCtrlPressed && !event.isMetaPressed) {
+                        activeTool = TimelineEditorTool.DRAW; return true
+                    }
+                }
+                Key.E -> {
+                    if (!event.isCtrlPressed && !event.isMetaPressed) {
+                        activeTool = TimelineEditorTool.ERASE; return true
+                    }
+                }
+
+                Key.W -> {
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        modeClose?.invoke()
+                        return true
+                    }
+                }
+
+                Key.MoveHome -> {
+                    val entry = currentEntry
+                    if (entry != null && entry.notes.isNotEmpty()) {
+                        val firstNote = entry.notes.minByOrNull { it.startTimeMs }
+                        if (firstNote != null) {
+                            SelectionManager.clear()
+                            SelectionManager.select(
+                                Selectable.PianoRollNote(
+                                    trackIndex = trackIndex,
+                                    entryStartMs = entryStartMs,
+                                    note = firstNote
+                                )
+                            )
+                            return true
+                        }
+                    }
+                }
+
+                Key.MoveEnd -> {
+                    val entry = currentEntry
+                    if (entry != null && entry.notes.isNotEmpty()) {
+                        val lastNote = entry.notes.maxByOrNull { it.startTimeMs }
+                        if (lastNote != null) {
+                            SelectionManager.clear()
+                            SelectionManager.select(
+                                Selectable.PianoRollNote(
+                                    trackIndex = trackIndex,
+                                    entryStartMs = entryStartMs,
+                                    note = lastNote
+                                )
+                            )
+                            return true
+                        }
+                    }
+                }
+
                 Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight -> {
                     val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
                         .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
@@ -301,7 +1241,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         val launchpadCount = Heaven.devices.size.coerceAtLeast(1)
                         val totalPitches = launchpadCount * 100
 
-                        val bpm = WorkspaceRepository.bpm.value
+                        val bpm = currentBpm()
                         val msPerBeat = (60000.0 / bpm).toLong()
                         val cellDurationMs = msPerBeat / 4
 
@@ -322,7 +1262,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                         selected.forEach { sel ->
                             val newPitch = (sel.note.pitch + pitchDelta).coerceIn(0, totalPitches - 1)
-                            val newStartTime = (sel.note.startTimeMs + timeDelta).coerceIn(0, currentEntry.durationMs - sel.note.durationMs)
+                            val newStartTime = sel.note.startTimeMs + timeDelta
 
                             val updatedNote = sel.note.copy(
                                 pitch = newPitch,
@@ -332,33 +1272,52 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                             noteUpdatesBefore.add(sel.note)
                             noteUpdatesAfter.add(updatedNote)
-                            onNoteUpdate?.invoke(sel.note, updatedNote)
                         }
 
-                        UndoManager.addAction(
-                            UndoableAction.PianoRollNoteMove(
+                        val result = if (isTimelineBackedEditing) {
+                            TimelineCommandSurface.moveNotes(
                                 trackIndex = trackIndex,
                                 entryStartMs = entryStartMs,
-                                notesBefore = noteUpdatesBefore,
-                                notesAfter = noteUpdatesAfter,
-                                onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
-                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
-                            )
-                        )
-
-                        this.currentEntry = currentEntry.copy(
-                            notes = currentEntry.notes.map { note ->
-                                noteUpdatesBefore.zip(noteUpdatesAfter).find { it.first == note }?.second ?: note
+                                changes = noteUpdatesBefore.zip(noteUpdatesAfter).map { (before, after) ->
+                                    TimelineEditedNote(before = before, after = after)
+                                }
+                            ).also { commandResult ->
+                                if (commandResult.didChange) {
+                                    syncCurrentEntry(timelineEntrySnapshot())
+                                }
                             }
-                        )
-
-                        SelectionManager.clear()
-                        noteUpdatesAfter.forEach { updatedNote ->
-                            SelectionManager.select(
-                                Selectable.PianoRollNote(trackIndex, entryStartMs, updatedNote),
-                                single = false
+                        } else {
+                            noteUpdatesBefore.zip(noteUpdatesAfter).forEach { (before, after) ->
+                                onNoteUpdate?.invoke(before, after)
+                            }
+                            UndoManager.addAction(
+                                UndoableAction.PianoRollNoteMove(
+                                    trackIndex = trackIndex,
+                                    entryStartMs = entryStartMs,
+                                    notesBefore = noteUpdatesBefore,
+                                    notesAfter = noteUpdatesAfter,
+                                    onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                    currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                                )
                             )
+
+                            this.currentEntry = currentEntry.copy(
+                                notes = currentEntry.notes.map { note ->
+                                    noteUpdatesBefore.zip(noteUpdatesAfter).find { it.first == note }?.second ?: note
+                                }
+                            )
+                            TimelineCommandResult(didChange = true)
+                        }
+
+                        if (result.didChange) {
+                            SelectionManager.clear()
+                            noteUpdatesAfter.forEach { updatedNote ->
+                                SelectionManager.select(
+                                    Selectable.PianoRollNote(trackIndex, entryStartMs, updatedNote),
+                                    single = false
+                                )
+                            }
                         }
 
                         return true
@@ -372,11 +1331,12 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         }
 
                         val currentEntry = currentEntry ?: return false
-                        val bpm = WorkspaceRepository.bpm.value
+                        val bpm = currentBpm()
                         val msPerBeat = (60000.0 / bpm).toLong()
 
                         // Calculate cell duration based on current grid resolution
-                        val cellDurationMs = msPerBeat / this@PianoRollWorkspaceMode.gridResolution.subBeatsPerBeat
+                        val cellDurationMs = ((60000.0 / bpm).toLong() /
+                            this@PianoRollWorkspaceMode.gridResolution.snapDivisionsPerBeat).coerceAtLeast(1L)
 
                         // Get current time or default to 0
                         val currentTimeMs = this@PianoRollWorkspaceMode.selectedTimeMs ?: 0L
@@ -385,7 +1345,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                         if (event.key == Key.DirectionRight) {
                             // Move forward: Add/extend notes if buttons pressed, otherwise just move selection
-                            val newTimeMs = (currentTimeMs + cellDurationMs).coerceAtMost(currentEntry.durationMs)
+                            val newTimeMs = currentTimeMs + cellDurationMs
 
                             if (pressedKeys.isNotEmpty()) {
                                 // Add or extend notes for each pressed button
@@ -406,7 +1366,6 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                                             durationMs = noteToExtend.durationMs + cellDurationMs
                                         )
                                         notesExtended.add(noteToExtend to extendedNote)
-                                        onNoteUpdate?.invoke(noteToExtend, extendedNote)
                                     } else {
                                         // Check if note already exists at this position
                                         val existingNote = currentEntry.notes.find {
@@ -415,43 +1374,58 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                                             it.startTimeMs == currentTimeMs
                                         }
 
-                                        if (existingNote == null && currentTimeMs + cellDurationMs <= currentEntry.durationMs) {
+                                        if (existingNote == null) {
                                             // Create new note
-                                            val newNote = MidiNote(
+                                            val newNote = MidiNote.withPaint(
                                                 device = deviceIndex,
                                                 pitch = pitch,
-                                                led = MidiNote.NoteLED(
-                                                    index = pitch,
-                                                    red = selectedColor.red,
-                                                    green = selectedColor.green,
-                                                    blue = selectedColor.blue
-                                                ),
+                                                color = selectedColor,
                                                 startTimeMs = currentTimeMs,
-                                                durationMs = cellDurationMs
+                                                durationMs = cellDurationMs,
+                                                gradient = workingGradient.takeIf { gradientMode }
                                             )
                                             notesAdded.add(newNote)
-                                            onNoteAdd?.invoke(newNote)
                                         }
                                     }
                                 }
 
                                 // Apply changes
                                 if (notesAdded.isNotEmpty() || notesExtended.isNotEmpty()) {
-                                    var updatedNotes = currentEntry.notes
+                                    if (isTimelineBackedEditing) {
+                                        val createResult = if (notesAdded.isNotEmpty()) {
+                                            TimelineCommandSurface.createNotes(
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
+                                                notes = notesAdded
+                                            )
+                                        } else {
+                                            TimelineCommandResult()
+                                        }
+                                        val resizeResult = if (notesExtended.isNotEmpty()) {
+                                            TimelineCommandSurface.resizeNotes(
+                                                trackIndex = trackIndex,
+                                                entryStartMs = entryStartMs,
+                                                changes = notesExtended.map { (before, after) ->
+                                                    TimelineEditedNote(before = before, after = after)
+                                                }
+                                            )
+                                        } else {
+                                            TimelineCommandResult()
+                                        }
+                                        if ((createResult + resizeResult).didChange) {
+                                            syncCurrentEntry(timelineEntrySnapshot())
+                                        }
+                                    } else {
+                                        var updatedNotes = currentEntry.notes
 
-                                    // Add new notes
-                                    updatedNotes = updatedNotes + notesAdded
+                                        updatedNotes = updatedNotes + notesAdded
+                                        notesExtended.forEach { (old, new) ->
+                                            updatedNotes = updatedNotes.map { if (it == old) new else it }
+                                            onNoteUpdate?.invoke(old, new)
+                                        }
 
-                                    // Update extended notes
-                                    notesExtended.forEach { (old, new) ->
-                                        updatedNotes = updatedNotes.map { if (it == old) new else it }
-                                    }
-
-                                    this.currentEntry = currentEntry.copy(notes = updatedNotes)
-
-                                    // Add to undo history
-                                    if (notesAdded.isNotEmpty()) {
                                         notesAdded.forEach { note ->
+                                            onNoteAdd?.invoke(note)
                                             UndoManager.addAction(
                                                 UndoableAction.PianoRollNoteCreation(
                                                     trackIndex = trackIndex,
@@ -460,24 +1434,26 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                                                     onNoteAdd = { n: MidiNote -> onNoteAdd?.invoke(n) },
                                                     onNoteDelete = { n: MidiNote -> onNoteDelete?.invoke(n) },
                                                     currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                                    currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                                    currentEntrySetter = { e: MidiEntry -> this@PianoRollWorkspaceMode.currentEntry = e }
                                                 )
                                             )
                                         }
-                                    }
 
-                                    if (notesExtended.isNotEmpty()) {
-                                        UndoManager.addAction(
-                                            UndoableAction.PianoRollNoteResize(
-                                                trackIndex = trackIndex,
-                                                entryStartMs = entryStartMs,
-                                                notesBefore = notesExtended.map { it.first },
-                                                notesAfter = notesExtended.map { it.second },
-                                                onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
-                                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                                currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                        if (notesExtended.isNotEmpty()) {
+                                            UndoManager.addAction(
+                                                UndoableAction.PianoRollNoteResize(
+                                                    trackIndex = trackIndex,
+                                                    entryStartMs = entryStartMs,
+                                                    notesBefore = notesExtended.map { it.first },
+                                                    notesAfter = notesExtended.map { it.second },
+                                                    onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                                    currentEntrySetter = { e: MidiEntry -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                                )
                                             )
-                                        )
+                                        }
+
+                                        this.currentEntry = currentEntry.copy(notes = updatedNotes)
                                     }
                                 }
                             }
@@ -487,7 +1463,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                         } else if (event.key == Key.DirectionLeft) {
                             // Move backward: Remove/shorten notes if buttons pressed, otherwise just move selection
-                            val newTimeMs = (currentTimeMs - cellDurationMs).coerceAtLeast(0L)
+                            val newTimeMs = currentTimeMs - cellDurationMs
 
                             if (pressedKeys.isNotEmpty()) {
                                 // Remove or shorten notes for each pressed button
@@ -506,59 +1482,84 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                                         if (noteToModify.durationMs <= cellDurationMs) {
                                             // Delete note if it would become too short
                                             notesDeleted.add(noteToModify)
-                                            onNoteDelete?.invoke(noteToModify)
                                         } else {
                                             // Shorten note
                                             val shortenedNote = noteToModify.copy(
                                                 durationMs = noteToModify.durationMs - cellDurationMs
                                             )
                                             notesShortened.add(noteToModify to shortenedNote)
-                                            onNoteUpdate?.invoke(noteToModify, shortenedNote)
                                         }
                                     }
                                 }
 
                                 // Apply changes
                                 if (notesDeleted.isNotEmpty() || notesShortened.isNotEmpty()) {
-                                    var updatedNotes = currentEntry.notes
-
-                                    // Remove deleted notes
-                                    updatedNotes = updatedNotes.filter { it !in notesDeleted }
-
-                                    // Update shortened notes
-                                    notesShortened.forEach { (old, new) ->
-                                        updatedNotes = updatedNotes.map { if (it == old) new else it }
-                                    }
-
-                                    this.currentEntry = currentEntry.copy(notes = updatedNotes)
-
-                                    // Add to undo history
-                                    if (notesDeleted.isNotEmpty()) {
-                                        UndoManager.addAction(
-                                            UndoableAction.PianoRollNoteDeletion(
+                                    if (isTimelineBackedEditing) {
+                                        val deleteResult = if (notesDeleted.isNotEmpty()) {
+                                            TimelineCommandSurface.deleteNotes(
                                                 trackIndex = trackIndex,
                                                 entryStartMs = entryStartMs,
-                                                notes = notesDeleted,
-                                                onNoteAdd = { n: MidiNote -> onNoteAdd?.invoke(n) },
-                                                onNoteDelete = { n: MidiNote -> onNoteDelete?.invoke(n) },
-                                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                                currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                                notes = notesDeleted
                                             )
-                                        )
-                                    }
-
-                                    if (notesShortened.isNotEmpty()) {
-                                        UndoManager.addAction(
-                                            UndoableAction.PianoRollNoteResize(
+                                        } else {
+                                            TimelineCommandResult()
+                                        }
+                                        val resizeResult = if (notesShortened.isNotEmpty()) {
+                                            TimelineCommandSurface.resizeNotes(
                                                 trackIndex = trackIndex,
                                                 entryStartMs = entryStartMs,
-                                                notesBefore = notesShortened.map { it.first },
-                                                notesAfter = notesShortened.map { it.second },
-                                                onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
-                                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                                currentEntrySetter = { e: MidiEntry? -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                                changes = notesShortened.map { (before, after) ->
+                                                    TimelineEditedNote(before = before, after = after)
+                                                }
                                             )
-                                        )
+                                        } else {
+                                            TimelineCommandResult()
+                                        }
+                                        if ((deleteResult + resizeResult).didChange) {
+                                            syncCurrentEntry(timelineEntrySnapshot())
+                                        }
+                                    } else {
+                                        var updatedNotes = currentEntry.notes
+
+                                        updatedNotes = updatedNotes.filter { it !in notesDeleted }
+                                        notesDeleted.forEach { noteToDelete ->
+                                            onNoteDelete?.invoke(noteToDelete)
+                                        }
+
+                                        notesShortened.forEach { (old, new) ->
+                                            updatedNotes = updatedNotes.map { if (it == old) new else it }
+                                            onNoteUpdate?.invoke(old, new)
+                                        }
+
+                                        if (notesDeleted.isNotEmpty()) {
+                                            UndoManager.addAction(
+                                                UndoableAction.PianoRollNoteDeletion(
+                                                    trackIndex = trackIndex,
+                                                    entryStartMs = entryStartMs,
+                                                    notes = notesDeleted,
+                                                    onNoteAdd = { n: MidiNote -> onNoteAdd?.invoke(n) },
+                                                    onNoteDelete = { n: MidiNote -> onNoteDelete?.invoke(n) },
+                                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                                    currentEntrySetter = { e: MidiEntry -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                                )
+                                            )
+                                        }
+
+                                        if (notesShortened.isNotEmpty()) {
+                                            UndoManager.addAction(
+                                                UndoableAction.PianoRollNoteResize(
+                                                    trackIndex = trackIndex,
+                                                    entryStartMs = entryStartMs,
+                                                    notesBefore = notesShortened.map { it.first },
+                                                    notesAfter = notesShortened.map { it.second },
+                                                    onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                                    currentEntrySetter = { e: MidiEntry -> this@PianoRollWorkspaceMode.currentEntry = e }
+                                                )
+                                            )
+                                        }
+
+                                        this.currentEntry = currentEntry.copy(notes = updatedNotes)
                                     }
                                 }
                             }
@@ -586,37 +1587,52 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                             val duplicates = selected.map { sel ->
                                 sel.note.copy(
-                                    startTimeMs = (sel.note.startTimeMs + offset).coerceAtMost(currentEntry.durationMs - sel.note.durationMs)
+                                    startTimeMs = sel.note.startTimeMs + offset
                                 )
                             }
 
-                            UndoManager.addAction(
-                                UndoableAction.PianoRollNoteDuplication(
+                            val result = if (isTimelineBackedEditing) {
+                                TimelineCommandSurface.createNotes(
                                     trackIndex = trackIndex,
                                     entryStartMs = entryStartMs,
-                                    duplicates = duplicates,
-                                    onNoteAdd = { note -> onNoteAdd?.invoke(note) },
-                                    onNoteDelete = { note -> onNoteDelete?.invoke(note) },
-                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                    currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                                    notes = duplicates
+                                ).also { commandResult ->
+                                    if (commandResult.didChange) {
+                                        syncCurrentEntry(timelineEntrySnapshot())
+                                    }
+                                }
+                            } else {
+                                UndoManager.addAction(
+                                    UndoableAction.PianoRollNoteDuplication(
+                                        trackIndex = trackIndex,
+                                        entryStartMs = entryStartMs,
+                                        duplicates = duplicates,
+                                        onNoteAdd = { note -> onNoteAdd?.invoke(note) },
+                                        onNoteDelete = { note -> onNoteDelete?.invoke(note) },
+                                        currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                        currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                                    )
                                 )
-                            )
 
-                            duplicates.forEach { duplicate ->
-                                onNoteAdd?.invoke(duplicate)
+                                duplicates.forEach { duplicate ->
+                                    onNoteAdd?.invoke(duplicate)
+                                }
+
+                                this.currentEntry = currentEntry.copy(notes = currentEntry.notes + duplicates)
+                                TimelineCommandResult(didChange = true)
                             }
 
-                            this.currentEntry = currentEntry.copy(notes = currentEntry.notes + duplicates)
+                            if (result.didChange) {
+                                SelectionManager.clear()
+                                duplicates.forEach { duplicate ->
+                                    SelectionManager.select(
+                                        Selectable.PianoRollNote(trackIndex, entryStartMs, duplicate),
+                                        single = false
+                                    )
+                                }
 
-                            SelectionManager.clear()
-                            duplicates.forEach { duplicate ->
-                                SelectionManager.select(
-                                    Selectable.PianoRollNote(trackIndex, entryStartMs, duplicate),
-                                    single = false
-                                )
+                                return true
                             }
-
-                            return true
                         }
                     }
                 }
@@ -626,24 +1642,42 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                         .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
                     if (selected.isNotEmpty()) {
                         val notesToDelete = selected.map { it.note }
-
-                        UndoManager.addAction(
-                            UndoableAction.PianoRollNoteDeletion(
+                        val result = if (isTimelineBackedEditing) {
+                            TimelineCommandSurface.deleteNotes(
                                 trackIndex = trackIndex,
                                 entryStartMs = entryStartMs,
-                                notes = notesToDelete,
-                                onNoteAdd = { note -> onNoteAdd?.invoke(note) },
-                                onNoteDelete = { note -> onNoteDelete?.invoke(note) },
-                                currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                                notes = notesToDelete
+                            ).also { commandResult ->
+                                if (commandResult.didChange) {
+                                    syncCurrentEntry(timelineEntrySnapshot())
+                                }
+                            }
+                        } else {
+                            UndoManager.addAction(
+                                UndoableAction.PianoRollNoteDeletion(
+                                    trackIndex = trackIndex,
+                                    entryStartMs = entryStartMs,
+                                    notes = notesToDelete,
+                                    onNoteAdd = { note -> onNoteAdd?.invoke(note) },
+                                    onNoteDelete = { note -> onNoteDelete?.invoke(note) },
+                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                                    currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                                )
                             )
-                        )
 
-                        selected.forEach { sel ->
-                            onNoteDelete?.invoke(sel.note)
-                            currentEntry = currentEntry?.copy(notes = currentEntry?.notes?.filter { it != sel.note } ?: emptyList())
+                            selected.forEach { sel ->
+                                onNoteDelete?.invoke(sel.note)
+                            }
+                            currentEntry = currentEntry?.copy(
+                                notes = currentEntry?.notes.orEmpty().filter { note -> note !in notesToDelete }
+                            )
+                            TimelineCommandResult(didChange = true)
                         }
-                        SelectionManager.clear(); return true
+
+                        if (result.didChange) {
+                            SelectionManager.clear()
+                            return true
+                        }
                     }
                 }
             }
@@ -677,36 +1711,73 @@ private fun PianoRollEditor(
     multiSelectModifierDown: Boolean,
     shiftModifierDown: Boolean,
     selectedColor: Color,
-    onNoteAdd: ((MidiNote) -> Unit)?,
-    onNoteUpdate: ((MidiNote, MidiNote) -> Unit)?,
-    onNoteDelete: ((MidiNote) -> Unit)?,
-    zoomFactorState: Float,
-    onZoomFactorChange: (Float) -> Unit,
+    gradientMode: Boolean,
+    workingGradient: List<NoteGradientStop>?,
+    activeTool: TimelineEditorTool,
+    onCreateNotes: (List<MidiNote>) -> TimelineCommandResult,
+    onMoveNotes: (List<TimelineEditedNote>) -> TimelineCommandResult,
+    onResizeNotes: (List<TimelineEditedNote>) -> TimelineCommandResult,
+    onDeleteNotes: (List<MidiNote>) -> TimelineCommandResult,
+    viewport: EditorViewportState,
+    onViewportChange: (EditorViewportState) -> Unit,
     gridResolution: GridResolution,
+    currentBpm: () -> Double,
     pressedKeysState: StateFlow<Map<Pair<Int, Int>, Boolean>>,
     selectedTimeMs: Long?,
     onSelectedTimeMsChange: (Long?) -> Unit
 ) {
-    val horizontalScroll = rememberScrollState()
-    val verticalScroll = rememberScrollState()
+    // Keep stable references for long-lived pointer coroutines (these lambdas are
+    // stable across recompositions caused by scroll/zoom updates).
+    val latestViewport by rememberUpdatedState(viewport)
+    val latestOnViewportChange by rememberUpdatedState(onViewportChange)
+
     val density = LocalDensity.current
+    val timelinePalette = TimelineTheme.palette
+    val gridColors = PianoRollGridColors(
+        canvasColor = timelinePalette.canvas,
+        rowColor = timelinePalette.laneSurface,
+        pitchSeparatorColor = timelinePalette.gridMinor,
+        quarterCellColor = timelinePalette.gridMinor,
+        beatLineColor = timelinePalette.tickMinor,
+        barLineColor = timelinePalette.tickMajor,
+    )
 
     val launchpadCount = launchpads.size.coerceAtLeast(1)
     val totalPitches = launchpadCount * 100
 
     val noteHeightDp: Dp = 22.dp
-    val basePixelsPerBeatDp: Dp = 80.dp
-    val effectivePixelsPerBeatDp = basePixelsPerBeatDp * zoomFactorState
+    // Derive effective pixels-per-beat from the viewport's horizontal zoom.
+    // zoomX is pixels-per-ms; one beat = MS_PER_BEAT ms.
+    val effectivePixelsPerBeatDp = with(density) { (viewport.zoomX * MS_PER_BEAT).toDp() }
     val beatsPerBar = 4
 
     val clipBeats = entry.durationMs.toFloat() / MS_PER_BEAT.toFloat()
 
-    val metrics = remember(totalPitches, density, gridResolution, effectivePixelsPerBeatDp) {
-        PianoRollMetrics(totalPitches, noteHeightDp, effectivePixelsPerBeatDp, density, gridResolution)
+    // Extend the visible time range 25% (or at least 2 s) on each side of the clip
+    val oobOverhangMs = (entry.durationMs * 0.25).toLong().coerceAtLeast(2000L)
+    val totalBeatsWithOverhang = (entry.durationMs + 2 * oobOverhangMs).toFloat() / MS_PER_BEAT.toFloat()
+
+    val metrics = remember(totalPitches, density, gridResolution, effectivePixelsPerBeatDp, oobOverhangMs) {
+        PianoRollMetrics(totalPitches, noteHeightDp, effectivePixelsPerBeatDp, density, gridResolution, oobOffsetMs = oobOverhangMs)
     }
+    val latestMetrics by rememberUpdatedState(metrics)
+    // Keep oobOverhangMs and totalBeatsWithOverhang fresh inside long-lived pointerInput(Unit)
+    // closures that use stable keys and therefore never restart on recomposition.
+    val latestOobOverhangMs by rememberUpdatedState(oobOverhangMs)
+    val latestTotalBeatsWithOverhang by rememberUpdatedState(totalBeatsWithOverhang)
 
     val canvasHeightDp = noteHeightDp * totalPitches
-    val canvasWidthDp = effectivePixelsPerBeatDp * clipBeats
+    val canvasWidthDp = effectivePixelsPerBeatDp * totalBeatsWithOverhang
+
+    // Position the viewport at t=0 on first open so the OOB lead-in region is off-screen.
+    // Also record the initial content extent so pan/zoom clamping works from the first frame.
+    LaunchedEffect(Unit) {
+        val initialScrollX = metrics.timeMsToXPx(0L).coerceAtLeast(0f)
+        val contentWidthPx = with(density) { canvasWidthDp.toPx() }
+        latestOnViewportChange(
+            viewport.copy(scrollX = initialScrollX, contentWidth = contentWidthPx)
+        )
+    }
 
     var notesState by remember { mutableStateOf(entry.notes) }
     LaunchedEffect(entry) { notesState = entry.notes }
@@ -726,48 +1797,68 @@ private fun PianoRollEditor(
 
     var marqueeStart by remember { mutableStateOf<Offset?>(null) }
     var marqueeCurrent by remember { mutableStateOf<Offset?>(null) }
+    var marqueeGestureActive by remember { mutableStateOf(false) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
     var resizeLeftDelta by remember { mutableStateOf(0f) }
     var resizeRightDelta by remember { mutableStateOf(0f) }
     var activeDragNote by remember { mutableStateOf<MidiNote?>(null) }
+    var draftNote by remember { mutableStateOf<MidiNote?>(null) }
+    var viewportWidthPx by remember { mutableStateOf(0) }
+    var lastPointerX by remember { mutableStateOf<Float?>(null) }
 
+    fun snapSelectedTimeMs(timeMs: Long, currentResolution: GridResolution, bpm: Double): Long {
+        val gridIntervalMs = currentCellDurationMs(
+            currentResolution = currentResolution,
+            bpm = bpm,
+        )
+        return ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
+    }
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Row(modifier = Modifier.fillMaxWidth().height(40.dp)) {
-            Box(
-                modifier = Modifier
-                    .width(100.dp)
-                    .height(40.dp)
-                    .background(Color(0xFF2B2B2B))
-            )
+    fun buildDraftNote(
+        device: Int,
+        pitch: Int,
+        color: Color,
+        gradient: List<NoteGradientStop>?,
+        anchorCellStartMs: Long,
+        currentCellStartMs: Long,
+        cellDurationMs: Long,
+    ): MidiNote {
+        val span = resolveDraftSpan(
+            anchorCellStartMs = anchorCellStartMs,
+            currentCellStartMs = currentCellStartMs,
+            cellDurationMs = cellDurationMs,
+        )
+        return MidiNote.withPaint(
+            device = device,
+            pitch = pitch,
+            color = color,
+            startTimeMs = span.startTimeMs,
+            durationMs = span.durationMs,
+            gradient = gradient,
+        )
+    }
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(40.dp)
-                    .horizontalScroll(horizontalScroll, enabled = false)
-                    .pointerInput(gridResolution) {
-                        detectTapGestures { offset ->
-                            val clickX = offset.x
-                            val timeMs = metrics.xPxToTimeMs(clickX)
-
-                            val bpm = WorkspaceRepository.bpm.value
-                            val msPerBeat = (60000.0 / bpm).toLong()
-                            val subdivisions = gridResolution.subBeatsPerBeat
-                            val gridIntervalMs = msPerBeat / subdivisions
-                            val snappedTimeMs = ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
-                            onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
-                        }
-                    }
-            ) {
-                TimelineRuler(
-                    clipBeats = clipBeats,
-                    metrics = metrics,
-                    beatsPerBar = beatsPerBar,
-                    canvasWidthDp = canvasWidthDp
+    Column(modifier = Modifier.fillMaxSize().background(Theme[colors][background])) {
+        PianoRollHeader(
+            clipBeats = clipBeats,
+            metrics = metrics,
+            beatsPerBar = beatsPerBar,
+            canvasWidthDp = canvasWidthDp,
+            viewport = viewport,
+            onTap = { offset ->
+                // offset.x is content-space (the header's inner offset box shifts by -scrollX)
+                val timeMs = snapClipTimeToGrid(
+                    viewport.contentXToClipTimeMs(offset.x, oobOverhangMs),
+                    gridResolution,
                 )
+                val snappedTimeMs = snapSelectedTimeMs(
+                    timeMs = timeMs,
+                    currentResolution = gridResolution,
+                    bpm = currentBpm(),
+                )
+                onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
             }
-        }
+        )
 
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -777,18 +1868,30 @@ private fun PianoRollEditor(
                     val deviceNotes = notesState.filter { it.device == index && it.pitch in devicePitchRange }
                     val rowHeight = noteHeightDp * 100
 
+                    val zoomCoroutineScope = rememberCoroutineScope()
+                    val zoomEndJobHolder = remember { arrayOfNulls<Job>(1) }
+
+                    // Keep fresh references for use inside long-lived pointer coroutines so
+                    // they always see the latest values without restarting on every state change.
+                    val latestOnCreateNotes by rememberUpdatedState(onCreateNotes)
+                    val latestOnDeleteNotes by rememberUpdatedState(onDeleteNotes)
+                    val latestSelectedColor by rememberUpdatedState(selectedColor)
+                    val latestGradientMode by rememberUpdatedState(gradientMode)
+                    val latestWorkingGradient by rememberUpdatedState(workingGradient)
+                    val latestGridResolution by rememberUpdatedState(gridResolution)
+                    val latestMultiSelectDown by rememberUpdatedState(multiSelectModifierDown)
+                    val latestShiftDown by rememberUpdatedState(shiftModifierDown)
+                    val latestCurrentBpm by rememberUpdatedState(currentBpm)
+
                     Column {
                         Text(
                             text = "${device.name} (pos. X: ${device.position.value.x}, Y: ${device.position.value.y})",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = Theme[typography][p].copy(color = Theme[colors][foreground]),
                             modifier = Modifier.padding(vertical = 6.dp)
                         )
 
                         Row(modifier = Modifier.height(rowHeight)) {
                             val pressedForDevice = pressedKeysPerDevice[index] ?: emptySet()
-                            if (pressedForDevice.isNotEmpty()) {
-                                println("🎹 Rendering device $index with pressed keys: $pressedForDevice")
-                            }
                             PianoKeysColumn(
                                 totalPitches = 100,
                                 noteHeight = noteHeightDp,
@@ -801,9 +1904,30 @@ private fun PianoRollEditor(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(rowHeight)
-                                .background(Color(0xFF1A1A1A))
-                                .horizontalScroll(horizontalScroll)
-                                .pointerInput(zoomFactorState, gridResolution) {
+                                .onSizeChanged { viewportWidthPx = it.width }
+                                .clipToBounds()
+                                .background(timelinePalette.canvas)
+                                .pointerInput(Unit) {
+                                    // Track the pointer position so the zoom handler can use it
+                                    // as the anchor even when the scroll event doesn't carry
+                                    // accurate position data.
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            val pointerX = event.changes.firstOrNull()?.position?.x
+                                            if (pointerX != null && event.type != PointerEventType.Exit) {
+                                                lastPointerX = pointerX
+                                            }
+                                        }
+                                    }
+                                }
+                                .pointerInput(Unit) {
+                                    // Handles zoom (Ctrl/Cmd + scroll-Y) and pan (plain scroll).
+                                    // Both are synchronous — no coroutines, no withFrameNanos.
+                                    // Pointer events here are in VIEWPORT-space coordinates because
+                                    // there is no horizontalScroll modifier in the chain.
+                                    // latestViewport / latestOnViewportChange stay fresh across
+                                    // recompositions without restarting this coroutine.
                                     awaitPointerEventScope {
                                         while (true) {
                                             val event = awaitPointerEvent()
@@ -811,235 +1935,394 @@ private fun PianoRollEditor(
                                                 val isZoomModifier = event.keyboardModifiers.isMetaPressed || event.keyboardModifiers.isCtrlPressed
                                                 val change = event.changes.firstOrNull()
                                                 val deltaY = change?.scrollDelta?.y ?: 0f
+                                                val deltaX = change?.scrollDelta?.x ?: 0f
                                                 if (isZoomModifier && deltaY != 0f) {
                                                     val direction = if (deltaY > 0f) -1f else 1f
-                                                    val factor = 1f + 0.03f * direction
-                                                    val newZoom = (zoomFactorState * factor).coerceIn(0.75f, 12f)
-                                                    onZoomFactorChange(newZoom)
+                                                    val factor = 1f + 0.1f * direction
+                                                    // cursorX is viewport-relative (no scroll subtraction needed)
+                                                    val cursorX = resolveViewportRelativeCursorX(
+                                                        trackedPointerX = lastPointerX,
+                                                        eventPointerX = change?.position?.x,
+                                                    )
+                                                    // Delegate zoom-with-anchor to the viewport projection.
+                                                    // Supply current viewport dimensions so clamp() works correctly.
+                                                    val contentWidthPx = latestViewport.zoomX * MS_PER_BEAT.toFloat() * latestTotalBeatsWithOverhang
+                                                    val primed = latestViewport.copy(
+                                                        viewportWidth = viewportWidthPx.toFloat(),
+                                                        contentWidth = contentWidthPx,
+                                                    )
+                                                    val zoomed = primed.zoomAtX(factor, cursorX)
+                                                    // After zoom, recompute content width for the new zoomX
+                                                    val newContentWidthPx = zoomed.zoomX * MS_PER_BEAT.toFloat() * latestTotalBeatsWithOverhang
+                                                    val clampedZoomed = zoomed.copy(contentWidth = newContentWidthPx).clamp()
+                                                    latestOnViewportChange(clampedZoomed)
+                                                    // Debounce: emit one log when zoom input stops for ~150 ms.
+                                                    zoomEndJobHolder[0]?.cancel()
+                                                    zoomEndJobHolder[0] = zoomCoroutineScope.launch {
+                                                        delay(150)
+                                                        println("[Amethyst/Zoom] PianoRollWorkspaceMode — zoom end, zoomX=${clampedZoomed.zoomX}")
+                                                    }
                                                     change?.consume()
+                                                } else if (!isZoomModifier) {
+                                                    // Pan: prefer horizontal delta; fall back to vertical
+                                                    val panDelta = if (deltaX != 0f) deltaX else deltaY
+                                                    if (panDelta != 0f) {
+                                                        val contentWidthPx = latestViewport.zoomX * MS_PER_BEAT.toFloat() * latestTotalBeatsWithOverhang
+                                                        latestOnViewportChange(
+                                                            latestViewport.copy(
+                                                                viewportWidth = viewportWidthPx.toFloat(),
+                                                                contentWidth = contentWidthPx,
+                                                            ).panBy(panDelta * 40f)
+                                                        )
+                                                        change?.consume()
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
+                                .pointerInput(activeTool, index, trackIndex, entryStartMs) {
+                                        when (activeTool) {
+                                            TimelineEditorTool.SELECT -> {
+                                                detectTapGestures(
+                                                    onTap = { offset ->
+                                                        val freshNotes = notesState.filter {
+                                                            it.device == index && it.pitch in devicePitchRange
+                                                        }
+                                                        val clickedNote = when (val hitTarget = findPianoRollHitTarget(
+                                                            point = offset,
+                                                            noteRects = buildNoteRectsScreenSpace(freshNotes, latestMetrics, latestViewport),
+                                                        )) {
+                                                            is PianoRollHitTarget.NoteBody -> hitTarget.note
+                                                            is PianoRollHitTarget.ResizeLeft -> hitTarget.note
+                                                            is PianoRollHitTarget.ResizeRight -> hitTarget.note
+                                                            PianoRollHitTarget.Empty -> null
+                                                        }
+
+                                                        if (clickedNote != null) {
+                                                            onSelectedTimeMsChange(null)
+                                                            if (latestShiftDown) {
+                                                                val selectable = Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote)
+                                                                val currentSelections = SelectionManager.selections.value
+                                                                val isSelected = currentSelections.any {
+                                                                    it is Selectable.PianoRollNote &&
+                                                                        it.selectionUUID == selectable.selectionUUID
+                                                                }
+                                                                if (isSelected) {
+                                                                    SelectionManager.replaceSelections(
+                                                                        currentSelections.filterNot {
+                                                                            it is Selectable.PianoRollNote &&
+                                                                                it.selectionUUID == selectable.selectionUUID
+                                                                        }
+                                                                    )
+                                                                } else {
+                                                                    SelectionManager.select(selectable, single = false)
+                                                                }
+                                                            } else {
+                                                                SelectionManager.select(
+                                                                    Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote),
+                                                                    single = !latestMultiSelectDown
+                                                                )
+                                                            }
+                                                        } else if (!latestMultiSelectDown) {
+                                                            SelectionManager.clear()
+                                                            val timeMs = snapClipTimeToGrid(
+                                                                 latestViewport.screenXToClipTimeMs(offset.x, latestOobOverhangMs),
+                                                                 latestGridResolution,
+                                                             )
+                                                            val snappedTimeMs = snapSelectedTimeMs(
+                                                                timeMs = timeMs,
+                                                                currentResolution = latestGridResolution,
+                                                                bpm = latestCurrentBpm(),
+                                                            )
+                                                            onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
+                                                        }
+                                                    }
+                                                )
+                                            }
+
+                                            TimelineEditorTool.DRAW -> {
+                                                awaitEachGesture {
+                                                    draftNote = null
+
+                                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                                    val freshNotes = notesState.filter {
+                                                        it.device == index && it.pitch in devicePitchRange
+                                                    }
+                                                    val hitTarget = findPianoRollHitTarget(
+                                                        point = down.position,
+                                                        noteRects = buildNoteRectsScreenSpace(freshNotes, latestMetrics, latestViewport),
+                                                    )
+
+                                                    if (hitTarget != PianoRollHitTarget.Empty) {
+                                                        return@awaitEachGesture
+                                                    }
+
+                                                    val lockedPitch = latestMetrics.yPxToPitch(down.position.y)
+                                                    if (lockedPitch !in devicePitchRange) {
+                                                        return@awaitEachGesture
+                                                    }
+
+                                                    val cellDurationMs = currentCellDurationMs(
+                                                        currentResolution = latestGridResolution,
+                                                        bpm = latestCurrentBpm(),
+                                                    )
+                                                    val anchorCellStartMs = floorClipTimeToGrid(
+                                                         latestViewport.screenXToClipTimeMs(down.position.x, latestOobOverhangMs),
+                                                         latestGridResolution,
+                                                     )
+
+                                                    fun updateDraft(position: Offset) {
+                                                        val currentCellStartMs = floorClipTimeToGrid(
+                                                             latestViewport.screenXToClipTimeMs(position.x, latestOobOverhangMs),
+                                                             latestGridResolution,
+                                                         )
+                                                        draftNote = buildDraftNote(
+                                                            device = index,
+                                                            pitch = lockedPitch,
+                                                            color = latestSelectedColor,
+                                                            gradient = latestWorkingGradient.takeIf { latestGradientMode },
+                                                            anchorCellStartMs = anchorCellStartMs,
+                                                            currentCellStartMs = currentCellStartMs,
+                                                            cellDurationMs = cellDurationMs,
+                                                        )
+                                                    }
+
+                                                    updateDraft(down.position)
+                                                    down.consume()
+
+                                                    while (true) {
+                                                        val event = awaitPointerEvent()
+                                                        val change = event.changes.firstOrNull { it.id == down.id } ?: continue
+                                                        if (!change.pressed) break
+                                                        updateDraft(change.position)
+                                                        change.consume()
+                                                    }
+
+                                                    val createdNote = draftNote
+                                                    draftNote = null
+
+                                                    if (createdNote != null) {
+                                                        val latestDeviceNotes = notesState.filter {
+                                                            it.device == index && it.pitch in devicePitchRange
+                                                        }
+                                                        val hasOverlap = latestDeviceNotes.any { note ->
+                                                            note.pitch == createdNote.pitch &&
+                                                                note.startTimeMs < createdNote.endTimeMs &&
+                                                                note.endTimeMs > createdNote.startTimeMs
+                                                        }
+
+                                                        if (!hasOverlap) {
+                                                            val result = latestOnCreateNotes(listOf(createdNote))
+                                                            if (result.didChange) {
+                                                                notesState = notesState + createdNote
+                                                                onSelectedTimeMsChange(null)
+                                                                SelectionManager.select(
+                                                                    Selectable.PianoRollNote(trackIndex, entryStartMs, createdNote),
+                                                                    single = !latestMultiSelectDown
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            TimelineEditorTool.ERASE -> {
+                                                awaitEachGesture {
+                                                    val erasedNoteKeys = mutableSetOf<Triple<Int, Int, Long>>()
+
+                                                    fun eraseAt(offset: Offset): Boolean {
+                                                        val freshNotes = notesState.filter {
+                                                            it.device == index && it.pitch in devicePitchRange
+                                                        }
+                                                        val hitNote = when (val hitTarget = findPianoRollHitTarget(
+                                                            point = offset,
+                                                            noteRects = buildNoteRectsScreenSpace(freshNotes, latestMetrics, latestViewport),
+                                                        )) {
+                                                            is PianoRollHitTarget.NoteBody -> hitTarget.note
+                                                            is PianoRollHitTarget.ResizeLeft -> hitTarget.note
+                                                            is PianoRollHitTarget.ResizeRight -> hitTarget.note
+                                                            PianoRollHitTarget.Empty -> null
+                                                        } ?: return false
+
+                                                        val noteKey = Triple(hitNote.device, hitNote.pitch, hitNote.startTimeMs)
+                                                        if (!erasedNoteKeys.add(noteKey)) {
+                                                            return false
+                                                        }
+
+                                                        val result = latestOnDeleteNotes(listOf(hitNote))
+                                                        if (!result.didChange) {
+                                                            return false
+                                                        }
+
+                                                        notesState = notesState.filter { it != hitNote }
+                                                        SelectionManager.replaceSelections(
+                                                            SelectionManager.selections.value.filter { sel ->
+                                                                !(sel is Selectable.PianoRollNote &&
+                                                                    sel.entryStartMs == entryStartMs &&
+                                                                    sel.trackIndex == trackIndex &&
+                                                                    sel.note.device == hitNote.device &&
+                                                                    sel.note.pitch == hitNote.pitch &&
+                                                                    sel.note.startTimeMs == hitNote.startTimeMs)
+                                                            }
+                                                        )
+                                                        return true
+                                                    }
+
+                                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                                    if (eraseAt(down.position)) {
+                                                        down.consume()
+                                                    }
+
+                                                    while (true) {
+                                                        val event = awaitPointerEvent()
+                                                        val change = event.changes.firstOrNull { it.id == down.id } ?: continue
+                                                        if (!change.pressed) break
+                                                        if (eraseAt(change.position)) {
+                                                            change.consume()
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                .pointerInput(activeTool, index, trackIndex, entryStartMs, multiSelectModifierDown) {
+                                        if (activeTool != TimelineEditorTool.SELECT) return@pointerInput
+                                        awaitEachGesture {
+                                            marqueeGestureActive = false
+
+                                            val down = awaitFirstDown(requireUnconsumed = false)
+                                            val freshNotes = notesState.filter {
+                                                it.device == index && it.pitch in devicePitchRange
+                                            }
+                                            val currentMetrics = latestMetrics
+                                            val hitTarget = findPianoRollHitTarget(
+                                                point = down.position,
+                                                noteRects = buildNoteRectsScreenSpace(freshNotes, currentMetrics, latestViewport),
+                                            )
+
+                                            if (hitTarget != PianoRollHitTarget.Empty) {
+                                                return@awaitEachGesture
+                                            }
+
+                                            marqueeGestureActive = true
+                                            marqueeStart = down.position
+                                            marqueeCurrent = down.position
+                                            if (!multiSelectModifierDown) {
+                                                SelectionManager.clear()
+                                            }
+
+                                            var didDrag = false
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.firstOrNull { it.id == down.id } ?: continue
+                                                if (!change.pressed) break
+
+                                                if (change.position != change.previousPosition) {
+                                                    didDrag = true
+                                                    marqueeCurrent = change.position
+                                                    change.consume()
+                                                }
+                                            }
+
+                                            if (didDrag) {
+                                                val s = marqueeStart
+                                                val c = marqueeCurrent
+                                                if (s != null && c != null) {
+                                                    val left = min(s.x, c.x)
+                                                    val right = max(s.x, c.x)
+                                                    val top = min(s.y, c.y)
+                                                    val bottom = max(s.y, c.y)
+                                                    buildNoteRectsScreenSpace(
+                                                        notesState.filter { it.device == index && it.pitch in devicePitchRange },
+                                                        currentMetrics,
+                                                        latestViewport,
+                                                    ).forEach { noteRect ->
+                                                        val overlaps =
+                                                            noteRect.left < right &&
+                                                                noteRect.right > left &&
+                                                                noteRect.top < bottom &&
+                                                                noteRect.bottom > top
+                                                        if (overlaps) {
+                                                            SelectionManager.select(
+                                                                Selectable.PianoRollNote(trackIndex, entryStartMs, noteRect.note),
+                                                                single = false
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            marqueeGestureActive = false
+                                            marqueeStart = null
+                                            marqueeCurrent = null
+                                        }
+                                    }
                         ) {
                             Box(
                                 modifier = Modifier
                                     .width(canvasWidthDp)
                                     .height(rowHeight)
-                                    .drawBehind {
-                                        val widthPx = size.width
-                                        val heightPx = size.height
-                                        val darkBackground = Color(0xFF1A1A1A)
-                                        val lightRow = Color(0xFF242424)
-                                        val beatLine = Color(0xFF444444)
-                                        val barLine = Color(0xFF555555)
-                                        val quarterCellLine = Color(0xFF2A2A2A)
-
-                                        for (pitch in devicePitchRange) {
-                                            val y = pitch * metrics.noteHeightPx
-                                            val isWhiteKey = pitch % 12 in listOf(0, 2, 4, 5, 7, 9, 11)
-                                            drawRect(
-                                                color = if (isWhiteKey) darkBackground else lightRow,
-                                                topLeft = Offset(0f, y),
-                                                size = Size(widthPx, metrics.noteHeightPx)
-                                            )
-                                        }
-
-                                        for (pitch in devicePitchRange) {
-                                            val y = pitch * metrics.noteHeightPx
-                                            drawLine(Color(0xFF333333), Offset(0f, y), Offset(widthPx, y), 1f)
-                                        }
-
-                                        val quarterSubdivisions = (clipBeats * 4).roundToInt()
-                                        for (quarterIndex in 0..quarterSubdivisions) {
-                                            val beatIndex = quarterIndex.toFloat() / 4
-                                            val x = beatIndex * metrics.pixelsPerBeatPx
-                                            if (x > widthPx) break
-                                            drawLine(
-                                                color = quarterCellLine,
-                                                start = Offset(x, 0f),
-                                                end = Offset(x, heightPx),
-                                                strokeWidth = 0.5f
-                                            )
-                                        }
-
-                                        val subdivisionsPerBeat = gridResolution.subBeatsPerBeat
-                                        val totalSubdivisions = (clipBeats * subdivisionsPerBeat).roundToInt()
-                                        for (subIndex in 0..totalSubdivisions) {
-                                            val beatIndex = subIndex.toFloat() / subdivisionsPerBeat
-                                            val x = beatIndex * metrics.pixelsPerBeatPx
-                                            if (x > widthPx) break
-                                            val isBarLine = (beatIndex % beatsPerBar) == 0f
-                                            drawLine(
-                                                color = if (isBarLine) barLine else beatLine,
-                                                start = Offset(x, 0f),
-                                                end = Offset(x, heightPx),
-                                                strokeWidth = if (isBarLine) 2f else 1f
-                                            )
-                                        }
-                                    }
-                                    .pointerInput(entry, onNoteAdd, zoomFactorState) {
-                                        detectTapGestures(
-                                            onTap = { offset ->
-                                                val clickedNote = deviceNotes.firstOrNull { note ->
-                                                    val yPx = metrics.pitchToYPx(note.pitch)
-                                                    val xPx = metrics.timeMsToXPx(note.startTimeMs)
-                                                    val wPx = metrics.durationMsToWidthPx(note.durationMs)
-                                                    offset.x in xPx..(xPx + wPx) &&
-                                                            offset.y >= yPx && offset.y <= yPx + metrics.noteRenderHeightPx
-                                                }
-                                                if (clickedNote != null) {
-                                                    onSelectedTimeMsChange(null)
-
-                                                    // Shift + Click = Toggle selection
-                                                    if (shiftModifierDown) {
-                                                        val selectable = Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote)
-                                                        val isSelected = selections.any {
-                                                            it is Selectable.PianoRollNote &&
-                                                            it.selectionUUID == selectable.selectionUUID
-                                                        }
-
-                                                        if (isSelected) {
-                                                            // Deselect: Remove from selection
-                                                            SelectionManager.selections.value = selections.filterNot {
-                                                                it is Selectable.PianoRollNote &&
-                                                                it.selectionUUID == selectable.selectionUUID
-                                                            }
-                                                        } else {
-                                                            // Select: Add to selection
-                                                            SelectionManager.select(selectable, single = false)
-                                                        }
-                                                    } else {
-                                                        // Normal click behavior
-                                                        SelectionManager.select(
-                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, clickedNote),
-                                                            single = !multiSelectModifierDown
-                                                        )
-                                                    }
-                                                } else {
-                                                    if (!multiSelectModifierDown) {
-                                                        SelectionManager.clear()
-
-                                                        val timeMs = metrics.xPxToTimeMs(offset.x)
-                                                        val bpm = WorkspaceRepository.bpm.value
-                                                        val msPerBeat = (60000.0 / bpm).toLong()
-                                                        val subdivisions = gridResolution.subBeatsPerBeat
-                                                        val gridIntervalMs = msPerBeat / subdivisions
-                                                        val snappedTimeMs = ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
-                                                        onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
-                                                    }
-                                                }
-                                            },
-                                            onDoubleTap = { offset ->
-                                                val pitch = metrics.yPxToPitch(offset.y)
-                                                if (pitch !in devicePitchRange) return@detectTapGestures
-
-                                                val currentGridResolution = when {
-                                                    zoomFactorState < 1.5f -> GridResolution.Quarter
-                                                    zoomFactorState < 2.5f -> GridResolution.Eighth
-                                                    zoomFactorState < 4f -> GridResolution.Sixteenth
-                                                    zoomFactorState < 6f -> GridResolution.ThirtySecond
-                                                    zoomFactorState < 9f -> GridResolution.SixtyFourth
-                                                    else -> GridResolution.OneTwentyEighth
-                                                }
-
-                                                val subdivisions = currentGridResolution.subBeatsPerBeat
-                                                val cellWidthPx = metrics.pixelsPerBeatPx / subdivisions
-                                                val cellIndex = (offset.x / cellWidthPx).toInt().coerceAtLeast(0)
-
-                                                val bpm = WorkspaceRepository.bpm.value
-                                                val msPerBeat = (60000.0 / bpm).toLong()
-                                                val startMs = (cellIndex * msPerBeat / subdivisions)
-
-                                                if (startMs >= entry.durationMs) return@detectTapGestures
-                                                val cellDurationMs = msPerBeat / subdivisions
-                                                var durationMs = cellDurationMs
-                                                if (startMs + durationMs > entry.durationMs) {
-                                                    durationMs = (entry.durationMs - startMs).coerceAtLeast(0L)
-                                                }
-                                                if (durationMs <= 0L) return@detectTapGestures
-                                                val existing = deviceNotes.firstOrNull { note ->
-                                                    val yPx = metrics.pitchToYPx(note.pitch)
-                                                    val xPx = metrics.timeMsToXPx(note.startTimeMs)
-                                                    val wPx = metrics.durationMsToWidthPx(note.durationMs)
-                                                    offset.x in xPx..(xPx + wPx) &&
-                                                            offset.y >= yPx && offset.y <= yPx + metrics.noteRenderHeightPx
-                                                }
-                                                if (existing != null) {
-                                                    SelectionManager.select(
-                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, existing),
-                                                        single = !multiSelectModifierDown
-                                                    )
-                                                } else {
-                                                    val newNote = MidiNote.withColor(
-                                                        device = index,
-                                                        pitch = pitch,
-                                                        color = selectedColor,
-                                                        startTimeMs = startMs,
-                                                        durationMs = durationMs
-                                                    )
-                                                    onNoteAdd?.invoke(newNote)
-                                                    notesState = notesState + newNote
-
-                                                    UndoManager.addAction(
-                                                        UndoableAction.PianoRollNoteCreation(
-                                                            trackIndex = trackIndex,
-                                                            entryStartMs = entryStartMs,
-                                                            note = newNote,
-                                                            onNoteAdd = { note -> onNoteAdd?.invoke(note) },
-                                                            onNoteDelete = { note -> onNoteDelete?.invoke(note) },
-                                                            currentEntryGetter = { entry },
-                                                            currentEntrySetter = { /* Entry is managed by parent */ }
-                                                        )
-                                                    )
-
-                                                    SelectionManager.select(
-                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, newNote),
-                                                        single = !multiSelectModifierDown
-                                                    )
-                                                }
-                                            }
-                                        )
-                                    }
-                                    .pointerInput(notesState, multiSelectModifierDown) {
-                                        detectDragGestures(
-                                            onDragStart = { offset ->
-                                                marqueeStart = offset; marqueeCurrent = offset
-                                                if (!multiSelectModifierDown) SelectionManager.clear()
-                                            },
-                                            onDragEnd = {
-                                                val s = marqueeStart; val c = marqueeCurrent
-                                                if (s != null && c != null) {
-                                                    val left = min(s.x, c.x); val right = max(s.x, c.x)
-                                                    val top = min(s.y, c.y); val bottom = max(s.y, c.y)
-                                                    notesState.forEach { note ->
-                                                        val yPx = metrics.pitchToYPx(note.pitch)
-                                                        val xPx = metrics.timeMsToXPx(note.startTimeMs)
-                                                        val wPx = metrics.durationMsToWidthPx(note.durationMs)
-                                                        val hPx = metrics.noteRenderHeightPx
-                                                        val overlaps = xPx < right && xPx + wPx > left && yPx < bottom && yPx + hPx > top
-                                                        if (overlaps) SelectionManager.select(
-                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, note),
-                                                            single = false
-                                                        )
-                                                    }
-                                                }
-                                                marqueeStart = null; marqueeCurrent = null
-                                            },
-                                            onDragCancel = { marqueeStart = null; marqueeCurrent = null },
-                                            onDrag = { change, dragAmount -> change.consume(); marqueeCurrent = marqueeCurrent?.let { it + dragAmount } }
-                                        )
-                                    }
+                                    .offset { IntOffset(-viewport.scrollX.roundToInt(), 0) }
+                                    .pianoRollGridBackground(
+                                        devicePitchRange = devicePitchRange,
+                                        clipBeats = clipBeats,
+                                        metrics = metrics,
+                                        beatsPerBar = beatsPerBar,
+                                        gridResolution = gridResolution,
+                                        colors = gridColors
+                                    )
+                                     
+                                     
                             ) {
-                                notesState.forEach { note ->
-                                    if (note.pitch in 0 until totalPitches) {
-                                        val selected = selections.filterIsInstance<Selectable.PianoRollNote>().any { it.note == note && it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                                // Clip boundary lines drawn behind notes
+                                val boundaryColor = Theme[timelineColorTokens][timelineSelectionCursor]
+                                Canvas(modifier = Modifier.matchParentSize()) {
+                                    val clipStartX = metrics.timeMsToXPx(0)
+                                    val clipEndX = metrics.timeMsToXPx(entry.durationMs)
+                                    val strokePx = 2.dp.toPx()
+                                    drawLine(
+                                        color = boundaryColor,
+                                        start = Offset(clipStartX, 0f),
+                                        end = Offset(clipStartX, size.height),
+                                        strokeWidth = strokePx
+                                    )
+                                    drawLine(
+                                        color = boundaryColor,
+                                        start = Offset(clipEndX, 0f),
+                                        end = Offset(clipEndX, size.height),
+                                        strokeWidth = strokePx
+                                    )
+                                }
+
+                                draftNote
+                                    ?.takeIf { it.device == index && it.pitch in devicePitchRange }
+                                    ?.let { previewNote ->
+                                        DraftNoteBox(
+                                            note = previewNote,
+                                            metrics = metrics,
+                                        )
+                                    }
+
+                                deviceNotes.forEach { note ->
+                                    if (note.pitch in devicePitchRange) {
+                                        // Use identity-based match (startTimeMs, pitch, device) instead of structural
+                                        // equality so that notes remain visually selected even when `notesState` lags
+                                        // behind `selections` by one Compose frame after a transform.
+                                        val selected = selections.filterIsInstance<Selectable.PianoRollNote>().any {
+                                            it.note.startTimeMs == note.startTimeMs &&
+                                            it.note.pitch == note.pitch &&
+                                            it.note.device == note.device &&
+                                            it.entryStartMs == entryStartMs &&
+                                            it.trackIndex == trackIndex
+                                        }
 
                                         NoteBox(
                                             note = note,
                                             metrics = metrics,
                                             isSelected = selected,
+                                            activeTool = activeTool,
+                                            clipDurationMs = entry.durationMs,
                                             onSelect = {
                                                 if (!selected) {
                                                     SelectionManager.select(
@@ -1054,6 +2337,7 @@ private fun PianoRollEditor(
                                             },
                                             onDragEnd = {
                                                 val selectedNotes = selections.filterIsInstance<Selectable.PianoRollNote>()
+                                                    .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
                                                     .map { it.note }
                                                     .ifEmpty { listOf(note) }
 
@@ -1063,15 +2347,18 @@ private fun PianoRollEditor(
                                                     0
                                                 }
 
-                                                val notesBefore = selectedNotes.toList()
                                                 val noteUpdates = selectedNotes.map { noteToDrag ->
-                                                    val baseX = metrics.timeMsToXPx(noteToDrag.startTimeMs)
-                                                    val newX = baseX + dragOffset.x
-                                                    var newTimeMs = metrics.xPxToTimeMs(newX)
-                                                    val newPitch = (noteToDrag.pitch + pitchDelta).coerceIn(0, metrics.totalPitches - 1)
+                                                    val baseContentX = viewport.clipTimeMsToContentX(
+                                                        noteToDrag.startTimeMs.toDouble(),
+                                                        oobOverhangMs
+                                                    )
+                                                    val newContentX = baseContentX + dragOffset.x
+                                                    val newTimeMs = snapClipTimeToGrid(
+                                                        viewport.contentXToClipTimeMs(newContentX, oobOverhangMs),
+                                                        latestGridResolution,
+                                                    )
+                                                    val newPitch = (noteToDrag.pitch + pitchDelta).coerceIn(devicePitchRange.first, devicePitchRange.last)
 
-                                                    val maxStart = (entry.durationMs - noteToDrag.durationMs).coerceAtLeast(0L)
-                                                    if (newTimeMs > maxStart) newTimeMs = maxStart
                                                     val updatedNote = noteToDrag.copy(
                                                         startTimeMs = newTimeMs,
                                                         pitch = newPitch,
@@ -1080,31 +2367,22 @@ private fun PianoRollEditor(
                                                     noteToDrag to updatedNote
                                                 }
 
-                                                val notesAfter = noteUpdates.map { it.second }
-
-                                                UndoManager.addAction(
-                                                    UndoableAction.PianoRollNoteMove(
-                                                        trackIndex = trackIndex,
-                                                        entryStartMs = entryStartMs,
-                                                        notesBefore = notesBefore,
-                                                        notesAfter = notesAfter,
-                                                        onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
-                                                        currentEntryGetter = { entry },
-                                                        currentEntrySetter = { /* Managed by parent */ }
-                                                    )
+                                                val result = onMoveNotes(
+                                                    noteUpdates.map { TimelineEditedNote(before = it.first, after = it.second) }
                                                 )
 
-                                                noteUpdates.forEach { (old, new) -> onNoteUpdate?.invoke(old, new) }
-                                                val updatedNotes = notesState.map { n ->
-                                                    noteUpdates.find { it.first == n }?.second ?: n
-                                                }
-                                                notesState = updatedNotes
-                                                SelectionManager.clear()
-                                                noteUpdates.forEach { (_, new) ->
-                                                    SelectionManager.select(
-                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, new),
-                                                        single = false
-                                                    )
+                                                if (result.didChange) {
+                                                    val updatedNotes = notesState.map { existingNote ->
+                                                        noteUpdates.find { it.first == existingNote }?.second ?: existingNote
+                                                    }
+                                                    notesState = updatedNotes
+                                                    SelectionManager.clear()
+                                                    noteUpdates.forEach { (_, new) ->
+                                                        SelectionManager.select(
+                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, new),
+                                                            single = false
+                                                        )
+                                                    }
                                                 }
                                                 dragOffset = Offset.Zero
                                                 activeDragNote = null
@@ -1114,6 +2392,7 @@ private fun PianoRollEditor(
                                             },
                                             onResizeLeftEnd = {
                                                 val selectedNotes = selections.filterIsInstance<Selectable.PianoRollNote>()
+                                                    .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
                                                     .map { it.note }
                                                     .ifEmpty { activeDragNote?.let { listOf(it) } ?: emptyList() }
 
@@ -1123,18 +2402,21 @@ private fun PianoRollEditor(
                                                     return@NoteBox
                                                 }
 
-                                                val notesBefore = selectedNotes.toList()
                                                 val noteUpdates = selectedNotes.mapNotNull { noteToResize ->
-                                                    val newX = metrics.timeMsToXPx(noteToResize.startTimeMs) + resizeLeftDelta
-                                                    val newStartMs = metrics.xPxToTimeMs(newX).coerceAtLeast(0L)
+                                                    val startContentX = viewport.clipTimeMsToContentX(
+                                                        noteToResize.startTimeMs.toDouble(),
+                                                        oobOverhangMs
+                                                    )
+                                                    val newStartContentX = startContentX + resizeLeftDelta
+                                                    val newStartMs = snapClipTimeToGrid(
+                                                        viewport.contentXToClipTimeMs(newStartContentX, oobOverhangMs),
+                                                        latestGridResolution,
+                                                    )
                                                     val newEndMs = noteToResize.endTimeMs
                                                     val minDur = MS_PER_BEAT / 4
-                                                    var newDurationMs = (newEndMs - newStartMs).coerceAtLeast(minDur)
-                                                    if (newStartMs + newDurationMs > entry.durationMs) {
-                                                        newDurationMs = (entry.durationMs - newStartMs).coerceAtLeast(minDur)
-                                                    }
+                                                    val newDurationMs = (newEndMs - newStartMs).coerceAtLeast(minDur)
 
-                                                    if (newDurationMs < minDur || newStartMs < 0) return@mapNotNull null
+                                                    if (newDurationMs < minDur) return@mapNotNull null
 
                                                     val updatedNote = noteToResize.copy(
                                                         startTimeMs = newStartMs,
@@ -1143,33 +2425,22 @@ private fun PianoRollEditor(
                                                     noteToResize to updatedNote
                                                 }
 
-                                                val notesAfter = noteUpdates.map { it.second }
+                                                val result = onResizeNotes(
+                                                    noteUpdates.map { TimelineEditedNote(before = it.first, after = it.second) }
+                                                )
 
-                                                if (noteUpdates.isNotEmpty()) {
-                                                    UndoManager.addAction(
-                                                        UndoableAction.PianoRollNoteResize(
-                                                            trackIndex = trackIndex,
-                                                            entryStartMs = entryStartMs,
-                                                            notesBefore = notesBefore,
-                                                            notesAfter = notesAfter,
-                                                            onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
-                                                            currentEntryGetter = { entry },
-                                                            currentEntrySetter = { /* Managed by parent */ }
+                                                if (result.didChange) {
+                                                    val updatedNotes = notesState.map { existingNote ->
+                                                        noteUpdates.find { it.first == existingNote }?.second ?: existingNote
+                                                    }
+                                                    notesState = updatedNotes
+                                                    SelectionManager.clear()
+                                                    noteUpdates.forEach { (_, new) ->
+                                                        SelectionManager.select(
+                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, new),
+                                                            single = false
                                                         )
-                                                    )
-                                                }
-
-                                                noteUpdates.forEach { (old, new) -> onNoteUpdate?.invoke(old, new) }
-                                                val updatedNotes = notesState.map { n ->
-                                                    noteUpdates.find { it.first == n }?.second ?: n
-                                                }
-                                                notesState = updatedNotes
-                                                SelectionManager.clear()
-                                                noteUpdates.forEach { (_, new) ->
-                                                    SelectionManager.select(
-                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, new),
-                                                        single = false
-                                                    )
+                                                    }
                                                 }
                                                 resizeLeftDelta = 0f
                                                 activeDragNote = null
@@ -1179,6 +2450,7 @@ private fun PianoRollEditor(
                                             },
                                             onResizeRightEnd = {
                                                 val selectedNotes = selections.filterIsInstance<Selectable.PianoRollNote>()
+                                                    .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
                                                     .map { it.note }
                                                     .ifEmpty { activeDragNote?.let { listOf(it) } ?: emptyList() }
 
@@ -1188,14 +2460,17 @@ private fun PianoRollEditor(
                                                     return@NoteBox
                                                 }
 
-                                                val notesBefore = selectedNotes.toList()
                                                 val noteUpdates = selectedNotes.mapNotNull { noteToResize ->
-                                                    val baseWidthPx = metrics.durationMsToWidthPx(noteToResize.durationMs)
-                                                    val newWidthPx = baseWidthPx + resizeRightDelta
-                                                    val newEndX = metrics.timeMsToXPx(noteToResize.startTimeMs) + newWidthPx
-                                                    var newEndTimeMs = metrics.xPxToTimeMs(newEndX)
+                                                    val endContentX = viewport.clipTimeMsToContentX(
+                                                        (noteToResize.startTimeMs + noteToResize.durationMs).toDouble(),
+                                                        oobOverhangMs
+                                                    )
+                                                    val newEndContentX = endContentX + resizeRightDelta
+                                                    val newEndTimeMs = snapClipTimeToGrid(
+                                                        viewport.contentXToClipTimeMs(newEndContentX, oobOverhangMs),
+                                                        latestGridResolution,
+                                                    )
                                                     val minDur = MS_PER_BEAT / 4
-                                                    if (newEndTimeMs > entry.durationMs) newEndTimeMs = entry.durationMs
                                                     val newDurationMs = (newEndTimeMs - noteToResize.startTimeMs).coerceAtLeast(minDur)
 
                                                     if (newDurationMs < minDur) return@mapNotNull null
@@ -1204,33 +2479,22 @@ private fun PianoRollEditor(
                                                     noteToResize to updatedNote
                                                 }
 
-                                                val notesAfter = noteUpdates.map { it.second }
+                                                val result = onResizeNotes(
+                                                    noteUpdates.map { TimelineEditedNote(before = it.first, after = it.second) }
+                                                )
 
-                                                if (noteUpdates.isNotEmpty()) {
-                                                    UndoManager.addAction(
-                                                        UndoableAction.PianoRollNoteResize(
-                                                            trackIndex = trackIndex,
-                                                            entryStartMs = entryStartMs,
-                                                            notesBefore = notesBefore,
-                                                            notesAfter = notesAfter,
-                                                            onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
-                                                            currentEntryGetter = { entry },
-                                                            currentEntrySetter = { /* Managed by parent */ }
+                                                if (result.didChange) {
+                                                    val updatedNotes = notesState.map { existingNote ->
+                                                        noteUpdates.find { it.first == existingNote }?.second ?: existingNote
+                                                    }
+                                                    notesState = updatedNotes
+                                                    SelectionManager.clear()
+                                                    noteUpdates.forEach { (_, new) ->
+                                                        SelectionManager.select(
+                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, new),
+                                                            single = false
                                                         )
-                                                    )
-                                                }
-
-                                                noteUpdates.forEach { (old, new) -> onNoteUpdate?.invoke(old, new) }
-                                                val updatedNotes = notesState.map { n ->
-                                                    noteUpdates.find { it.first == n }?.second ?: n
-                                                }
-                                                notesState = updatedNotes
-                                                SelectionManager.clear()
-                                                noteUpdates.forEach { (_, new) ->
-                                                    SelectionManager.select(
-                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, new),
-                                                        single = false
-                                                    )
+                                                    }
                                                 }
                                                 resizeRightDelta = 0f
                                                 activeDragNote = null
@@ -1242,264 +2506,22 @@ private fun PianoRollEditor(
                                     }
                                 }
 
-                                val s = marqueeStart; val c = marqueeCurrent
-                                if (s != null && c != null) {
-                                    val left = min(s.x, c.x); val top = min(s.y, c.y)
-                                    val w = kotlin.math.abs(c.x - s.x); val h = kotlin.math.abs(c.y - s.y)
-                                    with(LocalDensity.current) {
-                                        Box(
-                                            modifier = Modifier
-                                                .offset(x = left.toDp(), y = top.toDp())
-                                                .size(w.toDp(), h.toDp())
-                                                .border(1.dp, MaterialTheme.colorScheme.primary)
-                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                        )
-                                    }
-                                }
-
-                                selectedTimeMs?.let { timeMs ->
-                                    val xPx by remember(timeMs, metrics.pixelsPerBeatPx) {
-                                        derivedStateOf { metrics.timeMsToXPx(timeMs) }
-                                    }
-                                    val density = LocalDensity.current
-                                    Box(
-                                        modifier = Modifier
-                                            .offset { IntOffset((xPx - with(density) { 1.5.dp.toPx() }).toInt(), 0) }
-                                            .width(3.dp)
-                                            .height(rowHeight)
-                                            .background(Color.White.copy(alpha = 0.8f))
-                                    )
-                                }
+                                PianoRollSelectedTimeCursor(
+                                    selectedTimeMs = selectedTimeMs,
+                                    viewport = viewport,
+                                    oobOverhangMs = oobOverhangMs,
+                                    rowHeight = rowHeight
+                                )
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
-@Composable
-private fun NoteBox(
-    note: MidiNote,
-    metrics: PianoRollMetrics,
-    isSelected: Boolean,
-    onSelect: () -> Unit,
-    onDrag: (dragAmount: Offset) -> Unit,
-    onDragEnd: () -> Unit,
-    onResizeLeft: (resizeDelta: Float) -> Unit,
-    onResizeLeftEnd: () -> Unit,
-    onResizeRight: (resizeDelta: Float) -> Unit,
-    onResizeRightEnd: () -> Unit,
-    dragOffset: Offset,
-    resizeLeftDelta: Float,
-    resizeRightDelta: Float
-) {
-    val density = LocalDensity.current
-
-    val baseY = metrics.pitchToYPx(note.pitch)
-    val baseX = metrics.timeMsToXPx(note.startTimeMs)
-    val baseWidthPx = metrics.durationMsToWidthPx(note.durationMs)
-
-    val snappedDragOffsetY = if (dragOffset.y != 0f) {
-        val pitchSteps = kotlin.math.round(dragOffset.y / metrics.noteHeightPx).toInt()
-        pitchSteps * metrics.noteHeightPx
-    } else {
-        0f
-    }
-
-    val currentX = baseX + dragOffset.x + resizeLeftDelta
-    val currentY = baseY + snappedDragOffsetY
-    val currentWidthPx = (baseWidthPx - resizeLeftDelta + resizeRightDelta).coerceAtLeast(20f)
-
-    Box(
-        modifier = Modifier
-            .offset(
-                x = with(density) { currentX.toDp() },
-                y = with(density) { currentY.toDp() }
-            )
-            .size(
-                width = with(density) { currentWidthPx.toDp() },
-                height = 22.dp
-            )
-            .background(Color(note.led.red, note.led.green, note.led.blue))
-            .border(2.dp, MaterialTheme.colorScheme.onSurface.copy(if (isSelected) 1f else 0.4f))
-            .padding(1.dp)
-            .border(1.dp, MaterialTheme.colorScheme.surfaceDim)
-            .clickable { onSelect() }
-            .pointerInput(note) {
-                detectDragGestures(
-                    onDragStart = { onSelect() },
-                    onDragEnd = { onDragEnd() },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        onDrag(dragAmount)
-                    }
-                )
-            }
-    ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .width(6.dp)
-                .fillMaxHeight()
-                .pointerHoverIcon(PointerIcon.ResizeLeft)
-                .pointerInput(note) {
-                    detectDragGestures(
-                        onDragStart = { onSelect() },
-                        onDragEnd = { onResizeLeftEnd() },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            onResizeLeft(dragAmount.x)
-                        }
-                    )
-                }
-        )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .width(6.dp)
-                .fillMaxHeight()
-                .pointerHoverIcon(PointerIcon.ResizeRight)
-                .pointerInput(note) {
-                    detectDragGestures(
-                        onDragStart = { onSelect() },
-                        onDragEnd = { onResizeRightEnd() },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            onResizeRight(dragAmount.x)
-                        }
-                    )
-                }
-        )
-    }
-}
-
-@Composable
-private fun PianoKeysColumn(
-    totalPitches: Int,
-    noteHeight: Dp,
-    verticalScroll: ScrollState?,
-    deviceIndex: Int,
-    pressedPitches: Set<Int>
-) {
-    Box(
-        modifier = Modifier
-            .width(100.dp)
-            .fillMaxHeight()
-            .background(Color(0xFF2A2A2A))
-            .let { if (verticalScroll != null) it.verticalScroll(verticalScroll, enabled = false) else it }
-    ) {
-        Column(
-            modifier = Modifier
-                .width(120.dp)
-                .height(noteHeight * totalPitches)
-        ) {
-            for (pitch in (totalPitches - 1) downTo 0) {
-                val noteInOctave = pitch % 12
-                val isBlackKey = noteInOctave in listOf(1, 3, 6, 8, 10)
-                val isPressed = pressedPitches.contains(pitch)
-
-                val keyColor = when {
-                    isPressed -> Color(0xFFFF0000) // Red for pressed keys
-                    isBlackKey -> MaterialTheme.colorScheme.surfaceDim
-                    else -> MaterialTheme.colorScheme.onSurface
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(noteHeight)
-                        .background(keyColor)
-                        .drawBehind {
-                            drawLine(
-                                color = Color(0xFF0A0A0A),
-                                start = Offset(0f, size.height),
-                                end = Offset(size.width, size.height),
-                                strokeWidth = 1f
+                            PianoRollMarqueeOverlay(
+                                marqueeStart = marqueeStart,
+                                marqueeCurrent = marqueeCurrent
                             )
-                        },
-                    contentAlignment = Alignment.CenterEnd
-                ) {}
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimelineRuler(
-    clipBeats: Float,
-    metrics: PianoRollMetrics,
-    beatsPerBar: Int,
-    canvasWidthDp: Dp
-) {
-    val textMeasurer = rememberTextMeasurer()
-    val backgroundColor = Color(0xFF2B2B2B)
-    val textColor = Color(0xFFCCCCCC)
-    val majorTickColor = Color(0xFFFFFFFF).copy(alpha = 0.8f)
-    val minorTickColor = Color(0xFFFFFFFF).copy(alpha = 0.4f)
-
-    Canvas(
-        modifier = Modifier
-            .width(canvasWidthDp)
-            .fillMaxHeight()
-            .background(backgroundColor)
-    ) {
-        val heightPx = size.height
-        val totalBeats = clipBeats.toInt() + 1
-
-        for (beatIndex in 0 until totalBeats) {
-            val x = beatIndex * metrics.pixelsPerBeatPx
-            if (x > size.width) break
-
-            val isBar = (beatIndex % beatsPerBar) == 0
-            val tickHeight = if (isBar) heightPx * 0.6f else heightPx * 0.3f
-
-            drawLine(
-                color = if (isBar) majorTickColor else minorTickColor,
-                start = Offset(x, heightPx - tickHeight),
-                end = Offset(x, heightPx),
-                strokeWidth = 1.dp.toPx()
-            )
-        }
-
-        for (beatIndex in 0 until totalBeats) {
-            val x = beatIndex * metrics.pixelsPerBeatPx
-            if (x > size.width) break
-
-            val isBar = (beatIndex % beatsPerBar) == 0
-
-            if (isBar) {
-                val barNumber = (beatIndex / beatsPerBar) + 1
-
-                drawText(
-                    textMeasurer = textMeasurer,
-                    text = "$barNumber",
-                    topLeft = Offset(x + 4.dp.toPx(), 4.dp.toPx()),
-                    style = TextStyle(
-                        color = textColor,
-                        fontSize = 11.sp
-                    )
-                )
-
-                for (beat in 1 until beatsPerBar) {
-                    val beatX = (beatIndex + beat) * metrics.pixelsPerBeatPx
-                    if (beatX > size.width) break
-
-                    drawText(
-                        textMeasurer = textMeasurer,
-                        text = "${beat + 1}",
-                        topLeft = Offset(beatX + 4.dp.toPx(), 4.dp.toPx()),
-                        style = TextStyle(
-                            color = textColor.copy(alpha = 0.6f),
-                            fontSize = 10.sp
-                        )
-                    )
+                        }
+                    }
                 }
             }
         }
     }
 }
-
-

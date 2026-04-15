@@ -22,8 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,21 +42,28 @@ import androidx.compose.ui.zIndex
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drop.dropTarget
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.core.controls.automapping.buildChainDevicesFromTimelineAudioRange
+import dev.anthonyhfm.amethyst.core.controls.automapping.buildChainDeviceFromTimelineAudioEntry
+import dev.anthonyhfm.amethyst.core.controls.automapping.buildChainDeviceFromTimelineMidiEntry
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
-import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -188,7 +193,9 @@ fun ExpandingChainDevicePicker(
             .hoverable(interaction)
             .rightClickable {
                 val isDevice = clipboard is ClipboardData.ChainDevice
-                val isTimelineAudio = clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain
+                val isTimelineAudio =
+                    (clipboard is ClipboardData.TimelineAudioEntries || clipboard is ClipboardData.TimelineAudioRange) &&
+                        WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain
                 val isMidiEntries = clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain
 
                 if (isDevice || isTimelineAudio || isMidiEntries) {
@@ -200,15 +207,20 @@ fun ExpandingChainDevicePicker(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (clipboard is ClipboardData.ChainDevice || clipboard is ClipboardData.TimelineAudioEntries || clipboard is ClipboardData.TimelineMidiEntries) {
-            AmethystContextMenu(
+        if (
+            clipboard is ClipboardData.ChainDevice ||
+            clipboard is ClipboardData.TimelineAudioEntries ||
+            clipboard is ClipboardData.TimelineAudioRange ||
+            clipboard is ClipboardData.TimelineMidiEntries
+        ) {
+            ChainContextMenu(
                 expanded = showRightClickMenu,
                 onDismissRequest = { showRightClickMenu = false },
                 offset = rightClickMenuOffset,
-            ) { _, _, _ ->
+            ) {
                 if (clipboard is ClipboardData.ChainDevice) {
                     val count = (clipboard as ClipboardData.ChainDevice).states.size
-                    ContextMenuItem(
+                    ChainContextMenuItem(
                         label = "Paste all ($count)",
                         icon = Icons.Default.ContentPaste,
                         onClick = {
@@ -224,39 +236,41 @@ fun ExpandingChainDevicePicker(
                         }
                     )
                 } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
-                    ContextMenuItem(
+                    ChainContextMenuItem(
                         label = "Paste Audio from Timeline",
                         icon = Icons.Default.ContentPaste,
                         onClick = {
-                            (clipboard as ClipboardData.TimelineAudioEntries).entries.fastForEachReversed {
-                                destinationChain.add(
-                                    device = StateChain.unpackDevice(
-                                        device = ClipChainDeviceState(
-                                            fileName = it.fileName,
-                                            rawData = it.rawData,
-                                            sampleRate = it.sampleRate,
-                                            channels = it.channels,
-                                            bitDepth = it.bitDepth,
-                                            isLoaded = true,
-                                        )
-                                    )
-                                )
+                            (clipboard as ClipboardData.TimelineAudioEntries).entries.fastForEachReversed { entry ->
+                                buildChainDeviceFromTimelineAudioEntry(entry)?.let { device ->
+                                    destinationChain.add(device = device, atIndex = slotIndex)
+                                }
+                            }
+                            showRightClickMenu = false
+                        }
+                    )
+                } else if (clipboard is ClipboardData.TimelineAudioRange && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                    ChainContextMenuItem(
+                        label = "Paste Audio + Automation from Timeline",
+                        icon = Icons.Default.ContentPaste,
+                        onClick = {
+                            buildChainDevicesFromTimelineAudioRange(
+                                entries = (clipboard as ClipboardData.TimelineAudioRange).entries,
+                                automationLanes = (clipboard as ClipboardData.TimelineAudioRange).automationLanes,
+                                rangeStartMs = (clipboard as ClipboardData.TimelineAudioRange).rangeStartMs
+                            ).fastForEachReversed { device ->
+                                destinationChain.add(device = device, atIndex = slotIndex)
                             }
                             showRightClickMenu = false
                         }
                     )
                 } else if (clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
-                    ContextMenuItem(
+                    ChainContextMenuItem(
                         label = "Paste Midi from Timeline",
                         icon = Icons.Default.ContentPaste,
                         onClick = {
                             (clipboard as ClipboardData.TimelineMidiEntries).entries.fastForEachReversed { midiEntry ->
                                 destinationChain.add(
-                                    device = StateChain.unpackDevice(
-                                        device = dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDeviceState(
-                                            midiEntry = midiEntry.copy()
-                                        )
-                                    ),
+                                    device = buildChainDeviceFromTimelineMidiEntry(midiEntry),
                                     atIndex = slotIndex
                                 )
                             }
@@ -280,7 +294,7 @@ fun ExpandingChainDevicePicker(
                         .size(5.dp)
                         .align(Alignment.TopCenter)
                         .graphicsLayer(alpha = pulseAlpha.value)
-                        .background(MaterialTheme.colorScheme.secondary)
+                        .background(Theme[colors][mutedForeground].copy(alpha = 0.7f))
                 )
             }
 
@@ -290,7 +304,7 @@ fun ExpandingChainDevicePicker(
                         .width(indicatorWidth)
                         .fillMaxHeight()
                         .graphicsLayer(alpha = indicatorAlpha)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(Theme[colors][primary])
                         .zIndex(2f)
                 )
             }
@@ -302,7 +316,11 @@ fun ExpandingChainDevicePicker(
                         .graphicsLayer(alpha = buttonAlpha)
                         .zIndex(3f)
                 ) {
-                    IconButton(onClick = { pickerVisible = true }) {
+                    Button(
+                        onClick = { pickerVisible = true },
+                        variant = ButtonVariant.Ghost,
+                        size = ButtonSize.Icon,
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Add a new device"
@@ -331,7 +349,10 @@ private fun isDroppingIntoSelf(
 ): Boolean {
     return when (dragged) {
         is GroupChainDevice -> dragged.state.value.groups.any { it.chain.containsChain(destinationChain) }
-        is MultiGroupChainDevice -> dragged.state.value.groups.any { it.chain.containsChain(destinationChain) }
+        is MultiGroupChainDevice -> {
+            dragged.state.value.groups.any { it.chain.containsChain(destinationChain) } ||
+            dragged.preprocessChain.containsChain(destinationChain)
+        }
         is ChokeChainDevice -> dragged.state.value.chain.containsChain(destinationChain)
         else -> false
     }
@@ -342,7 +363,10 @@ private fun Chain.containsChain(target: Chain): Boolean {
     for (device in this.devices.value) {
         when (device) {
             is GroupChainDevice -> if (device.state.value.groups.any { it.chain.containsChain(target) }) return true
-            is MultiGroupChainDevice -> if (device.state.value.groups.any { it.chain.containsChain(target) }) return true
+            is MultiGroupChainDevice -> {
+                if (device.state.value.groups.any { it.chain.containsChain(target) }) return true
+                if (device.preprocessChain.containsChain(target)) return true
+            }
             is ChokeChainDevice -> if (device.state.value.chain.containsChain(target)) return true
         }
     }

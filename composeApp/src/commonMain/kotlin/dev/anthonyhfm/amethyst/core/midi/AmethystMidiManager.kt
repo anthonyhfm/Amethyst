@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.core.midi
 
 import androidx.compose.ui.graphics.Color
+import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
@@ -221,12 +222,22 @@ class AmethystMidiManager {
                     val y = it.pitch / 10
                     val posX = offset.x.toInt()
                     val posY = offset.y.toInt()
+                    val globalX = posX + x
+                    val globalY = posY + (9 - y)
+
+                    if (it.velocity != 0) {
+                        AutomappingManager.tryCommitPadMapping(
+                            device = this@onMidiMessage,
+                            globalX = globalX,
+                            globalY = globalY,
+                        )
+                    }
 
                     WorkspaceRepository.samplingChain.signalEnter(
                         Signal.Midi(
                             origin = null,
-                            x = posX + x,
-                            y = posY + (9 - y),
+                            x = globalX,
+                            y = globalY,
                             velocity = it.velocity
                         )
                     )
@@ -234,8 +245,8 @@ class AmethystMidiManager {
                     WorkspaceRepository.lightsChain.signalEnter(
                         Signal.LED(
                             origin = null,
-                            x = posX + x,
-                            y = posY + (9 - y),
+                            x = globalX,
+                            y = globalY,
                             color = if (it.velocity == 0) Color.Black else Color.White,
                             layer = 0
                         )

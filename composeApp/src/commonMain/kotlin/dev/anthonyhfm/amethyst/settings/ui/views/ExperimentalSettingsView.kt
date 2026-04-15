@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.settings.ui.views
 
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,6 +8,7 @@ import androidx.compose.runtime.setValue
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsCategory
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.Switch
 
 @Composable
 fun ExperimentalSettingsView() {

@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.home.ui.views
 import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.apollo.ApolloConverter
 import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
@@ -135,7 +136,31 @@ class RecentViewModel(
                                 }
 
                                 ZippedProjectFormat.ABLETON_APOLLO -> {
-                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.path))
+                                    FileHelper.clearCache()
+
+                                    navigator.navigate(HomeNavRoute.LoadingScreen("Translating your Ableton + Apollo Project"))
+
+                                    GlobalScope.launch {
+                                        try {
+                                            val workspace = AbletonConverter.convertZipToWorkspace(file).apply {
+                                                path = file.path
+                                            }
+
+                                            WorkspaceRepository.loadWorkspace(workspace)
+                                            triggerEffect(RecentViewContract.Effect.OpenWorkspace)
+                                        } catch (ex: Exception) {
+                                            CoroutineScope(Dispatchers.Main).launch {
+                                                navigator.popBackStack()
+                                            }
+
+                                            ex.printStackTrace()
+
+                                            snackbarHostState.showSnackbar(
+                                                message = "Failed to convert Ableton + Apollo Project",
+                                                withDismissAction = true,
+                                            )
+                                        }
+                                    }
                                 }
 
                                 ZippedProjectFormat.UNIPAD -> {
@@ -182,7 +207,15 @@ class RecentViewModel(
                     path = file.path
                 }
 
-                GlobalSettings.recentWorkspaces += event.project.copy(lastOpened = Clock.System.now().toEpochMilliseconds())
+                GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces
+                    .filter { it.path != event.project.path }
+                    .toMutableList()
+                    .apply {
+                        add(
+                            index = 0,
+                            element = event.project.copy(lastOpened = Clock.System.now().toEpochMilliseconds())
+                        )
+                    }
                 WorkspaceRepository.loadWorkspace(workspace)
 
                 triggerEffect(RecentViewContract.Effect.OpenWorkspace)

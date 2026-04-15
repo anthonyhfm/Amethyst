@@ -2,19 +2,9 @@ package dev.anthonyhfm.amethyst.workspace.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,131 +12,102 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.rememberDialogState
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.platformMidiAccess
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialog
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogAction
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogCancel
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogDescription
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
+import dev.anthonyhfm.amethyst.ui.components.primitives.Combobox
+import dev.anthonyhfm.amethyst.ui.components.primitives.Field
+import dev.anthonyhfm.amethyst.ui.components.primitives.FieldDescription
+import dev.anthonyhfm.amethyst.ui.components.primitives.FieldLabel
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.atsushieno.ktmidi.EmptyMidiAccess
-import dev.atsushieno.ktmidi.MidiAccess
 import dev.atsushieno.ktmidi.MidiPortDetails
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeviceSettingsDialog(
     uuid: String,
-    onEvent: (WorkspaceContract.Event) -> Unit
+    onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val midiAccess = platformMidiAccess ?: EmptyMidiAccess()
-
     val device = Heaven.devices.find { it.selectionUUID == uuid }
+    val inputPorts = remember(midiAccess) { midiAccess.inputs.toList() }
+    val outputPorts = remember(midiAccess) { midiAccess.outputs.toList() }
+    val dialogState = rememberDialogState(initiallyVisible = true)
 
-    var expandedInput: Boolean by remember { mutableStateOf(false) }
-    var expandedOutput: Boolean by remember { mutableStateOf(false) }
+    var midiInputPort: MidiPortDetails? by remember(uuid) { mutableStateOf(device?.deviceConfig?.input?.details) }
+    var midiOutputPort: MidiPortDetails? by remember(uuid) { mutableStateOf(device?.deviceConfig?.launchpadDevice?.midiOutput?.details) }
 
-    var midiInputPort: MidiPortDetails? by remember { mutableStateOf(device?.deviceConfig?.input?.details) }
-    var midiOutputPort: MidiPortDetails? by remember { mutableStateOf(device?.deviceConfig?.launchpadDevice?.midiOutput?.details) }
+    val selectedInput = inputPorts.firstOrNull { it.id == midiInputPort?.id } ?: midiInputPort
+    val selectedOutput = outputPorts.firstOrNull { it.id == midiOutputPort?.id } ?: midiOutputPort
 
     AlertDialog(
-        onDismissRequest = {
+        state = dialogState,
+        modifier = Modifier.width(350.dp),
+        onDismiss = {
             onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
         },
-        modifier = Modifier
-            .width(350.dp),
-        title = {
-            Text("Device Configuration")
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(),
+    ) {
+        AlertDialogHeader {
+            AlertDialogTitle("Device Configuration")
+            AlertDialogDescription("Choose the MIDI input and output ports for this device.")
+        }
 
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ExposedDropdownMenuBox(
-                    expanded = expandedInput,
-                    onExpandedChange = {
-                        expandedInput = it
-                    }
-                ) {
-                    OutlinedTextField(
-                        value = midiInputPort?.name ?: "",
-                        onValueChange = { },
-                        label = { Text("Midi Input") },
-                        readOnly = true,
-                        singleLine = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedInput) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                    )
-
-                    ExposedDropdownMenu(
-                        expanded = expandedInput,
-                        onDismissRequest = { expandedInput = false },
-                    ) {
-                        midiAccess.inputs.forEach {
-                            DropdownMenuItem(
-                                text = { Text(it.name ?: "Unknown Input") },
-                                onClick = {
-                                    midiInputPort = it
-                                    expandedInput = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                ExposedDropdownMenuBox(
-                    expanded = expandedOutput,
-                    onExpandedChange = {
-                        expandedOutput = it
-                    }
-                ) {
-                    OutlinedTextField(
-                        value = midiOutputPort?.name ?: "",
-                        onValueChange = { },
-                        label = { Text("Midi Output") },
-                        readOnly = true,
-                        singleLine = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedOutput) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                    )
-
-                    ExposedDropdownMenu(
-                        expanded = expandedOutput,
-                        onDismissRequest = { expandedOutput = false },
-                    ) {
-                        midiAccess.outputs.forEach {
-                            DropdownMenuItem(
-                                text = { Text(it.name ?: "Unknown Output") },
-                                onClick = {
-                                    midiOutputPort = it
-                                    expandedOutput = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Text("The device type will be recognized automatically")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
-                }
-            ) {
-                Text(
-                    text = "Cancel",
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = MaterialTheme.typography.bodyMedium.fontSize
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Field {
+                FieldLabel("MIDI Input")
+                Combobox(
+                    items = inputPorts,
+                    selectedItem = selectedInput,
+                    onItemSelected = { midiInputPort = it },
+                    itemLabel = { it.name ?: "Unknown Input" },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = if (inputPorts.isEmpty()) "No inputs available" else "Select an input",
+                    searchPlaceholder = "Search inputs...",
+                    emptyMessage = "No inputs found.",
+                    enabled = inputPorts.isNotEmpty(),
                 )
             }
-        },
-        confirmButton = {
-            Button(
+
+            Field {
+                FieldLabel("MIDI Output")
+                Combobox(
+                    items = outputPorts,
+                    selectedItem = selectedOutput,
+                    onItemSelected = { midiOutputPort = it },
+                    itemLabel = { it.name ?: "Unknown Output" },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = if (outputPorts.isEmpty()) "No outputs available" else "Select an output",
+                    searchPlaceholder = "Search outputs...",
+                    emptyMessage = "No outputs found.",
+                    enabled = outputPorts.isNotEmpty(),
+                )
+                FieldDescription("The device type will be recognized automatically.")
+            }
+        }
+
+        AlertDialogFooter {
+            AlertDialogCancel(
+                onClick = {
+                    onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                },
+            ) {
+                Text("Cancel")
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            AlertDialogAction(
                 onClick = {
                     onEvent(
                         WorkspaceContract.Event.OnChangeDeviceConfig(
@@ -156,14 +117,10 @@ fun DeviceSettingsDialog(
                         )
                     )
                     onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
-                }
+                },
             ) {
-                Text(
-                    text = "Save",
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = MaterialTheme.typography.bodyMedium.fontSize
-                )
+                Text("Save")
             }
         }
-    )
+    }
 }

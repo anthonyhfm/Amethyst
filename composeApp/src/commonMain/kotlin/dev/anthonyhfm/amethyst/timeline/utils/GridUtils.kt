@@ -32,6 +32,7 @@ object GridUtils {
     }
 
     fun snapToGrid(timeMs: Long, zoomLevel: Float, bpm: Double? = null, gridType: GridType? = null): Long {
+        if (gridType is GridType.NoGrid) return timeMs.coerceAtLeast(0L)
         val intervals = if (gridType == null || gridType is GridType.None) compute(zoomLevel) else computeWithGridType(zoomLevel, bpm ?: 120.0, gridType)
         val interval = intervals.intervalMs
         if (interval <= 0) return timeMs
@@ -52,6 +53,7 @@ object GridUtils {
         gridType: GridType? = null,
         thresholdPx: Float = 0f
     ): Long {
+        if (gridType is GridType.NoGrid) return timeMs.coerceAtLeast(0L)
         val intervals = if (gridType == null || gridType is GridType.None) compute(zoomLevel) else computeWithGridType(zoomLevel, bpm ?: 120.0, gridType)
         val interval = intervals.intervalMs
         if (interval <= 0) return timeMs
@@ -64,7 +66,7 @@ object GridUtils {
 
     // --- Ableton-ähnliche Grid Berechnung ---
     fun computeWithGridType(zoomLevel: Float, bpm: Double, gridType: GridType): GridIntervals {
-        if (gridType is GridType.None) return compute(zoomLevel)
+        if (gridType is GridType.None || gridType is GridType.NoGrid) return compute(zoomLevel)
         val safeBpm = bpm.takeIf { it > 0.0 } ?: 120.0
         val beatMs = 60000.0 / safeBpm // Länge eines Beats
         val barMs = beatMs * 4 // 4/4 Takt angenommen
@@ -82,7 +84,7 @@ object GridUtils {
         fun fractionToMs(frac: Double) = (barMs * frac).roundToLongSafe()
 
         return when (gridType) {
-            GridType.None -> compute(zoomLevel)
+            GridType.None, GridType.NoGrid -> compute(zoomLevel)
             is GridType.Flexible.Smallest -> {
                 val ms = fractionToMs(1.0 / 32.0)
                 GridIntervals(ms, (barMs / ms).ceilInt(), barMs.roundToLongSafe(), gridType)
@@ -140,6 +142,7 @@ object GridUtils {
 
     sealed interface GridType {
         data object None : GridType
+        data object NoGrid : GridType
         sealed interface Flexible : GridType {
             data object Smallest : Flexible
             data object Small : Flexible
@@ -162,3 +165,23 @@ object GridUtils {
         }
     }
 }
+
+val GridUtils.GridType.displayLabel: String
+    get() = when (this) {
+        is GridUtils.GridType.NoGrid -> "No Grid"
+        is GridUtils.GridType.None -> "Auto"
+        is GridUtils.GridType.Flexible.Smallest -> "Flex: Min"
+        is GridUtils.GridType.Flexible.Small -> "Flex: S"
+        is GridUtils.GridType.Flexible.Medium -> "Flex: M"
+        is GridUtils.GridType.Flexible.Large -> "Flex: L"
+        is GridUtils.GridType.Flexible.Largest -> "Flex: Max"
+        is GridUtils.GridType.Fixed.Bar_1 -> "1 Bar"
+        is GridUtils.GridType.Fixed.Bar_2 -> "2 Bars"
+        is GridUtils.GridType.Fixed.Bar_4 -> "4 Bars"
+        is GridUtils.GridType.Fixed.Bar_8 -> "8 Bars"
+        is GridUtils.GridType.Fixed._1_2 -> "1/2"
+        is GridUtils.GridType.Fixed._1_4 -> "1/4"
+        is GridUtils.GridType.Fixed._1_8 -> "1/8"
+        is GridUtils.GridType.Fixed._1_16 -> "1/16"
+        is GridUtils.GridType.Fixed._1_32 -> "1/32"
+    }

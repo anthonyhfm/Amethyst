@@ -1,0 +1,317 @@
+{
+    "schemaVersion": {
+        "major": 1,
+        "minor": 0,
+        "hotfix": 0
+    },
+    "metadata": {
+        "id": "gem://reference/color-transform",
+        "name": "Color Transform Gem",
+        "description": "Reference Phase 1 gem fixture that captures color/intensity authoring data in JSON.",
+        "category": {
+            "id": "reference",
+            "label": "Reference Gems"
+        },
+        "assetVersion": {
+            "major": 1,
+            "minor": 0,
+            "hotfix": 0
+        }
+    },
+    "definition": {
+        "rootGraph": {
+            "id": "root",
+            "kind": "ROOT",
+            "label": "Color Transform Root",
+            "description": "",
+            "nodes": [
+                {
+                    "id": "base-color",
+                    "type": {
+                        "typeId": "amethyst.parameter.color.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Base Color",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "color"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "intensity",
+                    "type": {
+                        "typeId": "amethyst.parameter.number.in",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Intensity",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                },
+                {
+                    "id": "default-intensity",
+                    "type": {
+                        "typeId": "amethyst.constant.number",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Default Intensity",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {
+                        "value": {
+                            "kind": "number",
+                            "value": 0.85
+                        }
+                    }
+                },
+                {
+                    "id": "intensity-scale",
+                    "type": {
+                        "typeId": "amethyst.transform.number.scale",
+                        "version": {
+                            "major": 1,
+                            "minor": 0,
+                            "hotfix": 0
+                        }
+                    },
+                    "label": "Intensity Scale",
+                    "pins": [
+                        {
+                            "id": "value",
+                            "label": "Value",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": true,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "scale",
+                            "label": "Scale",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 1.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "bias",
+                            "label": "Bias",
+                            "direction": "INPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": {
+                                "kind": "number",
+                                "value": 0.0
+                            },
+                            "groupId": null,
+                            "sortOrder": null
+                        },
+                        {
+                            "id": "result",
+                            "label": "Result",
+                            "direction": "OUTPUT",
+                            "type": {
+                                "kind": "value",
+                                "valueType": {
+                                    "kind": "number"
+                                },
+                                "family": "VALUE"
+                            },
+                            "required": false,
+                            "defaultValue": null,
+                            "groupId": null,
+                            "sortOrder": null
+                        }
+                    ],
+                    "serializedState": {}
+                }
+            ],
+            "connections": [
+                {
+                    "id": "intensity-into-scale",
+                    "from": {
+                        "nodeId": "intensity",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "intensity-scale",
+                        "pinId": "value"
+                    }
+                },
+                {
+                    "id": "default-scale-factor",
+                    "from": {
+                        "nodeId": "default-intensity",
+                        "pinId": "value"
+                    },
+                    "to": {
+                        "nodeId": "intensity-scale",
+                        "pinId": "scale"
+                    }
+                }
+            ]
+        },
+        "subgraphs": [],
+        "host": {
+            "assetShape": "PROCESSOR",
+            "supportedDomains": [
+                "LED"
+            ],
+            "inputs": [],
+            "outputs": []
+        },
+        "exposedParameters": [
+            {
+                "id": "base-color",
+                "label": "Base Color",
+                "description": "Primary color value exposed to the host.",
+                "type": {
+                    "kind": "color"
+                },
+                "defaultValue": {
+                    "kind": "color",
+                    "value": {
+                        "red": 0.92,
+                        "green": 0.37,
+                        "blue": 0.74,
+                        "alpha": 1.0
+                    }
+                },
+                "groupId": "appearance",
+                "sortOrder": 10,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "base-color",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            },
+            {
+                "id": "intensity",
+                "label": "Intensity",
+                "description": "Scalar transform amount for the color treatment.",
+                "type": {
+                    "kind": "number"
+                },
+                "defaultValue": {
+                    "kind": "number",
+                    "value": 0.85
+                },
+                "groupId": "appearance",
+                "sortOrder": 20,
+                "bindings": [
+                    {
+                        "graphId": "root",
+                        "nodeId": "intensity",
+                        "pinId": "value",
+                        "targetKind": "OUTPUT_PIN"
+                    }
+                ]
+            }
+        ],
+        "defaultState": {
+            "exposedParameterValues": {
+                "base-color": {
+                    "kind": "color",
+                    "value": {
+                        "red": 0.92,
+                        "green": 0.37,
+                        "blue": 0.74,
+                        "alpha": 1.0
+                    }
+                },
+                "intensity": {
+                    "kind": "number",
+                    "value": 0.85
+                }
+            },
+            "hostDeviceDefaults": {}
+        }
+    },
+    "extensions": {}
+}

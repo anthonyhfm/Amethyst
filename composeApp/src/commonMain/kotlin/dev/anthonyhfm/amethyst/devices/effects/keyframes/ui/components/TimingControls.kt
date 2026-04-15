@@ -6,10 +6,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.anthonyhfm.amethyst.core.util.Timing
-import dev.anthonyhfm.amethyst.ui.components.TextDial
-import dev.anthonyhfm.amethyst.ui.components.TimeDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import kotlinx.coroutines.flow.update
 
 @Composable
 fun TimingControls(

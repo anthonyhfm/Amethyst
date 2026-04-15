@@ -10,8 +10,8 @@ class ApolloSwitchAdapter(
 ) : ApolloAdapter<ApolloModel.Device.Switch>(model) {
     override fun toDeviceState(): DeviceState {
         return MacroControlChainDeviceState(
-            macro = model.target,
-            value = model.value
+            macro = model.target - 1,
+            value = model.value - 1
         )
     }
 }

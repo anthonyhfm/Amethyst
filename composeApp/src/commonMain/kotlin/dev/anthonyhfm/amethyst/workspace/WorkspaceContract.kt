@@ -29,6 +29,8 @@ interface WorkspaceContract {
             var outputPort: MidiPortDetails?,
         ) : Event
 
+        data class OnDeleteDevice(val uuid: String) : Event
+
         data class AddDeviceToViewport(val device: LaunchpadViewportElement) : Event
 
         data class AddChainDevice(val device: GenericChainDevice<*>, val atIndex: Int? = null) : Event

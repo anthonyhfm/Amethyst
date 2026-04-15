@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.ui.components
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -10,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -29,19 +29,18 @@ fun TimeDial(
         TextDial(
             value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / 1000,
             onStartValueChange = {
-                onStartValueChange(timing, (it * 1000).toInt().milliseconds.inWholeMilliseconds)
+                onStartValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
             },
             onValueChange = {
                 onSelectTiming(
-                    Timing.Duration((it * 1000).toInt().milliseconds),
-                    (it * 1000).toInt().milliseconds.inWholeMilliseconds
+                    Timing.Duration((it * 1000).roundToInt().milliseconds),
+                    (it * 1000).roundToInt().milliseconds.inWholeMilliseconds
                 )
             },
             onFinishValueChange = {
-                onFinishValueChange(timing, (it * 1000).toInt().milliseconds.inWholeMilliseconds)
+                onFinishValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
             },
             headline = headline,
-            dialColor = MaterialTheme.colorScheme.secondary,
             text = text ?: "${timing.duration.inWholeMilliseconds.toInt()} ms",
             onResolveTextValue = {
                 val timing = it.asTiming()
@@ -131,6 +130,6 @@ fun String.asTiming(): Timing? {
                 } else null
             } else null
         }
-        else -> null
+        else -> trimmed.toIntOrNull()?.let { Timing.Duration(it.milliseconds) }
     }
 }

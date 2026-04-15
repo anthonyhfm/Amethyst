@@ -8,26 +8,27 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.handleRenameShortcut
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.Zip
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.deprecated.openFileSaver
 import io.github.vinceglb.filekit.dialogs.openFileSaver
 import io.github.vinceglb.filekit.path
 import io.github.vinceglb.filekit.write
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 
@@ -36,93 +37,206 @@ object ShortcutManager {
     fun handleShortcut(keyEvent: KeyEvent): Boolean {
         if (keyEvent.type != KeyEventType.KeyDown) return false
 
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.Z) {
+        val isCtrl = keyEvent.isCtrlPressed || keyEvent.isMetaPressed
+
+        // Undo / Redo
+        if (isCtrl && keyEvent.key == Key.Z) {
             return if (keyEvent.isShiftPressed) {
-                UndoManager.redo()
-                true
+                UndoManager.redo(); true
             } else {
-                // Ctrl+Z = Undo
-                UndoManager.undo()
-                true
+                UndoManager.undo(); true
             }
         }
 
-        // Alternative Redo shortcut (Ctrl+Y)
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.Y) {
+        if (isCtrl && keyEvent.key == Key.Y) {
             UndoManager.redo()
             return true
         }
 
+        // Delete
         if (keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace) {
-            println("Delete/Backspace pressed")
             return handleDeletionShortcut()
         }
 
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.D) {
+        // Duplicate
+        if (isCtrl && keyEvent.key == Key.D) {
             return handleDuplicateShortcut()
         }
 
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.C) {
-            if (SelectionManager.selections.value.isNotEmpty()) {
-                ClipboardManager.copy(SelectionManager.selections.value)
+        // Copy
+        if (isCtrl && !keyEvent.isShiftPressed && keyEvent.key == Key.C) {
+            val selections = SelectionManager.selections.value
+            if (selections.isNotEmpty() && selections.none { it is Selectable.GroupChainItem }) {
+                ClipboardManager.copy(selections)
                 return true
             }
         }
 
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.V) {
+        // Cut (Ctrl+X)
+        if (isCtrl && keyEvent.key == Key.X) {
+            val selections = SelectionManager.selections.value
+            if (selections.isNotEmpty() && selections.none { it is Selectable.GroupChainItem }) {
+                ClipboardManager.copy(selections)
+                handleDeletionShortcut()
+                return true
+            }
+        }
+
+        // Paste
+        if (isCtrl && keyEvent.key == Key.V) {
+            val clipboard = ClipboardManager.clipboardData.value
+            val hasGroupSelection = SelectionManager.selections.value.any { it is Selectable.GroupChainItem }
+            if (hasGroupSelection && (clipboard is ClipboardData.GroupChainItem || clipboard is ClipboardData.ChainDevice)) {
+                return false
+            }
             ClipboardManager.paste()
             return true
         }
 
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.S) {
-            var path = WorkspaceRepository.workspaceMeta?.path
+        // Select All (Ctrl+A) — context-sensitive
+        if (isCtrl && keyEvent.key == Key.A) {
+            return handleSelectAllShortcut()
+        }
 
-            GlobalScope.launch {
-                if (path == null) {
-                    path = FileKit.openFileSaver(
+        // Save (Ctrl+S) / Save As (Ctrl+Shift+S)
+        if (isCtrl && keyEvent.key == Key.S) {
+            if (keyEvent.isShiftPressed) {
+                // Ctrl+Shift+S → always open file picker (Save As)
+                GlobalScope.launch {
+                    var path = FileKit.openFileSaver(
                         suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
                         extension = "ame"
                     )?.path ?: return@launch
+                    persistWorkspace(path)
                 }
-
-                if (!path!!.endsWith(".ame")) {
-                    path += ".ame"
-                }
-
-                WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = path)
-                    ?: WorkspaceRepository.workspaceMeta
-
-                PlatformFile(path).write(
-                    bytes = Zip.encode(
-                        data = AmethystProtoBuf
-                            .encodeToByteArray(
-                                value = WorkspaceRepository.saveWorkspace()
-                            )
-                    )
-                )
-
-                GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.filter { it.path != path }.toMutableList().apply {
-                    add(
-                        index = 0,
-                        element = RecentWorkspace(
-                            title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
-                            path = path
-                        )
-                    )
+            } else {
+                // Ctrl+S → save to existing path or prompt
+                GlobalScope.launch {
+                    var path = WorkspaceRepository.workspaceMeta?.path
+                        ?: FileKit.openFileSaver(
+                            suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+                            extension = "ame"
+                        )?.path ?: return@launch
+                    persistWorkspace(path)
                 }
             }
-
             return true
         }
 
-        if ((keyEvent.isCtrlPressed || keyEvent.isMetaPressed) && keyEvent.key == Key.R) {
+        // Rename — Ctrl+R or F2
+        if ((isCtrl && keyEvent.key == Key.R) || keyEvent.key == Key.F2) {
             return handleRenameShortcut(keyEvent)
         }
 
-        if (keyEvent.key == Key.DirectionDown || keyEvent.key == Key.DirectionUp || keyEvent.key == Key.DirectionLeft || keyEvent.key == Key.DirectionRight) {
+        // Escape — clear selection (fallback, only if something is selected)
+        if (keyEvent.key == Key.Escape) {
+            if (SelectionManager.selections.value.isNotEmpty()) {
+                SelectionManager.clear()
+                return true
+            }
+        }
+
+        // Arrow navigation
+        if (keyEvent.key == Key.DirectionDown || keyEvent.key == Key.DirectionUp ||
+            keyEvent.key == Key.DirectionLeft || keyEvent.key == Key.DirectionRight) {
             return handleNavigationShortcut(keyEvent)
         }
 
+        // Numeric mode switching (1–5): only when no modifier pressed, main mode is selectable
+        if (!isCtrl && !keyEvent.isShiftPressed && WorkspaceRepository.mode.value.selectable) {
+            val targetMode = when (keyEvent.key) {
+                Key.One -> WorkspaceContract.WorkspaceMode.Performance()
+                Key.Two -> WorkspaceContract.WorkspaceMode.Timeline()
+                Key.Three -> WorkspaceContract.WorkspaceMode.LightsChain()
+                Key.Four -> WorkspaceContract.WorkspaceMode.SamplingChain()
+                Key.Five -> WorkspaceContract.WorkspaceMode.Layout()
+                else -> null
+            }
+            if (targetMode != null) {
+                WorkspaceRepository.switchMode(targetMode)
+                return true
+            }
+        }
+
         return false
+    }
+
+    private fun handleSelectAllShortcut(): Boolean {
+        // GroupChainItem: select all groups in the same compound device
+        val groupItem = SelectionManager.selections.value.filterIsInstance<Selectable.GroupChainItem>().firstOrNull()
+        if (groupItem != null) {
+            val (_, groups) = ChainNavigator.getGroupsInfo(groupItem.parent) ?: return false
+            if (groups.isEmpty()) return false
+            SelectionManager.clear()
+            groups.indices.forEach { i ->
+                SelectionManager.select(Selectable.GroupChainItem(groupItem.parent, i), single = false)
+            }
+            return true
+        }
+
+        return when (val mode = WorkspaceRepository.mode.value) {
+            is WorkspaceContract.WorkspaceMode.LightsChain -> {
+                val chain = WorkspaceRepository.lightsChain
+                val devices = chain.devices.value
+                if (devices.isNotEmpty()) {
+                    SelectionManager.clear()
+                    devices.forEach { device ->
+                        SelectionManager.select(Selectable.ChainDevice(chain, device), single = false)
+                    }
+                    true
+                } else false
+            }
+            is WorkspaceContract.WorkspaceMode.SamplingChain -> {
+                val chain = WorkspaceRepository.samplingChain
+                val devices = chain.devices.value
+                if (devices.isNotEmpty()) {
+                    SelectionManager.clear()
+                    devices.forEach { device ->
+                        SelectionManager.select(Selectable.ChainDevice(chain, device), single = false)
+                    }
+                    true
+                } else false
+            }
+            is WorkspaceContract.WorkspaceMode.Timeline -> {
+                val tracks = TimelineRepository.tracks.value
+                if (tracks.isNotEmpty()) {
+                    SelectionManager.clear()
+                    tracks.forEachIndexed { index, _ ->
+                        SelectionManager.select(Selectable.TimelineTrack(index), single = false)
+                    }
+                    true
+                } else false
+            }
+            else -> false
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun persistWorkspace(rawPath: String) {
+        val path = if (rawPath.endsWith(".ame")) rawPath else "$rawPath.ame"
+
+        WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = path)
+            ?: WorkspaceRepository.workspaceMeta
+
+        PlatformFile(path).write(
+            bytes = Zip.encode(
+                data = AmethystProtoBuf.encodeToByteArray(
+                    value = WorkspaceRepository.saveWorkspace()
+                )
+            )
+        )
+
+        GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces
+            .filter { it.path != path }
+            .toMutableList()
+            .apply {
+                add(
+                    index = 0,
+                    element = RecentWorkspace(
+                        title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+                        path = path
+                    )
+                )
+            }
     }
 }

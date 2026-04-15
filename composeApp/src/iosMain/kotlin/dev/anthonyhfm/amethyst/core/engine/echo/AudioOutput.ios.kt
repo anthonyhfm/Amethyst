@@ -115,7 +115,8 @@ actual object AudioOutput {
         }
 
         val node = AVAudioPlayerNode()
-        node.volume = GlobalSettings.masterVolume
+        node.volume = GlobalSettings.masterVolume * audioSignal.gain.coerceAtLeast(0f)
+        node.pan = audioSignal.pan.coerceIn(-1f, 1f)
         engine.attachNode(node)
         engine.connect(node, to = engine.mainMixerNode, format = format)
 
@@ -129,6 +130,19 @@ actual object AudioOutput {
 
         activePlayers[id] = PlayerHolder(id, audioSignal.origin, node, buffer)
         return id
+    }
+
+    actual fun playMultiple(signals: List<Signal.AudioSignal>): List<String?> {
+        // All AVAudioPlayerNodes share the same AVAudioEngine clock — starting them
+        // sequentially places them in the same output render cycle.
+        return signals.map { play(it) }
+    }
+
+    actual fun update(sourceId: String, gain: Float, pan: Float) {
+        activePlayers[sourceId]?.node?.let { node ->
+            node.volume = GlobalSettings.masterVolume * gain.coerceAtLeast(0f)
+            node.pan = pan.coerceIn(-1f, 1f)
+        }
     }
 
     actual fun stop(sourceId: String) {

@@ -9,9 +9,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,17 +25,25 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
-import dev.anthonyhfm.amethyst.ui.components.AmethystDevice
-import dev.anthonyhfm.amethyst.ui.components.AmethystCheckbox
-import dev.anthonyhfm.amethyst.ui.components.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.TextDial
-import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
+import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kotlin.math.roundToInt
 
 class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
     private val activeHoldKeys = mutableSetOf<String>()
@@ -46,12 +53,14 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
-        AmethystDevice(
+        ChainDeviceShell(
             title = "Loop",
-            isSelected = selections.any { it.selectionUUID == this.selectionUUID },
+            isSelected = isSelected,
             isDragging = isDragging.value,
-            modifier = Modifier.width(200.dp)
+            modifier = Modifier.width(200.dp),
+            titleBarModifier = LocalTitleBarModifier.current
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -114,7 +123,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(start = 12.dp)
                         ) {
-                            AmethystCheckbox(
+                            Checkbox(
                                 checked = deviceState.onHold,
                                 onCheckedChange = { checked ->
                                     val before = state.value
@@ -125,15 +134,16 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
 
                             Text(
                                 text = "Hold",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = Theme[typography][small],
+                                color = Theme[colors][foreground],
                             )
                         }
                     }
                 }
 
-                VerticalDivider(
-                    modifier = Modifier
-                        .height(160.dp),
+                Separator(
+                    modifier = Modifier.height(160.dp),
+                    orientation = SeparatorOrientation.Vertical,
                 )
 
                 Column(
@@ -165,7 +175,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     var beforeGate = deviceState.gate
                     TextDial(
                         headline = "Gate",
-                        text = "${(deviceState.gate * 200).toInt()}%",
+                        text = "${(deviceState.gate * 200).roundToInt()}%",
                         value = deviceState.gate,
                         onStartValueChange = { v ->
                             beforeGate = v

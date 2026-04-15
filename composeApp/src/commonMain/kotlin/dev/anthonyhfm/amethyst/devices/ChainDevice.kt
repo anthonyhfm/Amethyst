@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.devices
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.elements.SignalReceiver
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -20,6 +21,16 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
     abstract val state: MutableStateFlow<State>
 
     var isDragging: MutableState<Boolean> = mutableStateOf(false)
+
+    open fun onAddedToChain() = Unit
+
+    open fun onAddedToChain(parentChain: Chain) {
+        onAddedToChain()
+    }
+
+    open fun onRemovedFromChain() = Unit
+
+    open fun onStateRestored() = Unit
 
     @Composable
     abstract fun Content()

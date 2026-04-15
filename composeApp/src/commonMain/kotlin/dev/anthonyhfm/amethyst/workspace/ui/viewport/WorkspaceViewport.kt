@@ -1,26 +1,29 @@
 package dev.anthonyhfm.amethyst.workspace.ui.viewport
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,8 +45,22 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.ui.components.primitives.FullShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.muted
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.primary
+import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -59,9 +76,18 @@ fun WorkspaceViewport(
 ) {
     val density = LocalDensity.current.density
     val gridSize = (40 * density).toInt()
-    val color = MaterialTheme.colorScheme.onSurface.copy(0.2f)
+    val gridColor = Color(0xFFA1A1AA).copy(alpha = 0.38f)
+    val viewportBackground = Color(0xFF18181B)
+    val viewportBorder = Color(0xFF27272A)
+    val selectionColor = Theme[colors][primary]
+    val shadowColor = Color.Black.copy(alpha = 0.24f)
+    val actionTrayBackground = Color(0xFF232326)
+    val actionTrayBorder = Color(0xFF3F3F46)
+    val originBackground = Color(0xFF232326)
+    val originForeground = Color(0xFFD4D4D8).copy(alpha = 0.82f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
     val selections by SelectionManager.selections.collectAsState()
+    val workspaceMode by WorkspaceRepository.mode.collectAsState()
 
     LaunchedEffect(elements.size, viewportSize.value) {
         if (viewportSize.value.width <= 0f || viewportSize.value.height <= 0f) return@LaunchedEffect
@@ -82,6 +108,8 @@ fun WorkspaceViewport(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .background(viewportBackground, DefaultShape)
+            .border(1.dp, viewportBorder, DefaultShape)
             .onSizeChanged { size ->
                 viewportSize.value = Size(size.width.toFloat(), size.height.toFloat())
             }
@@ -138,7 +166,7 @@ fun WorkspaceViewport(
                 var y = startY
                 while (y < size.height) {
                     drawCircle(
-                        color = color,
+                        color = gridColor,
                         radius = 2f * density * viewportState.zoom,
                         center = Offset(x, y)
                     )
@@ -169,8 +197,8 @@ fun WorkspaceViewport(
                     .dropShadow(
                         element.shape,
                         androidx.compose.ui.graphics.shadow.Shadow(
-                            radius = 8.dp,
-                            color = Color.Black.copy(0.3f)
+                            radius = 6.dp,
+                            color = shadowColor,
                         )
                     )
             )
@@ -196,7 +224,7 @@ fun WorkspaceViewport(
                     .then(
                         other = if (selected) {
                             Modifier
-                                .border((2 / viewportState.zoom).dp, MaterialTheme.colorScheme.primary, element.shape)
+                                .border((2 / viewportState.zoom).dp, selectionColor, element.shape)
                         } else Modifier
                     )
                     .pointerInput(Unit) {
@@ -259,18 +287,52 @@ fun WorkspaceViewport(
                         }
                     }
             ) {
-                if (selected) {
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .offset(y = (-56 / viewportState.zoom).dp)
-                            .zIndex(1000f),
-                    ) {
-                        element.Actions(this)
-                    }
-                }
+                val launchpadElement = element as? LaunchpadViewportElement
+                val animatedRotation by animateFloatAsState(
+                    targetValue = launchpadElement?.rotationDegrees?.floatValue ?: 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow,
+                    ),
+                    label = "launchpad-rotation",
+                )
 
-                element.Content()
+                Box(modifier = Modifier.graphicsLayer { rotationZ = animatedRotation }) {
+                    element.Content()
+                }
+            }
+        }
+
+        // Action tray overlay — rendered outside the zoomed element layer so it
+        // stays at a fixed screen-space size regardless of viewport zoom.
+        elements.forEach { element ->
+            val selected = selections.any { it.selectionUUID == element.selectionUUID }
+            if (!selected) return@forEach
+
+            var traySize by remember { mutableStateOf(Size(164f * density, 44f * density)) }
+
+            val scaledGridSize = gridSize * viewportState.zoom
+            val trayScreenCenterX = element.position.value.x * scaledGridSize + viewportState.offset.x + element.size.width * scaledGridSize / 2
+            val trayScreenTopY = element.position.value.y * scaledGridSize + viewportState.offset.y
+
+            Row(
+                modifier = Modifier
+                    .zIndex(2000f)
+                    .offset {
+                        IntOffset(
+                            x = (trayScreenCenterX - traySize.width / 2).roundToInt(),
+                            y = (trayScreenTopY - traySize.height - 8.dp.toPx()).roundToInt(),
+                        )
+                    }
+                    .onSizeChanged { size ->
+                        traySize = Size(size.width.toFloat(), size.height.toFloat())
+                    }
+                    .background(actionTrayBackground, FullShape)
+                    .border(1.dp, actionTrayBorder, FullShape)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                element.Actions(this)
             }
         }
 
@@ -283,7 +345,7 @@ fun WorkspaceViewport(
         val offsetY = (centerPxY - originSizePx / 2f).roundToInt()
 
         AnimatedVisibility(
-            visible = WorkspaceRepository.mode.collectAsState().value is WorkspaceContract.WorkspaceMode.Layout,
+            visible = workspaceMode is WorkspaceContract.WorkspaceMode.Layout,
             modifier = Modifier
                 .offset { IntOffset(offsetX, offsetY) }
                 .size(originSizeDp)
@@ -295,14 +357,16 @@ fun WorkspaceViewport(
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .background(originBackground)
+                    .border(1.dp, viewportBorder, CircleShape)
                     .size(originSizeDp)
             ) {
                 Text(
                     text = "0,0",
                     modifier = Modifier
                         .align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.5f)
+                    style = Theme[typography][small],
+                    color = originForeground,
                 )
             }
         }

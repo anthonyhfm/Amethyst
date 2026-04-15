@@ -26,10 +26,6 @@ actual fun Modifier.editorEventListener(onEvent: (EditorEvent) -> Unit): Modifie
         meta = it.isCtrlPressed
         shift = it.isShiftPressed
 
-        if (meta) {
-            return@onKeyEvent true
-        }
-
         if (it.type == KeyEventType.KeyDown) {
             when (it.key) {
                 Key.DirectionUp -> {

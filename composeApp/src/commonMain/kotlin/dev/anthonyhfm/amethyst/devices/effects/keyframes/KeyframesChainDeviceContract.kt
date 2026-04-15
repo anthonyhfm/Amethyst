@@ -79,6 +79,13 @@ sealed interface KeyframesChainDeviceContract {
         val y: Int,
         val r: Float,
         val g: Float,
-        val b: Float
-    )
+        val b: Float,
+        /** Device-anchored storage: non-null for new entries drawn after this schema. */
+        val launchpadId: String? = null,
+        val localX: Int? = null,
+        val localY: Int? = null,
+    ) {
+        /** True when this entry carries device-local coordinate data. */
+        val isDeviceAnchored: Boolean get() = launchpadId != null && localX != null && localY != null
+    }
 }

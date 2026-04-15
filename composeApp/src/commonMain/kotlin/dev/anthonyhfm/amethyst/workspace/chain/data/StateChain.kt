@@ -3,10 +3,12 @@ package dev.anthonyhfm.amethyst.workspace.chain.data
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDevice
-import dev.anthonyhfm.amethyst.devices.audio.clip.ClipChainDeviceState
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.opacity.OpacityChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.opacity.OpacityChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
@@ -49,10 +51,16 @@ import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDeviceState
+import dev.anthonyhfm.amethyst.devices.gem.GemChainDevice
+import dev.anthonyhfm.amethyst.gem.host.GemDeviceState
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
@@ -207,8 +215,8 @@ data class StateChain(
                     }
                 }
 
-                is ClipChainDeviceState -> {
-                    ClipChainDevice().apply {
+                is SampleChainDeviceState -> {
+                    SampleChainDevice().apply {
                         state.update { device }
                     }
                 }
@@ -227,6 +235,12 @@ data class StateChain(
 
                 is BlurChainDeviceState -> {
                     BlurChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is OpacityChainDeviceState -> {
+                    OpacityChainDevice().apply {
                         state.update { device }
                     }
                 }
@@ -255,7 +269,21 @@ data class StateChain(
                     }
                 }
 
+                is AdjustChainDeviceState -> {
+                    AdjustChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
+                is ClearChainDeviceState -> {
+                    ClearChainDevice().apply {
+                        state.update { device }
+                    }
+                }
+
                 is PreviewChainDeviceState -> PreviewChainDevice()
+
+                is GemDeviceState -> GemChainDevice(initialState = device)
 
                 else -> { throw IllegalArgumentException("Unknown device state: $device") }
             }

@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.timeline
 
-import androidx.compose.foundation.ScrollState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
@@ -9,14 +8,25 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
+import dev.anthonyhfm.amethyst.timeline.data.buildSegment
+import dev.anthonyhfm.amethyst.timeline.data.copyWithShiftedStartMs
+import dev.anthonyhfm.amethyst.timeline.data.cropAudioEntryEnd
+import dev.anthonyhfm.amethyst.timeline.data.deepCopy
+import dev.anthonyhfm.amethyst.timeline.data.timelineTrackRows
+import dev.anthonyhfm.amethyst.timeline.data.trimAudioEntry
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineTimingContext
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.toTimelineEntrySelection
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
+import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,11 +36,10 @@ class TimelineViewModel : ViewModel() {
     private val _tracks = MutableStateFlow<List<TimelineTrack<*>>>(emptyList())
     val tracks: StateFlow<List<TimelineTrack<*>>> = _tracks.asStateFlow()
 
-    private val _zoomLevel = MutableStateFlow(0.025f)
-    val zoomLevel: StateFlow<Float> = _zoomLevel.asStateFlow()
-
-    private val _scrollState = MutableStateFlow<ScrollState?>(null)
-    val scrollState: StateFlow<ScrollState?> = _scrollState.asStateFlow()
+    // Single authoritative viewport state — zoom and scroll are always emitted together so
+    // renderers never observe a mismatched (newScroll, oldZoom) combination.
+    private val _viewport = MutableStateFlow(EditorViewportState(zoomX = 0.025f))
+    val viewport: StateFlow<EditorViewportState> = _viewport.asStateFlow()
 
     val playheadPositionMs = TimelineRepository.playheadPositionMs
     val isPlaying = TimelineRepository.isPlaying
@@ -40,6 +49,7 @@ class TimelineViewModel : ViewModel() {
         viewModelScope.launch {
             TimelineRepository.tracks.collect { repoTracks ->
                 _tracks.value = repoTracks
+                pruneTimelineSelections(repoTracks)
             }
         }
 
@@ -51,10 +61,81 @@ class TimelineViewModel : ViewModel() {
         }
     }
 
+    private fun currentTimingContext(): TimelineTimingContext {
+        return TimelineTimingContext(
+            bpm = WorkspaceRepository.bpm.value,
+            gridType = WorkspaceRepository.gridType.value,
+            zoomLevel = _viewport.value.zoomX,
+            playheadPositionMs = TimelineRepository.playheadPositionMs.value,
+            isPlaying = TimelineRepository.isPlaying.value
+        )
+    }
+
+    private fun publishTrackSnapshot(updatedTracks: List<TimelineTrack<*>>) {
+        TimelineRepository.updateTracksSnapshot(updatedTracks)
+        _tracks.value = TimelineRepository.tracks.value
+        pruneTimelineSelections(_tracks.value)
+    }
+
+    private fun pruneTimelineSelections(tracks: List<TimelineTrack<*>>) {
+        val visibleTrackIndices = tracks.timelineTrackRows().mapTo(mutableSetOf()) { it.trackIndex }
+        val filteredSelections = SelectionManager.selections.value.filter { selection ->
+            when (selection) {
+                is Selectable.TimelineAutomationLane -> {
+                    val track = tracks.getOrNull(selection.trackIndex)
+                    selection.trackIndex in visibleTrackIndices &&
+                        track?.automationLane(selection.laneKey) != null
+                }
+
+                is Selectable.TimelineAutomationPoint -> {
+                    val track = tracks.getOrNull(selection.trackIndex)
+                    selection.trackIndex in visibleTrackIndices &&
+                        track?.automationLane(selection.laneKey)?.point(selection.pointId) != null
+                }
+
+                is Selectable.TimelineEntryItem -> {
+                    when (val track = tracks.getOrNull(selection.trackIndex)) {
+                        is AudioTimelineTrack -> {
+                            selection.trackIndex in visibleTrackIndices &&
+                                track.entries.containsKey(selection.entryStartMs)
+                        }
+
+                        is MidiTimelineTrack -> {
+                            selection.trackIndex in visibleTrackIndices &&
+                                track.entries.containsKey(selection.entryStartMs)
+                        }
+
+                        else -> false
+                    }
+                }
+
+                is Selectable.TimelineRange -> selection.trackIndex in visibleTrackIndices
+                is Selectable.TimelineTime -> selection.trackIndex in visibleTrackIndices
+                is Selectable.TimelineTrack -> selection.trackIndex in visibleTrackIndices
+                is Selectable.PianoRollNote -> {
+                    val track = tracks.getOrNull(selection.trackIndex) as? MidiTimelineTrack
+                    // Match by identity (startTimeMs + pitch) rather than full structural equality.
+                    // LED/gradient edits update the SelectionManager first, then the timeline note
+                    // by note; full equality would incorrectly prune still-pending selections.
+                    selection.trackIndex in visibleTrackIndices &&
+                        track?.entries?.get(selection.entryStartMs)?.notes?.any {
+                            it.startTimeMs == selection.note.startTimeMs && it.pitch == selection.note.pitch
+                        } == true
+                }
+
+                else -> true
+            }
+        }
+
+        if (filteredSelections != SelectionManager.selections.value) {
+            SelectionManager.replaceSelections(filteredSelections)
+        }
+    }
+
     private fun resnapTimelineSelections() {
         val bpm = WorkspaceRepository.bpm.value
         val gridType = WorkspaceRepository.gridType.value
-        val zoom = _zoomLevel.value
+        val zoom = _viewport.value.zoomX
         val updated = SelectionManager.selections.value.map { sel ->
             when (sel) {
                 is Selectable.TimelineTime -> {
@@ -69,7 +150,7 @@ class TimelineViewModel : ViewModel() {
                 else -> sel
             }
         }
-        SelectionManager.selections.value = updated
+        SelectionManager.replaceSelections(updated)
     }
 
     private fun initializeDemoData() {
@@ -100,252 +181,14 @@ class TimelineViewModel : ViewModel() {
         return (kotlin.math.round(q) * intervalMs).toLong().coerceAtLeast(0L)
     }
 
-    private fun cropEntryEnd(entry: AudioEntry, newEndMs: Long): AudioEntry? {
-        if (newEndMs <= entry.startTimeMs) return null
-        val newDuration = newEndMs - entry.startTimeMs
-        val raw = entry.rawData
-        val croppedData = if (raw != null && raw.isNotEmpty()) {
-            val bytesPerSample = (entry.bitDepth / 8) * entry.channels
-            val samplesPerMs = entry.sampleRate.toDouble() / 1000.0
-            val totalSamplesExact = newDuration * samplesPerMs
-            val totalSamples = kotlin.math.round(totalSamplesExact).toLong()
-            val totalBytes = (totalSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
-            raw.sliceArray(0 until totalBytes)
-        } else raw
-        return entry.copy(durationMs = newDuration, rawData = croppedData)
-    }
+    private fun cropEntryEnd(entry: AudioEntry, newEndMs: Long): AudioEntry? = entry.cropAudioEntryEnd(newEndMs)
 
     private fun cropEntryEndInPlace(entry: AudioEntry, newEndMs: Long): AudioEntry? = cropEntryEnd(entry, newEndMs)
 
-    private fun cropNewEntryEnd(newEntry: AudioEntry, newEndMs: Long): AudioEntry? {
-        if (newEndMs <= newEntry.startTimeMs) return null
-        val newDuration = newEndMs - newEntry.startTimeMs
-        val raw = newEntry.rawData
-        val croppedData = if (raw != null && raw.isNotEmpty()) {
-            val bytesPerSample = (newEntry.bitDepth / 8) * newEntry.channels
-            val samplesPerMs = newEntry.sampleRate.toDouble() / 1000.0
-            val totalSamplesExact = newDuration * samplesPerMs
-            val totalSamples = kotlin.math.round(totalSamplesExact).toLong()
-            val totalBytes = (totalSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
-            raw.sliceArray(0 until totalBytes)
-        } else raw
-        return newEntry.copy(durationMs = newDuration, rawData = croppedData)
-    }
+    private fun cropNewEntryEnd(newEntry: AudioEntry, newEndMs: Long): AudioEntry? = newEntry.cropAudioEntryEnd(newEndMs)
 
-    private fun findNearestZeroCrossing(samples: FloatArray, fromIndex: Int, searchRadius: Int): Int {
-        val n = samples.size
-        var bestIdx = fromIndex.coerceIn(0, n - 2)
-        var minAbs = Float.MAX_VALUE
-        val start = (fromIndex - searchRadius).coerceAtLeast(0)
-        val end = (fromIndex + searchRadius).coerceAtMost(n - 2)
-        var i = start
-        while (i <= end) {
-            val s0 = samples[i]
-            val s1 = samples[i + 1]
-            val crosses = (s0 <= 0f && s1 >= 0f) || (s0 >= 0f && s1 <= 0f)
-            val score = kotlin.math.abs(s0) + kotlin.math.abs(s1)
-            if (crosses && score < minAbs) {
-                minAbs = score
-                bestIdx = i
-            }
-            i++
-        }
-        return bestIdx
-    }
-
-    private fun applyEdgeFadesPcm(raw: ByteArray, bitDepth: Int, channels: Int, sampleRate: Int, fadeMs: Int): ByteArray {
-        if (fadeMs <= 0 || raw.isEmpty()) return raw
-        val samplesPerMs = sampleRate / 1000f
-        val fadeSamples = kotlin.math.max(1, (samplesPerMs * fadeMs).toInt())
-        val bytesPerSample = (bitDepth / 8) * channels
-        val totalFrames = raw.size / bytesPerSample
-        if (totalFrames <= 1) return raw
-
-        // Wandeln in Float-Mono für Fade-Berechnung, dann zurück in PCM mit gleicher BitTiefe/Kanälen
-        fun pcmToMonoFloatsLocal(raw: ByteArray): FloatArray {
-            val out = FloatArray(totalFrames)
-            var frameIdx = 0
-            var byteIndex = 0
-            while (frameIdx < totalFrames) {
-                var sum = 0f
-                var c = 0
-                while (c < channels) {
-                    val off = byteIndex + c * (bitDepth / 8)
-                    val sample = when (bitDepth) {
-                        8 -> {
-                            val u = raw[off].toInt() and 0xFF
-                            ((u - 128) / 128f)
-                        }
-                        16 -> {
-                            val lo = raw[off].toInt() and 0xFF
-                            val hi = raw[off + 1].toInt() shl 8
-                            val s = (lo or hi).toShort().toInt()
-                            (s / 32768f)
-                        }
-                        24 -> {
-                            val b0 = raw[off].toInt() and 0xFF
-                            val b1 = raw[off + 1].toInt() and 0xFF
-                            val b2 = raw[off + 2].toInt()
-                            var v = b0 or (b1 shl 8) or (b2 shl 16)
-                            if ((v and 0x800000) != 0) v = v or -0x1000000
-                            (v / 8388608f)
-                        }
-                        32 -> {
-                            val b0 = raw[off].toInt() and 0xFF
-                            val b1 = raw[off + 1].toInt() and 0xFF
-                            val b2 = raw[off + 2].toInt() and 0xFF
-                            val b3 = raw[off + 3].toInt()
-                            val v = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
-                            if (v == Int.MIN_VALUE) -1f else (v / 2147483648f)
-                        }
-                        else -> {
-                            val lo = raw[off].toInt() and 0xFF
-                            val hi = raw[off + 1].toInt() shl 8
-                            val s = (lo or hi).toShort().toInt()
-                            (s / 32768f)
-                        }
-                    }
-                    sum += sample
-                    c++
-                }
-                out[frameIdx] = (sum / channels)
-                frameIdx++
-                byteIndex += bytesPerSample
-            }
-            return out
-        }
-
-        fun monoFloatsToPcm(rawTemplate: ByteArray, mono: FloatArray): ByteArray {
-            val out = rawTemplate.copyOf()
-            var frameIdx = 0
-            var byteIndex = 0
-            while (frameIdx < totalFrames) {
-                val v = mono[frameIdx].coerceIn(-1f, 1f)
-                var c = 0
-                while (c < channels) {
-                    val off = byteIndex + c * (bitDepth / 8)
-                    when (bitDepth) {
-                        8 -> {
-                            val u = ((v * 128f) + 128f).toInt().coerceIn(0, 255)
-                            out[off] = u.toByte()
-                        }
-                        16 -> {
-                            val s = (v * 32768f).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-                            out[off] = (s.toInt() and 0xFF).toByte()
-                            out[off + 1] = ((s.toInt() shr 8) and 0xFF).toByte()
-                        }
-                        24 -> {
-                            var vv = (v * 8388608f).toInt()
-                            out[off] = (vv and 0xFF).toByte()
-                            out[off + 1] = ((vv shr 8) and 0xFF).toByte()
-                            out[off + 2] = ((vv shr 16) and 0xFF).toByte()
-                        }
-                        32 -> {
-                            val iv = (v * 2147483648f).toInt()
-                            out[off] = (iv and 0xFF).toByte()
-                            out[off + 1] = ((iv shr 8) and 0xFF).toByte()
-                            out[off + 2] = ((iv shr 16) and 0xFF).toByte()
-                            out[off + 3] = ((iv shr 24) and 0xFF).toByte()
-                        }
-                        else -> {
-                            val s = (v * 32768f).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-                            out[off] = (s.toInt() and 0xFF).toByte()
-                            out[off + 1] = ((s.toInt() shr 8) and 0xFF).toByte()
-                        }
-                    }
-                    c++
-                }
-                frameIdx++
-                byteIndex += bytesPerSample
-            }
-            return out
-        }
-
-        val mono = pcmToMonoFloatsLocal(raw)
-        // Fade-In
-        var i = 0
-        while (i < fadeSamples && i < mono.size) {
-            val g = i.toFloat() / fadeSamples.toFloat()
-            mono[i] *= g
-            i++
-        }
-        // Fade-Out
-        i = 0
-        while (i < fadeSamples && i < mono.size) {
-            val idx = mono.size - 1 - i
-            val g = i.toFloat() / fadeSamples.toFloat()
-            mono[idx] *= g
-            i++
-        }
-        return monoFloatsToPcm(raw, mono)
-    }
-
-    private fun sliceAudio(entry: AudioEntry, startMs: Long, endMs: Long): ByteArray? {
-        val raw = entry.rawData ?: return null
-        val safeStart = startMs.coerceAtLeast(entry.startTimeMs)
-        val safeEnd = endMs.coerceAtMost(entry.endTimeMs)
-        if (safeEnd <= safeStart) return ByteArray(0)
-        val bytesPerSample = (entry.bitDepth / 8) * entry.channels
-        val samplesPerMs = entry.sampleRate.toDouble() / 1000.0
-        var startSamplesExact = (safeStart - entry.startTimeMs) * samplesPerMs
-        var endSamplesExact = (safeEnd - entry.startTimeMs) * samplesPerMs
-        var startSamples = kotlin.math.round(startSamplesExact).toLong().coerceAtLeast(0)
-        var endSamples = kotlin.math.round(endSamplesExact).toLong().coerceAtLeast(startSamples + 1)
-
-        // Zero-Crossing Snap innerhalb ±searchRadius Samples
-        val totalFrames = raw.size / bytesPerSample
-        val mono = try {
-            // Schnelle lokale Konvertierung (wie oben) für Zero-Crossing
-            val floats = kotlin.run {
-                val out = FloatArray(totalFrames)
-                var frameIdx = 0
-                var byteIndex = 0
-                while (frameIdx < totalFrames) {
-                    var sum = 0f; var c = 0
-                    while (c < entry.channels) {
-                        val off = byteIndex + c * (entry.bitDepth / 8)
-                        val sample = when (entry.bitDepth) {
-                            8 -> { val u = raw[off].toInt() and 0xFF; ((u - 128) / 128f) }
-                            16 -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f) }
-                            24 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt(); var v = b0 or (b1 shl 8) or (b2 shl 16); if ((v and 0x800000) != 0) v = v or -0x1000000; (v / 8388608f) }
-                            32 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt() and 0xFF; val b3 = raw[off + 3].toInt(); val v = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24); if (v == Int.MIN_VALUE) -1f else (v / 2147483648f) }
-                            else -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f) }
-                        }
-                        sum += sample; c++
-                    }
-                    out[frameIdx] = (sum / entry.channels)
-                    frameIdx++
-                    byteIndex += bytesPerSample
-                }
-                out
-            }
-            floats
-        } catch (e: Exception) { null }
-        if (mono != null && mono.isNotEmpty()) {
-            val radius = 64 // ca. ~1.5ms bei 44.1kHz
-            val startIdx = findNearestZeroCrossing(mono, startSamples.toInt(), radius)
-            val endIdx = findNearestZeroCrossing(mono, (endSamples - 1).toInt(), radius)
-            startSamples = startIdx.toLong().coerceIn(0, endSamples - 1)
-            endSamples = endIdx.toLong().coerceIn(startSamples + 1, totalFrames.toLong())
-        }
-
-        val startByte = (startSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
-        val endByte = (endSamples * bytesPerSample).toInt().coerceAtMost(raw.size)
-        if (startByte >= endByte) return ByteArray(0)
-        val sliced = raw.sliceArray(startByte until endByte)
-        // Mikro-Fades anwenden (z. B. 4ms)
-        return applyEdgeFadesPcm(sliced, entry.bitDepth, entry.channels, entry.sampleRate, fadeMs = 4)
-    }
-
-    private fun buildEntrySegment(original: AudioEntry, segStartMs: Long, segEndMs: Long): AudioEntry? {
-        if (segEndMs <= segStartMs) return null
-        val data = sliceAudio(original, segStartMs, segEndMs)
-        return original.copy(
-            startTimeMs = segStartMs,
-            durationMs = segEndMs - segStartMs,
-            rawData = data
-        )
-    }
+    private fun buildEntrySegment(original: AudioEntry, segStartMs: Long, segEndMs: Long): AudioEntry? =
+        original.buildSegment(segStartMs, segEndMs)
 
     private fun splitEntry(original: AudioEntry, splitStartMs: Long, splitEndMs: Long): Pair<AudioEntry?, AudioEntry?> {
         val left = if (original.startTimeMs < splitStartMs && original.endTimeMs > splitStartMs) {
@@ -492,6 +335,38 @@ class TimelineViewModel : ViewModel() {
     private fun snapshotAudioEntries(track: AudioTimelineTrack): List<AudioEntry> =
         track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
 
+    private fun snapshotMidiEntries(track: MidiTimelineTrack): List<MidiEntry> =
+        track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
+
+    private data class PendingTrackStateChange(
+        val trackIndex: Int,
+        val beforeTrack: TimelineTrack<*>,
+        val afterTrack: TimelineTrack<*>
+    )
+
+    private fun cloneTimelineTrack(track: TimelineTrack<*>): TimelineTrack<*> = track.deepCopy()
+
+    private fun updateTrackState(
+        trackIndex: Int,
+        mutate: TimelineTrack<*>.() -> Boolean
+    ) {
+        val track = _tracks.value.getOrNull(trackIndex) ?: return
+        val beforeTrack = cloneTimelineTrack(track)
+        val afterTrack = cloneTimelineTrack(track)
+        if (!afterTrack.mutate()) return
+
+        TimelineRepository.replaceTrack(trackIndex, afterTrack)
+        _tracks.value = TimelineRepository.tracks.value
+        pruneTimelineSelections(_tracks.value)
+        UndoManager.addAction(
+            UndoableAction.TrackStateChange(
+                trackIndex = trackIndex,
+                beforeTrack = beforeTrack,
+                afterTrack = afterTrack
+            )
+        )
+    }
+
     fun addAudioFileToTrack(trackIndex: Int, file: PlatformFile, at: Long = 0) {
         viewModelScope.launch {
             val currentTracks = _tracks.value.toMutableList()
@@ -501,17 +376,20 @@ class TimelineViewModel : ViewModel() {
             val original = track.entries[at] ?: return@launch
             val bpm = WorkspaceRepository.bpm.value
             val gridType = WorkspaceRepository.gridType.value
-            val intervals = GridUtils.computeWithGridType(_zoomLevel.value, bpm, gridType)
-            val gridInterval = intervals.intervalMs
-            val snappedStart = snapToGrid(original.startTimeMs, gridInterval)
+            val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
+                original.startTimeMs
+            } else {
+                val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
+                snapToGrid(original.startTimeMs, intervals.intervalMs)
+            }
             val newEntry = if (snappedStart != original.startTimeMs) {
                 track.entries.remove(original.startTimeMs)
-                original.copy(startTimeMs = snappedStart)
+                original.copyWithShiftedStartMs(snappedStart)
             } else original
             val resolved = resolveOverlapAsymmetric(track, newEntry, originStartMs = original.startTimeMs) ?: return@launch
             track.entries[resolved.startTimeMs] = resolved
             val after = snapshotAudioEntries(track)
-            val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+            val newTrack = track.copyWithEntries()
             currentTracks[trackIndex] = newTrack
             _tracks.value = currentTracks.toList()
             TimelineRepository.tracks.value = currentTracks.toList()
@@ -520,38 +398,166 @@ class TimelineViewModel : ViewModel() {
         }
     }
 
+    /** Update zoom and scroll atomically to prevent mismatched recompositions. */
+    fun updateViewport(vp: EditorViewportState) {
+        _viewport.value = vp
+    }
+
     fun setZoomLevel(zoom: Float) {
-        val before = _zoomLevel.value
+        val before = _viewport.value.zoomX
         val clamped = zoom.coerceIn(0.01f, 10.0f)
-        _zoomLevel.value = clamped
-        println("[TimelineViewModel] setZoomLevel: requested=$zoom clamped=$clamped before=$before after=${_zoomLevel.value}")
+        _viewport.value = _viewport.value.copy(zoomX = clamped)
+        println("[TimelineViewModel] setZoomLevel: requested=$zoom clamped=$clamped before=$before after=${_viewport.value.zoomX}")
     }
 
     fun zoomBy(factor: Float) {
-        val before = _zoomLevel.value
+        val before = _viewport.value.zoomX
         val requested = before * factor
         val clamped = requested.coerceIn(0.01f, 10.0f)
-        _zoomLevel.value = clamped
-        println("[TimelineViewModel] zoomBy: factor=$factor before=$before requested=$requested clamped=$clamped after=${_zoomLevel.value}")
+        _viewport.value = _viewport.value.copy(zoomX = clamped)
+        println("[TimelineViewModel] zoomBy: factor=$factor before=$before requested=$requested clamped=$clamped after=${_viewport.value.zoomX}")
     }
 
     fun msToPixels(timeMs: Long): Float {
         // Use Double precision for better accuracy
-        val px = (timeMs.toDouble() * _zoomLevel.value.toDouble()).toFloat()
-        // println("[TimelineViewModel] msToPixels: ms=$timeMs zoom=${_zoomLevel.value} -> px=$px")
+        val px = (timeMs.toDouble() * _viewport.value.zoomX.toDouble()).toFloat()
         return px
     }
 
     fun pixelsToMs(pixels: Float): Long {
         // Use Double precision for better accuracy
-        val ms = (pixels.toDouble() / _zoomLevel.value.toDouble()).toLong()
-        // println("[TimelineViewModel] pixelsToMs: px=$pixels zoom=${_zoomLevel.value} -> ms=$ms")
+        val ms = (pixels.toDouble() / _viewport.value.zoomX.toDouble()).toLong()
         return ms
     }
 
-    fun setScrollState(scrollState: ScrollState) {
-        _scrollState.value = scrollState
+    fun setScrollOffset(offsetPx: Float) {
+        _viewport.value = _viewport.value.copy(scrollX = offsetPx)
     }
+
+    fun renameTrack(trackIndex: Int, newName: String) {
+        val normalizedName = newName.trim()
+        val track = _tracks.value.getOrNull(trackIndex) ?: return
+        if (track.name == normalizedName) return
+
+        UndoManager.addAction(
+            UndoableAction.TrackRename(
+                trackIndex = trackIndex,
+                oldName = track.name,
+                newName = normalizedName
+            )
+        )
+        TimelineRepository.renameTrack(trackIndex, normalizedName)
+        _tracks.value = TimelineRepository.tracks.value
+    }
+
+    fun renameTimelineEntry(trackIndex: Int, entryStartMs: Long, newName: String) {
+        val normalizedName = newName.trim()
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex) ?: return
+
+        when (track) {
+            is AudioTimelineTrack -> {
+                val entry = track.entries[entryStartMs] ?: return
+                if (entry.name == normalizedName) return
+
+                val before = snapshotAudioEntries(track)
+                track.entries[entryStartMs] = entry.copy(name = normalizedName)
+                val after = snapshotAudioEntries(track)
+                val newTrack = track.copyWithEntries()
+
+                currentTracks[trackIndex] = newTrack
+                _tracks.value = currentTracks.toList()
+                TimelineRepository.tracks.value = currentTracks.toList()
+                SelectionManager.select(
+                    Selectable.TimelineEntryItem(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs
+                    )
+                )
+                UndoManager.addAction(
+                    UndoableAction.TimelineChange(
+                        trackIndex = trackIndex,
+                        beforeEntries = before,
+                        afterEntries = after
+                    )
+                )
+            }
+
+            is MidiTimelineTrack -> {
+                val entry = track.entries[entryStartMs] ?: return
+                if (entry.name == normalizedName) return
+
+                val before = snapshotMidiEntries(track)
+                track.entries[entryStartMs] = entry.copy(name = normalizedName)
+                val after = snapshotMidiEntries(track)
+                val newTrack = track.copyWithEntries()
+
+                currentTracks[trackIndex] = newTrack
+                _tracks.value = currentTracks.toList()
+                TimelineRepository.tracks.value = currentTracks.toList()
+                SelectionManager.select(
+                    Selectable.TimelineEntryItem(
+                        trackIndex = trackIndex,
+                        entryStartMs = entryStartMs
+                    )
+                )
+                UndoManager.addAction(
+                    UndoableAction.MidiTimelineChange(
+                        trackIndex = trackIndex,
+                        beforeEntries = before,
+                        afterEntries = after
+                    )
+                )
+            }
+        }
+    }
+
+    fun setTrackBaseAutomation(
+        trackIndex: Int,
+        target: TimelineTrackAutomationTarget,
+        value: Float
+    ) {
+        val normalizedValue = target.normalizeValue(value)
+        updateTrackState(trackIndex) {
+            if (baseAutomationValue(target) == normalizedValue) {
+                false
+            } else {
+                setBaseAutomationValue(target, normalizedValue)
+                true
+            }
+        }
+    }
+
+    fun nudgeTrackBaseAutomation(
+        trackIndex: Int,
+        target: TimelineTrackAutomationTarget,
+        delta: Float
+    ) {
+        val track = _tracks.value.getOrNull(trackIndex) ?: return
+        setTrackBaseAutomation(
+            trackIndex = trackIndex,
+            target = target,
+            value = track.baseAutomationValue(target) + delta
+        )
+    }
+
+    fun toggleTrackMute(trackIndex: Int) {
+        updateTrackState(trackIndex) {
+            isMuted = !isMuted
+            true
+        }
+    }
+
+    fun toggleTrackSolo(trackIndex: Int) {
+        updateTrackState(trackIndex) {
+            isSoloed = !isSoloed
+            true
+        }
+    }
+
+
+
+
 
     fun moveAudioEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long) {
         val currentTracks = _tracks.value.toMutableList()
@@ -560,12 +566,16 @@ class TimelineViewModel : ViewModel() {
         val entry = track.entries.remove(oldStartMs) ?: return
         val bpm = WorkspaceRepository.bpm.value
         val gridType = WorkspaceRepository.gridType.value
-        val intervals = GridUtils.computeWithGridType(_zoomLevel.value, bpm, gridType)
-        val gridInterval = intervals.intervalMs
-        val isAlreadySnapped = gridInterval > 0 && newStartMs % gridInterval == 0L
-        val snappedStart = if (isAlreadySnapped) newStartMs else snapToGrid(newStartMs, gridInterval)
-        println("[TimelineViewModel] moveAudioEntry: old=$oldStartMs requested=$newStartMs snapped=$snappedStart gridInterval=$gridInterval alreadySnapped=$isAlreadySnapped")
-        val movedEntry = entry.copy(startTimeMs = snappedStart)
+        val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
+            newStartMs.coerceAtLeast(0L)
+        } else {
+            val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
+            val gridInterval = intervals.intervalMs
+            val isAlreadySnapped = gridInterval > 0 && newStartMs % gridInterval == 0L
+            if (isAlreadySnapped) newStartMs else snapToGrid(newStartMs, gridInterval)
+        }
+        println("[TimelineViewModel] moveAudioEntry: old=$oldStartMs requested=$newStartMs snapped=$snappedStart gridType=$gridType")
+        val movedEntry = entry.copyWithShiftedStartMs(snappedStart)
         val resolved = resolveOverlapAsymmetric(track, movedEntry, originStartMs = oldStartMs) ?: run {
             println("[TimelineViewModel] moveAudioEntry: overlap resolution failed, restoring original")
             track.entries[oldStartMs] = entry
@@ -573,7 +583,7 @@ class TimelineViewModel : ViewModel() {
         }
         track.entries[resolved.startTimeMs] = resolved
         val after = snapshotAudioEntries(track)
-        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = track.copyWithEntries()
         currentTracks[trackIndex] = newTrack
         _tracks.value = currentTracks.toList()
         TimelineRepository.tracks.value = currentTracks.toList()
@@ -584,7 +594,7 @@ class TimelineViewModel : ViewModel() {
     fun deleteAudioEntry(trackIndex: Int, entryStartMs: Long) {
         val track = _tracks.value.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
         val original = track.entries.remove(entryStartMs) ?: return
-        val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = track.copyWithEntries()
         val current = _tracks.value.toMutableList(); current[trackIndex] = newTrack
         _tracks.value = current.toList(); TimelineRepository.tracks.value = current.toList()
         UndoManager.addAction(UndoableAction.TimelineClipDeletion(trackIndex, deleted = original))
@@ -634,6 +644,7 @@ class TimelineViewModel : ViewModel() {
         }
     }
 
+
     /**
      * Add a MIDI entry to a track
      */
@@ -645,10 +656,9 @@ class TimelineViewModel : ViewModel() {
             track.addEntry(entry)
             
             // Update tracks
-            val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+            val newTrack = track.copyWithEntries()
             currentTracks[trackIndex] = newTrack
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.tracks.value = currentTracks.toList()
+            publishTrackSnapshot(currentTracks.toList())
             
             SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entry.startTimeMs))
         }
@@ -668,10 +678,9 @@ class TimelineViewModel : ViewModel() {
             track.entries[entryStartMs] = updatedEntry
             
             // Update timeline
-            val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+            val newTrack = track.copyWithEntries()
             currentTracks[trackIndex] = newTrack
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.tracks.value = currentTracks.toList()
+            publishTrackSnapshot(currentTracks.toList())
         }
     }
 
@@ -684,10 +693,9 @@ class TimelineViewModel : ViewModel() {
         
         track.updateNote(entryStartMs, oldNote, newNote)
         
-        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = track.copyWithEntries()
         currentTracks[trackIndex] = newTrack
-        _tracks.value = currentTracks.toList()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
     }
 
     /**
@@ -699,10 +707,9 @@ class TimelineViewModel : ViewModel() {
         
         track.removeNote(entryStartMs, note)
         
-        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = track.copyWithEntries()
         currentTracks[trackIndex] = newTrack
-        _tracks.value = currentTracks.toList()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
     }
 
     /**
@@ -711,14 +718,14 @@ class TimelineViewModel : ViewModel() {
     fun deleteMidiEntry(trackIndex: Int, entryStartMs: Long) {
         val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
         val original = track.entries.remove(entryStartMs) ?: return
-        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = track.copyWithEntries()
         val current = _tracks.value.toMutableList(); current[trackIndex] = newTrack
-        _tracks.value = current.toList(); TimelineRepository.tracks.value = current.toList()
+        publishTrackSnapshot(current.toList())
         // Note: UndoableAction would need to be extended to support MIDI entries
     }
 
     /**
-     * Handle double-click on lights track to create a new MIDI clip or open existing one
+     * Handle an arrangement open request on a MIDI track by creating or opening an entry.
      */
     fun onDoubleClickMidiTrack(trackIndex: Int, timeMs: Long) {
         val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
@@ -729,8 +736,8 @@ class TimelineViewModel : ViewModel() {
         }
         
         if (existingEntry != null) {
-            // Open Piano Roll for existing entry
-            openPianoRollForEntry(trackIndex, existingEntry)
+            val clipContext = TimelineClipContext.midi(trackIndex, existingEntry)
+            enterPianoRollForEntry(clipContext, existingEntry)
         } else {
             // Create a new empty MIDI entry at the double-click position
             val defaultDuration = 4000L // 4 seconds default
@@ -744,50 +751,55 @@ class TimelineViewModel : ViewModel() {
             track.addEntry(newEntry)
             
             val currentTracks = _tracks.value.toMutableList()
-            val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+            val newTrack = track.copyWithEntries()
             currentTracks[trackIndex] = newTrack
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.tracks.value = currentTracks.toList()
-            
-            SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newEntry.startTimeMs))
+            publishTrackSnapshot(currentTracks.toList())
             
             println("Created new lights clip at ${timeMs}ms on track $trackIndex")
             
-            openPianoRollForEntry(trackIndex, newEntry)
+            val clipContext = TimelineClipContext.midi(trackIndex, newEntry)
+            enterPianoRollForEntry(clipContext, newEntry)
         }
+    }
+
+    private fun enterPianoRollForEntry(clipContext: TimelineClipContext, entry: MidiEntry) {
+        SelectionManager.select(clipContext.toTimelineEntrySelection())
+        openPianoRollForEntry(clipContext, entry)
     }
 
     /**
      * Open Piano Roll workspace mode for editing a MIDI entry
      */
-    private fun openPianoRollForEntry(trackIndex: Int, entry: MidiEntry) {
+    private fun openPianoRollForEntry(clipContext: TimelineClipContext, entry: MidiEntry) {
         val pianoRollMode = PianoRollWorkspaceMode()
 
-        pianoRollMode.currentEntry = entry
-        pianoRollMode.trackIndex = trackIndex
-        pianoRollMode.entryStartMs = entry.startTimeMs
+        pianoRollMode.bindClipContext(clipContext, entry)
+        pianoRollMode.timingContextProvider = ::currentTimingContext
         pianoRollMode.onNoteAdd = { note ->
-            addNoteToPianoRoll(trackIndex, entry.startTimeMs, note)
+            withPianoRollClipContext(pianoRollMode) { currentClipContext ->
+                addMidiNoteLive(currentClipContext.trackIndex, currentClipContext.entryStartMs, note)
+            }
         }
         pianoRollMode.onNoteUpdate = { old, new ->
-            updateNoteInPianoRoll(trackIndex, entry.startTimeMs, old, new)
+            withPianoRollClipContext(pianoRollMode) { currentClipContext ->
+                updateMidiNoteLive(currentClipContext.trackIndex, currentClipContext.entryStartMs, old, new)
+            }
         }
         pianoRollMode.onNoteDelete = { note ->
-            deleteNoteFromPianoRoll(trackIndex, entry.startTimeMs, note)
+            withPianoRollClipContext(pianoRollMode) { currentClipContext ->
+                deleteMidiNoteLive(currentClipContext.trackIndex, currentClipContext.entryStartMs, note)
+            }
         }
         pianoRollMode.modeClose = { WorkspaceRepository.switchToPreviousMode() }
         WorkspaceRepository.switchMode(pianoRollMode)
-        println("Opened Piano Roll for entry at ${entry.startTimeMs}ms on track $trackIndex")
+        println("Opened Piano Roll for entry at ${clipContext.entryStartMs}ms on track ${clipContext.trackIndex}")
     }
 
-    private fun addNoteToPianoRoll(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
-        addMidiNoteLive(trackIndex, entryStartMs, note)
-    }
-    private fun updateNoteInPianoRoll(trackIndex: Int, entryStartMs: Long, old: MidiNote, new: MidiNote) {
-        updateMidiNoteLive(trackIndex, entryStartMs, old, new)
-    }
-    private fun deleteNoteFromPianoRoll(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
-        deleteMidiNoteLive(trackIndex, entryStartMs, note)
+    private inline fun withPianoRollClipContext(
+        pianoRollMode: PianoRollWorkspaceMode,
+        block: (TimelineClipContext) -> Unit
+    ) {
+        pianoRollMode.clipContext?.let(block)
     }
 
     /**
@@ -799,22 +811,23 @@ class TimelineViewModel : ViewModel() {
         
         if (track !is MidiTimelineTrack) return
         
-        val midiTrack = track as TimelineTrack<MidiEntry>
-        val entry = midiTrack.entries.remove(oldStartMs) ?: return
+        val entry = track.entries.remove(oldStartMs) ?: return
         
         val bpm = WorkspaceRepository.bpm.value
         val gridType = WorkspaceRepository.gridType.value
-        val intervals = GridUtils.computeWithGridType(_zoomLevel.value, bpm, gridType)
-        val gridInterval = intervals.intervalMs
-        val snappedStart = snapToGrid(newStartMs, gridInterval)
+        val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
+            newStartMs.coerceAtLeast(0L)
+        } else {
+            val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
+            snapToGrid(newStartMs, intervals.intervalMs)
+        }
         
         val movedEntry = entry.copy(startTimeMs = snappedStart)
-        midiTrack.entries[snappedStart] = movedEntry
+        track.entries[snappedStart] = movedEntry
         
-        val newTrack = MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+        val newTrack = track.copyWithEntries()
         currentTracks[trackIndex] = newTrack
-        _tracks.value = currentTracks.toList()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
         
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = snappedStart))
     }
@@ -836,10 +849,9 @@ class TimelineViewModel : ViewModel() {
         track.entries[newStartMs] = duplicatedEntry
         
         // Update track
-        val newTrack = MidiTimelineTrack().apply { entries.putAll(track.entries) }
+        val newTrack = track.copyWithEntries()
         currentTracks[trackIndex] = newTrack
-        _tracks.value = currentTracks.toList()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
         
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newStartMs))
     }
@@ -849,23 +861,22 @@ class TimelineViewModel : ViewModel() {
         val track = currentTracks.getOrNull(trackIndex)
         val isMidi = track is MidiTimelineTrack
         if (!isMidi) return
-        val midiTrack = track as TimelineTrack<MidiEntry>
-        val entry = midiTrack.entries[entryStartMs] ?: return
+        val entry = track.entries[entryStartMs] ?: return
         val updated = transform(entry)
-        midiTrack.entries[entryStartMs] = updated
+        track.entries[entryStartMs] = updated
 
         val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.durationMs
         val newDuration = maxEnd.coerceAtLeast(updated.durationMs)
         if (newDuration != updated.durationMs) {
-            midiTrack.entries[entryStartMs] = updated.copy(durationMs = newDuration)
+            track.entries[entryStartMs] = updated.copy(durationMs = newDuration)
         }
-        val newTrackInstance = MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
+        val newTrackInstance = track.copyWithEntries()
         currentTracks[trackIndex] = newTrackInstance
-        _tracks.value = currentTracks.toList(); TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
         // Update Piano Roll mode entry if open
         val mode = WorkspaceRepository.mode.value
-        if (mode is PianoRollWorkspaceMode && mode.trackIndex == trackIndex && mode.entryStartMs == entryStartMs) {
-            mode.currentEntry = newTrackInstance.entries[entryStartMs]
+        if (mode is PianoRollWorkspaceMode && mode.isEditingClip(trackIndex, entryStartMs)) {
+            mode.syncCurrentEntry(newTrackInstance.entries[entryStartMs])
         }
     }
 
@@ -890,8 +901,8 @@ class TimelineViewModel : ViewModel() {
         val currentTracks = _tracks.value.toMutableList()
         val track = currentTracks.getOrNull(trackIndex)
         if (track !is MidiTimelineTrack) return
-        val timelineTrack = track as TimelineTrack<MidiEntry>
-        val entry = timelineTrack.entries[oldStartMs] ?: return
+        val before = snapshotMidiEntries(track)
+        val entry = track.entries[oldStartMs] ?: return
 
         val clampedDuration = newDurationMs.coerceAtLeast(50L)
         val startChanged = newStartMs != oldStartMs
@@ -901,26 +912,37 @@ class TimelineViewModel : ViewModel() {
             entry.notes.map { n -> n.copy(startTimeMs = (n.startTimeMs + delta).coerceAtLeast(0L)) }
         } else entry.notes
 
-        if (startChanged) timelineTrack.entries.remove(oldStartMs)
+        if (startChanged) track.entries.remove(oldStartMs)
         val updated = entry.copy(startTimeMs = newStartMs, durationMs = clampedDuration, notes = movedNotes)
-        timelineTrack.entries[newStartMs] = updated
+        track.entries[newStartMs] = updated
 
         val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.endTimeMs
         val finalDuration = maxEnd - updated.startTimeMs
         if (finalDuration > updated.durationMs) {
-            timelineTrack.entries[newStartMs] = updated.copy(durationMs = finalDuration)
+            track.entries[newStartMs] = updated.copy(durationMs = finalDuration)
         }
 
-        val newTrackInstance = MidiTimelineTrack().apply { entries.putAll(timelineTrack.entries) }
+        val newTrackInstance = track.copyWithEntries()
+        val after = snapshotMidiEntries(newTrackInstance)
 
         currentTracks[trackIndex] = newTrackInstance
-        _tracks.value = currentTracks.toList(); TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = newStartMs))
 
         val mode = WorkspaceRepository.mode.value
-        if (mode is PianoRollWorkspaceMode && mode.trackIndex == trackIndex && mode.entryStartMs == oldStartMs) {
-            mode.entryStartMs = newStartMs
-            mode.currentEntry = newTrackInstance.entries[newStartMs]
+        if (mode is PianoRollWorkspaceMode && mode.isEditingClip(trackIndex, oldStartMs)) {
+            mode.syncClipEntryStart(newStartMs)
+            mode.syncCurrentEntry(newTrackInstance.entries[newStartMs])
+        }
+
+        if (before != after) {
+            UndoManager.addAction(
+                UndoableAction.MidiTimelineChange(
+                    trackIndex = trackIndex,
+                    beforeEntries = before,
+                    afterEntries = after
+                )
+            )
         }
     }
 }

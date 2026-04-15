@@ -18,7 +18,6 @@ object WorkspaceSaveHelper {
      * Saves the current workspace, prompting for a file path if not already set.
      * Returns true if save was successful, false if cancelled.
      */
-    @OptIn(ExperimentalSerializationApi::class)
     suspend fun saveWorkspace(): Boolean {
         var path = WorkspaceRepository.workspaceMeta?.path
 
@@ -29,7 +28,26 @@ object WorkspaceSaveHelper {
             )?.path ?: return false
         }
 
-        // Update metadata path
+        return writeToPath(path)
+    }
+
+    /**
+     * Always opens a file-save dialog, ignoring any existing path (Save As).
+     * Returns true if save was successful, false if cancelled.
+     */
+    suspend fun saveWorkspaceAs(): Boolean {
+        val path = FileKit.openFileSaver(
+            suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+            extension = "ame"
+        )?.path ?: return false
+
+        return writeToPath(path)
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun writeToPath(rawPath: String): Boolean {
+        val path = if (rawPath.endsWith(".ame")) rawPath else "$rawPath.ame"
+
         WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = path)
             ?: WorkspaceRepository.workspaceMeta
 

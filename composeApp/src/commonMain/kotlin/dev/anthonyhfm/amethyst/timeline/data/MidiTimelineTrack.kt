@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.timeline.data
 
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import kotlinx.serialization.Serializable
 
 /**
@@ -8,7 +10,27 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 class MidiTimelineTrack : TimelineTrack<MidiEntry>() {
+    override var volume: Float = 1f
+    override var isMuted: Boolean = false
+    override var isSoloed: Boolean = false
+    override val automationLanes: MutableList<TimelineAutomationLane> = mutableListOf()
     override val entries: MutableMap<Long, MidiEntry> = mutableMapOf()
+    override var trackId: String = UUID.randomUUID()
+    override val kind: TimelineTrackKind = TimelineTrackKind.MIDI
+
+    fun copyWithEntries(
+        entriesToCopy: Map<Long, MidiEntry> = entries,
+        preserveTrackIdentity: Boolean = true
+    ): MidiTimelineTrack {
+        return MidiTimelineTrack().apply {
+            if (preserveTrackIdentity) {
+                trackId = this@MidiTimelineTrack.trackId
+            }
+            name = this@MidiTimelineTrack.name
+            copyMixerStateFrom(other = this@MidiTimelineTrack)
+            entries.putAll(entriesToCopy)
+        }
+    }
 
     /**
      * Add a MIDI entry to the track at a specific time position

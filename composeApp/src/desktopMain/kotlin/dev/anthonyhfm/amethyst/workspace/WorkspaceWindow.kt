@@ -17,12 +17,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
+import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState.updateFromKeyEvent
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.ShortcutManager
 import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
+import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
@@ -61,15 +63,11 @@ fun WorkspaceWindow(
         ),
         onKeyEvent = {
             updateFromKeyEvent(it)
+            AutomappingManager.handleKeyEvent(it)
 
-            // Prioritize mode events over shortcuts
-            val modeEvent = WorkspaceRepository.mode.value.onKeyEvent(it)
-
-            if (!modeEvent) {
-                ShortcutManager.handleShortcut(it)
-            }
-
-            modeEvent
+            // Mode-specific handlers have priority over global shortcuts.
+            if (WorkspaceRepository.mode.value.onKeyEvent(it)) return@Window true
+            ShortcutManager.handleShortcut(it)
         },
         icon = when (DesktopPlatform.get()) {
             DesktopPlatform.Windows -> painterResource(Res.drawable.amethyst_windows)
@@ -87,9 +85,7 @@ fun WorkspaceWindow(
             }
         }
 
-        MaterialTheme(
-            colorScheme = darkColorScheme()
-        ) {
+        AmethystTheme {
             Column {
                 if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
                     OSXTitleBar()
@@ -97,35 +93,35 @@ fun WorkspaceWindow(
 
                 Workspace()
             }
-        }
 
-        // Show save changes dialog if needed
-        if (showSaveDialog) {
-            SaveChangesDialog(
-                onSave = {
-                    coroutineScope.launch {
-                        val saved = WorkspaceSaveHelper.saveWorkspace()
-                        if (saved && pendingClose) {
+            // Keep the dialog in the same theme tree as the workspace so it matches the catalog styling.
+            if (showSaveDialog) {
+                SaveChangesDialog(
+                    onSave = {
+                        coroutineScope.launch {
+                            val saved = WorkspaceSaveHelper.saveWorkspace()
+                            if (saved && pendingClose) {
+                                WorkspaceRepository.clean()
+                                onClose()
+                            }
+                            showSaveDialog = false
+                            pendingClose = false
+                        }
+                    },
+                    onDontSave = {
+                        showSaveDialog = false
+                        if (pendingClose) {
                             WorkspaceRepository.clean()
                             onClose()
                         }
+                        pendingClose = false
+                    },
+                    onCancel = {
                         showSaveDialog = false
                         pendingClose = false
                     }
-                },
-                onDontSave = {
-                    showSaveDialog = false
-                    if (pendingClose) {
-                        WorkspaceRepository.clean()
-                        onClose()
-                    }
-                    pendingClose = false
-                },
-                onCancel = {
-                    showSaveDialog = false
-                    pendingClose = false
-                }
-            )
+                )
+            }
         }
     }
 }

@@ -1,13 +1,20 @@
 package dev.anthonyhfm.amethyst.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatUtilityLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
+import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.colors
 import javax.swing.UIManager
 
 @Composable
@@ -33,12 +40,18 @@ actual fun SettingsDialog(visible: Boolean, onDismiss: () -> Unit) {
             window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
         }
 
-        Column {
-            if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
-                OSXTitleBar()
-            }
+        AmethystTheme {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Theme[colors][background]),
+            ) {
+                if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
+                    OSXTitleBar()
+                }
 
-            Settings()
+                Settings()
+            }
         }
     }
 }

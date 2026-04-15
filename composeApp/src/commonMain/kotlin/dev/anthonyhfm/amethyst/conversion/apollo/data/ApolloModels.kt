@@ -58,8 +58,7 @@ sealed interface ApolloModel {
         val y: Int,
         val isAbsolute: Boolean,
         val absoluteX: Int,
-        val absoluteY: Int,
-        val angle: Int
+        val absoluteY: Int
     ) : ApolloModel
 
     data class Time(
@@ -116,7 +115,8 @@ sealed interface ApolloModel {
             val mode: Int,
             val gridMode: Int,
             val wrap: Boolean,
-            val offsets: List<Offset>
+            val offsets: List<Offset>,
+            val angles: List<Int>
         ) : Device
 
         data class Hold(
@@ -190,6 +190,40 @@ sealed interface ApolloModel {
             val hueTolerance: Double,
             val saturationTolerance: Double,
             val valueTolerance: Double
+        ) : Device
+
+        data class Move(
+            val offset: Offset,
+            val gridMode: Int,
+            val wrap: Boolean
+        ) : Device
+
+        data class Multi(
+            val preprocess: Chain,
+            val chains: List<Chain>,
+            val multiMode: Int,
+            val hasExpanded: Boolean,
+            val expandedIndex: Int
+        ) : Device
+
+        data class Output(
+            val target: Int
+        ) : Device
+
+        data class Tone(
+            val hue: Double,
+            val satHigh: Double,
+            val satLow: Double,
+            val valueHigh: Double,
+            val valueLow: Double
+        ) : Device
+
+        data class Clear(
+            val mode: Int
+        ) : Device
+
+        data class Refresh(
+            val macros: List<Boolean>
         ) : Device
     }
 }

@@ -5,6 +5,9 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import kotlin.time.Duration.Companion.milliseconds
 
 fun ApolloModel.Time.toTiming(): Timing {
+    // NOTE: ApolloModel.Time.free stores Apollo's Time.Mode field
+    // Mode=true (free=true) → BPM-synced, use Length step index
+    // Mode=false (free=false) → exact milliseconds, use divisor (Apollo's Free field)
     return if (free) {
         Timing.Rythm(
             timing = listOf(

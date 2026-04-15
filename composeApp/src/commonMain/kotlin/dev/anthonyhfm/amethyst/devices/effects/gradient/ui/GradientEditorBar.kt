@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BlurLinear
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,13 +27,19 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientSmoothness
-import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
-import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuRadioItem
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.ui.theme.background as themeBackground
+import dev.anthonyhfm.amethyst.ui.theme.border as themeBorder
+import dev.anthonyhfm.amethyst.ui.theme.colors as themeColors
+import dev.anthonyhfm.amethyst.ui.theme.input as themeInput
+import dev.anthonyhfm.amethyst.ui.theme.primary as themePrimary
 
 @Composable
 fun GradientEditorBar(
@@ -65,10 +69,11 @@ fun GradientEditorBar(
         ) {
             Canvas(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(6.dp))
                     .fillMaxWidth()
                     .height(28.dp)
-                    .border(2.dp, Color.White, RoundedCornerShape(4.dp))
+                    .background(Theme[themeColors][themeInput])
+                    .border(1.dp, Theme[themeColors][themeBorder], RoundedCornerShape(6.dp))
                     .padding(4.dp)
                     .rightClickable { offset ->
                         val position = offset.x / constraints.maxWidth.toFloat()
@@ -157,8 +162,6 @@ fun GradientEditorBar(
 
             colors.forEach { color ->
                 var pos by positionStates.getValue(color.selectionUUID)
-                var showSmoothnessMenu by remember { mutableStateOf(false) }
-                var smoothnessMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
                 LaunchedEffect(color.position) {
                     if (color.position != pos) {
@@ -166,7 +169,7 @@ fun GradientEditorBar(
                     }
                 }
 
-                Box(
+                ContextMenu(
                     modifier = Modifier
                         .offset(x = -6.dp, y = -5.dp)
                         .offset(x = maxWidth * pos)
@@ -174,133 +177,83 @@ fun GradientEditorBar(
                         .shadow(
                             elevation = if (selectedColor == color.selectionUUID) 16.dp else 6.dp,
                             shape = CircleShape
-                        )
-                        .clip(CircleShape)
-                        .height(38.dp)
-                        .width(12.dp)
-                        .background(Color(color.r, color.g, color.b))
-                        .border(
-                            width = 2.dp,
-                            color = Color.White,
-                            shape = CircleShape
-                        )
-                        .clickable {
-                            if (selectedColor == color.selectionUUID) {
-                                onSelectionChange(null)
-                            } else {
-                                onSelectionChange(color.selectionUUID)
-                            }
-                        }
-                        .rightClickable { offset ->
-                            smoothnessMenuOffset = DpOffset((offset.x / density.density).dp, (offset.y / density.density).dp)
-                            showSmoothnessMenu = true
-                        }
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    onGradientDragStart()
-                                },
-                                onDrag = { input, offset ->
-                                    input.consume()
-                                    val pct = (offset.x / density.density).dp / maxWidth
-                                    val newPos = (pos + pct).coerceIn(0f, 1f)
-                                    pos = newPos
-                                },
-                                onDragEnd = {
-                                    val committed = colors.map { c ->
-                                        val p = positionStates[c.selectionUUID]?.value ?: c.position
-                                        GradientChainDeviceState.GradientColor(
-                                            position = p,
-                                            r = c.r,
-                                            g = c.g,
-                                            b = c.b,
-                                            smoothness = c.smoothness,
-                                            selectionUUID = c.selectionUUID
-                                        )
+                        ),
+                    trigger = {
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .height(38.dp)
+                                .width(12.dp)
+                                .background(Color(color.r, color.g, color.b))
+                                .border(
+                                    width = if (selectedColor == color.selectionUUID) 2.dp else 1.dp,
+                                    color = if (selectedColor == color.selectionUUID) Theme[themeColors][themePrimary]
+                                    else Theme[themeColors][themeBackground],
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    if (selectedColor == color.selectionUUID) {
+                                        onSelectionChange(null)
+                                    } else {
+                                        onSelectionChange(color.selectionUUID)
                                     }
-                                    onGradientDataEmit(committed)
-                                    onGradientDragFinish()
-                                },
-                                onDragCancel = {
-                                    val committed = colors.map { c ->
-                                        val p = positionStates[c.selectionUUID]?.value ?: c.position
-                                        GradientChainDeviceState.GradientColor(
-                                            position = p,
-                                            r = c.r,
-                                            g = c.g,
-                                            b = c.b,
-                                            smoothness = c.smoothness,
-                                            selectionUUID = c.selectionUUID
-                                        )
-                                    }
-                                    onGradientDataEmit(committed)
-                                    onGradientDragFinish()
                                 }
-                            )
+                                .pointerInput(color.selectionUUID) {
+                                    detectDragGestures(
+                                        onDragStart = {
+                                            onGradientDragStart()
+                                        },
+                                        onDrag = { input, offset ->
+                                            input.consume()
+                                            val pct = (offset.x / density.density).dp / maxWidth
+                                            val newPos = (pos + pct).coerceIn(0f, 1f)
+                                            pos = newPos
+                                        },
+                                        onDragEnd = {
+                                            val committed = colors.map { c ->
+                                                val p = positionStates[c.selectionUUID]?.value ?: c.position
+                                                GradientChainDeviceState.GradientColor(
+                                                    position = p,
+                                                    r = c.r,
+                                                    g = c.g,
+                                                    b = c.b,
+                                                    smoothness = c.smoothness,
+                                                    selectionUUID = c.selectionUUID
+                                                )
+                                            }
+                                            onGradientDataEmit(committed)
+                                            onGradientDragFinish()
+                                        },
+                                        onDragCancel = {
+                                            val committed = colors.map { c ->
+                                                val p = positionStates[c.selectionUUID]?.value ?: c.position
+                                                GradientChainDeviceState.GradientColor(
+                                                    position = p,
+                                                    r = c.r,
+                                                    g = c.g,
+                                                    b = c.b,
+                                                    smoothness = c.smoothness,
+                                                    selectionUUID = c.selectionUUID
+                                                )
+                                            }
+                                            onGradientDataEmit(committed)
+                                            onGradientDragFinish()
+                                        }
+                                    )
+                                }
+                        )
+                    },
+                ) {
+                    GradientSmoothness.entries.forEach { smoothness ->
+                        ContextMenuRadioItem(
+                            selected = smoothness == color.smoothness,
+                            onClick = {
+                                onSmoothnessChange(color.selectionUUID, smoothness)
+                            },
+                        ) {
+                            Text(smoothness.name)
                         }
-                )
-
-                AmethystContextMenu(
-                    expanded = showSmoothnessMenu,
-                    onDismissRequest = { showSmoothnessMenu = false },
-                    offset = smoothnessMenuOffset
-                ) { _, _, _ ->
-                    ContextMenuItem(
-                        label = "Linear",
-                        icon = Icons.Default.BlurLinear,
-                        onClick = {
-                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Linear)
-                            showSmoothnessMenu = false
-                        }
-                    )
-                    ContextMenuItem(
-                        label = "Smooth",
-                        icon = Icons.Default.BlurLinear,
-                        onClick = {
-                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Smooth)
-                            showSmoothnessMenu = false
-                        }
-                    )
-                    ContextMenuItem(
-                        label = "Sharp",
-                        icon = Icons.Default.BlurLinear,
-                        onClick = {
-                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Sharp)
-                            showSmoothnessMenu = false
-                        }
-                    )
-                    ContextMenuItem(
-                        label = "Fast",
-                        icon = Icons.Default.BlurLinear,
-                        onClick = {
-                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Fast)
-                            showSmoothnessMenu = false
-                        }
-                    )
-                    ContextMenuItem(
-                        label = "Slow",
-                        icon = Icons.Default.BlurLinear,
-                        onClick = {
-                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Slow)
-                            showSmoothnessMenu = false
-                        }
-                    )
-                    ContextMenuItem(
-                        label = "Hold",
-                        icon = Icons.Default.BlurLinear,
-                        onClick = {
-                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Hold)
-                            showSmoothnessMenu = false
-                        }
-                    )
-                    ContextMenuItem(
-                        label = "Release",
-                        icon = Icons.Default.BlurLinear,
-                        onClick = {
-                            onSmoothnessChange(color.selectionUUID, GradientSmoothness.Release)
-                            showSmoothnessMenu = false
-                        }
-                    )
+                    }
                 }
             }
         }
