@@ -39,7 +39,7 @@ jobs:
       - name: Install gems
         working-directory: iosApp
         run: |
-          gem install bundler
+          gem install bundler -v '~> 2.5'
           bundle install
 
       - name: Set up SSH key for Match
