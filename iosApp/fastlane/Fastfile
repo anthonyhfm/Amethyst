@@ -1,0 +1,42 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    setup_ci
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_API_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_API_KEY_CONTENT"],
+      is_key_content_base64: false
+    )
+
+    match(
+      type: "appstore",
+      readonly: true,
+      api_key: api_key
+    )
+
+    increment_build_number(
+      build_number: ENV["BUILD_NUMBER"],
+      xcodeproj: "iosApp.xcodeproj"
+    )
+
+    build_app(
+      scheme: "iosApp",
+      project: "iosApp.xcodeproj",
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          "dev.anthonyhfm.amethyst.Amethyst" => "match AppStore dev.anthonyhfm.amethyst.Amethyst"
+        }
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+end

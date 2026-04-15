@@ -1,0 +1,4 @@
+app_identifier("dev.anthonyhfm.amethyst.Amethyst")
+apple_dev_portal_id(ENV["APPLE_ID"]) if ENV["APPLE_ID"]
+itc_team_id("5WK8V9T8SM")
+team_id("5WK8V9T8SM")
