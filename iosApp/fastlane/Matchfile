@@ -1,5 +1,0 @@
-git_url("git@github.com:anthonyhfm/apple-signing.git")
-storage_mode("git")
-type("appstore")
-app_identifier(["dev.anthonyhfm.amethyst.Amethyst"])
-team_id("5WK8V9T8SM")
