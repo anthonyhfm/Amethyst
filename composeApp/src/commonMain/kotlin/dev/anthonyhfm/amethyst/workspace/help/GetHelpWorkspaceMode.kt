@@ -37,7 +37,6 @@ class GetHelpWorkspaceMode(
         HelpViewer(
             helpRef = helpRef,
             paddingValues = paddingValues,
-            onClose = { WorkspaceRepository.switchToPreviousMode() }
         )
     }
 }
