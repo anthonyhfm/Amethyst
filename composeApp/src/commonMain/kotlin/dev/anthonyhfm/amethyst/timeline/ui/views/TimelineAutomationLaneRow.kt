@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,6 +24,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -39,12 +39,16 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.data.applyAutomationCurve
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromContentX
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.abs
+import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -58,7 +62,8 @@ private data class AutomationPointDragState(
     val afterPoints: List<TimelineAutomationPoint>,
     val draggedPointId: String,
     val dragStartOffset: Offset,
-    val mode: AutomationDragMode
+    val mode: AutomationDragMode,
+    val curveSegmentEndPoint: TimelineAutomationPoint? = null
 )
 
 private data class AutomationPointTapState(
@@ -76,11 +81,19 @@ private data class AutomationSegmentHit(
     val endPoint: TimelineAutomationPoint
 )
 
+private sealed interface AutomationHoverTarget {
+    data class Point(val pointId: String) : AutomationHoverTarget
+    data class Segment(
+        val startPointId: String,
+        val endPointId: String
+    ) : AutomationHoverTarget
+}
+
 private const val AutomationDoubleTapTimeoutMs = 300L
 private const val AutomationTapSlopPx = 10f
 private const val AutomationPointHitRadiusPx = 14f
-private const val AutomationSegmentHitRadiusPx = 12f
-private const val AutomationCurveDragSensitivityPx = 96f
+private const val AutomationSegmentHitRadiusPx = 20f
+private const val AutomationMaxCurve = 3f
 private const val AutomationCurvePathSteps = 16
 
 @Composable
@@ -104,10 +117,12 @@ internal fun TimelineAutomationLaneRow(
     val currentIsMetaSelectionPressed by rememberUpdatedState(
         ModifierKeysState.isMetaPressed || ModifierKeysState.isCtrlPressed
     )
-    // Always-fresh viewport for pointer-input closures that are not keyed on scroll changes.
+    // Always-fresh state refs for pointer-input closures keyed on Unit.
     val currentViewport = rememberUpdatedState(viewport)
     val bpm by WorkspaceRepository.bpm.collectAsState()
     val gridType by WorkspaceRepository.gridType.collectAsState()
+    val currentBpm = rememberUpdatedState(bpm)
+    val currentGridType = rememberUpdatedState(gridType)
     val selectedRange = selections
         .filterIsInstance<Selectable.TimelineRange>()
         .firstOrNull { it.trackIndex == trackIndex }
@@ -117,14 +132,26 @@ internal fun TimelineAutomationLaneRow(
         currentSelections = selections
     )
 
-    var dragState by remember(trackIndex, laneKey) {
+    var dragState by remember {
         mutableStateOf<AutomationPointDragState?>(null)
     }
-    var rangeDragState by remember(trackIndex, laneKey) {
+    var rangeDragState by remember {
         mutableStateOf<AutomationRangeDragState?>(null)
     }
-    var lastTapState by remember(trackIndex, laneKey) {
+    var lastTapState by remember {
         mutableStateOf<AutomationPointTapState?>(null)
+    }
+    var lastPointerPosition by remember {
+        mutableStateOf<Offset?>(null)
+    }
+    var contextMenuState by remember {
+        mutableStateOf<AutomationSegmentHit?>(null)
+    }
+    var contextMenuPosition by remember {
+        mutableStateOf(Offset.Zero)
+    }
+    val laneHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+        TimelineAutomationLaneRowHeight.toPx()
     }
 
     val renderedPoints = remember(normalizedLane.points, dragState) {
@@ -139,6 +166,40 @@ internal fun TimelineAutomationLaneRow(
     }
     val renderedLane = remember(normalizedLane, renderedPoints) {
         normalizedLane.copy(points = renderedPoints).normalized()
+    }
+    val hoverTarget = remember(
+        lastPointerPosition,
+        renderedLane.points,
+        viewport.scrollX,
+        viewport.zoomX,
+        ModifierKeysState.isAltPressed,
+    ) {
+        val pos = lastPointerPosition ?: return@remember null
+        val hitPt = hitAutomationPoint(
+            points = renderedLane.points,
+            tapOffset = pos,
+            zoomLevel = viewport.zoomX,
+            scrollOffsetPx = viewport.scrollX,
+            laneHeightPx = laneHeightPx,
+            target = normalizedLane.target
+        )
+        if (hitPt != null) return@remember AutomationHoverTarget.Point(hitPt.pointId)
+
+        if (ModifierKeysState.isAltPressed) {
+            val hitSeg = hitAutomationSegment(
+                points = renderedLane.points,
+                tapOffset = pos,
+                zoomLevel = viewport.zoomX,
+                scrollOffsetPx = viewport.scrollX,
+                laneHeightPx = laneHeightPx,
+                target = normalizedLane.target
+            )
+            if (hitSeg != null) return@remember AutomationHoverTarget.Segment(
+                startPointId = hitSeg.startPoint.pointId,
+                endPointId = hitSeg.endPoint.pointId
+            )
+        }
+        null
     }
     val rangeSelectedPointIds = remember(renderedLane.points, selectedRange) {
         if (selectedRange == null) {
@@ -156,6 +217,9 @@ internal fun TimelineAutomationLaneRow(
         rangeSelectedPointIds.isNotEmpty() -> rangeSelectedPointIds
         else -> emptySet()
     }
+    val currentRenderedLane = rememberUpdatedState(renderedLane)
+    val currentNormalizedLane = rememberUpdatedState(normalizedLane)
+    val currentEffectiveSelectedPointIds = rememberUpdatedState(effectiveSelectedPointIds)
     val baseValue = track.automationLaneBaseValue(normalizedLane)
     val neutralValue = normalizedLane.target.defaultValue
 
@@ -189,299 +253,410 @@ internal fun TimelineAutomationLaneRow(
                 shape = SmallShape
             )
             .clipToBounds()
-            .pointerInput(
-                laneKey,
-                zoomLevel,
-                renderedLane.points,
-                currentIsMetaSelectionPressed
-            ) {
+            .rightClickable { position ->
+                val vp = currentViewport.value
+                val pts = currentRenderedLane.value.points
+                val tgt = currentNormalizedLane.value.target
+                val hitSeg = hitAutomationSegment(
+                    points = pts,
+                    tapOffset = position,
+                    zoomLevel = vp.zoomX,
+                    scrollOffsetPx = vp.scrollX,
+                    laneHeightPx = laneHeightPx,
+                    target = tgt
+                )
+                if (hitSeg != null) {
+                    contextMenuState = hitSeg
+                    contextMenuPosition = position
+                }
+            }
+            .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(
                         requireUnconsumed = false,
                         pass = PointerEventPass.Main
                     )
-                    var cancelled = false
+
+                    // Snapshot state at press time via rememberUpdatedState refs
+                    val vp = currentViewport.value
+                    val points = currentRenderedLane.value.points
+                    val target = currentNormalizedLane.value.target
+                    val lk = currentNormalizedLane.value.key
+                    val isAlt = currentIsAltPressed
+                    val isMeta = currentIsMetaSelectionPressed
+                    val selectedIds = currentEffectiveSelectedPointIds.value
+                    val laneHeight = size.height.toFloat()
+
+                    // Hit tests
+                    val hitPoint = hitAutomationPoint(
+                        points = points,
+                        tapOffset = down.position,
+                        zoomLevel = vp.zoomX,
+                        scrollOffsetPx = vp.scrollX,
+                        laneHeightPx = laneHeight,
+                        target = target
+                    )
+                    val hitSegment = if (hitPoint == null && isAlt) {
+                        hitAutomationSegment(
+                            points = points,
+                            tapOffset = down.position,
+                            zoomLevel = vp.zoomX,
+                            scrollOffsetPx = vp.scrollX,
+                            laneHeightPx = laneHeight,
+                            target = target
+                        )
+                    } else null
+
+                    // === POINT HIT ===
+                    if (hitPoint != null) {
+                        val affectedPointIds = if (
+                            selectedIds.isNotEmpty() &&
+                            hitPoint.pointId in selectedIds
+                        ) {
+                            selectedIds
+                        } else {
+                            if (!isMeta) {
+                                SelectionManager.selectTimelineAutomationPoints(
+                                    trackIndex = trackIndex,
+                                    lane = lk,
+                                    pointIds = listOf(hitPoint.pointId)
+                                )
+                            }
+                            setOf(hitPoint.pointId)
+                        }
+
+                        val affectedPoints = points.filter { it.pointId in affectedPointIds }
+                        dragState = AutomationPointDragState(
+                            beforePoints = affectedPoints,
+                            afterPoints = affectedPoints,
+                            draggedPointId = hitPoint.pointId,
+                            dragStartOffset = down.position,
+                            mode = AutomationDragMode.Point
+                        )
+                        rangeDragState = null
+
+                        var totalMovement = 0f
+                        var lastPos = down.position
+                        var upPosition: Offset? = null
+                        var upTimeMillis = 0L
+
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Main)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.isConsumed) {
+                                dragState = null
+                                return@awaitEachGesture
+                            }
+
+                            if (!change.pressed) {
+                                upPosition = change.position
+                                upTimeMillis = change.uptimeMillis
+                                break
+                            }
+
+                            val delta = change.position - lastPos
+                            totalMovement += sqrt(delta.x * delta.x + delta.y * delta.y)
+                            lastPos = change.position
+
+                            // Live-update point positions (no slop — immediate response)
+                            val vp2 = currentViewport.value
+                            val currentDrag = dragState ?: break
+                            val anchorBefore = currentDrag.beforePoints
+                                .firstOrNull { it.pointId == currentDrag.draggedPointId }
+                                ?: break
+                            val snapTime = computeSnappedTimeFromContentX(
+                                vp2.screenToContentX(change.position.x),
+                                vp2.zoomX,
+                                currentBpm.value,
+                                currentGridType.value
+                            )
+                            val minDelta = -(
+                                currentDrag.beforePoints.minOfOrNull(
+                                    TimelineAutomationPoint::timeMs
+                                ) ?: 0L
+                            )
+                            val deltaTime = (snapTime - anchorBefore.timeMs)
+                                .coerceAtLeast(minDelta)
+                            val anchorValue = pointerOffsetToValue(
+                                y = change.position.y,
+                                laneHeightPx = laneHeight,
+                                target = target
+                            )
+                            val anchorDisplayValue =
+                                target.valueToDisplayValue(anchorValue)
+                            val deltaDisplayValue = anchorDisplayValue -
+                                target.valueToDisplayValue(anchorBefore.value)
+
+                            val updatedPoints = currentDrag.beforePoints.map { point ->
+                                val updatedDisplayValue =
+                                    target.valueToDisplayValue(point.value) +
+                                        deltaDisplayValue
+                                point.copy(
+                                    timeMs = (point.timeMs + deltaTime)
+                                        .coerceAtLeast(0L),
+                                    value = target.displayValueToValue(
+                                        updatedDisplayValue
+                                    )
+                                )
+                            }
+                            if (updatedPoints != currentDrag.afterPoints) {
+                                dragState = currentDrag.copy(
+                                    afterPoints = updatedPoints
+                                )
+                            }
+                            change.consume()
+                        }
+
+                        // Handle release
+                        val finalDrag = dragState
+                        dragState = null
+
+                        if (upPosition != null && totalMovement < AutomationTapSlopPx) {
+                            // It was a tap, not a drag — handle selection
+                            selectLane()
+                            val isDoubleTap =
+                                lastTapState?.pointId == hitPoint.pointId &&
+                                    upTimeMillis - (lastTapState?.timeMillis ?: 0L) <=
+                                    AutomationDoubleTapTimeoutMs
+
+                            if (isDoubleTap) {
+                                TimelineCommandSurface.deleteAutomationPoints(
+                                    trackIndex = trackIndex,
+                                    lane = lk,
+                                    pointIds = listOf(hitPoint.pointId)
+                                )
+                                lastTapState = null
+                            } else {
+                                if (isMeta) {
+                                    SelectionManager.toggleTimelineAutomationPoint(
+                                        trackIndex = trackIndex,
+                                        lane = lk,
+                                        pointId = hitPoint.pointId
+                                    )
+                                } else {
+                                    SelectionManager.selectTimelineAutomationPoints(
+                                        trackIndex = trackIndex,
+                                        lane = lk,
+                                        pointIds = listOf(hitPoint.pointId)
+                                    )
+                                }
+                                lastTapState = AutomationPointTapState(
+                                    pointId = hitPoint.pointId,
+                                    timeMillis = upTimeMillis
+                                )
+                            }
+                        } else if (
+                            finalDrag != null &&
+                            finalDrag.afterPoints != finalDrag.beforePoints
+                        ) {
+                            TimelineCommandSurface.moveAutomationPoints(
+                                trackIndex = trackIndex,
+                                lane = lk,
+                                changes = finalDrag.beforePoints
+                                    .zip(finalDrag.afterPoints)
+                                    .map { (before, after) ->
+                                        TimelineEditedAutomationPoint(
+                                            before = before,
+                                            after = after
+                                        )
+                                    }
+                            )
+                        }
+                        return@awaitEachGesture
+                    }
+
+                    // === CURVE SEGMENT HIT (Alt held) ===
+                    if (hitSegment != null) {
+                        selectLane()
+                        dragState = AutomationPointDragState(
+                            beforePoints = listOf(hitSegment.startPoint),
+                            afterPoints = listOf(hitSegment.startPoint),
+                            draggedPointId = hitSegment.startPoint.pointId,
+                            dragStartOffset = down.position,
+                            mode = AutomationDragMode.Curve,
+                            curveSegmentEndPoint = hitSegment.endPoint
+                        )
+                        rangeDragState = null
+
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Main)
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                                ?: break
+                            if (change.isConsumed) {
+                                dragState = null
+                                return@awaitEachGesture
+                            }
+
+                            if (!change.pressed) break
+
+                            // Compute curve so the line passes through the cursor
+                            val currentDrag = dragState ?: break
+                            val segEnd = currentDrag.curveSegmentEndPoint ?: break
+                            val vp2 = currentViewport.value
+                            val newCurve = computeCurveFromCursor(
+                                cursorScreenX = change.position.x,
+                                cursorScreenY = change.position.y,
+                                startPoint = currentDrag.beforePoints.first(),
+                                endPoint = segEnd,
+                                zoomLevel = vp2.zoomX,
+                                scrollOffsetPx = vp2.scrollX,
+                                laneHeightPx = laneHeight,
+                                target = target
+                            )
+
+                            dragState = currentDrag.copy(
+                                afterPoints = listOf(
+                                    currentDrag.beforePoints.first().copy(
+                                        curve = newCurve
+                                    )
+                                )
+                            )
+                            change.consume()
+                        }
+
+                        val finalDrag = dragState
+                        dragState = null
+                        if (
+                            finalDrag != null &&
+                            finalDrag.afterPoints != finalDrag.beforePoints
+                        ) {
+                            TimelineCommandSurface.moveAutomationPoints(
+                                trackIndex = trackIndex,
+                                lane = lk,
+                                changes = finalDrag.beforePoints
+                                    .zip(finalDrag.afterPoints)
+                                    .map { (before, after) ->
+                                        TimelineEditedAutomationPoint(
+                                            before = before,
+                                            after = after
+                                        )
+                                    }
+                            )
+                        }
+                        return@awaitEachGesture
+                    }
+
+                    // === EMPTY SPACE ===
+                    val initTime = computeSnappedTimeFromContentX(
+                        vp.screenToContentX(down.position.x),
+                        vp.zoomX,
+                        currentBpm.value,
+                        currentGridType.value
+                    )
+                    rangeDragState = AutomationRangeDragState(
+                        startTimeMs = initTime,
+                        endTimeMs = initTime
+                    )
+                    dragState = null
+
+                    var totalMovement = 0f
+                    var lastPos = down.position
                     var upPosition: Offset? = null
                     var upTimeMillis = 0L
 
                     while (true) {
                         val event = awaitPointerEvent(pass = PointerEventPass.Main)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: continue
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (change.isConsumed) {
-                            cancelled = true
-                            break
+                            rangeDragState = null
+                            return@awaitEachGesture
                         }
+
                         if (!change.pressed) {
                             upPosition = change.position
                             upTimeMillis = change.uptimeMillis
                             break
                         }
-                    }
 
-                    val releasePosition = upPosition ?: return@awaitEachGesture
-                    if (cancelled || !isWithinTapSlop(down.position, releasePosition)) {
-                        return@awaitEachGesture
-                    }
+                        val delta = change.position - lastPos
+                        totalMovement += sqrt(delta.x * delta.x + delta.y * delta.y)
+                        lastPos = change.position
 
-                    val hitPoint = hitAutomationPoint(
-                        points = renderedLane.points,
-                        tapOffset = releasePosition,
-                        zoomLevel = zoomLevel,
-                        scrollOffsetPx = currentViewport.value.scrollX,
-                        laneHeightPx = size.height.toFloat(),
-                        target = normalizedLane.target
-                    )
-
-                    if (hitPoint != null) {
-                        selectLane()
-                        val isDoubleTap = lastTapState?.pointId == hitPoint.pointId &&
-                            upTimeMillis - (lastTapState?.timeMillis ?: 0L) <= AutomationDoubleTapTimeoutMs
-
-                        if (isDoubleTap) {
-                            TimelineCommandSurface.deleteAutomationPoints(
-                                trackIndex = trackIndex,
-                                lane = laneKey,
-                                pointIds = listOf(hitPoint.pointId)
-                            )
-                            lastTapState = null
-                        } else {
-                            if (currentIsMetaSelectionPressed) {
-                                SelectionManager.toggleTimelineAutomationPoint(
-                                    trackIndex = trackIndex,
-                                    lane = laneKey,
-                                    pointId = hitPoint.pointId
+                        if (totalMovement >= AutomationTapSlopPx) {
+                            val vp2 = currentViewport.value
+                            val currentRange = rangeDragState ?: break
+                            rangeDragState = currentRange.copy(
+                                endTimeMs = computeSnappedTimeFromContentX(
+                                    vp2.screenToContentX(change.position.x),
+                                    vp2.zoomX,
+                                    currentBpm.value,
+                                    currentGridType.value
                                 )
-                            } else {
-                                SelectionManager.selectTimelineAutomationPoints(
-                                    trackIndex = trackIndex,
-                                    lane = laneKey,
-                                    pointIds = listOf(hitPoint.pointId)
-                                )
-                            }
-                            lastTapState = AutomationPointTapState(
-                                pointId = hitPoint.pointId,
-                                timeMillis = upTimeMillis
                             )
+                            change.consume()
                         }
-                        return@awaitEachGesture
                     }
 
-                    lastTapState = null
-                    TimelineCommandSurface.createAutomationPoints(
-                        trackIndex = trackIndex,
-                        lane = laneKey,
-                        points = listOf(
-                            TimelineAutomationPoint(
-                                timeMs = computeSnappedTimeFromContentX(
-                                    currentViewport.value.screenToContentX(releasePosition.x), currentViewport.value.zoomX, bpm, gridType
-                                ),
-                                value = pointerOffsetToValue(
-                                    y = releasePosition.y,
-                                    laneHeightPx = size.height.toFloat(),
-                                    target = normalizedLane.target
+                    val currentRange = rangeDragState
+                    rangeDragState = null
+
+                    if (upPosition != null && totalMovement < AutomationTapSlopPx) {
+                        // Tap on empty space — create a new automation point
+                        lastTapState = null
+                        val vp2 = currentViewport.value
+                        TimelineCommandSurface.createAutomationPoints(
+                            trackIndex = trackIndex,
+                            lane = lk,
+                            points = listOf(
+                                TimelineAutomationPoint(
+                                    timeMs = computeSnappedTimeFromContentX(
+                                        vp2.screenToContentX(upPosition.x),
+                                        vp2.zoomX,
+                                        currentBpm.value,
+                                        currentGridType.value
+                                    ),
+                                    value = pointerOffsetToValue(
+                                        y = upPosition.y,
+                                        laneHeightPx = laneHeight,
+                                        target = target
+                                    )
                                 )
                             )
                         )
-                    )
+                    } else if (currentRange != null) {
+                        val normalizedStart = minOf(
+                            currentRange.startTimeMs,
+                            currentRange.endTimeMs
+                        )
+                        val normalizedEnd = maxOf(
+                            currentRange.startTimeMs,
+                            currentRange.endTimeMs
+                        )
+                        if (normalizedEnd > normalizedStart) {
+                            SelectionManager.replaceSelections(
+                                listOf(
+                                    Selectable.TimelineAutomationLane(
+                                        trackIndex = trackIndex,
+                                        target = lk.target,
+                                        bindingId = lk.bindingId
+                                    ),
+                                    Selectable.TimelineRange(
+                                        trackIndex = trackIndex,
+                                        startMs = normalizedStart,
+                                        endMs = normalizedEnd
+                                    )
+                                )
+                            )
+                        } else {
+                            selectLane()
+                        }
+                    }
                 }
             }
-            .pointerInput(
-                laneKey,
-                zoomLevel,
-                renderedLane.points,
-                effectiveSelectedPointIds,
-                currentIsAltPressed
-            ) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val laneSelection = Selectable.TimelineAutomationLane(
-                            trackIndex = trackIndex,
-                            target = laneKey.target,
-                            bindingId = laneKey.bindingId
-                        )
-                        val hitPoint = hitAutomationPoint(
-                            points = renderedLane.points,
-                            tapOffset = offset,
-                            zoomLevel = zoomLevel,
-                            scrollOffsetPx = currentViewport.value.scrollX,
-                            laneHeightPx = size.height.toFloat(),
-                            target = normalizedLane.target
-                        )
-
-                        if (hitPoint != null) {
-                            val affectedPointIds = if (
-                                effectiveSelectedPointIds.isNotEmpty() &&
-                                hitPoint.pointId in effectiveSelectedPointIds
-                            ) {
-                                effectiveSelectedPointIds
-                            } else {
-                                SelectionManager.selectTimelineAutomationPoints(
-                                    trackIndex = trackIndex,
-                                    lane = laneKey,
-                                    pointIds = listOf(hitPoint.pointId)
-                                )
-                                setOf(hitPoint.pointId)
-                            }
-
-                            val affectedPoints = renderedLane.points.filter { point ->
-                                point.pointId in affectedPointIds
-                            }
-
-                            dragState = AutomationPointDragState(
-                                beforePoints = affectedPoints,
-                                afterPoints = affectedPoints,
-                                draggedPointId = hitPoint.pointId,
-                                dragStartOffset = offset,
-                                mode = AutomationDragMode.Point
-                            )
-                            rangeDragState = null
-                            return@detectDragGestures
-                        }
-
-                        if (currentIsAltPressed) {
-                            val hitSegment = hitAutomationSegment(
-                                points = renderedLane.points,
-                                tapOffset = offset,
-                                zoomLevel = zoomLevel,
-                                scrollOffsetPx = currentViewport.value.scrollX,
-                                laneHeightPx = size.height.toFloat(),
-                                target = normalizedLane.target
-                            )
-                            if (hitSegment != null) {
-                                SelectionManager.replaceSelections(listOf(laneSelection))
-                                dragState = AutomationPointDragState(
-                                    beforePoints = listOf(hitSegment.startPoint),
-                                    afterPoints = listOf(hitSegment.startPoint),
-                                    draggedPointId = hitSegment.startPoint.pointId,
-                                    dragStartOffset = offset,
-                                    mode = AutomationDragMode.Curve
-                                )
-                                rangeDragState = null
-                                return@detectDragGestures
-                            }
-                        }
-
-                        dragState = null
-                        rangeDragState = AutomationRangeDragState(
-                            startTimeMs = computeSnappedTimeFromContentX(currentViewport.value.screenToContentX(offset.x), currentViewport.value.zoomX, bpm, gridType),
-                            endTimeMs = computeSnappedTimeFromContentX(currentViewport.value.screenToContentX(offset.x), currentViewport.value.zoomX, bpm, gridType)
-                        )
-                    },
-                    onDrag = { change, dragAmount ->
-                        val currentDragState = dragState
-                        if (currentDragState != null) {
-                            val updatedPoints = when (currentDragState.mode) {
-                                AutomationDragMode.Point -> {
-                                    val anchorBefore = currentDragState.beforePoints
-                                        .firstOrNull { point -> point.pointId == currentDragState.draggedPointId }
-                                        ?: return@detectDragGestures
-                                    val anchorTime = computeSnappedTimeFromContentX(
-                                        currentViewport.value.screenToContentX(change.position.x), currentViewport.value.zoomX, bpm, gridType
-                                    )
-                                    val minimumDeltaTime = -(
-                                        currentDragState.beforePoints.minOfOrNull(TimelineAutomationPoint::timeMs)
-                                            ?: 0L
-                                    )
-                                    val deltaTime = (anchorTime - anchorBefore.timeMs).coerceAtLeast(minimumDeltaTime)
-
-                                    val anchorValue = pointerOffsetToValue(
-                                        y = change.position.y,
-                                        laneHeightPx = size.height.toFloat(),
-                                        target = normalizedLane.target
-                                    )
-                                    val anchorDisplayValue = normalizedLane.target.valueToDisplayValue(anchorValue)
-                                    val deltaDisplayValue = anchorDisplayValue -
-                                        normalizedLane.target.valueToDisplayValue(anchorBefore.value)
-
-                                    currentDragState.beforePoints.map { point ->
-                                        val updatedDisplayValue =
-                                            normalizedLane.target.valueToDisplayValue(point.value) + deltaDisplayValue
-                                        point.copy(
-                                            timeMs = (point.timeMs + deltaTime).coerceAtLeast(0L),
-                                            value = normalizedLane.target.displayValueToValue(updatedDisplayValue)
-                                        )
-                                    }
-                                }
-
-                                AutomationDragMode.Curve -> {
-                                    val currentPoint = currentDragState.afterPoints.first()
-                                    listOf(
-                                        currentPoint.copy(
-                                            curve = (currentPoint.curve - (dragAmount.y / AutomationCurveDragSensitivityPx))
-                                                .coerceIn(-1f, 1f)
-                                        )
-                                    )
-                                }
-                            }
-
-                            if (updatedPoints != currentDragState.afterPoints) {
-                                dragState = currentDragState.copy(afterPoints = updatedPoints)
-                            }
-                            change.consume()
-                            return@detectDragGestures
-                        }
-
-                        val currentRangeDragState = rangeDragState ?: return@detectDragGestures
-                        rangeDragState = currentRangeDragState.copy(
-                            endTimeMs = computeSnappedTimeFromContentX(currentViewport.value.screenToContentX(change.position.x), currentViewport.value.zoomX, bpm, gridType)
-                        )
-                        change.consume()
-                    },
-                    onDragEnd = {
-                        val currentDragState = dragState
-                        val currentRangeDragState = rangeDragState
-                        dragState = null
-                        rangeDragState = null
-                        lastTapState = null
-
-                        if (currentDragState != null && currentDragState.afterPoints != currentDragState.beforePoints) {
-                            TimelineCommandSurface.moveAutomationPoints(
-                                trackIndex = trackIndex,
-                                lane = laneKey,
-                                changes = currentDragState.beforePoints.zip(currentDragState.afterPoints).map { (before, after) ->
-                                    TimelineEditedAutomationPoint(
-                                        before = before,
-                                        after = after
-                                    )
-                                }
-                            )
-                            return@detectDragGestures
-                        }
-
-                        if (currentRangeDragState != null) {
-                            val normalizedStart = minOf(
-                                currentRangeDragState.startTimeMs,
-                                currentRangeDragState.endTimeMs
-                            )
-                            val normalizedEnd = maxOf(
-                                currentRangeDragState.startTimeMs,
-                                currentRangeDragState.endTimeMs
-                            )
-                            if (normalizedEnd > normalizedStart) {
-                                SelectionManager.replaceSelections(
-                                    listOf(
-                                        Selectable.TimelineAutomationLane(
-                                            trackIndex = trackIndex,
-                                            target = laneKey.target,
-                                            bindingId = laneKey.bindingId
-                                        ),
-                                        Selectable.TimelineRange(
-                                            trackIndex = trackIndex,
-                                            startMs = normalizedStart,
-                                            endMs = normalizedEnd
-                                        )
-                                    )
-                                )
-                            } else {
-                                selectLane()
-                            }
-                        }
-                    },
-                    onDragCancel = {
-                        dragState = null
-                        rangeDragState = null
+            .pointerInput(Unit) {
+                while (true) {
+                    val event = awaitPointerEventScope {
+                        awaitPointerEvent(pass = PointerEventPass.Main)
                     }
-                )
+                    when (event.type) {
+                        PointerEventType.Move -> {
+                            lastPointerPosition = event.changes.firstOrNull()?.position
+                        }
+                        PointerEventType.Exit -> {
+                            lastPointerPosition = null
+                        }
+                    }
+                }
             }
     ) {
         Box(
@@ -611,6 +786,16 @@ internal fun TimelineAutomationLaneRow(
                     val isExplicitlySelected = point.pointId in explicitlySelectedPointIds
                     val isRangeSelected = point.pointId in rangeSelectedPointIds
                     val isSelectedPoint = point.pointId in effectiveSelectedPointIds
+                    val isHoveredPoint = hoverTarget is AutomationHoverTarget.Point &&
+                        (hoverTarget as AutomationHoverTarget.Point).pointId == point.pointId
+
+                    if (isHoveredPoint && !isDraggedPoint) {
+                        drawCircle(
+                            color = accentColor.copy(alpha = 0.18f),
+                            radius = 10.dp.toPx(),
+                            center = Offset(pointX, pointY)
+                        )
+                    }
 
                     if (isRangeSelected || isSelectedPoint) {
                         drawCircle(
@@ -624,6 +809,7 @@ internal fun TimelineAutomationLaneRow(
                         color = accentColor,
                         radius = when {
                             isDraggedPoint -> 5.5.dp.toPx()
+                            isHoveredPoint -> 5.5.dp.toPx()
                             isSelectedPoint -> 5.dp.toPx()
                             else -> 4.dp.toPx()
                         },
@@ -636,11 +822,131 @@ internal fun TimelineAutomationLaneRow(
                         },
                         radius = when {
                             isDraggedPoint -> 2.4.dp.toPx()
+                            isHoveredPoint -> 2.4.dp.toPx()
                             isSelectedPoint -> 2.2.dp.toPx()
                             else -> 1.8.dp.toPx()
                         },
                         center = Offset(pointX, pointY)
                     )
+                }
+
+                // Highlight hovered segment (Alt+hover feedback)
+                val currentHover = hoverTarget
+                if (currentHover is AutomationHoverTarget.Segment) {
+                    val startPt = renderedLane.points.firstOrNull {
+                        it.pointId == currentHover.startPointId
+                    }
+                    val endPt = renderedLane.points.firstOrNull {
+                        it.pointId == currentHover.endPointId
+                    }
+                    if (startPt != null && endPt != null) {
+                        val hoverSegPath = Path().apply {
+                            moveTo(
+                                startPt.timeMs.toFloat() * zoomLevel - scrollOffsetPx,
+                                valueToY(startPt.value, size.height, normalizedLane.target)
+                            )
+                            appendAutomationSegmentToPath(
+                                path = this,
+                                startPoint = startPt,
+                                endPoint = endPt,
+                                zoomLevel = zoomLevel,
+                                scrollOffsetPx = scrollOffsetPx,
+                                laneHeightPx = size.height,
+                                target = normalizedLane.target
+                            )
+                        }
+                        drawPath(
+                            path = hoverSegPath,
+                            color = accentColor.copy(alpha = 0.3f),
+                            style = Stroke(
+                                width = 6.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        )
+                    }
+                }
+
+                // Highlight active segment during curve drag
+                val activeCurveDrag = dragState
+                if (activeCurveDrag != null &&
+                    activeCurveDrag.mode == AutomationDragMode.Curve
+                ) {
+                    val draggedId = activeCurveDrag.draggedPointId
+                    val startIdx = renderedLane.points.indexOfFirst {
+                        it.pointId == draggedId
+                    }
+                    if (startIdx >= 0 && startIdx + 1 < renderedLane.points.size) {
+                        val segStartPt = renderedLane.points[startIdx]
+                        val segEndPt = renderedLane.points[startIdx + 1]
+                        val segPath = Path().apply {
+                            moveTo(
+                                segStartPt.timeMs.toFloat() * zoomLevel - scrollOffsetPx,
+                                valueToY(segStartPt.value, size.height, normalizedLane.target)
+                            )
+                            appendAutomationSegmentToPath(
+                                path = this,
+                                startPoint = segStartPt,
+                                endPoint = segEndPt,
+                                zoomLevel = zoomLevel,
+                                scrollOffsetPx = scrollOffsetPx,
+                                laneHeightPx = size.height,
+                                target = normalizedLane.target
+                            )
+                        }
+                        drawPath(
+                            path = segPath,
+                            color = accentColor.copy(alpha = 0.4f),
+                            style = Stroke(
+                                width = 5.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        if (contextMenuState != null) {
+            androidx.compose.ui.window.Popup(
+                popupPositionProvider = object : androidx.compose.ui.window.PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: androidx.compose.ui.unit.IntRect,
+                        windowSize: androidx.compose.ui.unit.IntSize,
+                        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                        popupContentSize: androidx.compose.ui.unit.IntSize,
+                    ): IntOffset {
+                        val x = anchorBounds.left + contextMenuPosition.x.toInt()
+                        val y = anchorBounds.top + contextMenuPosition.y.toInt()
+                        return IntOffset(
+                            x = x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
+                            y = y.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
+                        )
+                    }
+                },
+                onDismissRequest = { contextMenuState = null },
+                properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+            ) {
+                ContextMenuContent {
+                    ContextMenuItem(
+                        onClick = {
+                            val seg = contextMenuState
+                            if (seg != null) {
+                                TimelineCommandSurface.moveAutomationPoints(
+                                    trackIndex = trackIndex,
+                                    lane = laneKey,
+                                    changes = listOf(
+                                        TimelineEditedAutomationPoint(
+                                            before = seg.startPoint,
+                                            after = seg.startPoint.copy(curve = 0f)
+                                        )
+                                    )
+                                )
+                            }
+                            contextMenuState = null
+                        }
+                    ) {
+                        com.composeunstyled.Text("Reset Curve to Linear")
+                    }
                 }
             }
         }
@@ -670,8 +976,14 @@ private fun appendAutomationSegmentToPath(
 
     val startX = startPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
     val endX = endPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
-    for (step in 1..AutomationCurvePathSteps) {
-        val progress = step.toFloat() / AutomationCurvePathSteps.toFloat()
+    // More steps for extreme curves to keep the visual smooth
+    val steps = if (abs(startPoint.curve) > 1f) {
+        (AutomationCurvePathSteps * 2).coerceAtMost(48)
+    } else {
+        AutomationCurvePathSteps
+    }
+    for (step in 1..steps) {
+        val progress = step.toFloat() / steps.toFloat()
         path.lineTo(
             lerp(startX, endX, progress),
             valueToY(
@@ -836,4 +1148,65 @@ private fun Offset.distanceSquaredTo(other: Offset): Float {
 
 private fun lerp(start: Float, end: Float, progress: Float): Float {
     return start + ((end - start) * progress.coerceIn(0f, 1f))
+}
+
+/**
+ * Compute the automation curve value that makes the segment pass through the
+ * cursor position. This inverts [applyAutomationCurve] so the line literally
+ * follows the mouse.
+ *
+ * For positive curve (ease-out): `curvedProgress = 1 - (1-t)^exponent`
+ * For negative curve (ease-in):  `curvedProgress = t^exponent`
+ *
+ * Given cursor position, we solve for the exponent that produces the target
+ * progress at time t, then convert back to a curve value.
+ *
+ * Uses Double precision internally to avoid Float artifacts near extreme values.
+ */
+private fun computeCurveFromCursor(
+    cursorScreenX: Float,
+    cursorScreenY: Float,
+    startPoint: TimelineAutomationPoint,
+    endPoint: TimelineAutomationPoint,
+    zoomLevel: Float,
+    scrollOffsetPx: Float,
+    laneHeightPx: Float,
+    target: TimelineTrackAutomationTarget
+): Float {
+    val startX = startPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
+    val endX = endPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
+    val segmentWidth = endX - startX
+    if (segmentWidth < 1f) return 0f
+
+    // Use Double for all math to avoid precision loss near extremes
+    val t = ((cursorScreenX - startX) / segmentWidth).toDouble().coerceIn(0.005, 0.995)
+    val cursorValue = pointerOffsetToValue(cursorScreenY, laneHeightPx, target)
+
+    val valueDelta = (endPoint.value - startPoint.value).toDouble()
+    if (abs(valueDelta) < 0.0001) return 0f
+
+    val targetProgress = ((cursorValue - startPoint.value) / valueDelta)
+        .toDouble().coerceIn(0.0005, 0.9995)
+
+    // Near-linear — avoid expensive log computation
+    if (abs(targetProgress - t) < 0.005) return 0f
+
+    val maxCurve = AutomationMaxCurve.toDouble()
+    return if (targetProgress > t) {
+        // Ease-out (positive curve): 1 - (1-t)^exponent = targetProgress
+        val base = 1.0 - t
+        val result = 1.0 - targetProgress
+        if (base <= 0.0005 || result <= 0.0005) return AutomationMaxCurve
+        val lnBase = ln(base)
+        if (abs(lnBase) < 0.00001) return 0f
+        val exponent = ln(result) / lnBase
+        ((exponent - 1.0) / 3.0).coerceIn(0.0, maxCurve).toFloat()
+    } else {
+        // Ease-in (negative curve): t^exponent = targetProgress
+        val lnT = ln(t)
+        if (abs(lnT) < 0.00001) return 0f
+        val lnTarget = ln(targetProgress)
+        val exponent = lnTarget / lnT
+        -(((exponent - 1.0) / 3.0).coerceIn(0.0, maxCurve)).toFloat()
+    }
 }

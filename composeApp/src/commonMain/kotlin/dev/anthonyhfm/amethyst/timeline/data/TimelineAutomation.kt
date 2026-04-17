@@ -220,13 +220,12 @@ data class TimelineAutomationLane(
 
 internal fun applyAutomationCurve(progress: Float, curve: Float): Float {
     val normalizedProgress = progress.coerceIn(0f, 1f)
-    val normalizedCurve = curve.coerceIn(-1f, 1f)
-    if (abs(normalizedCurve) < 0.001f) {
+    if (abs(curve) < 0.001f) {
         return normalizedProgress
     }
 
-    val exponent = 1f + (abs(normalizedCurve) * 3f)
-    return if (normalizedCurve > 0f) {
+    val exponent = 1f + (abs(curve) * 3f)
+    return if (curve > 0f) {
         1f - (1f - normalizedProgress).pow(exponent)
     } else {
         normalizedProgress.pow(exponent)
