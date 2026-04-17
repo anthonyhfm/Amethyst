@@ -20,6 +20,8 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     abstract val state: MutableStateFlow<State>
 
+    open val helpRef: String? = null
+
     var isDragging: MutableState<Boolean> = mutableStateOf(false)
 
     open fun onAddedToChain() = Unit

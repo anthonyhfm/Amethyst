@@ -28,6 +28,7 @@ import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.Timeline
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.theme.background
@@ -175,6 +176,10 @@ fun Workspace(onBack: () -> Unit = {}) {
 
             if (state.mode is PianoRollWorkspaceMode) {
                 (state.mode as PianoRollWorkspaceMode).ModeContent(paddingValues)
+            }
+
+            if (state.mode is GetHelpWorkspaceMode) {
+                (state.mode as GetHelpWorkspaceMode).ModeContent(paddingValues)
             }
         }
     }

@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachReversed
+import com.composables.icons.lucide.BookOpenText
 import com.composables.icons.lucide.ClipboardPaste
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.CopyPlus
@@ -60,6 +61,7 @@ import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
 
 @Composable
 fun WorkspaceChainEditor(
@@ -346,6 +348,20 @@ fun ChainDeviceContextMenu(
                 onDismiss()
             }
         )
+
+        if (device.helpRef != null) {
+            ChainContextMenuItem(
+                label = "Get Help",
+                icon = Lucide.BookOpenText,
+                onClick = {
+                    WorkspaceRepository.switchMode(
+                        GetHelpWorkspaceMode(helpRef = device.helpRef!!),
+                        undoable = false
+                    )
+                    onDismiss()
+                }
+            )
+        }
 
         if (currentClipboard is ClipboardData.ChainDevice) {
             ChainContextMenuItem(

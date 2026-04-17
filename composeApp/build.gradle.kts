@@ -74,6 +74,9 @@ kotlin {
             implementation("com.composables:composeunstyled:1.49.6")
             implementation("com.composables:icons-lucide-cmp:2.2.1")
 
+            implementation("com.mikepenz:multiplatform-markdown-renderer:0.40.2")
+            implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.40.2")
+
             kotlin("stdlib")
         }
         commonTest.dependencies {

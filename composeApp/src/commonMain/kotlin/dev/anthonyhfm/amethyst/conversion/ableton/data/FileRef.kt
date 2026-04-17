@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.parent
 import io.github.vinceglb.filekit.path
 import kotlinx.serialization.SerialName
@@ -14,7 +16,15 @@ data class FileRef(
     val relativePath: RelativePath,
 
     @XmlElement
+    @SerialName("Path")
+    val path: Path? = null,
+
+    @XmlElement
     val name: Name? = null,
+
+    @XmlElement
+    @SerialName("SourceHint")
+    val sourceHint: SourceHint? = null,
 
     @XmlElement
     @SerialName("Type")
@@ -34,11 +44,23 @@ data class FileRef(
     )
 
     @Serializable
+    data class Path(
+        @SerialName("Value")
+        val value: String? = null
+    )
+
+    @Serializable
+    data class SourceHint(
+        @SerialName("Value")
+        val value: String? = null
+    )
+
+    @Serializable
     data class RelativePath(
         @SerialName("Value")
         val value: String? = null,
 
-        val items: List<RelativePathElement>
+        val items: List<RelativePathElement> = emptyList()
     ) {
         @Serializable
         data class RelativePathElement(
@@ -54,10 +76,56 @@ data class FileRef(
             AbletonConverter.file!!.parent()!!.path
         }
 
-        return "$projectPath/" + if (name != null) {
-            relativePath.items.joinToString("/") { it.dir ?: "" } + "/" + name.value
-        } else {
-            relativePath.value ?: error("Could not resolve file path")
+        return resolvePath(
+            projectPath = projectPath,
+            isZip = AbletonConverter.isZip,
+            zipEntryExists = AbletonConverter.zipEntries::containsKey
+        )
+    }
+
+    internal fun resolvePathCandidates(projectPath: String): List<String> {
+        val candidates = LinkedHashSet<String>()
+
+        buildRelativePath()?.let {
+            candidates += "$projectPath/$it"
         }
+
+        path?.value
+            ?.takeIf { it.isNotBlank() }
+            ?.let { candidates += it }
+
+        return candidates.toList()
+    }
+
+    internal fun resolvePath(
+        projectPath: String,
+        isZip: Boolean,
+        zipEntryExists: (String) -> Boolean = { false },
+        fileExists: (String) -> Boolean = { PlatformFile(it).exists() }
+    ): String {
+        val candidates = resolvePathCandidates(projectPath)
+        if (candidates.isEmpty()) {
+            error("Could not resolve file path")
+        }
+
+        return if (isZip) {
+            candidates.firstOrNull(zipEntryExists) ?: candidates.first()
+        } else {
+            candidates.firstOrNull(fileExists) ?: candidates.first()
+        }
+    }
+
+    private fun buildRelativePath(): String? {
+        if (name != null) {
+            val pathParts = relativePath.items
+                .mapNotNull { it.dir?.takeIf(String::isNotBlank) } +
+                listOf(name.value)
+
+            if (pathParts.isNotEmpty()) {
+                return pathParts.joinToString("/")
+            }
+        }
+
+        return relativePath.value?.takeIf { it.isNotBlank() }
     }
 }

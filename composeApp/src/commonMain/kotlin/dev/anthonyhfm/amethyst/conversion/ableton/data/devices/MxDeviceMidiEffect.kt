@@ -7,6 +7,7 @@ import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import nl.adaptivity.xmlutil.serialization.XmlElement
+import nl.adaptivity.xmlutil.serialization.XmlSerialName
 import nl.adaptivity.xmlutil.serialization.XmlValue
 
 @Serializable
@@ -97,17 +98,43 @@ data class MxDeviceMidiEffect(
         @Serializable
         data class Value(
             @XmlElement
-            val patchRef: MxDPatchRef? = null
+            @XmlSerialName("MxDPatchRef")
+            private val legacyPatchRef: LegacyPatchRef? = null,
+
+            @XmlElement
+            @XmlSerialName("MxPatchRef")
+            private val live12PatchRef: Live12PatchRef? = null
         ) {
+            val patchRef: PatchRef?
+                get() = legacyPatchRef?.toPatchRef() ?: live12PatchRef?.toPatchRef()
+
+            data class PatchRef(
+                val fileRef: FileRef
+            )
+
             @Serializable
-            data class MxDPatchRef(
+            data class LegacyPatchRef(
                 @SerialName("Id")
                 val id: Int = 0,
 
                 @XmlElement
                 @SerialName("FileRef")
                 val fileRef: FileRef
-            )
+            ) {
+                fun toPatchRef(): PatchRef = PatchRef(fileRef = fileRef)
+            }
+
+            @Serializable
+            data class Live12PatchRef(
+                @SerialName("Id")
+                val id: Int = 0,
+
+                @XmlElement
+                @SerialName("FileRef")
+                val fileRef: FileRef
+            ) {
+                fun toPatchRef(): PatchRef = PatchRef(fileRef = fileRef)
+            }
         }
     }
 

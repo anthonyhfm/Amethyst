@@ -40,6 +40,7 @@ import kotlinx.serialization.Serializable
 
 class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
     override val state = MutableStateFlow(LayerChainDeviceState())
+    override val helpRef: String = "layer"
 
     @Composable
     override fun Content() {
