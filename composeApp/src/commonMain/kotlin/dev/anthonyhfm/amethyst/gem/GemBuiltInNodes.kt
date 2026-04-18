@@ -65,14 +65,14 @@ object GemBuiltInNodes {
 
     val hostMidiInput: GemNodeDescriptor = hostSignalInput(
         typeId = TypeIds.HOST_MIDI_INPUT,
-        label = "Host MIDI Input",
+        label = "MIDI Input",
         description = "Root host MIDI signal entry point for the gem graph.",
         domain = GemSignalDomain.MIDI
     ).copy(defaultState = hostPortState("midi-in"))
 
     val hostMidiOutput: GemNodeDescriptor = hostSignalOutput(
         typeId = TypeIds.HOST_MIDI_OUTPUT,
-        label = "Host MIDI Output",
+        label = "sMIDI Output",
         description = "Routes the graph MIDI signal back to the host contract.",
         domain = GemSignalDomain.MIDI
     ).copy(defaultState = hostPortState("midi-out"))
