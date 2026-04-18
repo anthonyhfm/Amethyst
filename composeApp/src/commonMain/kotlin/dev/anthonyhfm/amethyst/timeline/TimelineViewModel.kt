@@ -30,6 +30,7 @@ import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class TimelineViewModel : ViewModel() {
@@ -403,11 +404,14 @@ class TimelineViewModel : ViewModel() {
         _viewport.value = vp
     }
 
+    /** Read-modify-write against the latest viewport snapshot. */
+    fun updateViewport(transform: (EditorViewportState) -> EditorViewportState) {
+        _viewport.update(transform)
+    }
+
     fun setZoomLevel(zoom: Float) {
-        val before = _viewport.value.zoomX
         val clamped = zoom.coerceIn(0.01f, 10.0f)
         _viewport.value = _viewport.value.copy(zoomX = clamped)
-        println("[TimelineViewModel] setZoomLevel: requested=$zoom clamped=$clamped before=$before after=${_viewport.value.zoomX}")
     }
 
     fun zoomBy(factor: Float) {
@@ -415,7 +419,6 @@ class TimelineViewModel : ViewModel() {
         val requested = before * factor
         val clamped = requested.coerceIn(0.01f, 10.0f)
         _viewport.value = _viewport.value.copy(zoomX = clamped)
-        println("[TimelineViewModel] zoomBy: factor=$factor before=$before requested=$requested clamped=$clamped after=${_viewport.value.zoomX}")
     }
 
     fun msToPixels(timeMs: Long): Float {

@@ -265,6 +265,25 @@ abstract class TimelineTrack<E : TimelineEntry> {
         copyAutomationStateFrom(other)
     }
 
+    fun automationLaneInRange(
+        key: TimelineAutomationLaneKey,
+        startMs: Long,
+        endMs: Long
+    ): TimelineAutomationLane? {
+        if (endMs <= startMs) return null
+
+        val normalizedKey = key.normalized()
+        val lane = automationLane(normalizedKey) ?: return null
+        return lane.clippedToRange(
+            startMs = startMs,
+            endMs = endMs,
+            baseValue = baseAutomationValue(
+                target = normalizedKey.target,
+                bindingId = normalizedKey.bindingId
+            )
+        )
+    }
+
     fun automationLanesInRange(
         startMs: Long,
         endMs: Long
@@ -325,29 +344,32 @@ abstract class TimelineTrack<E : TimelineEntry> {
     }
 
     fun deleteAutomationRange(
+        key: TimelineAutomationLaneKey,
         startMs: Long,
         endMs: Long
     ): Boolean {
         if (endMs <= startMs) return false
 
-        var didChange = false
-        TimelineTrackAutomationTarget.globalEntries.forEach { target ->
-            val lane = automationLane(target)?.normalized() ?: return@forEach
-            val baseValue = baseAutomationValue(target)
+        return mutateAutomationLane(key) { existingLane ->
+            val lane = existingLane?.normalized() ?: return@mutateAutomationLane null
+            val baseValue = baseAutomationValue(
+                target = lane.target,
+                bindingId = lane.bindingId
+            )
             val pointsToDelete = lane.points
                 .filter { point -> point.timeMs in startMs..endMs }
                 .map(TimelineAutomationPoint::pointId)
 
-            if (pointsToDelete.isEmpty()) return@forEach
+            if (pointsToDelete.isEmpty()) return@mutateAutomationLane existingLane
 
             val leftBoundaryPoint = lane.boundaryPointAt(
                 timeMs = startMs,
                 baseValue = baseValue
-            )
+            )?.clearCurveHandle()
             val rightBoundaryPoint = lane.boundaryPointAt(
                 timeMs = endMs,
                 baseValue = baseValue
-            )?.copy(curve = 0f)
+            )?.clearCurveHandle()
             val remainingPoints = lane.points.filterNot { point ->
                 point.pointId in pointsToDelete
             }
@@ -366,15 +388,49 @@ abstract class TimelineTrack<E : TimelineEntry> {
                 }
             }
 
-            didChange = deleteAutomationPoints(
-                key = lane.key,
-                pointIds = pointsToDelete
-            ) || didChange
-            didChange = createAutomationPoints(
-                key = lane.key,
-                points = boundaryPoints
-            ) || didChange
+            lane.copy(points = remainingPoints + boundaryPoints)
+                .normalized()
+                .rebuildSegmentHandlesFromSource(
+                    sourceLane = lane,
+                    sourceBaseValue = baseValue
+                )
         }
+    }
+
+    fun duplicateAutomationRange(
+        key: TimelineAutomationLaneKey,
+        startMs: Long,
+        endMs: Long
+    ): Boolean {
+        if (endMs <= startMs) return false
+        val clippedLane = automationLaneInRange(
+            key = key,
+            startMs = startMs,
+            endMs = endMs
+        ) ?: return false
+
+        return pasteAutomationLanes(
+            startMs = endMs,
+            lanes = listOf(clippedLane)
+        )
+    }
+
+    fun deleteAutomationRange(
+        startMs: Long,
+        endMs: Long
+    ): Boolean {
+        if (endMs <= startMs) return false
+
+        var didChange = false
+        automationLanes
+            .map(TimelineAutomationLane::key)
+            .forEach { laneKey ->
+                didChange = deleteAutomationRange(
+                    key = laneKey,
+                    startMs = startMs,
+                    endMs = endMs
+                ) || didChange
+            }
 
         return didChange
     }
@@ -453,7 +509,7 @@ internal fun TimelineAutomationLane.clippedToRange(
     val endBoundaryPoint = normalizedLane.boundaryPointAt(
         timeMs = endMs,
         baseValue = baseValue
-    )?.copy(curve = 0f)
+    )?.clearCurveHandle()
 
     val clippedPoints = buildList {
         if (pointsWithinRange.firstOrNull()?.timeMs != 0L && startBoundaryPoint != null) {
@@ -468,7 +524,11 @@ internal fun TimelineAutomationLane.clippedToRange(
     return copy(
         points = clippedPoints,
         visible = true
-    ).normalized()
+    ).normalized().rebuildSegmentHandlesFromSource(
+        sourceLane = normalizedLane,
+        sourceBaseValue = baseValue,
+        sourceTimeOffset = startMs
+    )
 }
 
 internal fun TimelineAutomationLane.boundaryPointAt(

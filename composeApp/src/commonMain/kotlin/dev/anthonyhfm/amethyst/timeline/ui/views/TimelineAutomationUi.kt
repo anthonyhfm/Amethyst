@@ -15,6 +15,29 @@ internal fun TimelineTrack<*>.visibleAutomationLanes(): List<TimelineAutomationL
     return automationLanes.filter(TimelineAutomationLane::visible)
 }
 
+internal fun TimelineTrack<*>.overlayAutomationLanes(): List<TimelineAutomationLane> {
+    return when (this) {
+        is AudioTimelineTrack -> visibleAutomationLanes().filter { lane ->
+            lane.target == TimelineTrackAutomationTarget.VOLUME
+        }
+
+        else -> emptyList()
+    }
+}
+
+internal fun TimelineTrack<*>.stackedAutomationLanes(): List<TimelineAutomationLane> {
+    val overlayLaneKeys = overlayAutomationLanes()
+        .mapTo(mutableSetOf(), TimelineAutomationLane::key)
+
+    return visibleAutomationLanes().filterNot { lane ->
+        lane.key in overlayLaneKeys
+    }
+}
+
+internal fun TimelineTrack<*>.isAutomationOverlayActive(): Boolean {
+    return overlayAutomationLanes().isNotEmpty()
+}
+
 internal fun TimelineTrack<*>.automationLaneBaseValue(lane: TimelineAutomationLane): Float {
     return baseAutomationValue(
         target = lane.target,

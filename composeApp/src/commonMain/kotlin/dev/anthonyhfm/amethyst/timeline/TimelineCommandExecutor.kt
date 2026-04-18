@@ -36,6 +36,8 @@ object TimelineCommandExecutor {
             is TimelineEditCommand.CreateAutomationPoints -> createAutomationPoints(command.trackIndex, command.lane, command.points)
             is TimelineEditCommand.MoveAutomationPoints -> moveAutomationPoints(command.trackIndex, command.lane, command.changes)
             is TimelineEditCommand.DeleteAutomationPoints -> deleteAutomationPoints(command.trackIndex, command.lane, command.pointIds)
+            is TimelineEditCommand.DeleteAutomationRange -> deleteAutomationRange(command.trackIndex, command.lane, command.startMs, command.endMs)
+            is TimelineEditCommand.DuplicateAutomationRange -> duplicateAutomationRange(command.trackIndex, command.lane, command.startMs, command.endMs)
             is TimelineEditCommand.SetAutomationLaneVisibility -> setAutomationLaneVisibility(command.trackIndex, command.lane, command.visible)
             is TimelineEditCommand.SetAutomationLaneEnabled -> setAutomationLaneEnabled(command.trackIndex, command.lane, command.enabled)
         }
@@ -405,6 +407,44 @@ object TimelineCommandExecutor {
                 deleteAutomationPoints(
                     key = lane,
                     pointIds = uniquePointIds
+                )
+            }
+        )
+    }
+
+    private fun deleteAutomationRange(
+        trackIndex: Int,
+        lane: dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLaneKey,
+        startMs: Long,
+        endMs: Long
+    ): TimelineCommandResult {
+        if (endMs <= startMs) return TimelineCommandResult()
+
+        return TimelineCommandResult(
+            didChange = applyTrackStateChange(trackIndex) {
+                deleteAutomationRange(
+                    key = lane,
+                    startMs = startMs,
+                    endMs = endMs
+                )
+            }
+        )
+    }
+
+    private fun duplicateAutomationRange(
+        trackIndex: Int,
+        lane: dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLaneKey,
+        startMs: Long,
+        endMs: Long
+    ): TimelineCommandResult {
+        if (endMs <= startMs) return TimelineCommandResult()
+
+        return TimelineCommandResult(
+            didChange = applyTrackStateChange(trackIndex) {
+                duplicateAutomationRange(
+                    key = lane,
+                    startMs = startMs,
+                    endMs = endMs
                 )
             }
         )

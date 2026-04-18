@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -93,9 +94,153 @@ fun TimelineLane(
     val timelineDimensions = TimelineTheme.dimensions
     val headerHeightPx = with(LocalDensity.current) { timelineDimensions.clipHeaderHeight.toPx() }
     val childLaneTint = timelinePalette.selectionStroke.copy(alpha = 0.08f)
-    val visibleAutomationLanes = track.visibleAutomationLanes()
+    val overlayAutomationLanes = track.overlayAutomationLanes()
+    val stackedAutomationLanes = track.stackedAutomationLanes()
+    val automationOverlayActive = overlayAutomationLanes.isNotEmpty()
     // Always-fresh viewport for pointer-input closures that are not keyed on scroll changes.
     val currentViewport = rememberUpdatedState(viewport)
+    val laneInteractionModifier = if (automationOverlayActive) {
+        Modifier
+    } else {
+        Modifier
+            .pointerInput(track, zoomLevel, bpm, gridType) {
+                var lastClickTime = 0L
+                var lastClickPos: Offset? = null
+                val doubleThresholdMs = 250L
+                val moveTolerancePx = 20f
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Press) {
+                            val change = event.changes.firstOrNull() ?: continue
+                            val pos = change.position
+                            val time = change.uptimeMillis
+                            val headerHit = findHeaderEntryHit(
+                                track,
+                                currentViewport.value.screenToContentX(pos.x),
+                                pos.y,
+                                currentViewport.value.zoomX,
+                                headerHeightPx
+                            )
+                            if (headerHit != null) {
+                                onSelectEntry(headerHit)
+                                lastClickTime = 0L
+                                lastClickPos = null
+                                change.consume()
+                                continue
+                            }
+                            val isLights = track is MidiTimelineTrack
+                            val snappedMs = computeSnappedTimeFromContentX(
+                                currentViewport.value.screenToContentX(pos.x),
+                                currentViewport.value.zoomX,
+                                bpm,
+                                gridType
+                            )
+                            val isDouble = isLights &&
+                                lastClickTime != 0L &&
+                                (time - lastClickTime) in 1..doubleThresholdMs &&
+                                lastClickPos?.let { prev ->
+                                    val dx = pos.x - prev.x
+                                    val dy = pos.y - prev.y
+                                    (dx * dx + dy * dy) <= moveTolerancePx * moveTolerancePx
+                                } == true
+                            if (isDouble) {
+                                onDoubleClickLane(snappedMs)
+                                lastClickTime = 0L
+                                lastClickPos = null
+                            } else {
+                                onSelectTime(snappedMs)
+                                if (isLights) {
+                                    lastClickTime = time
+                                    lastClickPos = pos
+                                } else {
+                                    lastClickTime = 0L
+                                    lastClickPos = null
+                                }
+                            }
+                            change.consume()
+                        }
+                    }
+                }
+            }
+            .pointerInput(track, zoomLevel, bpm, gridType) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val headerHit = findHeaderEntryHit(
+                            track,
+                            currentViewport.value.screenToContentX(offset.x),
+                            offset.y,
+                            currentViewport.value.zoomX,
+                            headerHeightPx
+                        )
+                        if (headerHit != null) {
+                            onSelectEntry(headerHit)
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                            return@detectDragGestures
+                        }
+                        val startMs = computeSnappedTimeFromContentX(
+                            currentViewport.value.screenToContentX(offset.x),
+                            currentViewport.value.zoomX,
+                            bpm,
+                            gridType
+                        )
+                        if (!isPointInsideAnyEntry(track, startMs)) {
+                            rangeStartMs = startMs
+                            rangeEndMs = startMs
+                            rangeActive = true
+                        } else {
+                            rangeActive = false
+                            rangeStartMs = null
+                            rangeEndMs = null
+                        }
+                    },
+                    onDrag = { change, _ ->
+                        if (rangeActive && rangeStartMs != null) {
+                            val currentMs = computeSnappedTimeFromContentX(
+                                currentViewport.value.screenToContentX(change.position.x),
+                                currentViewport.value.zoomX,
+                                bpm,
+                                gridType
+                            )
+                            if (currentMs != rangeEndMs) rangeEndMs = currentMs
+                        }
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                            val start = rangeStartMs!!.coerceAtLeast(0L)
+                            val end = rangeEndMs!!.coerceAtLeast(0L)
+                            val normalizedStart = min(start, end)
+                            val normalizedEnd = maxOf(start, end)
+                            if (normalizedEnd > normalizedStart) {
+                                SelectionManager.select(
+                                    Selectable.TimelineRange(
+                                        trackIndex = trackIndexOf(track),
+                                        startMs = normalizedStart,
+                                        endMs = normalizedEnd
+                                    )
+                                )
+                            } else {
+                                SelectionManager.select(
+                                    Selectable.TimelineTime(
+                                        trackIndex = trackIndexOf(track),
+                                        timeMs = normalizedStart
+                                    )
+                                )
+                            }
+                        }
+                        rangeActive = false
+                    },
+                    onDragCancel = {
+                        rangeActive = false
+                        rangeStartMs = null
+                        rangeEndMs = null
+                    }
+                )
+            }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -134,124 +279,7 @@ fun TimelineLane(
                     }
                 )
                 .clipToBounds()
-                .pointerInput(track, zoomLevel, bpm, gridType) {
-                    var lastClickTime = 0L
-                    var lastClickPos: Offset? = null
-                    val doubleThresholdMs = 250L
-                    val moveTolerancePx = 20f
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.type == PointerEventType.Press) {
-                                val change = event.changes.firstOrNull() ?: continue
-                                val pos = change.position
-                                val time = change.uptimeMillis
-                                val headerHit = findHeaderEntryHit(
-                                    track,
-                                    currentViewport.value.screenToContentX(pos.x),
-                                    pos.y,
-                                    currentViewport.value.zoomX,
-                                    headerHeightPx
-                                )
-                                if (headerHit != null) {
-                                    onSelectEntry(headerHit)
-                                    lastClickTime = 0L
-                                    lastClickPos = null
-                                    change.consume(); continue
-                                }
-                                val isLights = track is MidiTimelineTrack
-                                val snappedMs = computeSnappedTimeFromContentX(currentViewport.value.screenToContentX(pos.x), currentViewport.value.zoomX, bpm, gridType)
-                                val isDouble = isLights && lastClickTime != 0L && (time - lastClickTime) in 1..doubleThresholdMs && lastClickPos?.let { prev ->
-                                    val dx = pos.x - prev.x
-                                    val dy = pos.y - prev.y
-                                    (dx * dx + dy * dy) <= moveTolerancePx * moveTolerancePx
-                                } ?: false
-                                if (isDouble) {
-                                    onDoubleClickLane(snappedMs)
-                                    lastClickTime = 0L
-                                    lastClickPos = null
-                                } else {
-                                    onSelectTime(snappedMs)
-                                    if (isLights) {
-                                        lastClickTime = time
-                                        lastClickPos = pos
-                                    } else {
-                                        lastClickTime = 0L
-                                        lastClickPos = null
-                                    }
-                                }
-                                change.consume()
-                            }
-                        }
-                    }
-                }
-                .pointerInput(track, zoomLevel, bpm, gridType) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val headerHit = findHeaderEntryHit(
-                                track,
-                                currentViewport.value.screenToContentX(offset.x),
-                                offset.y,
-                                currentViewport.value.zoomX,
-                                headerHeightPx
-                            )
-                            if (headerHit != null) {
-                                onSelectEntry(headerHit)
-                                rangeActive = false
-                                rangeStartMs = null
-                                rangeEndMs = null
-                                return@detectDragGestures
-                            }
-                            val startMs = computeSnappedTimeFromContentX(currentViewport.value.screenToContentX(offset.x), currentViewport.value.zoomX, bpm, gridType)
-                            if (!isPointInsideAnyEntry(track, startMs)) {
-                                rangeStartMs = startMs
-                                rangeEndMs = startMs
-                                rangeActive = true
-                            } else {
-                                rangeActive = false
-                                rangeStartMs = null
-                                rangeEndMs = null
-                            }
-                        },
-                        onDrag = { change, _ ->
-                            if (rangeActive && rangeStartMs != null) {
-                                val currentMs = computeSnappedTimeFromContentX(currentViewport.value.screenToContentX(change.position.x), currentViewport.value.zoomX, bpm, gridType)
-                                if (currentMs != rangeEndMs) rangeEndMs = currentMs
-                            }
-                            change.consume()
-                        },
-                        onDragEnd = {
-                            if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                                val start = rangeStartMs!!.coerceAtLeast(0L)
-                                val end = rangeEndMs!!.coerceAtLeast(0L)
-                                val normalizedStart = min(start, end)
-                                val normalizedEnd = maxOf(start, end)
-                                if (normalizedEnd > normalizedStart) {
-                                    SelectionManager.select(
-                                        Selectable.TimelineRange(
-                                            trackIndex = trackIndexOf(track),
-                                            startMs = normalizedStart,
-                                            endMs = normalizedEnd
-                                        )
-                                    )
-                                } else {
-                                    SelectionManager.select(
-                                        Selectable.TimelineTime(
-                                            trackIndex = trackIndexOf(track),
-                                            timeMs = normalizedStart
-                                        )
-                                    )
-                                }
-                            }
-                            rangeActive = false
-                        },
-                        onDragCancel = {
-                            rangeActive = false
-                            rangeStartMs = null
-                            rangeEndMs = null
-                        }
-                    )
-                }
+                .then(laneInteractionModifier)
         ) {
         // Viewport-relative clip rendering: no large offset container is used.
         // Each clip positions itself at (contentX - scrollX) in screen space, which
@@ -305,6 +333,7 @@ fun TimelineLane(
                                 audioEntry = audioEntry,
                                 viewport = viewport,
                                 isSelected = isSelectedEntry,
+                                automationOverlayActive = automationOverlayActive,
                                 onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) },
                                 onMoveEntry = { newStart -> onMoveEntry(audioEntry.startTimeMs, newStart) },
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
@@ -345,9 +374,22 @@ fun TimelineLane(
             viewport = viewport,
             laneHeight = timelineDimensions.laneHeight,
         )
+        overlayAutomationLanes.forEach { automationLane ->
+            TimelineAutomationLaneRow(
+                trackIndex = trackIndex,
+                track = track,
+                lane = automationLane,
+                viewport = viewport,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1.2f),
+                rowHeight = timelineDimensions.laneHeight,
+                overlayMode = true,
+            )
+        }
         }
 
-        visibleAutomationLanes.forEach { automationLane ->
+        stackedAutomationLanes.forEach { automationLane ->
             TimelineAutomationLaneRow(
                 trackIndex = trackIndex,
                 track = track,

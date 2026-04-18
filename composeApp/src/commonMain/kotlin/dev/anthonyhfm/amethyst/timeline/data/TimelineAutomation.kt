@@ -11,6 +11,12 @@ import kotlin.math.roundToInt
 private const val VolumeAutomationMinimumDisplayDb = -24f
 private const val VolumeAutomationMaximumDisplayDb = 24f
 private const val VolumeAutomationSilenceThreshold = 0.0005f
+private const val VolumeAutomationUnitySnapThresholdDb = 0.35f
+internal const val TimelineAutomationCurveMaxMagnitude = 3f
+internal const val TimelineAutomationDefaultHandleTimeProgress = 0.5f
+private const val TimelineAutomationMinimumHandleTimeProgress = 0.05f
+private const val TimelineAutomationMaximumHandleTimeProgress = 0.95f
+private const val TimelineAutomationLinearHandleTolerance = 0.05f
 private val VolumeAutomationMaximumGain = decibelsToLinearGain(VolumeAutomationMaximumDisplayDb)
 
 @Serializable
@@ -68,10 +74,32 @@ enum class TimelineTrackAutomationTarget(
     }
 
     fun displayProgressToValue(progress: Float): Float {
+        return displayValueToValue(displayProgressToDisplayValue(progress))
+    }
+
+    fun displayProgressToDisplayValue(progress: Float): Float {
         val minimumDisplayValue = displayMinimumValue()
         val maximumDisplayValue = displayMaximumValue()
+        return minimumDisplayValue + ((maximumDisplayValue - minimumDisplayValue) * progress.coerceIn(0f, 1f))
+    }
+
+    fun snapDisplayValue(displayValue: Float): Float = when (this) {
+        VOLUME -> {
+            val clampedValue = displayValue.coerceIn(
+                minimumValue = VolumeAutomationMinimumDisplayDb,
+                maximumValue = VolumeAutomationMaximumDisplayDb
+            )
+            if (abs(clampedValue) <= VolumeAutomationUnitySnapThresholdDb) {
+                0f
+            } else {
+                clampedValue
+            }
+        }
+    }
+
+    fun snapValue(value: Float): Float {
         return displayValueToValue(
-            minimumDisplayValue + ((maximumDisplayValue - minimumDisplayValue) * progress.coerceIn(0f, 1f))
+            snapDisplayValue(valueToDisplayValue(value))
         )
     }
 
@@ -110,17 +138,43 @@ data class TimelineAutomationPoint(
     val timeMs: Long,
     val value: Float,
     val curve: Float = 0f,
+    val curveHandleTime: Float? = null,
+    val curveHandleValue: Float? = null,
     val pointId: String = UUID.randomUUID()
 ) {
     fun normalized(target: TimelineTrackAutomationTarget): TimelineAutomationPoint {
+        val normalizedHandleTime = curveHandleTime?.coerceIn(
+            minimumValue = TimelineAutomationMinimumHandleTimeProgress,
+            maximumValue = TimelineAutomationMaximumHandleTimeProgress
+        )
+        val normalizedHandleValue = curveHandleValue?.let(target::normalizeValue)
+
         return copy(
             timeMs = timeMs.coerceAtLeast(0L),
             value = target.normalizeValue(value),
-            curve = curve.coerceIn(-1f, 1f),
+            curve = curve.coerceIn(
+                minimumValue = -TimelineAutomationCurveMaxMagnitude,
+                maximumValue = TimelineAutomationCurveMaxMagnitude
+            ),
+            curveHandleTime = if (normalizedHandleTime != null && normalizedHandleValue != null) {
+                normalizedHandleTime
+            } else {
+                null
+            },
+            curveHandleValue = if (normalizedHandleTime != null && normalizedHandleValue != null) {
+                normalizedHandleValue
+            } else {
+                null
+            },
             pointId = pointId.ifBlank { UUID.randomUUID() }
         )
     }
 }
+
+internal data class TimelineAutomationSegmentHandle(
+    val timeProgress: Float,
+    val value: Float
+)
 
 @Serializable
 data class TimelineAutomationLane(
@@ -172,11 +226,11 @@ data class TimelineAutomationLane(
                 val durationMs = (nextPoint.timeMs - previousPoint.timeMs).coerceAtLeast(1L)
                 val progress = ((timeMs - previousPoint.timeMs).toFloat() / durationMs.toFloat())
                     .coerceIn(0f, 1f)
-                val curvedProgress = applyAutomationCurve(
-                    progress = progress,
-                    curve = previousPoint.curve
+                return previousPoint.segmentValueAtProgress(
+                    target = target,
+                    endPoint = nextPoint,
+                    progress = progress
                 )
-                return previousPoint.value + ((nextPoint.value - previousPoint.value) * curvedProgress)
             }
             previousPoint = nextPoint
         }
@@ -230,6 +284,215 @@ internal fun applyAutomationCurve(progress: Float, curve: Float): Float {
     } else {
         normalizedProgress.pow(exponent)
     }.coerceIn(0f, 1f)
+}
+
+internal fun TimelineAutomationPoint.clearCurveHandle(): TimelineAutomationPoint {
+    return copy(
+        curve = 0f,
+        curveHandleTime = null,
+        curveHandleValue = null
+    )
+}
+
+internal fun TimelineAutomationPoint.withCurveHandle(
+    target: TimelineTrackAutomationTarget,
+    endPoint: TimelineAutomationPoint,
+    timeProgress: Float,
+    value: Float
+): TimelineAutomationPoint {
+    val normalizedTimeProgress = timeProgress.coerceIn(
+        minimumValue = TimelineAutomationMinimumHandleTimeProgress,
+        maximumValue = TimelineAutomationMaximumHandleTimeProgress
+    )
+    val normalizedValue = target.normalizeValue(value)
+    val linearValue = valueAtLinearProgress(
+        start = this.value,
+        end = endPoint.value,
+        progress = normalizedTimeProgress
+    )
+    val linearDisplayDelta = abs(
+        target.valueToDisplayValue(normalizedValue) -
+            target.valueToDisplayValue(linearValue)
+    )
+
+    return if (linearDisplayDelta <= TimelineAutomationLinearHandleTolerance) {
+        clearCurveHandle()
+    } else {
+        copy(
+            curve = 0f,
+            curveHandleTime = normalizedTimeProgress,
+            curveHandleValue = normalizedValue
+        )
+    }
+}
+
+internal fun TimelineAutomationPoint.curveHandle(
+    target: TimelineTrackAutomationTarget,
+    endPoint: TimelineAutomationPoint
+): TimelineAutomationSegmentHandle? {
+    val normalizedPoint = normalized(target)
+    val normalizedEndPoint = endPoint.normalized(target)
+    if (normalizedPoint.curveHandleTime != null &&
+        normalizedPoint.curveHandleValue != null
+    ) {
+        return TimelineAutomationSegmentHandle(
+            timeProgress = normalizedPoint.curveHandleTime,
+            value = normalizedPoint.curveHandleValue
+        )
+    }
+
+    if (abs(normalizedPoint.curve) < 0.001f) {
+        return null
+    }
+
+    return TimelineAutomationSegmentHandle(
+        timeProgress = TimelineAutomationDefaultHandleTimeProgress,
+        value = legacyAutomationSegmentValueAtProgress(
+            startValue = normalizedPoint.value,
+            endValue = normalizedEndPoint.value,
+            curve = normalizedPoint.curve,
+            progress = TimelineAutomationDefaultHandleTimeProgress
+        )
+    )
+}
+
+internal fun TimelineAutomationPoint.displayCurveHandle(
+    target: TimelineTrackAutomationTarget,
+    endPoint: TimelineAutomationPoint
+): TimelineAutomationSegmentHandle {
+    return curveHandle(
+        target = target,
+        endPoint = endPoint
+    ) ?: TimelineAutomationSegmentHandle(
+        timeProgress = TimelineAutomationDefaultHandleTimeProgress,
+        value = valueAtLinearProgress(
+            start = value,
+            end = endPoint.value,
+            progress = TimelineAutomationDefaultHandleTimeProgress
+        )
+    )
+}
+
+internal fun TimelineAutomationPoint.segmentValueAtProgress(
+    target: TimelineTrackAutomationTarget,
+    endPoint: TimelineAutomationPoint,
+    progress: Float
+): Float {
+    val normalizedProgress = progress.coerceIn(0f, 1f)
+    val handle = curveHandle(
+        target = target,
+        endPoint = endPoint
+    )
+
+    return when {
+        handle != null -> quadraticAutomationSegmentValueAtProgress(
+            startValue = value,
+            endValue = endPoint.value,
+            handleTime = handle.timeProgress,
+            handleValue = handle.value,
+            progress = normalizedProgress
+        )
+
+        abs(curve) >= 0.001f -> legacyAutomationSegmentValueAtProgress(
+            startValue = value,
+            endValue = endPoint.value,
+            curve = curve,
+            progress = normalizedProgress
+        )
+
+        else -> valueAtLinearProgress(
+            start = value,
+            end = endPoint.value,
+            progress = normalizedProgress
+        )
+    }
+}
+
+internal fun TimelineAutomationLane.rebuildSegmentHandlesFromSource(
+    sourceLane: TimelineAutomationLane,
+    sourceBaseValue: Float,
+    sourceTimeOffset: Long = 0L
+): TimelineAutomationLane {
+    val normalizedLane = normalized()
+    if (normalizedLane.points.isEmpty()) return normalizedLane
+
+    val rebuiltPoints = normalizedLane.points.mapIndexed { index, point ->
+        if (index == normalizedLane.points.lastIndex) {
+            point.clearCurveHandle()
+        } else {
+            val nextPoint = normalizedLane.points[index + 1]
+            val sourceStartTime = sourceTimeOffset + point.timeMs
+            val sourceEndTime = sourceTimeOffset + nextPoint.timeMs
+            val midpointTime = sourceStartTime + ((sourceEndTime - sourceStartTime) / 2L)
+            val midpointValue = sourceLane.valueAt(
+                timeMs = midpointTime,
+                defaultValue = sourceBaseValue
+            )
+
+            point.withCurveHandle(
+                target = normalizedLane.target,
+                endPoint = nextPoint,
+                timeProgress = TimelineAutomationDefaultHandleTimeProgress,
+                value = midpointValue
+            )
+        }
+    }
+
+    return normalizedLane.copy(points = rebuiltPoints).normalized()
+}
+
+private fun legacyAutomationSegmentValueAtProgress(
+    startValue: Float,
+    endValue: Float,
+    curve: Float,
+    progress: Float
+): Float {
+    val curvedProgress = applyAutomationCurve(
+        progress = progress,
+        curve = curve
+    )
+    return valueAtLinearProgress(
+        start = startValue,
+        end = endValue,
+        progress = curvedProgress
+    )
+}
+
+private fun quadraticAutomationSegmentValueAtProgress(
+    startValue: Float,
+    endValue: Float,
+    handleTime: Float,
+    handleValue: Float,
+    progress: Float
+): Float {
+    val normalizedHandleTime = handleTime.coerceIn(
+        minimumValue = TimelineAutomationMinimumHandleTimeProgress,
+        maximumValue = TimelineAutomationMaximumHandleTimeProgress
+    )
+    val denominator = (normalizedHandleTime * normalizedHandleTime) - normalizedHandleTime
+    if (abs(denominator) < 0.0001f) {
+        return valueAtLinearProgress(
+            start = startValue,
+            end = endValue,
+            progress = progress
+        )
+    }
+
+    val coefficientA = (
+        handleValue -
+            startValue -
+            (normalizedHandleTime * (endValue - startValue))
+        ) / denominator
+    val coefficientB = endValue - startValue - coefficientA
+    return (((coefficientA * progress) + coefficientB) * progress) + startValue
+}
+
+private fun valueAtLinearProgress(
+    start: Float,
+    end: Float,
+    progress: Float
+): Float {
+    return start + ((end - start) * progress.coerceIn(0f, 1f))
 }
 
 private fun linearGainToDecibels(value: Float): Float {

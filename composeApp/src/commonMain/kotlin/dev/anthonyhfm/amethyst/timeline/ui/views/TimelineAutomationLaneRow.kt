@@ -27,6 +27,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -34,10 +35,14 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
 import dev.anthonyhfm.amethyst.timeline.TimelineEditedAutomationPoint
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
+import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationDefaultHandleTimeProgress
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationPoint
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
-import dev.anthonyhfm.amethyst.timeline.data.applyAutomationCurve
+import dev.anthonyhfm.amethyst.timeline.data.clearCurveHandle
+import dev.anthonyhfm.amethyst.timeline.data.displayCurveHandle
+import dev.anthonyhfm.amethyst.timeline.data.segmentValueAtProgress
+import dev.anthonyhfm.amethyst.timeline.data.withCurveHandle
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
@@ -48,8 +53,8 @@ import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromContentX
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.abs
-import kotlin.math.ln
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 private enum class AutomationDragMode {
@@ -71,11 +76,6 @@ private data class AutomationPointTapState(
     val timeMillis: Long
 )
 
-private data class AutomationRangeDragState(
-    val startTimeMs: Long,
-    val endTimeMs: Long,
-)
-
 private data class AutomationSegmentHit(
     val startPoint: TimelineAutomationPoint,
     val endPoint: TimelineAutomationPoint
@@ -93,8 +93,8 @@ private const val AutomationDoubleTapTimeoutMs = 300L
 private const val AutomationTapSlopPx = 10f
 private const val AutomationPointHitRadiusPx = 14f
 private const val AutomationSegmentHitRadiusPx = 20f
-private const val AutomationMaxCurve = 3f
 private const val AutomationCurvePathSteps = 16
+private const val AutomationCurveDragSensitivity = 0.6f
 
 @Composable
 internal fun TimelineAutomationLaneRow(
@@ -102,7 +102,9 @@ internal fun TimelineAutomationLaneRow(
     track: TimelineTrack<*>,
     lane: TimelineAutomationLane,
     viewport: EditorViewportState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    rowHeight: Dp = TimelineAutomationLaneRowHeight,
+    overlayMode: Boolean = false,
 ) {
     val zoomLevel = viewport.zoomX
     val scrollOffsetPx = viewport.scrollX
@@ -113,7 +115,8 @@ internal fun TimelineAutomationLaneRow(
     val laneKey = normalizedLane.key
     val isSelected = activeAutomationLane?.trackIndex == trackIndex &&
         activeAutomationLane?.laneKey == laneKey
-    val currentIsAltPressed by rememberUpdatedState(ModifierKeysState.isAltPressed)
+    val currentIsCurveEditPressed by rememberUpdatedState(ModifierKeysState.isAltPressed)
+    val currentIsSnapBypassPressed by rememberUpdatedState(ModifierKeysState.isShiftPressed)
     val currentIsMetaSelectionPressed by rememberUpdatedState(
         ModifierKeysState.isMetaPressed || ModifierKeysState.isCtrlPressed
     )
@@ -135,9 +138,6 @@ internal fun TimelineAutomationLaneRow(
     var dragState by remember {
         mutableStateOf<AutomationPointDragState?>(null)
     }
-    var rangeDragState by remember {
-        mutableStateOf<AutomationRangeDragState?>(null)
-    }
     var lastTapState by remember {
         mutableStateOf<AutomationPointTapState?>(null)
     }
@@ -151,7 +151,7 @@ internal fun TimelineAutomationLaneRow(
         mutableStateOf(Offset.Zero)
     }
     val laneHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) {
-        TimelineAutomationLaneRowHeight.toPx()
+        rowHeight.toPx()
     }
 
     val renderedPoints = remember(normalizedLane.points, dragState) {
@@ -172,7 +172,6 @@ internal fun TimelineAutomationLaneRow(
         renderedLane.points,
         viewport.scrollX,
         viewport.zoomX,
-        ModifierKeysState.isAltPressed,
     ) {
         val pos = lastPointerPosition ?: return@remember null
         val hitPt = hitAutomationPoint(
@@ -185,20 +184,18 @@ internal fun TimelineAutomationLaneRow(
         )
         if (hitPt != null) return@remember AutomationHoverTarget.Point(hitPt.pointId)
 
-        if (ModifierKeysState.isAltPressed) {
-            val hitSeg = hitAutomationSegment(
-                points = renderedLane.points,
-                tapOffset = pos,
-                zoomLevel = viewport.zoomX,
-                scrollOffsetPx = viewport.scrollX,
-                laneHeightPx = laneHeightPx,
-                target = normalizedLane.target
-            )
-            if (hitSeg != null) return@remember AutomationHoverTarget.Segment(
-                startPointId = hitSeg.startPoint.pointId,
-                endPointId = hitSeg.endPoint.pointId
-            )
-        }
+        val hitSeg = hitAutomationSegment(
+            points = renderedLane.points,
+            tapOffset = pos,
+            zoomLevel = viewport.zoomX,
+            scrollOffsetPx = viewport.scrollX,
+            laneHeightPx = laneHeightPx,
+            target = normalizedLane.target
+        )
+        if (hitSeg != null) return@remember AutomationHoverTarget.Segment(
+            startPointId = hitSeg.startPoint.pointId,
+            endPointId = hitSeg.endPoint.pointId
+        )
         null
     }
     val rangeSelectedPointIds = remember(renderedLane.points, selectedRange) {
@@ -234,23 +231,34 @@ internal fun TimelineAutomationLaneRow(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(TimelineAutomationLaneRowHeight)
-            .background(
-                color = if (isSelected) {
-                    timelinePalette.automationLaneSurface.copy(alpha = 0.94f)
+            .height(rowHeight)
+            .then(
+                if (overlayMode) {
+                    Modifier.background(
+                        color = timelinePalette.automationLaneSurface.copy(
+                            alpha = if (isSelected) 0.18f else 0.12f
+                        )
+                    )
                 } else {
-                    timelinePalette.automationLaneSurface.copy(alpha = 0.72f)
-                },
-                shape = SmallShape
-            )
-            .border(
-                width = 1.dp,
-                color = if (isSelected) {
-                    timelinePalette.automationLaneAccent
-                } else {
-                    timelinePalette.shellBorder.copy(alpha = 0.84f)
-                },
-                shape = SmallShape
+                    Modifier
+                        .background(
+                            color = if (isSelected) {
+                                timelinePalette.automationLaneSurface.copy(alpha = 0.94f)
+                            } else {
+                                timelinePalette.automationLaneSurface.copy(alpha = 0.72f)
+                            },
+                            shape = SmallShape
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) {
+                                timelinePalette.automationLaneAccent
+                            } else {
+                                timelinePalette.shellBorder.copy(alpha = 0.84f)
+                            },
+                            shape = SmallShape
+                        )
+                }
             )
             .clipToBounds()
             .rightClickable { position ->
@@ -282,8 +290,8 @@ internal fun TimelineAutomationLaneRow(
                     val points = currentRenderedLane.value.points
                     val target = currentNormalizedLane.value.target
                     val lk = currentNormalizedLane.value.key
-                    val isAlt = currentIsAltPressed
                     val isMeta = currentIsMetaSelectionPressed
+                    val isCurveEditPressed = currentIsCurveEditPressed
                     val selectedIds = currentEffectiveSelectedPointIds.value
                     val laneHeight = size.height.toFloat()
 
@@ -296,7 +304,7 @@ internal fun TimelineAutomationLaneRow(
                         laneHeightPx = laneHeight,
                         target = target
                     )
-                    val hitSegment = if (hitPoint == null && isAlt) {
+                    val hitSegment = if (hitPoint == null) {
                         hitAutomationSegment(
                             points = points,
                             tapOffset = down.position,
@@ -333,7 +341,6 @@ internal fun TimelineAutomationLaneRow(
                             dragStartOffset = down.position,
                             mode = AutomationDragMode.Point
                         )
-                        rangeDragState = null
 
                         var totalMovement = 0f
                         var lastPos = down.position
@@ -364,11 +371,12 @@ internal fun TimelineAutomationLaneRow(
                             val anchorBefore = currentDrag.beforePoints
                                 .firstOrNull { it.pointId == currentDrag.draggedPointId }
                                 ?: break
-                            val snapTime = computeSnappedTimeFromContentX(
-                                vp2.screenToContentX(change.position.x),
-                                vp2.zoomX,
-                                currentBpm.value,
-                                currentGridType.value
+                            val snapTime = pointerOffsetToTimeMs(
+                                screenX = change.position.x,
+                                viewport = vp2,
+                                bpm = currentBpm.value,
+                                gridType = currentGridType.value,
+                                snapToGrid = !currentIsSnapBypassPressed
                             )
                             val minDelta = -(
                                 currentDrag.beforePoints.minOfOrNull(
@@ -380,7 +388,8 @@ internal fun TimelineAutomationLaneRow(
                             val anchorValue = pointerOffsetToValue(
                                 y = change.position.y,
                                 laneHeightPx = laneHeight,
-                                target = target
+                                target = target,
+                                snapToDefault = !currentIsSnapBypassPressed
                             )
                             val anchorDisplayValue =
                                 target.valueToDisplayValue(anchorValue)
@@ -391,12 +400,19 @@ internal fun TimelineAutomationLaneRow(
                                 val updatedDisplayValue =
                                     target.valueToDisplayValue(point.value) +
                                         deltaDisplayValue
+                                val updatedHandleValue = point.curveHandleValue?.let { handleValue ->
+                                    target.displayValueToValue(
+                                        target.valueToDisplayValue(handleValue) +
+                                            deltaDisplayValue
+                                    )
+                                }
                                 point.copy(
                                     timeMs = (point.timeMs + deltaTime)
                                         .coerceAtLeast(0L),
                                     value = target.displayValueToValue(
                                         updatedDisplayValue
-                                    )
+                                    ),
+                                    curveHandleValue = updatedHandleValue
                                 )
                             }
                             if (updatedPoints != currentDrag.afterPoints) {
@@ -465,18 +481,11 @@ internal fun TimelineAutomationLaneRow(
                         return@awaitEachGesture
                     }
 
-                    // === CURVE SEGMENT HIT (Alt held) ===
-                    if (hitSegment != null) {
+                    // === CURVE SEGMENT HIT ===
+                    if (hitSegment != null && isCurveEditPressed) {
                         selectLane()
-                        dragState = AutomationPointDragState(
-                            beforePoints = listOf(hitSegment.startPoint),
-                            afterPoints = listOf(hitSegment.startPoint),
-                            draggedPointId = hitSegment.startPoint.pointId,
-                            dragStartOffset = down.position,
-                            mode = AutomationDragMode.Curve,
-                            curveSegmentEndPoint = hitSegment.endPoint
-                        )
-                        rangeDragState = null
+                        var totalMovement = 0f
+                        var lastPos = down.position
 
                         while (true) {
                             val event = awaitPointerEvent(pass = PointerEventPass.Main)
@@ -487,27 +496,56 @@ internal fun TimelineAutomationLaneRow(
                                 return@awaitEachGesture
                             }
 
-                            if (!change.pressed) break
+                            if (!change.pressed) {
+                                break
+                            }
 
-                            // Compute curve so the line passes through the cursor
-                            val currentDrag = dragState ?: break
+                            val delta = change.position - lastPos
+                            totalMovement += sqrt(delta.x * delta.x + delta.y * delta.y)
+                            lastPos = change.position
+
+                            if (totalMovement < AutomationTapSlopPx) {
+                                continue
+                            }
+
+                            val currentDrag = dragState ?: AutomationPointDragState(
+                                beforePoints = listOf(hitSegment.startPoint),
+                                afterPoints = listOf(hitSegment.startPoint),
+                                draggedPointId = hitSegment.startPoint.pointId,
+                                dragStartOffset = down.position,
+                                mode = AutomationDragMode.Curve,
+                                curveSegmentEndPoint = hitSegment.endPoint
+                            ).also { dragState = it }
+
                             val segEnd = currentDrag.curveSegmentEndPoint ?: break
-                            val vp2 = currentViewport.value
-                            val newCurve = computeCurveFromCursor(
-                                cursorScreenX = change.position.x,
-                                cursorScreenY = change.position.y,
-                                startPoint = currentDrag.beforePoints.first(),
-                                endPoint = segEnd,
-                                zoomLevel = vp2.zoomX,
-                                scrollOffsetPx = vp2.scrollX,
-                                laneHeightPx = laneHeight,
-                                target = target
+                            val startPoint = currentDrag.beforePoints.first()
+                            val initialHandle = startPoint.displayCurveHandle(
+                                target = target,
+                                endPoint = segEnd
+                            )
+                            val displayRange = target.displayMaximumValue() -
+                                target.displayMinimumValue()
+                            val displayDelta = (
+                                (currentDrag.dragStartOffset.y - change.position.y) /
+                                    laneHeight.coerceAtLeast(1f)
+                                ) * displayRange * AutomationCurveDragSensitivity
+                            val updatedHandleDisplayValue = (
+                                target.valueToDisplayValue(initialHandle.value) + displayDelta
+                                ).coerceIn(
+                                minimumValue = target.displayMinimumValue(),
+                                maximumValue = target.displayMaximumValue()
+                            )
+                            val handleValue = target.displayValueToValue(
+                                updatedHandleDisplayValue
                             )
 
                             dragState = currentDrag.copy(
                                 afterPoints = listOf(
-                                    currentDrag.beforePoints.first().copy(
-                                        curve = newCurve
+                                    startPoint.withCurveHandle(
+                                        target = target,
+                                        endPoint = segEnd,
+                                        timeProgress = TimelineAutomationDefaultHandleTimeProgress,
+                                        value = handleValue
                                     )
                                 )
                             )
@@ -537,34 +575,30 @@ internal fun TimelineAutomationLaneRow(
                     }
 
                     // === EMPTY SPACE ===
-                    val initTime = computeSnappedTimeFromContentX(
-                        vp.screenToContentX(down.position.x),
-                        vp.zoomX,
-                        currentBpm.value,
-                        currentGridType.value
-                    )
-                    rangeDragState = AutomationRangeDragState(
-                        startTimeMs = initTime,
-                        endTimeMs = initTime
+                    val initTime = pointerOffsetToTimeMs(
+                        screenX = down.position.x,
+                        viewport = vp,
+                        bpm = currentBpm.value,
+                        gridType = currentGridType.value,
+                        snapToGrid = true
                     )
                     dragState = null
 
                     var totalMovement = 0f
                     var lastPos = down.position
                     var upPosition: Offset? = null
-                    var upTimeMillis = 0L
+                    var rangeEndTimeMs = initTime
+                    var rangeWasApplied = false
 
                     while (true) {
                         val event = awaitPointerEvent(pass = PointerEventPass.Main)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (change.isConsumed) {
-                            rangeDragState = null
                             return@awaitEachGesture
                         }
 
                         if (!change.pressed) {
                             upPosition = change.position
-                            upTimeMillis = change.uptimeMillis
                             break
                         }
 
@@ -574,21 +608,35 @@ internal fun TimelineAutomationLaneRow(
 
                         if (totalMovement >= AutomationTapSlopPx) {
                             val vp2 = currentViewport.value
-                            val currentRange = rangeDragState ?: break
-                            rangeDragState = currentRange.copy(
-                                endTimeMs = computeSnappedTimeFromContentX(
-                                    vp2.screenToContentX(change.position.x),
-                                    vp2.zoomX,
-                                    currentBpm.value,
-                                    currentGridType.value
-                                )
+                            rangeEndTimeMs = pointerOffsetToTimeMs(
+                                screenX = change.position.x,
+                                viewport = vp2,
+                                bpm = currentBpm.value,
+                                gridType = currentGridType.value,
+                                snapToGrid = true
                             )
+                            rangeWasApplied = true
+                            val normalizedStart = minOf(initTime, rangeEndTimeMs)
+                            val normalizedEnd = maxOf(initTime, rangeEndTimeMs)
+                            if (normalizedEnd > normalizedStart) {
+                                SelectionManager.replaceSelections(
+                                    listOf(
+                                        Selectable.TimelineAutomationLane(
+                                            trackIndex = trackIndex,
+                                            target = lk.target,
+                                            bindingId = lk.bindingId
+                                        ),
+                                        Selectable.TimelineRange(
+                                            trackIndex = trackIndex,
+                                            startMs = normalizedStart,
+                                            endMs = normalizedEnd
+                                        )
+                                    )
+                                )
+                            }
                             change.consume()
                         }
                     }
-
-                    val currentRange = rangeDragState
-                    rangeDragState = null
 
                     if (upPosition != null && totalMovement < AutomationTapSlopPx) {
                         // Tap on empty space — create a new automation point
@@ -599,49 +647,31 @@ internal fun TimelineAutomationLaneRow(
                             lane = lk,
                             points = listOf(
                                 TimelineAutomationPoint(
-                                    timeMs = computeSnappedTimeFromContentX(
-                                        vp2.screenToContentX(upPosition.x),
-                                        vp2.zoomX,
-                                        currentBpm.value,
-                                        currentGridType.value
+                                    timeMs = pointerOffsetToTimeMs(
+                                        screenX = upPosition.x,
+                                        viewport = vp2,
+                                        bpm = currentBpm.value,
+                                        gridType = currentGridType.value,
+                                        snapToGrid = !currentIsSnapBypassPressed
                                     ),
                                     value = pointerOffsetToValue(
                                         y = upPosition.y,
                                         laneHeightPx = laneHeight,
-                                        target = target
+                                        target = target,
+                                        snapToDefault = false
                                     )
                                 )
                             )
                         )
-                    } else if (currentRange != null) {
-                        val normalizedStart = minOf(
-                            currentRange.startTimeMs,
-                            currentRange.endTimeMs
-                        )
-                        val normalizedEnd = maxOf(
-                            currentRange.startTimeMs,
-                            currentRange.endTimeMs
-                        )
-                        if (normalizedEnd > normalizedStart) {
-                            SelectionManager.replaceSelections(
-                                listOf(
-                                    Selectable.TimelineAutomationLane(
-                                        trackIndex = trackIndex,
-                                        target = lk.target,
-                                        bindingId = lk.bindingId
-                                    ),
-                                    Selectable.TimelineRange(
-                                        trackIndex = trackIndex,
-                                        startMs = normalizedStart,
-                                        endMs = normalizedEnd
-                                    )
-                                )
-                            )
-                        } else {
+                    } else if (rangeWasApplied) {
+                        val normalizedStart = minOf(initTime, rangeEndTimeMs)
+                        val normalizedEnd = maxOf(initTime, rangeEndTimeMs)
+                        if (normalizedEnd <= normalizedStart) {
                             selectLane()
                         }
                     }
                 }
+
             }
             .pointerInput(Unit) {
                 while (true) {
@@ -662,23 +692,15 @@ internal fun TimelineAutomationLaneRow(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(TimelineAutomationLaneRowHeight)
+                .height(rowHeight)
         ) {
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(TimelineAutomationLaneRowHeight)
+                    .height(rowHeight)
             ) {
-                val overlayStart = when {
-                    rangeDragState != null -> minOf(rangeDragState!!.startTimeMs, rangeDragState!!.endTimeMs)
-                    selectedRange != null -> selectedRange.startMs
-                    else -> null
-                }
-                val overlayEnd = when {
-                    rangeDragState != null -> maxOf(rangeDragState!!.startTimeMs, rangeDragState!!.endTimeMs)
-                    selectedRange != null -> selectedRange.endMs
-                    else -> null
-                }
+                val overlayStart = selectedRange?.startMs
+                val overlayEnd = selectedRange?.endMs
 
                 if (overlayStart != null && overlayEnd != null && overlayEnd > overlayStart) {
                     drawRect(
@@ -787,7 +809,7 @@ internal fun TimelineAutomationLaneRow(
                     val isRangeSelected = point.pointId in rangeSelectedPointIds
                     val isSelectedPoint = point.pointId in effectiveSelectedPointIds
                     val isHoveredPoint = hoverTarget is AutomationHoverTarget.Point &&
-                        (hoverTarget as AutomationHoverTarget.Point).pointId == point.pointId
+                        hoverTarget.pointId == point.pointId
 
                     if (isHoveredPoint && !isDraggedPoint) {
                         drawCircle(
@@ -830,7 +852,7 @@ internal fun TimelineAutomationLaneRow(
                     )
                 }
 
-                // Highlight hovered segment (Alt+hover feedback)
+                // Highlight the hovered segment so curve editing is discoverable.
                 val currentHover = hoverTarget
                 if (currentHover is AutomationHoverTarget.Segment) {
                     val startPt = renderedLane.points.firstOrNull {
@@ -903,6 +925,62 @@ internal fun TimelineAutomationLaneRow(
                         )
                     }
                 }
+
+                val activeCurveDraggedPointId = activeCurveDrag?.draggedPointId
+                renderedLane.points.zipWithNext().forEach { (startPoint, endPoint) ->
+                    val isHoveredSegment = hoverTarget is AutomationHoverTarget.Segment &&
+                        hoverTarget.startPointId == startPoint.pointId &&
+                        hoverTarget.endPointId == endPoint.pointId
+                    val isActiveCurveSegment = activeCurveDraggedPointId == startPoint.pointId
+                    val hasStoredCurveHandle = (
+                        startPoint.curveHandleTime != null &&
+                            startPoint.curveHandleValue != null
+                        ) || abs(startPoint.curve) >= 0.001f
+                    val shouldShowHandle = hasStoredCurveHandle ||
+                        isActiveCurveSegment ||
+                        (isHoveredSegment && currentIsCurveEditPressed)
+                    if (!shouldShowHandle) {
+                        return@forEach
+                    }
+
+                    val handleOffset = automationSegmentHandleOffset(
+                        startPoint = startPoint,
+                        endPoint = endPoint,
+                        zoomLevel = zoomLevel,
+                        scrollOffsetPx = scrollOffsetPx,
+                        laneHeightPx = size.height,
+                        target = normalizedLane.target
+                    )
+                    drawCircle(
+                        color = accentColor.copy(
+                            alpha = when {
+                                isActiveCurveSegment -> 0.42f
+                                isHoveredSegment -> 0.34f
+                                else -> 0.24f
+                            }
+                        ),
+                        radius = when {
+                            isActiveCurveSegment -> 8.dp.toPx()
+                            isHoveredSegment -> 7.dp.toPx()
+                            else -> 6.dp.toPx()
+                        },
+                        center = handleOffset
+                    )
+                    drawCircle(
+                        color = accentColor,
+                        radius = when {
+                            isActiveCurveSegment -> 4.8.dp.toPx()
+                            isHoveredSegment -> 4.4.dp.toPx()
+                            else -> 4.dp.toPx()
+                        },
+                        center = handleOffset
+                    )
+                    drawCircle(
+                        color = timelinePalette.automationLaneSurface,
+                        radius = 1.8.dp.toPx(),
+                        center = handleOffset
+                    )
+                }
             }
         }
 
@@ -937,7 +1015,7 @@ internal fun TimelineAutomationLaneRow(
                                     changes = listOf(
                                         TimelineEditedAutomationPoint(
                                             before = seg.startPoint,
-                                            after = seg.startPoint.copy(curve = 0f)
+                                            after = seg.startPoint.clearCurveHandle()
                                         )
                                     )
                                 )
@@ -950,7 +1028,7 @@ internal fun TimelineAutomationLaneRow(
                 }
             }
         }
-    }
+}
 }
 
 private fun appendAutomationSegmentToPath(
@@ -962,7 +1040,11 @@ private fun appendAutomationSegmentToPath(
     laneHeightPx: Float,
     target: TimelineTrackAutomationTarget
 ) {
-    if (abs(startPoint.curve) < 0.001f) {
+    if (
+        startPoint.curveHandleTime == null &&
+        startPoint.curveHandleValue == null &&
+        abs(startPoint.curve) < 0.001f
+    ) {
         path.lineTo(
             endPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx,
             valueToY(
@@ -977,7 +1059,10 @@ private fun appendAutomationSegmentToPath(
     val startX = startPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
     val endX = endPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
     // More steps for extreme curves to keep the visual smooth
-    val steps = if (abs(startPoint.curve) > 1f) {
+    val steps = if (
+        (startPoint.curveHandleTime != null && startPoint.curveHandleValue != null) ||
+        abs(startPoint.curve) > 1f
+    ) {
         (AutomationCurvePathSteps * 2).coerceAtMost(48)
     } else {
         AutomationCurvePathSteps
@@ -990,7 +1075,8 @@ private fun appendAutomationSegmentToPath(
                 value = automationSegmentValueAtProgress(
                     startPoint = startPoint,
                     endPoint = endPoint,
-                    progress = progress
+                    progress = progress,
+                    target = target
                 ),
                 laneHeightPx = laneHeightPx,
                 target = target
@@ -1061,7 +1147,8 @@ private fun hitAutomationSegment(
                     value = automationSegmentValueAtProgress(
                         startPoint = startPoint,
                         endPoint = endPoint,
-                        progress = progress
+                        progress = progress,
+                        target = target
                     ),
                     laneHeightPx = laneHeightPx,
                     target = target
@@ -1098,23 +1185,76 @@ private fun valueToY(
 private fun pointerOffsetToValue(
     y: Float,
     laneHeightPx: Float,
-    target: TimelineTrackAutomationTarget
+    target: TimelineTrackAutomationTarget,
+    snapToDefault: Boolean = true,
 ): Float {
     if (laneHeightPx <= 0f) return target.defaultValue
     val normalizedValue = (1f - (y / laneHeightPx)).coerceIn(0f, 1f)
-    return target.displayProgressToValue(normalizedValue)
+    val displayValue = target.displayProgressToDisplayValue(normalizedValue)
+    return target.displayValueToValue(
+        if (snapToDefault) target.snapDisplayValue(displayValue) else displayValue
+    )
+}
+
+private fun pointerOffsetToTimeMs(
+    screenX: Float,
+    viewport: EditorViewportState,
+    bpm: Double,
+    gridType: GridUtils.GridType,
+    snapToGrid: Boolean,
+): Long {
+    val contentX = viewport.screenToContentX(screenX)
+    val rawTimeMs = viewport.contentXToTimeMs(contentX)
+        .roundToLong()
+        .coerceAtLeast(0L)
+
+    return if (snapToGrid) {
+        computeSnappedTimeFromContentX(
+            x = contentX,
+            zoomLevel = viewport.zoomX,
+            bpm = bpm,
+            gridType = gridType
+        )
+    } else {
+        rawTimeMs
+    }
 }
 
 private fun automationSegmentValueAtProgress(
     startPoint: TimelineAutomationPoint,
     endPoint: TimelineAutomationPoint,
-    progress: Float
+    progress: Float,
+    target: TimelineTrackAutomationTarget
 ): Float {
-    val curvedProgress = applyAutomationCurve(
-        progress = progress,
-        curve = startPoint.curve
+    return startPoint.segmentValueAtProgress(
+        target = target,
+        endPoint = endPoint,
+        progress = progress
     )
-    return lerp(startPoint.value, endPoint.value, curvedProgress)
+}
+
+private fun automationSegmentHandleOffset(
+    startPoint: TimelineAutomationPoint,
+    endPoint: TimelineAutomationPoint,
+    zoomLevel: Float,
+    scrollOffsetPx: Float,
+    laneHeightPx: Float,
+    target: TimelineTrackAutomationTarget
+): Offset {
+    val handle = startPoint.displayCurveHandle(
+        target = target,
+        endPoint = endPoint
+    )
+    val startX = startPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
+    val endX = endPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
+    return Offset(
+        x = lerp(startX, endX, handle.timeProgress),
+        y = valueToY(
+            value = handle.value,
+            laneHeightPx = laneHeightPx,
+            target = target
+        )
+    )
 }
 
 private fun isWithinTapSlop(start: Offset, end: Offset): Boolean {
@@ -1148,65 +1288,4 @@ private fun Offset.distanceSquaredTo(other: Offset): Float {
 
 private fun lerp(start: Float, end: Float, progress: Float): Float {
     return start + ((end - start) * progress.coerceIn(0f, 1f))
-}
-
-/**
- * Compute the automation curve value that makes the segment pass through the
- * cursor position. This inverts [applyAutomationCurve] so the line literally
- * follows the mouse.
- *
- * For positive curve (ease-out): `curvedProgress = 1 - (1-t)^exponent`
- * For negative curve (ease-in):  `curvedProgress = t^exponent`
- *
- * Given cursor position, we solve for the exponent that produces the target
- * progress at time t, then convert back to a curve value.
- *
- * Uses Double precision internally to avoid Float artifacts near extreme values.
- */
-private fun computeCurveFromCursor(
-    cursorScreenX: Float,
-    cursorScreenY: Float,
-    startPoint: TimelineAutomationPoint,
-    endPoint: TimelineAutomationPoint,
-    zoomLevel: Float,
-    scrollOffsetPx: Float,
-    laneHeightPx: Float,
-    target: TimelineTrackAutomationTarget
-): Float {
-    val startX = startPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
-    val endX = endPoint.timeMs.toFloat() * zoomLevel - scrollOffsetPx
-    val segmentWidth = endX - startX
-    if (segmentWidth < 1f) return 0f
-
-    // Use Double for all math to avoid precision loss near extremes
-    val t = ((cursorScreenX - startX) / segmentWidth).toDouble().coerceIn(0.005, 0.995)
-    val cursorValue = pointerOffsetToValue(cursorScreenY, laneHeightPx, target)
-
-    val valueDelta = (endPoint.value - startPoint.value).toDouble()
-    if (abs(valueDelta) < 0.0001) return 0f
-
-    val targetProgress = ((cursorValue - startPoint.value) / valueDelta)
-        .toDouble().coerceIn(0.0005, 0.9995)
-
-    // Near-linear — avoid expensive log computation
-    if (abs(targetProgress - t) < 0.005) return 0f
-
-    val maxCurve = AutomationMaxCurve.toDouble()
-    return if (targetProgress > t) {
-        // Ease-out (positive curve): 1 - (1-t)^exponent = targetProgress
-        val base = 1.0 - t
-        val result = 1.0 - targetProgress
-        if (base <= 0.0005 || result <= 0.0005) return AutomationMaxCurve
-        val lnBase = ln(base)
-        if (abs(lnBase) < 0.00001) return 0f
-        val exponent = ln(result) / lnBase
-        ((exponent - 1.0) / 3.0).coerceIn(0.0, maxCurve).toFloat()
-    } else {
-        // Ease-in (negative curve): t^exponent = targetProgress
-        val lnT = ln(t)
-        if (abs(lnT) < 0.00001) return 0f
-        val lnTarget = ln(targetProgress)
-        val exponent = lnTarget / lnT
-        -(((exponent - 1.0) / 3.0).coerceIn(0.0, maxCurve)).toFloat()
-    }
 }

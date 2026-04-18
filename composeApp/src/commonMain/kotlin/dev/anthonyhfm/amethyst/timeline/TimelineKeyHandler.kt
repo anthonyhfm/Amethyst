@@ -71,6 +71,10 @@ object TimelineKeyHandler {
     }
 
     private fun handleCopy(): Boolean {
+        activeAutomationRangeSelection()?.let { (automationLaneSelection, rangeSelection) ->
+            return handleAutomationRangeCopy(automationLaneSelection, rangeSelection)
+        }
+
         val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
         if (rangeSelections.isNotEmpty()) {
             return handleRangeCopy(rangeSelections)
@@ -86,6 +90,19 @@ object TimelineKeyHandler {
     }
 
     private fun handleCut(): Boolean {
+        activeAutomationRangeSelection()?.let { (automationLaneSelection, rangeSelection) ->
+            if (!handleAutomationRangeCopy(automationLaneSelection, rangeSelection)) {
+                return false
+            }
+
+            return TimelineCommandSurface.deleteAutomationRange(
+                trackIndex = automationLaneSelection.trackIndex,
+                lane = automationLaneSelection.laneKey,
+                startMs = rangeSelection.startMs,
+                endMs = rangeSelection.endMs
+            ).didChange
+        }
+
         val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
         if (rangeSelections.isNotEmpty()) {
             handleRangeCopy(rangeSelections)
@@ -121,6 +138,15 @@ object TimelineKeyHandler {
     }
 
     private fun handleDelete(): Boolean {
+        activeAutomationRangeSelection()?.let { (automationLaneSelection, rangeSelection) ->
+            return TimelineCommandSurface.deleteAutomationRange(
+                trackIndex = automationLaneSelection.trackIndex,
+                lane = automationLaneSelection.laneKey,
+                startMs = rangeSelection.startMs,
+                endMs = rangeSelection.endMs
+            ).didChange
+        }
+
         val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
         if (rangeSelections.isNotEmpty()) {
             TimelineCommandExecutor.execute(
@@ -183,6 +209,15 @@ object TimelineKeyHandler {
     }
 
     private fun handleDuplicate(): Boolean {
+        activeAutomationRangeSelection()?.let { (automationLaneSelection, rangeSelection) ->
+            return TimelineCommandSurface.duplicateAutomationRange(
+                trackIndex = automationLaneSelection.trackIndex,
+                lane = automationLaneSelection.laneKey,
+                startMs = rangeSelection.startMs,
+                endMs = rangeSelection.endMs
+            ).didChange
+        }
+
         val rangeSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineRange>()
         if (rangeSelections.isNotEmpty()) {
             TimelineCommandExecutor.execute(
@@ -250,6 +285,45 @@ object TimelineKeyHandler {
                 else -> Unit
             }
         }
+        return true
+    }
+
+    private fun activeAutomationRangeSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Pair<Selectable.TimelineAutomationLane, Selectable.TimelineRange>? {
+        val automationLaneSelection = selections
+            .filterIsInstance<Selectable.TimelineAutomationLane>()
+            .lastOrNull()
+            ?: return null
+        val rangeSelection = selections
+            .filterIsInstance<Selectable.TimelineRange>()
+            .firstOrNull { it.trackIndex == automationLaneSelection.trackIndex }
+            ?: return null
+
+        return automationLaneSelection to rangeSelection
+    }
+
+    private fun handleAutomationRangeCopy(
+        automationLaneSelection: Selectable.TimelineAutomationLane,
+        rangeSelection: Selectable.TimelineRange
+    ): Boolean {
+        val track = TimelineRepository.tracks.value
+            .getOrNull(automationLaneSelection.trackIndex) as? AudioTimelineTrack
+            ?: return false
+        val lane = track.automationLaneInRange(
+            key = automationLaneSelection.laneKey,
+            startMs = rangeSelection.startMs,
+            endMs = rangeSelection.endMs
+        ) ?: return false
+
+        ClipboardManager.setClipboardData(
+            ClipboardData.TimelineAudioRange(
+                entries = emptyList(),
+                automationLanes = listOf(lane),
+                rangeStartMs = rangeSelection.startMs,
+                rangeEndMs = rangeSelection.endMs
+            )
+        )
         return true
     }
 

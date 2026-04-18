@@ -75,6 +75,7 @@ fun AudioClip(
     audioEntry: AudioEntry,
     viewport: EditorViewportState,
     isSelected: Boolean,
+    automationOverlayActive: Boolean = false,
     onSelectEntry: () -> Unit,
     onMoveEntry: (newStartMs: Long) -> Unit,
     gridIntervalMs: Long,
@@ -96,6 +97,27 @@ fun AudioClip(
         topStart = timelineDimensions.clipCornerRadius,
         topEnd = timelineDimensions.clipCornerRadius
     )
+    val interactionEnabled = !automationOverlayActive
+    val clipBackgroundColor = if (automationOverlayActive) {
+        clipColors.background.copy(alpha = if (isSelected) 0.54f else 0.42f)
+    } else {
+        clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f)
+    }
+    val clipBorderColor = if (automationOverlayActive) {
+        clipColors.border.copy(alpha = if (isSelected) 0.58f else 0.32f)
+    } else {
+        clipColors.border
+    }
+    val clipHeaderColor = if (automationOverlayActive) {
+        clipColors.header.copy(alpha = 0.48f)
+    } else {
+        clipColors.header
+    }
+    val clipContentColor = if (automationOverlayActive) {
+        clipColors.content.copy(alpha = 0.44f)
+    } else {
+        clipColors.content
+    }
 
     var rangeActive by remember { mutableStateOf(false) }
     var rangeStartMs by remember { mutableStateOf<Long?>(null) }
@@ -179,250 +201,290 @@ fun AudioClip(
     val widthPx = minOf(fullWidthPx, viewportWidthPx + overflowLeft + 200).coerceAtMost(260_000)
     val widthDp = with(LocalDensity.current) { widthPx.toDp() }
 
-    ContextMenu(
-        modifier = Modifier
-            .offset { IntOffset(screenLeftPx, 0) }
-            .height(timelineDimensions.laneHeight)
-            .width(widthDp),
-        trigger = {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(clipShape)
-                    .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
-                    .border(if (isSelected) 1.5.dp else 1.dp, clipColors.border, clipShape)
-            ) {
-        if (!renaming) {
-            Text(
-                text = displayName,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(timelineDimensions.clipHeaderHeight)
-                    .background(clipColors.header, clipHeaderShape)
-                    .pointerInput(audioEntry.startTimeMs) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.type == PointerEventType.Press) {
-                                    val change = event.changes.firstOrNull()
-                                    if (change != null) {
-                                        val isShiftPressed = event.keyboardModifiers.isShiftPressed
-                                        if (isShiftPressed) {
-                                            // Multi-select mode
-                                            SelectionManager.select(
-                                                Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entryStartMs),
-                                                single = false
-                                            )
-                                        } else {
-                                            // Single select mode
-                                            onSelectEntry()
-                                        }
-                                        change.consume()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
-                        detectDragGestures(
-                            onDragStart = { onSelectEntry() },
-                            onDragEnd = {
-                                if (previewStartMs != audioEntry.startTimeMs) onMoveEntry(previewStartMs)
-                                dragOffsetPx.value = 0f
-                                snapEnabled = true
-                            },
-                            onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                dragOffsetPx.value += dragAmount.x
-                            }
-                        )
-                    }
-                    .padding(4.dp),
-                style = MaterialTheme.typography.labelSmall.copy(lineHeight = MaterialTheme.typography.labelSmall.fontSize),
-                color = clipColors.content,
-                maxLines = 1
-            )
-        } else {
-            val customTextSelectionColors = TextSelectionColors(
-                handleColor = timelinePalette.selectionStroke,
-                backgroundColor = timelinePalette.selectionFill
-            )
+    val outerModifier = Modifier
+        .offset { IntOffset(screenLeftPx, 0) }
+        .height(timelineDimensions.laneHeight)
+        .width(widthDp)
 
-            CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
-                BasicTextField(
-                    value = textValue.value,
-                    onValueChange = { textValue.value = it },
-                    singleLine = true,
+    val clipContent: @Composable () -> Unit = {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(clipShape)
+                .background(clipBackgroundColor)
+                .border(if (isSelected) 1.5.dp else 1.dp, clipBorderColor, clipShape)
+        ) {
+            if (!renaming) {
+                Text(
+                    text = displayName,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(timelineDimensions.clipHeaderHeight)
-                        .background(clipColors.header, clipHeaderShape)
-                        .focusRequester(focusRequester)
-                        .onFocusSelectAll(textValue)
-                        .onKeyEvent { ev ->
-                            if (ev.key == Key.Enter) {
-                                TimelineCommandExecutor.execute(
-                                    TimelineEditCommand.RenameEntry(
-                                        trackIndex = trackIndex,
-                                        entryStartTime = entryStartMs,
-                                        newName = textValue.value.text
-                                    )
-                                )
-                                renamingEntryIndex.value = null
-                                return@onKeyEvent true
+                        .background(clipHeaderColor, clipHeaderShape)
+                        .then(
+                            if (interactionEnabled) {
+                                Modifier
+                                    .pointerInput(audioEntry.startTimeMs) {
+                                        awaitPointerEventScope {
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                if (event.type == PointerEventType.Press) {
+                                                    val change = event.changes.firstOrNull()
+                                                    if (change != null) {
+                                                        val isShiftPressed = event.keyboardModifiers.isShiftPressed
+                                                        if (isShiftPressed) {
+                                                            SelectionManager.select(
+                                                                Selectable.TimelineEntryItem(
+                                                                    trackIndex = trackIndex,
+                                                                    entryStartMs = entryStartMs
+                                                                ),
+                                                                single = false
+                                                            )
+                                                        } else {
+                                                            onSelectEntry()
+                                                        }
+                                                        change.consume()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                                        detectDragGestures(
+                                            onDragStart = { onSelectEntry() },
+                                            onDragEnd = {
+                                                if (previewStartMs != audioEntry.startTimeMs) {
+                                                    onMoveEntry(previewStartMs)
+                                                }
+                                                dragOffsetPx.value = 0f
+                                                snapEnabled = true
+                                            },
+                                            onDragCancel = {
+                                                dragOffsetPx.value = 0f
+                                                snapEnabled = true
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragOffsetPx.value += dragAmount.x
+                                            }
+                                        )
+                                    }
+                            } else {
+                                Modifier
                             }
-
-                            if (ev.key == Key.Escape) {
-                                renamingEntryIndex.value = null
-                                textValue.value = TextFieldValue(displayName)
-                                return@onKeyEvent true
-                            }
-
-                            return@onKeyEvent false
-                        }
+                        )
                         .padding(4.dp),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Unspecified,
-                        imeAction = ImeAction.Done
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        lineHeight = MaterialTheme.typography.labelSmall.fontSize
                     ),
-                    textStyle = MaterialTheme.typography.labelSmall.copy(
-                        lineHeight = MaterialTheme.typography.labelSmall.fontSize,
-                        color = clipColors.content
-                    ),
-                    cursorBrush = SolidColor(clipColors.content),
+                    color = clipContentColor,
+                    maxLines = 1
                 )
-            }
-        }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            // offset.x is clip-relative (0..clipWidth). Convert to timeline ms
-                            // via the content-space position: clipStart_contentX + offset.x.
-                            val startMs = GridUtils.snapToGrid(
-                                viewport.contentXToTimeMs(startOffsetPx + offset.x).roundToLong().coerceAtLeast(0L),
-                                zoomLevel, bpm, gridType
-                            )
-                            rangeStartMs = startMs
-                            rangeEndMs = startMs
-                            rangeActive = true
-                        },
-                        onDrag = { change, _ ->
-                            if (rangeActive && rangeStartMs != null) {
-                                val currentMs = GridUtils.snapToGrid(
-                                    viewport.contentXToTimeMs(startOffsetPx + change.position.x).roundToLong().coerceAtLeast(0L),
-                                    zoomLevel, bpm, gridType
-                                )
-                                if (currentMs != rangeEndMs) {
-                                    rangeEndMs = currentMs
-                                }
-                                change.consume()
-                            }
-                        },
-                        onDragEnd = {
-                            if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                                val start = rangeStartMs!!.coerceAtLeast(0L)
-                                val end = rangeEndMs!!.coerceAtLeast(0L)
-                                val normalizedStart = kotlin.math.min(start, end)
-                                val normalizedEnd = kotlin.math.max(start, end)
-                                if (normalizedEnd > normalizedStart) {
-                                    SelectionManager.select(
-                                        Selectable.TimelineRange(
+            } else {
+                val customTextSelectionColors = TextSelectionColors(
+                    handleColor = timelinePalette.selectionStroke,
+                    backgroundColor = timelinePalette.selectionFill
+                )
+
+                CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
+                    BasicTextField(
+                        value = textValue.value,
+                        onValueChange = { textValue.value = it },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(timelineDimensions.clipHeaderHeight)
+                            .background(clipHeaderColor, clipHeaderShape)
+                            .focusRequester(focusRequester)
+                            .onFocusSelectAll(textValue)
+                            .onKeyEvent { ev ->
+                                if (ev.key == Key.Enter) {
+                                    TimelineCommandExecutor.execute(
+                                        TimelineEditCommand.RenameEntry(
                                             trackIndex = trackIndex,
-                                            startMs = normalizedStart,
-                                            endMs = normalizedEnd
+                                            entryStartTime = entryStartMs,
+                                            newName = textValue.value.text
                                         )
                                     )
+                                    renamingEntryIndex.value = null
+                                    return@onKeyEvent true
                                 }
+
+                                if (ev.key == Key.Escape) {
+                                    renamingEntryIndex.value = null
+                                    textValue.value = TextFieldValue(displayName)
+                                    return@onKeyEvent true
+                                }
+
+                                return@onKeyEvent false
                             }
-                            rangeActive = false
-                            rangeStartMs = null
-                            rangeEndMs = null
-                        },
-                        onDragCancel = {
-                            rangeActive = false
-                            rangeStartMs = null
-                            rangeEndMs = null
-                        }
+                            .padding(4.dp),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrectEnabled = false,
+                            keyboardType = KeyboardType.Unspecified,
+                            imeAction = ImeAction.Done
+                        ),
+                        textStyle = MaterialTheme.typography.labelSmall.copy(
+                            lineHeight = MaterialTheme.typography.labelSmall.fontSize,
+                            color = clipContentColor
+                        ),
+                        cursorBrush = SolidColor(clipContentColor),
                     )
                 }
-                .drawWithContent {
-                    drawContent()
-                    // Draw range selection overlay
-                    if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                        val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
-                        val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .then(
+                        if (interactionEnabled) {
+                            Modifier.pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
+                                detectDragGestures(
+                                    onDragStart = { offset ->
+                                        val startMs = GridUtils.snapToGrid(
+                                            viewport.contentXToTimeMs(startOffsetPx + offset.x)
+                                                .roundToLong()
+                                                .coerceAtLeast(0L),
+                                            zoomLevel,
+                                            bpm,
+                                            gridType
+                                        )
+                                        rangeStartMs = startMs
+                                        rangeEndMs = startMs
+                                        rangeActive = true
+                                    },
+                                    onDrag = { change, _ ->
+                                        if (rangeActive && rangeStartMs != null) {
+                                            val currentMs = GridUtils.snapToGrid(
+                                                viewport.contentXToTimeMs(startOffsetPx + change.position.x)
+                                                    .roundToLong()
+                                                    .coerceAtLeast(0L),
+                                                zoomLevel,
+                                                bpm,
+                                                gridType
+                                            )
+                                            if (currentMs != rangeEndMs) {
+                                                rangeEndMs = currentMs
+                                            }
+                                            change.consume()
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                                            val start = rangeStartMs!!.coerceAtLeast(0L)
+                                            val end = rangeEndMs!!.coerceAtLeast(0L)
+                                            val normalizedStart = kotlin.math.min(start, end)
+                                            val normalizedEnd = kotlin.math.max(start, end)
+                                            if (normalizedEnd > normalizedStart) {
+                                                SelectionManager.select(
+                                                    Selectable.TimelineRange(
+                                                        trackIndex = trackIndex,
+                                                        startMs = normalizedStart,
+                                                        endMs = normalizedEnd
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        rangeActive = false
+                                        rangeStartMs = null
+                                        rangeEndMs = null
+                                    },
+                                    onDragCancel = {
+                                        rangeActive = false
+                                        rangeStartMs = null
+                                        rangeEndMs = null
+                                    }
+                                )
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .drawWithContent {
+                        drawContent()
+                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                            val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
+                            val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
+                            val clipStartUs = audioEntry.startTimeUs
+                            val clipEndUs = audioEntry.endTimeUs
+                            val visibleStartUs = msToUs(start).coerceIn(clipStartUs, clipEndUs)
+                            val visibleEndUs = msToUs(end).coerceIn(clipStartUs, clipEndUs)
 
-                        // Convert to clip-relative coordinates
-                        val clipStartUs = audioEntry.startTimeUs
-                        val clipEndUs = audioEntry.endTimeUs
+                            if (visibleEndUs > visibleStartUs) {
+                                val localStartPx = timeUsToPx(visibleStartUs) - startOffsetPx
+                                val localEndPx = timeUsToPx(visibleEndUs) - startOffsetPx
+                                val startX = localStartPx.toFloat()
+                                val width = (localEndPx - localStartPx).coerceAtLeast(1).toFloat()
 
-                        // Clip the range to visible portion
-                        val visibleStartUs = msToUs(start).coerceIn(clipStartUs, clipEndUs)
-                        val visibleEndUs = msToUs(end).coerceIn(clipStartUs, clipEndUs)
+                                drawRect(
+                                    color = timelinePalette.selectionFill,
+                                    topLeft = Offset(startX, 0f),
+                                    size = Size(width, size.height)
+                                )
+                            }
+                        }
 
-                        if (visibleEndUs > visibleStartUs) {
-                            val localStartPx = timeUsToPx(visibleStartUs) - startOffsetPx
-                            val localEndPx = timeUsToPx(visibleEndUs) - startOffsetPx
-                            val startX = localStartPx.toFloat()
-                            val width = (localEndPx - localStartPx).coerceAtLeast(1).toFloat()
-
+                        if (automationOverlayActive) {
                             drawRect(
-                                color = timelinePalette.selectionFill,
-                                topLeft = Offset(startX, 0f),
-                                size = Size(width, size.height)
+                                color = timelinePalette.laneSurfaceRaised.copy(alpha = 0.34f)
                             )
                         }
                     }
-                }
+            ) {
+                WaveformView(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 4.dp),
+                    waveColor = clipContentColor,
+                    rawData = audioEntry.source()?.rawData,
+                    sampleRate = audioEntry.sampleRate,
+                    channels = audioEntry.channels,
+                    bitDepth = audioEntry.bitDepth,
+                    timelineStartUs = audioEntry.startTimeUs,
+                    startSample = audioEntry.clipStartSample,
+                    endSample = audioEntry.clipEndSample,
+                    renderWidthPx = widthPx,
+                    zoomLevel = zoomLevel
+                )
+            }
+        }
+    }
+
+    if (interactionEnabled) {
+        ContextMenu(
+            modifier = outerModifier,
+            trigger = clipContent
         ) {
-            WaveformView(
-                modifier = Modifier.fillMaxSize().padding(vertical = 4.dp),
-                waveColor = clipColors.content,
-                rawData = audioEntry.source()?.rawData,
-                sampleRate = audioEntry.sampleRate,
-                channels = audioEntry.channels,
-                bitDepth = audioEntry.bitDepth,
-                timelineStartUs = audioEntry.startTimeUs,
-                startSample = audioEntry.clipStartSample,
-                endSample = audioEntry.clipEndSample,
-                renderWidthPx = widthPx,
-                zoomLevel = zoomLevel
+            TimelineContextMenuAction(
+                label = "Rename Clip",
+                shortcut = "⌘/Ctrl+R",
+                enabled = renameTarget != null,
+                onClick = {
+                    renameTarget?.let {
+                        TimelineCommandSurface.requestEntryRename(
+                            trackIndex = it.trackIndex,
+                            entryStartMs = it.entryStartMs
+                        )
+                    }
+                }
+            )
+            TimelineContextMenuAction(
+                label = if (contextEntryTargets.size > 1) "Duplicate Clips" else "Duplicate Clip",
+                shortcut = "⌘/Ctrl+D",
+                onClick = { TimelineCommandSurface.duplicateEntries(contextEntryTargets) }
+            )
+            ContextMenuSeparator()
+            TimelineContextMenuAction(
+                label = if (contextEntryTargets.size > 1) "Delete Clips" else "Delete Clip",
+                shortcut = "Delete",
+                destructive = true,
+                onClick = { TimelineCommandSurface.deleteEntries(contextEntryTargets) }
             )
         }
-            }
+    } else {
+        Box(modifier = outerModifier) {
+            clipContent()
         }
-    ) {
-        TimelineContextMenuAction(
-            label = "Rename Clip",
-            shortcut = "⌘/Ctrl+R",
-            enabled = renameTarget != null,
-            onClick = {
-                renameTarget?.let {
-                    TimelineCommandSurface.requestEntryRename(
-                        trackIndex = it.trackIndex,
-                        entryStartMs = it.entryStartMs
-                    )
-                }
-            }
-        )
-        TimelineContextMenuAction(
-            label = if (contextEntryTargets.size > 1) "Duplicate Clips" else "Duplicate Clip",
-            shortcut = "⌘/Ctrl+D",
-            onClick = { TimelineCommandSurface.duplicateEntries(contextEntryTargets) }
-        )
-        ContextMenuSeparator()
-        TimelineContextMenuAction(
-            label = if (contextEntryTargets.size > 1) "Delete Clips" else "Delete Clip",
-            shortcut = "Delete",
-            destructive = true,
-            onClick = { TimelineCommandSurface.deleteEntries(contextEntryTargets) }
-        )
     }
 }

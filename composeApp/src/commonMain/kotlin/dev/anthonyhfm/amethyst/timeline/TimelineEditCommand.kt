@@ -94,6 +94,20 @@ sealed interface TimelineEditCommand {
         val pointIds: List<String>
     ) : TimelineEditCommand
 
+    data class DeleteAutomationRange(
+        val trackIndex: Int,
+        val lane: TimelineAutomationLaneKey,
+        val startMs: Long,
+        val endMs: Long
+    ) : TimelineEditCommand
+
+    data class DuplicateAutomationRange(
+        val trackIndex: Int,
+        val lane: TimelineAutomationLaneKey,
+        val startMs: Long,
+        val endMs: Long
+    ) : TimelineEditCommand
+
     data class SetAutomationLaneVisibility(
         val trackIndex: Int,
         val lane: TimelineAutomationLaneKey,

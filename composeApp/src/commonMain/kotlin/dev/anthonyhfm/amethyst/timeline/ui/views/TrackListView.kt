@@ -207,11 +207,25 @@ fun TrackInfo(
         tracks = allTracks
     )
     val renameTarget = contextTrackIndices.singleOrNull()
-    val visibleAutomationLanes = track.visibleAutomationLanes()
-    val automationVisible = visibleAutomationLanes.isNotEmpty()
+    val overlayAutomationLanes = track.overlayAutomationLanes()
+    val stackedAutomationLanes = track.stackedAutomationLanes()
+    val automationVisible = overlayAutomationLanes.isNotEmpty() || stackedAutomationLanes.isNotEmpty()
     val headerSummary = buildList {
-        if (visibleAutomationLanes.isNotEmpty()) {
-            add("${visibleAutomationLanes.size} LANE${if (visibleAutomationLanes.size == 1) "" else "S"}")
+        overlayAutomationLanes.firstOrNull()?.let { automationLane ->
+            add(
+                buildString {
+                    append("VOL AUTO")
+                    append(" · ")
+                    append(automationLane.points.size)
+                    append(" PTS")
+                    if (!automationLane.enabled) {
+                        append(" · BYPASSED")
+                    }
+                }
+            )
+        }
+        if (stackedAutomationLanes.isNotEmpty()) {
+            add("${stackedAutomationLanes.size} EXTRA LANE${if (stackedAutomationLanes.size == 1) "" else "S"}")
         }
     }.joinToString(separator = " · ")
 
@@ -544,7 +558,7 @@ fun TrackInfo(
             )
         }
 
-        visibleAutomationLanes.forEach { automationLane ->
+        stackedAutomationLanes.forEach { automationLane ->
             val laneSelection = selectedAutomationLane
             val isLaneSelected = laneSelection?.trackIndex == trackIndex &&
                 laneSelection.laneKey == automationLane.key

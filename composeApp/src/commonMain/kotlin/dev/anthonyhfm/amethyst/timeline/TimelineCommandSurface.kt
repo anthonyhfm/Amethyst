@@ -284,6 +284,67 @@ object TimelineCommandSurface {
         return result
     }
 
+    fun deleteAutomationRange(
+        trackIndex: Int,
+        lane: TimelineAutomationLaneKey,
+        startMs: Long,
+        endMs: Long
+    ): TimelineCommandResult {
+        val result = TimelineCommandExecutor.execute(
+            TimelineEditCommand.DeleteAutomationRange(
+                trackIndex = trackIndex,
+                lane = lane,
+                startMs = startMs,
+                endMs = endMs
+            )
+        )
+
+        if (result.didChange) {
+            SelectionManager.selectTimelineAutomationLane(
+                trackIndex = trackIndex,
+                target = lane.target,
+                bindingId = lane.bindingId
+            )
+        }
+
+        return result
+    }
+
+    fun duplicateAutomationRange(
+        trackIndex: Int,
+        lane: TimelineAutomationLaneKey,
+        startMs: Long,
+        endMs: Long
+    ): TimelineCommandResult {
+        val result = TimelineCommandExecutor.execute(
+            TimelineEditCommand.DuplicateAutomationRange(
+                trackIndex = trackIndex,
+                lane = lane,
+                startMs = startMs,
+                endMs = endMs
+            )
+        )
+
+        if (result.didChange) {
+            SelectionManager.replaceSelections(
+                listOf(
+                    Selectable.TimelineAutomationLane(
+                        trackIndex = trackIndex,
+                        target = lane.target,
+                        bindingId = lane.bindingId
+                    ),
+                    Selectable.TimelineRange(
+                        trackIndex = trackIndex,
+                        startMs = endMs,
+                        endMs = endMs + (endMs - startMs)
+                    )
+                )
+            )
+        }
+
+        return result
+    }
+
     fun setAutomationLaneVisibility(
         trackIndex: Int,
         lane: TimelineAutomationLaneKey,
