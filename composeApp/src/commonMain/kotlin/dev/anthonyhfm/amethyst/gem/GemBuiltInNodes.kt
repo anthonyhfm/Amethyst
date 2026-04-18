@@ -51,14 +51,14 @@ object GemBuiltInNodes {
 
     val hostLedInput: GemNodeDescriptor = hostSignalInput(
         typeId = TypeIds.HOST_LED_INPUT,
-        label = "Host LED Input",
+        label = "LED Input",
         description = "Root host LED signal entry point for the gem graph.",
         domain = GemSignalDomain.LED
     ).copy(defaultState = hostPortState("led-in"))
 
     val hostLedOutput: GemNodeDescriptor = hostSignalOutput(
         typeId = TypeIds.HOST_LED_OUTPUT,
-        label = "Host LED Output",
+        label = "LED Output",
         description = "Routes the graph LED signal back to the host contract.",
         domain = GemSignalDomain.LED
     ).copy(defaultState = hostPortState("led-out"))
