@@ -139,7 +139,16 @@ object AbletonConverter : AmethystConverter {
         )
 
         if (format == ZippedProjectFormat.ABLETON_APOLLO) {
-            val approjEntry = entries.firstOrNull { it.path.endsWith(".approj") }
+            val approjEntries = entries.filter { it.path.endsWith(".approj") }
+
+            println("Possible Apollo Entries: ${approjEntries.size}")
+
+            val approjEntry = approjEntries.firstOrNull {
+                val split = it.path.split("/")
+
+                !split[split.lastIndex - 1].lowercase().endsWith("backups")
+            }
+
             if (approjEntry != null) {
                 return try {
                     val apolloWorkspace = ApolloConverter.convertBytesToWorkspace(approjEntry.data)

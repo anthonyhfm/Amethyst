@@ -81,7 +81,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         val selections by SelectionManager.selections.collectAsState()
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
-        val leftPanelWidth = 240.dp
+        val leftPanelWidth = 280.dp
 
         ChainDeviceShell(
             title = "Copy",
@@ -137,7 +137,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
                     ) {
                         ToggleOption(
                             label = "Wrap",
@@ -434,11 +434,13 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
             }
 
             Box(
-                modifier = Modifier.height(76.dp),
+                modifier = Modifier,
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
                 ) {
                     IconActionButton(
                         icon = Icons.Default.ArrowUpward,
@@ -452,48 +454,46 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                         },
                     )
 
-                    IconActionButton(
-                        icon = Icons.Default.ArrowDownward,
-                        contentDescription = "Move down",
-                        onClick = {
-                            if (offset.isAbsolute) {
-                                onChangeOffset(offset.copy(absoluteY = offset.absoluteY - 1))
-                            } else {
-                                onChangeOffset(offset.copy(y = offset.y - 1))
-                            }
-                        },
-                    )
-                }
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                    ) {
+                        IconActionButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Move left",
+                            onClick = {
+                                if (offset.isAbsolute) {
+                                    onChangeOffset(offset.copy(absoluteX = offset.absoluteX - 1))
+                                } else {
+                                    onChangeOffset(offset.copy(x = offset.x - 1))
+                                }
+                            },
+                        )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
+                        IconActionButton(
+                            icon = Icons.Default.ArrowDownward,
+                            contentDescription = "Move down",
+                            onClick = {
+                                if (offset.isAbsolute) {
+                                    onChangeOffset(offset.copy(absoluteY = offset.absoluteY - 1))
+                                } else {
+                                    onChangeOffset(offset.copy(y = offset.y - 1))
+                                }
+                            },
+                        )
 
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                ) {
-                    IconActionButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Move left",
-                        onClick = {
-                            if (offset.isAbsolute) {
-                                onChangeOffset(offset.copy(absoluteX = offset.absoluteX - 1))
-                            } else {
-                                onChangeOffset(offset.copy(x = offset.x - 1))
-                            }
-                        },
-                    )
-
-                    IconActionButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Move right",
-                        onClick = {
-                            if (offset.isAbsolute) {
-                                onChangeOffset(offset.copy(absoluteX = offset.absoluteX + 1))
-                            } else {
-                                onChangeOffset(offset.copy(x = offset.x + 1))
-                            }
-                        },
-                    )
+                        IconActionButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Move right",
+                            onClick = {
+                                if (offset.isAbsolute) {
+                                    onChangeOffset(offset.copy(absoluteX = offset.absoluteX + 1))
+                                } else {
+                                    onChangeOffset(offset.copy(x = offset.x + 1))
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
@@ -505,7 +505,6 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     TextDial(
-                        headline = "Angle",
                         text = "${offset.angle}°",
                         value = offset.angle.toFloat() / 360f,
                         onValueChange = { value ->

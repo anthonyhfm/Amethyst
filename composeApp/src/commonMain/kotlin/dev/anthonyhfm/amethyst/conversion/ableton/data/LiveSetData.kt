@@ -254,7 +254,7 @@ data class MidiClip(
                         val duration: Float,
 
                         @XmlSerialName("Velocity")
-                        val velocity: Int,
+                        val velocity: Float,
                     )
                 }
             }

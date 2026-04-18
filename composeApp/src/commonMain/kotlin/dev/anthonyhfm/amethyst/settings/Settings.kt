@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -45,26 +47,30 @@ fun Settings(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SettingsHeader(onBack = onBack)
-
             ScrollArea(
                 modifier = Modifier.fillMaxSize(),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 760.dp)
-                        .padding(end = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    GeneralSettingsView()
-                    AudioSettingsView()
+                Column {
+                    SettingsHeader(onBack = onBack)
 
-                    if (platform is Platform.Desktop) {
-                        DiscordSettingsView()
+                    Spacer(Modifier.height(24.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 760.dp)
+                            .padding(end = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        GeneralSettingsView()
+                        AudioSettingsView()
+
+                        if (platform is Platform.Desktop) {
+                            DiscordSettingsView()
+                        }
+
+                        ExperimentalSettingsView()
                     }
-
-                    ExperimentalSettingsView()
                 }
             }
         }
