@@ -10,10 +10,25 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 object UndoManager {
+    data class State(
+        val canUndo: Boolean = false,
+        val canRedo: Boolean = false
+    )
+
     private val undoStack: MutableList<UndoableAction> = mutableListOf()
     private val redoStack: MutableList<UndoableAction> = mutableListOf()
+    private val _state = MutableStateFlow(State())
+    val state = _state.asStateFlow()
+
+    private fun publishState() {
+        _state.value = State(
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
+    }
 
     fun addAction(action: UndoableAction) {
         if (action is UndoableAction.TrackStateChange && action.mergeable) {
@@ -25,12 +40,14 @@ object UndoManager {
             ) {
                 undoStack[undoStack.lastIndex] = previous.copy(afterTrack = action.afterTrack)
                 redoStack.clear()
+                publishState()
                 return
             }
         }
 
         undoStack.add(action)
         redoStack.clear()
+        publishState()
     }
 
     fun undo() {
@@ -500,6 +517,8 @@ object UndoManager {
                     redoStack.add(action)
                 }
             }
+
+            publishState()
         }
     }
 
@@ -960,14 +979,17 @@ object UndoManager {
                     undoStack.add(action)
                 }
             }
+
+            publishState()
         }
     }
 
-    fun canUndo(): Boolean = undoStack.isNotEmpty()
-    fun canRedo(): Boolean = redoStack.isNotEmpty()
+    fun canUndo(): Boolean = state.value.canUndo
+    fun canRedo(): Boolean = state.value.canRedo
 
     fun clear() {
         undoStack.clear()
         redoStack.clear()
+        publishState()
     }
 }

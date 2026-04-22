@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.util.amethystVersion
+import dev.anthonyhfm.amethyst.core.util.displayString
 import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyH2
 import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyMuted
 import org.jetbrains.compose.resources.painterResource
@@ -42,7 +43,7 @@ fun AboutView() {
                 modifier = Modifier.padding(top = 8.dp),
             )
 
-            TypographyMuted(buildVersionLabel())
+            TypographyMuted("Version ${amethystVersion.displayString}")
         }
 
         Box(
@@ -55,8 +56,4 @@ fun AboutView() {
             TypographyMuted("Made with love by anthonyhfm")
         }
     }
-}
-
-private fun buildVersionLabel(): String {
-    return "Version ${amethystVersion.major}.${amethystVersion.minor}.${amethystVersion.hotfix}"
 }

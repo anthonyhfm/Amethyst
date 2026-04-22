@@ -221,6 +221,134 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
         return track.entries[context.entryStartMs]
     }
 
+    private fun selectedNotes(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): List<Selectable.PianoRollNote> {
+        return selections
+            .filterIsInstance<Selectable.PianoRollNote>()
+            .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+    }
+
+    fun selectAllNotes(): Boolean {
+        val entry = currentEntry ?: return false
+        if (entry.notes.isEmpty()) return false
+
+        SelectionManager.clear()
+        entry.notes.forEach { note ->
+            SelectionManager.select(
+                Selectable.PianoRollNote(
+                    trackIndex = trackIndex,
+                    entryStartMs = entryStartMs,
+                    note = note
+                ),
+                single = false
+            )
+        }
+
+        return true
+    }
+
+    fun duplicateSelectedNotes(): Boolean {
+        val selected = selectedNotes()
+        if (selected.isEmpty()) return false
+
+        val currentEntry = currentEntry ?: return false
+        val latestEndTime = selected.maxOf { it.note.endTimeMs }
+        val earliestStartTime = selected.minOf { it.note.startTimeMs }
+        val offset = latestEndTime - earliestStartTime
+        val duplicates = selected.map { sel ->
+            sel.note.copy(
+                startTimeMs = sel.note.startTimeMs + offset
+            )
+        }
+
+        val result = if (isTimelineBackedEditing) {
+            TimelineCommandSurface.createNotes(
+                trackIndex = trackIndex,
+                entryStartMs = entryStartMs,
+                notes = duplicates
+            ).also { commandResult ->
+                if (commandResult.didChange) {
+                    syncCurrentEntry(timelineEntrySnapshot())
+                }
+            }
+        } else {
+            UndoManager.addAction(
+                UndoableAction.PianoRollNoteDuplication(
+                    trackIndex = trackIndex,
+                    entryStartMs = entryStartMs,
+                    duplicates = duplicates,
+                    onNoteAdd = { note -> onNoteAdd?.invoke(note) },
+                    onNoteDelete = { note -> onNoteDelete?.invoke(note) },
+                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                    currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                )
+            )
+
+            duplicates.forEach { duplicate ->
+                onNoteAdd?.invoke(duplicate)
+            }
+
+            this.currentEntry = currentEntry.copy(notes = currentEntry.notes + duplicates)
+            TimelineCommandResult(didChange = true)
+        }
+
+        if (!result.didChange) return false
+
+        SelectionManager.clear()
+        duplicates.forEach { duplicate ->
+            SelectionManager.select(
+                Selectable.PianoRollNote(trackIndex, entryStartMs, duplicate),
+                single = false
+            )
+        }
+
+        return true
+    }
+
+    fun deleteSelectedNotes(): Boolean {
+        val selected = selectedNotes()
+        if (selected.isEmpty()) return false
+
+        val notesToDelete = selected.map { it.note }
+        val result = if (isTimelineBackedEditing) {
+            TimelineCommandSurface.deleteNotes(
+                trackIndex = trackIndex,
+                entryStartMs = entryStartMs,
+                notes = notesToDelete
+            ).also { commandResult ->
+                if (commandResult.didChange) {
+                    syncCurrentEntry(timelineEntrySnapshot())
+                }
+            }
+        } else {
+            UndoManager.addAction(
+                UndoableAction.PianoRollNoteDeletion(
+                    trackIndex = trackIndex,
+                    entryStartMs = entryStartMs,
+                    notes = notesToDelete,
+                    onNoteAdd = { note -> onNoteAdd?.invoke(note) },
+                    onNoteDelete = { note -> onNoteDelete?.invoke(note) },
+                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
+                    currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
+                )
+            )
+
+            selected.forEach { selection ->
+                onNoteDelete?.invoke(selection.note)
+            }
+            currentEntry = currentEntry?.copy(
+                notes = currentEntry?.notes.orEmpty().filter { note -> note !in notesToDelete }
+            )
+            TimelineCommandResult(didChange = true)
+        }
+
+        if (!result.didChange) return false
+
+        SelectionManager.clear()
+        return true
+    }
+
     @Composable
     fun ModeContent(paddingValues: PaddingValues) {
         val entry = currentEntry ?: return
@@ -1194,6 +1322,12 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     }
                 }
 
+                Key.A -> {
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        return selectAllNotes()
+                    }
+                }
+
                 Key.MoveHome -> {
                     val entry = currentEntry
                     if (entry != null && entry.notes.isNotEmpty()) {
@@ -1574,111 +1708,12 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                 Key.D -> {
                     if (event.isCtrlPressed || event.isMetaPressed) {
-                        val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
-                            .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
-
-                        if (selected.isNotEmpty()) {
-                            val currentEntry = currentEntry ?: return false
-
-                            val latestEndTime = selected.maxOf { it.note.endTimeMs }
-
-                            val earliestStartTime = selected.minOf { it.note.startTimeMs }
-                            val offset = latestEndTime - earliestStartTime
-
-                            val duplicates = selected.map { sel ->
-                                sel.note.copy(
-                                    startTimeMs = sel.note.startTimeMs + offset
-                                )
-                            }
-
-                            val result = if (isTimelineBackedEditing) {
-                                TimelineCommandSurface.createNotes(
-                                    trackIndex = trackIndex,
-                                    entryStartMs = entryStartMs,
-                                    notes = duplicates
-                                ).also { commandResult ->
-                                    if (commandResult.didChange) {
-                                        syncCurrentEntry(timelineEntrySnapshot())
-                                    }
-                                }
-                            } else {
-                                UndoManager.addAction(
-                                    UndoableAction.PianoRollNoteDuplication(
-                                        trackIndex = trackIndex,
-                                        entryStartMs = entryStartMs,
-                                        duplicates = duplicates,
-                                        onNoteAdd = { note -> onNoteAdd?.invoke(note) },
-                                        onNoteDelete = { note -> onNoteDelete?.invoke(note) },
-                                        currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                        currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
-                                    )
-                                )
-
-                                duplicates.forEach { duplicate ->
-                                    onNoteAdd?.invoke(duplicate)
-                                }
-
-                                this.currentEntry = currentEntry.copy(notes = currentEntry.notes + duplicates)
-                                TimelineCommandResult(didChange = true)
-                            }
-
-                            if (result.didChange) {
-                                SelectionManager.clear()
-                                duplicates.forEach { duplicate ->
-                                    SelectionManager.select(
-                                        Selectable.PianoRollNote(trackIndex, entryStartMs, duplicate),
-                                        single = false
-                                    )
-                                }
-
-                                return true
-                            }
-                        }
+                        return duplicateSelectedNotes()
                     }
                 }
 
                 Key.Delete, Key.Backspace -> {
-                    val selected = SelectionManager.selections.value.filterIsInstance<Selectable.PianoRollNote>()
-                        .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
-                    if (selected.isNotEmpty()) {
-                        val notesToDelete = selected.map { it.note }
-                        val result = if (isTimelineBackedEditing) {
-                            TimelineCommandSurface.deleteNotes(
-                                trackIndex = trackIndex,
-                                entryStartMs = entryStartMs,
-                                notes = notesToDelete
-                            ).also { commandResult ->
-                                if (commandResult.didChange) {
-                                    syncCurrentEntry(timelineEntrySnapshot())
-                                }
-                            }
-                        } else {
-                            UndoManager.addAction(
-                                UndoableAction.PianoRollNoteDeletion(
-                                    trackIndex = trackIndex,
-                                    entryStartMs = entryStartMs,
-                                    notes = notesToDelete,
-                                    onNoteAdd = { note -> onNoteAdd?.invoke(note) },
-                                    onNoteDelete = { note -> onNoteDelete?.invoke(note) },
-                                    currentEntryGetter = { this@PianoRollWorkspaceMode.currentEntry },
-                                    currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
-                                )
-                            )
-
-                            selected.forEach { sel ->
-                                onNoteDelete?.invoke(sel.note)
-                            }
-                            currentEntry = currentEntry?.copy(
-                                notes = currentEntry?.notes.orEmpty().filter { note -> note !in notesToDelete }
-                            )
-                            TimelineCommandResult(didChange = true)
-                        }
-
-                        if (result.didChange) {
-                            SelectionManager.clear()
-                            return true
-                        }
-                    }
+                    return deleteSelectedNotes()
                 }
             }
         }

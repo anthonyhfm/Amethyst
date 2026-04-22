@@ -10,6 +10,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.DiscordRPCManager
 import dev.anthonyhfm.amethyst.desktop.about.setupAboutHandler
+import dev.anthonyhfm.amethyst.settings.setupPreferencesHandler
 import dev.anthonyhfm.amethyst.start.StartWindow
 import dev.anthonyhfm.amethyst.workspace.WorkspaceWindow
 import io.github.vinceglb.filekit.FileKit
@@ -22,6 +23,7 @@ fun main() {
         System.setProperty("apple.awt.application.appearance", "NSAppearanceNameDarkAqua")
 
         setupAboutHandler()
+        setupPreferencesHandler()
     }
 
     AudioOutput // <- Initialize AudioOutput, no constructor call, just reference

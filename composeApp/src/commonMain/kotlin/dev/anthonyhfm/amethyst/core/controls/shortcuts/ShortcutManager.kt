@@ -33,6 +33,114 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 
 object ShortcutManager {
+    fun undo(): Boolean {
+        if (!UndoManager.canUndo()) return false
+        UndoManager.undo()
+        return true
+    }
+
+    fun redo(): Boolean {
+        if (!UndoManager.canRedo()) return false
+        UndoManager.redo()
+        return true
+    }
+
+    fun canCopySelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return selections.isNotEmpty() && selections.none { it is Selectable.GroupChainItem }
+    }
+
+    fun copySelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        if (!canCopySelection(selections)) return false
+        ClipboardManager.copy(selections)
+        return true
+    }
+
+    fun canCutSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean = canCopySelection(selections)
+
+    fun cutSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        if (!copySelection(selections)) return false
+        return deleteSelection()
+    }
+
+    fun canPasteClipboard(
+        clipboard: ClipboardData? = ClipboardManager.clipboardData.value,
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        if (clipboard == null) return false
+
+        val hasGroupSelection = selections.any { it is Selectable.GroupChainItem }
+        return !hasGroupSelection || (clipboard !is ClipboardData.GroupChainItem && clipboard !is ClipboardData.ChainDevice)
+    }
+
+    fun pasteClipboard(
+        clipboard: ClipboardData? = ClipboardManager.clipboardData.value,
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        if (!canPasteClipboard(clipboard, selections)) return false
+        ClipboardManager.paste()
+        return true
+    }
+
+    fun canDeleteSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return selections.any {
+            it is Selectable.GroupChainItem ||
+                it is Selectable.ChainDevice ||
+                it is Selectable.GradientStep
+        }
+    }
+
+    fun deleteSelection(): Boolean = handleDeletionShortcut()
+
+    fun canDuplicateSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return selections.any { it is Selectable.GroupChainItem || it is Selectable.ChainDevice }
+    }
+
+    fun duplicateSelection(): Boolean = handleDuplicateShortcut()
+
+    fun canRenameSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return selections.any {
+            it is Selectable.GroupChainItem ||
+                it is Selectable.TimelineTrack ||
+                it is Selectable.TimelineEntryItem
+        }
+    }
+
+    fun renameSelection(): Boolean = handleRenameShortcut()
+
+    fun canSelectAll(
+        mode: WorkspaceContract.WorkspaceMode = WorkspaceRepository.mode.value,
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        val groupItem = selections.filterIsInstance<Selectable.GroupChainItem>().firstOrNull()
+        if (groupItem != null) {
+            val (_, groups) = ChainNavigator.getGroupsInfo(groupItem.parent) ?: return false
+            return groups.isNotEmpty()
+        }
+
+        return when (mode) {
+            is WorkspaceContract.WorkspaceMode.LightsChain -> WorkspaceRepository.lightsChain.devices.value.isNotEmpty()
+            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain.devices.value.isNotEmpty()
+            is WorkspaceContract.WorkspaceMode.Timeline -> TimelineRepository.tracks.value.isNotEmpty()
+            else -> false
+        }
+    }
+
+    fun selectAll(): Boolean = handleSelectAllShortcut()
+
     @OptIn(ExperimentalSerializationApi::class, DelicateCoroutinesApi::class)
     fun handleShortcut(keyEvent: KeyEvent): Boolean {
         if (keyEvent.type != KeyEventType.KeyDown) return false
@@ -41,61 +149,41 @@ object ShortcutManager {
 
         // Undo / Redo
         if (isCtrl && keyEvent.key == Key.Z) {
-            return if (keyEvent.isShiftPressed) {
-                UndoManager.redo(); true
-            } else {
-                UndoManager.undo(); true
-            }
+            return if (keyEvent.isShiftPressed) redo() else undo()
         }
 
         if (isCtrl && keyEvent.key == Key.Y) {
-            UndoManager.redo()
-            return true
+            return redo()
         }
 
         // Delete
         if (keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace) {
-            return handleDeletionShortcut()
+            return deleteSelection()
         }
 
         // Duplicate
         if (isCtrl && keyEvent.key == Key.D) {
-            return handleDuplicateShortcut()
+            return duplicateSelection()
         }
 
         // Copy
         if (isCtrl && !keyEvent.isShiftPressed && keyEvent.key == Key.C) {
-            val selections = SelectionManager.selections.value
-            if (selections.isNotEmpty() && selections.none { it is Selectable.GroupChainItem }) {
-                ClipboardManager.copy(selections)
-                return true
-            }
+            return copySelection()
         }
 
         // Cut (Ctrl+X)
         if (isCtrl && keyEvent.key == Key.X) {
-            val selections = SelectionManager.selections.value
-            if (selections.isNotEmpty() && selections.none { it is Selectable.GroupChainItem }) {
-                ClipboardManager.copy(selections)
-                handleDeletionShortcut()
-                return true
-            }
+            return cutSelection()
         }
 
         // Paste
         if (isCtrl && keyEvent.key == Key.V) {
-            val clipboard = ClipboardManager.clipboardData.value
-            val hasGroupSelection = SelectionManager.selections.value.any { it is Selectable.GroupChainItem }
-            if (hasGroupSelection && (clipboard is ClipboardData.GroupChainItem || clipboard is ClipboardData.ChainDevice)) {
-                return false
-            }
-            ClipboardManager.paste()
-            return true
+            return pasteClipboard()
         }
 
         // Select All (Ctrl+A) — context-sensitive
         if (isCtrl && keyEvent.key == Key.A) {
-            return handleSelectAllShortcut()
+            return selectAll()
         }
 
         // Save (Ctrl+S) / Save As (Ctrl+Shift+S)
@@ -125,7 +213,7 @@ object ShortcutManager {
 
         // Rename — Ctrl+R or F2
         if ((isCtrl && keyEvent.key == Key.R) || keyEvent.key == Key.F2) {
-            return handleRenameShortcut(keyEvent)
+            return renameSelection()
         }
 
         // Escape — clear selection (fallback, only if something is selected)

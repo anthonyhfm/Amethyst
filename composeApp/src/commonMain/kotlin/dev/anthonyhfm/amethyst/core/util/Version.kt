@@ -10,3 +10,6 @@ data class Version(
 )
 
 val amethystVersion = Version(0, 4, 0)
+
+val Version.displayString: String
+    get() = "$major.$minor.$hotfix"

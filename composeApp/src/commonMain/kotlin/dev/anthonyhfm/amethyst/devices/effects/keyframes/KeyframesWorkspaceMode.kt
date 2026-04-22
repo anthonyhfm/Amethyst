@@ -20,9 +20,10 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
+import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Event
@@ -112,6 +113,94 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
         }
     }
 
+    fun selectAllFrames(): Boolean {
+        val device = parentDevice ?: return false
+        if (state.value.frames.isEmpty()) return false
+
+        SelectionManager.clear()
+        state.value.frames.indices.forEach { frameIndex ->
+            SelectionManager.select(
+                Selectable.KeyframeItem(parent = device, frameIndex = frameIndex),
+                single = false
+            )
+        }
+
+        return true
+    }
+
+    fun copySelection(): Boolean {
+        val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
+        if (selectedKeyframes.isEmpty()) return false
+
+        ClipboardManager.copy(selectedKeyframes)
+        return true
+    }
+
+    fun pasteSelection(
+        clipboard: ClipboardData? = ClipboardManager.clipboardData.value
+    ): Boolean {
+        if (clipboard !is ClipboardData.Keyframe) return false
+
+        ClipboardManager.paste()
+        return true
+    }
+
+    fun deleteSelection(): Boolean {
+        if (state.value.frames.isEmpty()) return false
+
+        val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
+        if (selectedKeyframes.isNotEmpty()) {
+            val device = parentDevice ?: return false
+            val frameIndices = selectedKeyframes.map { it.frameIndex }
+
+            if (frameIndices[0] == 0 && state.value.frames.lastIndex == frameIndices.last()) {
+                val newFrame = Frame(timing = state.value.frames[state.value.currentFrameIndex].timing)
+                parentDevice?.addFrameInternal(frameIndices.last() + 1, newFrame)
+            }
+
+            parentDevice?.removeFrames(frameIndices)
+
+            val lowestDeletedIndex = frameIndices.minOrNull() ?: 0
+            val newFrameCount = parentDevice?.state?.value?.frames?.size ?: 1
+            val newSelectionIndex = minOf(lowestDeletedIndex, newFrameCount - 1)
+
+            SelectionManager.select(
+                Selectable.KeyframeItem(parent = device, frameIndex = newSelectionIndex),
+                single = true
+            )
+
+            return true
+        }
+
+        onEvent?.invoke(Event.OnDeleteFrame(state.value.currentFrameIndex))
+        return true
+    }
+
+    fun cutSelection(): Boolean {
+        if (!copySelection()) return false
+        return deleteSelection()
+    }
+
+    fun duplicateSelection(): Boolean {
+        if (state.value.frames.isEmpty()) return false
+
+        val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
+        if (selectedKeyframes.isNotEmpty()) {
+            val frameIndices = selectedKeyframes.map { it.frameIndex }
+            val highest = frameIndices.maxOrNull() ?: 0
+
+            parentDevice?.duplicateFrames(frameIndices, highest + 1)
+            parentDevice?.state?.update { currentState ->
+                currentState.copy(currentFrameIndex = highest + selectedKeyframes.size)
+            }
+
+            return true
+        }
+
+        onEvent?.invoke(Event.OnDuplicateFrame())
+        return true
+    }
+
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.type == KeyEventType.KeyDown) {
             when (event.key) {
@@ -141,78 +230,35 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
                 Key.A -> {
                     if (event.isCtrlPressed || event.isMetaPressed) {
-                        SelectionManager.clear()
-
-                        state.value.frames.indices.forEach { frameIndex ->
-                            SelectionManager.select(
-                                Selectable.KeyframeItem(parent = parentDevice!!, frameIndex = frameIndex),
-                                single = false
-                            )
-                        }
-
-                        return true
+                        return selectAllFrames()
                     }
                 }
 
                 Key.D -> {
                     if (event.isCtrlPressed || event.isMetaPressed) {
-                        val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
-                        if (selectedKeyframes.isNotEmpty()) {
-                            val frameIndices = selectedKeyframes.map { it.frameIndex }
-                            val highest = frameIndices.maxOrNull() ?: 0
-
-                            parentDevice?.duplicateFrames(frameIndices, highest + 1)
-
-                            parentDevice?.state?.update { currentState ->
-                                currentState.copy(currentFrameIndex = highest + selectedKeyframes.size)
-                            }
-                        } else {
-                            onEvent?.invoke(Event.OnDuplicateFrame())
-                        }
-                        return true
+                        return duplicateSelection()
                     }
                 }
 
                 Key.Delete, Key.Backspace -> {
-                    val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
-                    if (selectedKeyframes.isNotEmpty()) {
-                        val frameIndices = selectedKeyframes.map { it.frameIndex }
-
-                        if (frameIndices[0] == 0 && (parentDevice?.state?.value?.frames?.size ?: 0) - 1 == frameIndices.last()) {
-                            val newFrame = Frame(timing = state.value.frames[state.value.currentFrameIndex].timing)
-                            parentDevice?.addFrameInternal(frameIndices.last() + 1, newFrame)
-                        }
-
-                        parentDevice?.removeFrames(frameIndices)
-
-                        val lowestDeletedIndex = frameIndices.minOrNull() ?: 0
-                        val newFrameCount = (parentDevice?.state?.value?.frames?.size ?: 1)
-                        val newSelectionIndex = minOf(lowestDeletedIndex, newFrameCount - 1)
-
-                        SelectionManager.select(
-                            Selectable.KeyframeItem(parent = parentDevice!!, frameIndex = newSelectionIndex),
-                            single = true
-                        )
-                    } else {
-                        onEvent?.invoke(Event.OnDeleteFrame(state.value.currentFrameIndex))
-                    }
-                    return true
+                    return deleteSelection()
                 }
 
                 Key.C -> {
                     if (event.isCtrlPressed || event.isMetaPressed) {
-                        val selectedKeyframes = SelectionManager.selections.value.filterIsInstance<Selectable.KeyframeItem>()
-                        if (selectedKeyframes.isNotEmpty()) {
-                            ClipboardManager.copy(selectedKeyframes)
-                        }
-                        return true
+                        return copySelection()
+                    }
+                }
+
+                Key.X -> {
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        return cutSelection()
                     }
                 }
 
                 Key.V -> {
                     if (event.isCtrlPressed || event.isMetaPressed) {
-                        ClipboardManager.paste()
-                        return true
+                        return pasteSelection()
                     }
                 }
 

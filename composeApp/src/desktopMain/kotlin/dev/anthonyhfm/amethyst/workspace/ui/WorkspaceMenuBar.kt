@@ -1,37 +1,126 @@
 package dev.anthonyhfm.amethyst.workspace.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.MenuBar
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
+import dev.anthonyhfm.amethyst.desktop.about.showAboutDialog
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
+import dev.anthonyhfm.amethyst.settings.showSettingsWindow
+import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineEditorTool
+import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceMenuCommandSurface
+import dev.anthonyhfm.amethyst.workspace.WorkspacePrimaryMode
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
+import kotlinx.coroutines.launch
+import java.awt.Frame
+import java.awt.event.WindowEvent
 
 @Composable
 fun FrameWindowScope.WorkspaceMenuBar() {
     val viewModel = viewModel { WorkspaceMenuBarViewModel() }
+    val coroutineScope = rememberCoroutineScope()
+
+    val mode by WorkspaceRepository.mode.collectAsState()
+    val selections by SelectionManager.selections.collectAsState()
+    val clipboard by ClipboardManager.clipboardData.collectAsState()
+    val undoState by UndoManager.state.collectAsState()
+    val recentProjects by viewModel.recentProjects.collectAsState()
+    val timelineTracks by TimelineRepository.tracks.collectAsState()
+    val isTimelinePlaying by TimelineRepository.isPlaying.collectAsState()
+
+    val editState = remember(mode, selections, clipboard, undoState) {
+        WorkspaceMenuCommandSurface.editState(
+            mode = mode,
+            selections = selections,
+            clipboard = clipboard
+        )
+    }
+    val primaryMode = remember(mode) {
+        WorkspaceMenuCommandSurface.currentPrimaryMode(mode)
+    }
+    val keyframesMode = mode as? KeyframesWorkspaceMode
+    val pianoRollMode = mode as? PianoRollWorkspaceMode
+    val gemEditorMode = mode as? GemEditorWorkspaceMode
+
+    var showProjectChangeDialog by remember { mutableStateOf(false) }
+    var pendingProjectChangeAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun requestProjectChange(action: () -> Unit) {
+        if (WorkspaceRepository.hasUnsavedChanges()) {
+            pendingProjectChangeAction = action
+            showProjectChangeDialog = true
+        } else {
+            action()
+        }
+    }
 
     MenuBar {
-        Menu(
-            text = "File"
-        ) {
+        Menu(text = "File") {
             Item(
-                text = "Open Project",
+                text = "Open Project...",
+                shortcut = primaryShortcut(Key.O),
                 onClick = {
-                    viewModel.openProject()
+                    requestProjectChange {
+                        viewModel.openProject()
+                    }
                 }
             )
+
+            Menu(text = "Open Recent") {
+                if (recentProjects.isEmpty()) {
+                    Item(
+                        text = "No Recent Projects",
+                        enabled = false,
+                        onClick = {}
+                    )
+                } else {
+                    recentProjects.take(12).forEach { project ->
+                        Item(
+                            text = project.title.ifBlank { project.path.substringAfterLast('/') },
+                            onClick = {
+                                requestProjectChange {
+                                    viewModel.openRecentProject(project)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
 
             Separator()
 
             Item(
                 text = "Save",
+                shortcut = primaryShortcut(Key.S),
                 onClick = {
                     viewModel.saveProject()
                 }
             )
 
             Item(
-                text = "Save As..",
+                text = "Save As...",
+                shortcut = primaryShortcut(Key.S, shift = true),
                 onClick = {
                     viewModel.saveProjectAs()
                 }
@@ -41,34 +130,387 @@ fun FrameWindowScope.WorkspaceMenuBar() {
 
             Item(
                 text = "Close Project",
+                shortcut = primaryShortcut(Key.W, shift = true),
                 onClick = {
-                    viewModel.closeProject()
+                    window.dispatchEvent(WindowEvent(window, WindowEvent.WINDOW_CLOSING))
                 }
             )
         }
 
-        Menu(
-            text = "View"
-        ) {
-            Menu(
-                text = "Workspace Mode"
-            ) {
-                Item("Layout") {
-                    viewModel.switchMode(WorkspaceContract.WorkspaceMode.Layout())
+        Menu(text = "Edit") {
+            Item(
+                text = "Undo",
+                enabled = editState.canUndo,
+                shortcut = undoShortcut(),
+                onClick = {
+                    WorkspaceMenuCommandSurface.undo()
+                }
+            )
+
+            Item(
+                text = "Redo",
+                enabled = editState.canRedo,
+                shortcut = redoShortcut(),
+                onClick = {
+                    WorkspaceMenuCommandSurface.redo()
+                }
+            )
+
+            Separator()
+
+            Item(
+                text = "Cut",
+                enabled = editState.canCut,
+                shortcut = primaryShortcut(Key.X),
+                onClick = {
+                    WorkspaceMenuCommandSurface.cut()
+                }
+            )
+
+            Item(
+                text = "Copy",
+                enabled = editState.canCopy,
+                shortcut = primaryShortcut(Key.C),
+                onClick = {
+                    WorkspaceMenuCommandSurface.copy()
+                }
+            )
+
+            Item(
+                text = "Paste",
+                enabled = editState.canPaste,
+                shortcut = primaryShortcut(Key.V),
+                onClick = {
+                    WorkspaceMenuCommandSurface.paste()
+                }
+            )
+
+            Separator()
+
+            Item(
+                text = "Delete",
+                enabled = editState.canDelete,
+                onClick = {
+                    WorkspaceMenuCommandSurface.delete()
+                }
+            )
+
+            Item(
+                text = "Duplicate",
+                enabled = editState.canDuplicate,
+                shortcut = primaryShortcut(Key.D),
+                onClick = {
+                    WorkspaceMenuCommandSurface.duplicate()
+                }
+            )
+
+            Item(
+                text = "Rename",
+                enabled = editState.canRename,
+                shortcut = primaryShortcut(Key.R),
+                onClick = {
+                    WorkspaceMenuCommandSurface.rename()
+                }
+            )
+
+            Separator()
+
+            Item(
+                text = "Select All",
+                enabled = editState.canSelectAll,
+                shortcut = primaryShortcut(Key.A),
+                onClick = {
+                    WorkspaceMenuCommandSurface.selectAll()
+                }
+            )
+        }
+
+        Menu(text = "View") {
+            if (editState.canCloseCurrentTool) {
+                Item(
+                    text = "Close ${mode.displayName}",
+                    shortcut = primaryShortcut(Key.W),
+                    onClick = {
+                        WorkspaceMenuCommandSurface.closeCurrentTool()
+                    }
+                )
+
+                Separator()
+            }
+
+            Menu(text = "Workspace Mode") {
+                RadioButtonItem(
+                    text = "Layout",
+                    selected = primaryMode == WorkspacePrimaryMode.Layout,
+                    onClick = {
+                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.Layout())
+                    }
+                )
+
+                RadioButtonItem(
+                    text = "Performance",
+                    selected = primaryMode == WorkspacePrimaryMode.Performance,
+                    onClick = {
+                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.Performance())
+                    }
+                )
+
+                RadioButtonItem(
+                    text = "Timeline",
+                    selected = primaryMode == WorkspacePrimaryMode.Timeline,
+                    onClick = {
+                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.Timeline())
+                    }
+                )
+
+                RadioButtonItem(
+                    text = "Lights (Chain Editor)",
+                    selected = primaryMode == WorkspacePrimaryMode.LightsChain,
+                    onClick = {
+                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.LightsChain())
+                    }
+                )
+
+                RadioButtonItem(
+                    text = "Sampling (Chain Editor)",
+                    selected = primaryMode == WorkspacePrimaryMode.SamplingChain,
+                    onClick = {
+                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.SamplingChain())
+                    }
+                )
+            }
+        }
+
+        if (mode is WorkspaceContract.WorkspaceMode.Timeline) {
+            Menu(text = "Transport") {
+                Item(
+                    text = if (isTimelinePlaying) "Pause" else "Play",
+                    enabled = timelineTracks.isNotEmpty(),
+                    onClick = {
+                        if (isTimelinePlaying) {
+                            TimelineRepository.pause()
+                        } else {
+                            TimelineRepository.play()
+                        }
+                    }
+                )
+
+                Item(
+                    text = "Stop",
+                    enabled = timelineTracks.isNotEmpty(),
+                    onClick = {
+                        TimelineRepository.stop()
+                    }
+                )
+            }
+        }
+
+        if (keyframesMode != null) {
+            val keyframesState by keyframesMode.state.collectAsState()
+
+            Menu(text = "Keyframes") {
+                CheckboxItem(
+                    text = "Wrap",
+                    checked = keyframesState.wrap,
+                    onCheckedChange = { checked ->
+                        keyframesMode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeWrap(checked))
+                    }
+                )
+
+                CheckboxItem(
+                    text = "Isolate",
+                    checked = keyframesState.isolate,
+                    onCheckedChange = { checked ->
+                        keyframesMode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeIsolate(checked))
+                    }
+                )
+
+                Separator()
+
+                Item(
+                    text = "Clear Root Key",
+                    enabled = keyframesState.rootKey != null,
+                    onClick = {
+                        keyframesMode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeRootKey(null))
+                    }
+                )
+            }
+        }
+
+        if (pianoRollMode != null) {
+            Menu(text = "Piano Roll") {
+                Menu(text = "Tool") {
+                    RadioButtonItem(
+                        text = "Select",
+                        selected = pianoRollMode.activeTool == TimelineEditorTool.SELECT,
+                        onClick = {
+                            pianoRollMode.activeTool = TimelineEditorTool.SELECT
+                        }
+                    )
+
+                    RadioButtonItem(
+                        text = "Draw",
+                        selected = pianoRollMode.activeTool == TimelineEditorTool.DRAW,
+                        onClick = {
+                            pianoRollMode.activeTool = TimelineEditorTool.DRAW
+                        }
+                    )
+
+                    RadioButtonItem(
+                        text = "Erase",
+                        selected = pianoRollMode.activeTool == TimelineEditorTool.ERASE,
+                        onClick = {
+                            pianoRollMode.activeTool = TimelineEditorTool.ERASE
+                        }
+                    )
                 }
 
-                Item("Preview") {
-                    viewModel.switchMode(WorkspaceContract.WorkspaceMode.Performance())
-                }
+                Menu(text = "Grid") {
+                    RadioButtonItem(
+                        text = "Auto",
+                        selected = !pianoRollMode.gridResolutionLocked,
+                        onClick = {
+                            pianoRollMode.gridResolutionLocked = false
+                        }
+                    )
 
-                Item("Lights (Chain-Editor)") {
-                    viewModel.switchMode(WorkspaceContract.WorkspaceMode.LightsChain())
-                }
-
-                Item("Sampling (Chain-Editor)") {
-                    viewModel.switchMode(WorkspaceContract.WorkspaceMode.SamplingChain())
+                    pianoRollGridOptions().forEach { (resolution, label) ->
+                        RadioButtonItem(
+                            text = label,
+                            selected = pianoRollMode.gridResolutionLocked && pianoRollMode.gridResolution == resolution,
+                            onClick = {
+                                pianoRollMode.gridResolution = resolution
+                                pianoRollMode.gridResolutionLocked = true
+                            }
+                        )
+                    }
                 }
             }
         }
+
+        if (gemEditorMode != null) {
+            Menu(text = "Gem") {
+                Item(
+                    text = "Add Node",
+                    enabled = gemEditorMode.canOpenNodePalette,
+                    onClick = {
+                        gemEditorMode.openNodePalette()
+                    }
+                )
+
+                Item(
+                    text = "New Asset",
+                    enabled = gemEditorMode.canCreateAsset,
+                    onClick = {
+                        gemEditorMode.createAsset()
+                    }
+                )
+
+                Item(
+                    text = "Discard Changes",
+                    enabled = gemEditorMode.canDiscard,
+                    onClick = {
+                        gemEditorMode.discard()
+                    }
+                )
+            }
+        }
+
+        Menu(text = "Window") {
+            Item(
+                text = "Minimize",
+                shortcut = primaryShortcut(Key.M),
+                onClick = {
+                    window.extendedState = window.extendedState or Frame.ICONIFIED
+                }
+            )
+
+            Item(
+                text = "Zoom",
+                onClick = {
+                    val isMaximized = window.extendedState and Frame.MAXIMIZED_BOTH == Frame.MAXIMIZED_BOTH
+                    window.extendedState = if (isMaximized) Frame.NORMAL else Frame.MAXIMIZED_BOTH
+                }
+            )
+        }
+
+        Menu(text = "Help") {
+            Item(
+                text = "Settings...",
+                shortcut = primaryShortcut(Key.Comma),
+                onClick = {
+                    showSettingsWindow()
+                }
+            )
+
+            Separator()
+
+            Item(
+                text = "About Amethyst",
+                onClick = {
+                    showAboutDialog()
+                }
+            )
+        }
     }
+
+    if (showProjectChangeDialog) {
+        AmethystTheme {
+            SaveChangesDialog(
+                description = "You have unsaved changes. Do you want to save them before opening another project?",
+                onSave = {
+                    val pendingAction = pendingProjectChangeAction
+                    coroutineScope.launch {
+                        val saved = WorkspaceSaveHelper.saveWorkspace()
+                        if (saved) {
+                            showProjectChangeDialog = false
+                            pendingProjectChangeAction = null
+                            pendingAction?.invoke()
+                        }
+                    }
+                },
+                onDontSave = {
+                    val pendingAction = pendingProjectChangeAction
+                    showProjectChangeDialog = false
+                    pendingProjectChangeAction = null
+                    pendingAction?.invoke()
+                },
+                onCancel = {
+                    showProjectChangeDialog = false
+                    pendingProjectChangeAction = null
+                }
+            )
+        }
+    }
+}
+
+private fun primaryShortcut(
+    key: Key,
+    shift: Boolean = false,
+    alt: Boolean = false
+): KeyShortcut {
+    return if (platform == Platform.Desktop.MacOS) {
+        KeyShortcut(key = key, meta = true, shift = shift, alt = alt)
+    } else {
+        KeyShortcut(key = key, ctrl = true, shift = shift, alt = alt)
+    }
+}
+
+private fun undoShortcut(): KeyShortcut = primaryShortcut(Key.Z)
+
+private fun redoShortcut(): KeyShortcut {
+    return if (platform == Platform.Desktop.MacOS) {
+        KeyShortcut(key = Key.Z, meta = true, shift = true)
+    } else {
+        KeyShortcut(key = Key.Y, ctrl = true)
+    }
+}
+
+private fun pianoRollGridOptions(): List<Pair<GridResolution, String>> {
+    return listOf(
+        GridResolution.Quarter to "1/4",
+        GridResolution.Eighth to "1/8",
+        GridResolution.Sixteenth to "1/16",
+        GridResolution.ThirtySecond to "1/32"
+    )
 }

@@ -19,23 +19,76 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.utils.TimelineClipUtils
 
 object TimelineKeyHandler {
+    fun canCopySelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return activeAutomationRangeSelection(selections) != null ||
+            selections.any { it is Selectable.TimelineRange } ||
+            selections.any { it is Selectable.TimelineEntryItem }
+    }
+
+    fun canCutSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean = canCopySelection(selections)
+
+    fun canDeleteSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return activeAutomationRangeSelection(selections) != null ||
+            selections.any { it is Selectable.TimelineRange } ||
+            selections.any { it is Selectable.TimelineAutomationPoint } ||
+            selections.any { it is Selectable.TimelineTrack } ||
+            selections.any { it is Selectable.TimelineEntryItem }
+    }
+
+    fun canDuplicateSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return activeAutomationRangeSelection(selections) != null ||
+            selections.any { it is Selectable.TimelineRange } ||
+            selections.any { it is Selectable.TimelineTrack } ||
+            selections.any { it is Selectable.TimelineEntryItem }
+    }
+
+    fun canRenameSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        val trackTargets = TimelineCommandSurface.selectedTrackIndices(selections)
+        if (trackTargets.size == 1) return true
+
+        return selections
+            .filterIsInstance<Selectable.TimelineEntryItem>()
+            .distinctBy { it.trackIndex to it.entryStartMs }
+            .size == 1
+    }
+
+    fun renameSelection(): Boolean = handleRename()
+
+    fun copySelection(): Boolean = handleCopy()
+
+    fun cutSelection(): Boolean = handleCut()
+
+    fun deleteSelection(): Boolean = handleDelete()
+
+    fun duplicateSelection(): Boolean = handleDuplicate()
+
     fun handleKeyInput(keyEvent: KeyEvent): Boolean {
         if (keyEvent.type != KeyEventType.KeyDown) return false
 
         return when {
-            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.R -> handleRename()
+            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.R -> renameSelection()
             keyEvent.key == Key.A && keyEvent.isAltPressed -> handleAutomappingTrigger()
             keyEvent.key == Key.A && keyEvent.hasNoShortcutModifier() -> handleToggleAutomation()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.E -> handleCutAtSelection()
-            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.C -> handleCopy()
-            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.X -> handleCut()
+            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.C -> copySelection()
+            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.X -> cutSelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.V -> {
                 ClipboardManager.paste()
                 true
             }
 
-            keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> handleDelete()
-            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.D -> handleDuplicate()
+            keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> deleteSelection()
+            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.D -> duplicateSelection()
 
             // Track navigation: ↑/↓ with optional Shift to extend selection
             !keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.DirectionUp ->

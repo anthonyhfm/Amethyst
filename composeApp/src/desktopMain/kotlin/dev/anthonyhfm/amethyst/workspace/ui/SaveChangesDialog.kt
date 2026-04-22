@@ -20,6 +20,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.DialogContent
 
 @Composable
 fun SaveChangesDialog(
+    description: String = "You have unsaved changes. Do you want to save them before closing?",
     onSave: () -> Unit,
     onDontSave: () -> Unit,
     onCancel: () -> Unit,
@@ -40,7 +41,7 @@ fun SaveChangesDialog(
         ) {
             AlertDialogHeader {
                 AlertDialogTitle("Save Changes?")
-                AlertDialogDescription("You have unsaved changes. Do you want to save them before closing?")
+                AlertDialogDescription(description)
             }
 
             AlertDialogFooter {

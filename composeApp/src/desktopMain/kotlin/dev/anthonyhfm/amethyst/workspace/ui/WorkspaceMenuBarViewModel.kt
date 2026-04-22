@@ -3,78 +3,73 @@ package dev.anthonyhfm.amethyst.workspace.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
-import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
-import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
-import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.openFileSaver
-import io.github.vinceglb.filekit.path
-import io.github.vinceglb.filekit.readBytes
-import io.github.vinceglb.filekit.write
+import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenHelper
+import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenResult
+import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.decodeFromByteArray
-import java.io.File
+import javax.swing.JOptionPane
 
 class WorkspaceMenuBarViewModel : ViewModel() {
+    private val _recentProjects = MutableStateFlow(loadRecentProjects())
+    val recentProjects = _recentProjects.asStateFlow()
+
     fun openProject() {
-        // Logic to open a project
-    }
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun saveProject() {
-        val workspace = WorkspaceRepository.saveWorkspace()
-
-        File(workspace.path).let { file ->
-            file.writeBytes(
-                Zip.encode(
-                    AmethystProtoBuf.encodeToByteArray(
-                        serializer = SavableWorkspaceData.serializer(),
-                        value = workspace
-                    )
-                )
-            )
+        viewModelScope.launch {
+            handleOpenResult(WorkspaceProjectOpenHelper.openProjectPicker())
         }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    fun saveProjectAs() {
+    fun openRecentProject(project: RecentWorkspace) {
         viewModelScope.launch {
-            val file = FileKit.openFileSaver(
-                extension = "ame",
-                suggestedName = "project",
-            )
+            handleOpenResult(WorkspaceProjectOpenHelper.openRecentProject(project))
+        }
+    }
 
-            file?.write(
-                AmethystProtoBuf.encodeToByteArray(
-                    serializer = SavableWorkspaceData.serializer(),
-                    value = WorkspaceRepository.saveWorkspace()
-                )
-            )
-
-            file?.readBytes()?.let { bytes ->
-                val data = AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(bytes).apply {
-                    this.path = file.path
-                }
-
-                GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces.plus(
-                    RecentWorkspace(
-                        title = data.title,
-                        path = file.path
-                    )
-                ).toSet().toList()
+    fun saveProject() {
+        viewModelScope.launch {
+            if (WorkspaceSaveHelper.saveWorkspace()) {
+                refreshRecentProjects()
             }
         }
     }
 
-    fun closeProject() {
-        
+    fun saveProjectAs() {
+        viewModelScope.launch {
+            if (WorkspaceSaveHelper.saveWorkspaceAs()) {
+                refreshRecentProjects()
+            }
+        }
     }
 
     fun switchMode(mode: WorkspaceContract.WorkspaceMode) {
-        WorkspaceRepository.switchMode(mode)
+        dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.switchMode(mode)
+    }
+
+    private fun refreshRecentProjects() {
+        _recentProjects.value = loadRecentProjects()
+    }
+
+    private fun handleOpenResult(result: WorkspaceProjectOpenResult) {
+        when (result) {
+            is WorkspaceProjectOpenResult.Cancelled -> Unit
+            is WorkspaceProjectOpenResult.Success -> refreshRecentProjects()
+            is WorkspaceProjectOpenResult.Failure -> {
+                JOptionPane.showMessageDialog(
+                    null,
+                    result.message,
+                    "Open Project Failed",
+                    JOptionPane.ERROR_MESSAGE
+                )
+                result.cause?.printStackTrace()
+            }
+        }
+    }
+
+    private fun loadRecentProjects(): List<RecentWorkspace> {
+        return GlobalSettings.recentWorkspaces.sortedByDescending { it.lastOpened }
     }
 }
