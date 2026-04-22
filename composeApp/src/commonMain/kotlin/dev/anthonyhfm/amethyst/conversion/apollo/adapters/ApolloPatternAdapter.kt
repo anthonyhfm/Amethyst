@@ -20,9 +20,9 @@ class ApolloPatternAdapter(
                         KeyframesChainDeviceContract.KeyframesEntry(
                             x = x,
                             y = y,
-                            r = (color.r.toInt() and 0xFF) / 255f,
-                            g = (color.g.toInt() and 0xFF) / 255f,
-                            b = (color.b.toInt() and 0xFF) / 255f
+                            r = color.r.toInt() / 63f,
+                            g = color.g.toInt() / 63f,
+                            b = color.b.toInt() / 63f,
                         )
                     )
                 }
