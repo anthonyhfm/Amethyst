@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
 import dev.anthonyhfm.amethyst.timeline.data.timelineTrackRows
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.viewport.wheelZoomScaleFactor
@@ -38,6 +39,7 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.ui.components.PlayheadCursor
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
+import dev.anthonyhfm.amethyst.timeline.utils.computeTimelineContentWidthPx
 
 @Composable
 fun TimelineLaneView(
@@ -49,24 +51,26 @@ fun TimelineLaneView(
     // Single atomic viewport read — zoom and scroll always come from the same snapshot.
     val viewportState by viewModel.viewport.collectAsState()
     val playheadPositionMs by viewModel.playheadPositionMs.collectAsState()
-    val minTimelinePx = 12_000f
-    val timelinePaddingPx = 1000f
+    val timelineTrailingMarginPx = 240f
     val minZoomLevel = 0.0025f
     val maxZoomLevel = 5f
-    val maxDurationMs = tracks.maxOfOrNull { track ->
+    val maxTimelineEndMs = tracks.maxOfOrNull { track ->
         when (track) {
-            is AudioTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
-            is MidiTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs } ?: 0L
-            else -> 0L
+            is AudioTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeUs / 1000.0 } ?: 0.0
+            is MidiTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs.toDouble() } ?: 0.0
+            else -> 0.0
         }
-    } ?: 0L
+    } ?: 0.0
     var viewportWidthPx by remember { mutableStateOf(0) }
     val currentViewportWidthPx = rememberUpdatedState(viewportWidthPx.toFloat())
-    val currentMaxDurationMs = rememberUpdatedState(maxDurationMs)
+    val currentMaxTimelineEndMs = rememberUpdatedState(maxTimelineEndMs)
     fun timelineContentWidthForZoom(zoomX: Float): Float {
-        return (
-            currentMaxDurationMs.value.toDouble() * zoomX.toDouble() + timelinePaddingPx.toDouble()
-            ).coerceAtLeast(minTimelinePx.toDouble()).toFloat()
+        return computeTimelineContentWidthPx(
+            maxTimelineEndMs = currentMaxTimelineEndMs.value,
+            zoomX = zoomX,
+            viewportWidthPx = currentViewportWidthPx.value,
+            trailingMarginPx = timelineTrailingMarginPx,
+        )
     }
     fun viewportWithTimelineMetrics(base: EditorViewportState): EditorViewportState {
         return base.copy(

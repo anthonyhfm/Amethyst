@@ -66,6 +66,8 @@ import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleClipWindowPx
+import dev.anthonyhfm.amethyst.timeline.utils.projectTimelineSpanPx
 import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -85,17 +87,11 @@ fun AudioClip(
     gridType: GridUtils.GridType
 ) {
     val zoomLevel = viewport.zoomX
-    val scrollOffsetPx = viewport.scrollX
     val timelineDimensions = TimelineTheme.dimensions
     val timelinePalette = TimelineTheme.palette
     val clipColors = TimelineTheme.clipColors(
         role = TimelineClipRole.Audio,
         selected = isSelected
-    )
-    val clipShape = RoundedCornerShape(timelineDimensions.clipCornerRadius)
-    val clipHeaderShape = RoundedCornerShape(
-        topStart = timelineDimensions.clipCornerRadius,
-        topEnd = timelineDimensions.clipCornerRadius
     )
     val interactionEnabled = !automationOverlayActive
     val clipBackgroundColor = if (automationOverlayActive) {
@@ -123,23 +119,26 @@ fun AudioClip(
     var rangeStartMs by remember { mutableStateOf<Long?>(null) }
     var rangeEndMs by remember { mutableStateOf<Long?>(null) }
 
-    fun timeUsToPx(timeUs: Long): Int =
-        ((timeUs.toDouble() / 1000.0) * zoomLevel.toDouble()).roundToInt()
-
     // Project the exact audio bounds and derive width from the projected end to keep the
     // visual clip edge stable across split/zoom operations.
-    val startOffsetPx = timeUsToPx(audioEntry.startTimeUs)
-    val endOffsetPx = timeUsToPx(audioEntry.endTimeUs)
-    val fullWidthPx = (endOffsetPx - startOffsetPx).coerceAtLeast(1)
+    val projectedSpan = projectTimelineSpanPx(
+        startTimeMs = audioEntry.startTimeUs / 1000.0,
+        endTimeMs = audioEntry.endTimeUs / 1000.0,
+        zoomX = zoomLevel,
+    )
+    val startOffsetPx = projectedSpan.startPx
+    val endOffsetPx = projectedSpan.endPx
 
     // State that must be declared before any early return so Compose hook order is stable.
     val dragOffsetPx = remember(audioEntry.startTimeMs) { mutableStateOf(0f) }
     var snapEnabled by remember { mutableStateOf(true) }
 
-    // Screen-space left edge of the clip (can be negative when scrolled past clip start).
-    val viewportWidthPx = viewport.viewportWidth.coerceAtLeast(1f).toInt()
-    val screenLeftPx = startOffsetPx - scrollOffsetPx.roundToInt() + dragOffsetPx.value.roundToInt()
-    val screenRightPx = screenLeftPx + fullWidthPx
+    val clipWindow = computeVisibleClipWindowPx(
+        contentStartPx = startOffsetPx,
+        contentEndPx = endOffsetPx,
+        viewport = viewport,
+        screenOffsetPx = dragOffsetPx.value.roundToInt(),
+    )
     
     // Rename support
     val displayName = if (audioEntry.name.isNotEmpty()) audioEntry.name else audioEntry.fileName.substringBeforeLast('.')
@@ -193,16 +192,53 @@ fun AudioClip(
     
     // Visibility culling: skip layout entirely if clip is off-screen.
     // All state above must be declared before this return so Compose hook order stays stable.
-    if (screenRightPx < -100 || screenLeftPx > viewportWidthPx + 100) return
+    if (clipWindow == null || clipWindow.visibleWidthPx <= 0) return
 
-    // Dynamic width cap: render at most enough pixels to cover the visible portion
-    // plus a small overflow buffer. Compose's hard layout limit is 262 143 px.
-    val overflowLeft = maxOf(0, -screenLeftPx)
-    val widthPx = minOf(fullWidthPx, viewportWidthPx + overflowLeft + 200).coerceAtMost(260_000)
-    val widthDp = with(LocalDensity.current) { widthPx.toDp() }
+    val clipShape = RoundedCornerShape(
+        topStart = if (clipWindow.isLeftEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        topEnd = if (clipWindow.isRightEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        bottomStart = if (clipWindow.isLeftEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        bottomEnd = if (clipWindow.isRightEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+    )
+    val clipHeaderShape = RoundedCornerShape(
+        topStart = if (clipWindow.isLeftEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        topEnd = if (clipWindow.isRightEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+    )
+    val widthDp = with(LocalDensity.current) { clipWindow.visibleWidthPx.toDp() }
+
+    val visibleStartUs = if (clipWindow.isLeftEdgeVisible) {
+        audioEntry.startTimeUs
+    } else {
+        (viewport.contentXToTimeMs(clipWindow.visibleContentStartPx.toFloat()) * 1000.0)
+            .roundToLong()
+            .coerceIn(audioEntry.startTimeUs, audioEntry.endTimeUs)
+    }
+    val visibleEndUs = if (clipWindow.isRightEdgeVisible) {
+        audioEntry.endTimeUs
+    } else {
+        (viewport.contentXToTimeMs(clipWindow.visibleContentEndPx.toFloat()) * 1000.0)
+            .roundToLong()
+            .coerceIn(visibleStartUs, audioEntry.endTimeUs)
+    }
+    val visibleStartSample = if (clipWindow.isLeftEdgeVisible) {
+        audioEntry.clipStartSample
+    } else {
+        (audioEntry.clipStartSample + dev.anthonyhfm.amethyst.timeline.data.usToSamples(
+            (visibleStartUs - audioEntry.startTimeUs).coerceAtLeast(0L),
+            audioEntry.sampleRate,
+        )).coerceIn(audioEntry.clipStartSample, audioEntry.clipEndSample)
+    }
+    val visibleEndSample = if (clipWindow.isRightEdgeVisible) {
+        audioEntry.clipEndSample
+    } else {
+        (audioEntry.clipStartSample + dev.anthonyhfm.amethyst.timeline.data.usToSamples(
+            (visibleEndUs - audioEntry.startTimeUs).coerceAtLeast(0L),
+            audioEntry.sampleRate,
+        )).coerceIn((visibleStartSample + 1).coerceAtMost(audioEntry.clipEndSample), audioEntry.clipEndSample)
+    }
 
     val outerModifier = Modifier
-        .offset { IntOffset(screenLeftPx, 0) }
+        .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
         .height(timelineDimensions.laneHeight)
         .width(widthDp)
 
@@ -340,10 +376,10 @@ fun AudioClip(
                     .then(
                         if (interactionEnabled) {
                             Modifier.pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
-                                detectDragGestures(
-                                    onDragStart = { offset ->
-                                        val startMs = GridUtils.snapToGrid(
-                                            viewport.contentXToTimeMs(startOffsetPx + offset.x)
+                                        detectDragGestures(
+                                            onDragStart = { offset ->
+                                                val startMs = GridUtils.snapToGrid(
+                                            viewport.contentXToTimeMs(clipWindow.visibleContentStartPx + offset.x)
                                                 .roundToLong()
                                                 .coerceAtLeast(0L),
                                             zoomLevel,
@@ -357,7 +393,7 @@ fun AudioClip(
                                     onDrag = { change, _ ->
                                         if (rangeActive && rangeStartMs != null) {
                                             val currentMs = GridUtils.snapToGrid(
-                                                viewport.contentXToTimeMs(startOffsetPx + change.position.x)
+                                                viewport.contentXToTimeMs(clipWindow.visibleContentStartPx + change.position.x)
                                                     .roundToLong()
                                                     .coerceAtLeast(0L),
                                                 zoomLevel,
@@ -412,8 +448,16 @@ fun AudioClip(
                             val visibleEndUs = msToUs(end).coerceIn(clipStartUs, clipEndUs)
 
                             if (visibleEndUs > visibleStartUs) {
-                                val localStartPx = timeUsToPx(visibleStartUs) - startOffsetPx
-                                val localEndPx = timeUsToPx(visibleEndUs) - startOffsetPx
+                                val localStartPx = projectTimelineSpanPx(
+                                    startTimeMs = visibleStartUs / 1000.0,
+                                    endTimeMs = visibleStartUs / 1000.0,
+                                    zoomX = zoomLevel,
+                                ).startPx - clipWindow.visibleContentStartPx
+                                val localEndPx = projectTimelineSpanPx(
+                                    startTimeMs = visibleEndUs / 1000.0,
+                                    endTimeMs = visibleEndUs / 1000.0,
+                                    zoomX = zoomLevel,
+                                ).startPx - clipWindow.visibleContentStartPx
                                 val startX = localStartPx.toFloat()
                                 val width = (localEndPx - localStartPx).coerceAtLeast(1).toFloat()
 
@@ -441,10 +485,10 @@ fun AudioClip(
                     sampleRate = audioEntry.sampleRate,
                     channels = audioEntry.channels,
                     bitDepth = audioEntry.bitDepth,
-                    timelineStartUs = audioEntry.startTimeUs,
-                    startSample = audioEntry.clipStartSample,
-                    endSample = audioEntry.clipEndSample,
-                    renderWidthPx = widthPx,
+                    timelineStartUs = visibleStartUs,
+                    startSample = visibleStartSample,
+                    endSample = visibleEndSample,
+                    renderWidthPx = clipWindow.visibleWidthPx,
                     zoomLevel = zoomLevel
                 )
             }

@@ -63,6 +63,8 @@ import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleClipWindowPx
+import dev.anthonyhfm.amethyst.timeline.utils.projectTimelineSpanPx
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
@@ -92,29 +94,24 @@ fun MidiClip(
     gridType: GridUtils.GridType
 ) {
     val zoomLevel = viewport.zoomX
-    val scrollOffsetPx = viewport.scrollX
     val timelineDimensions = TimelineTheme.dimensions
     val timelinePalette = TimelineTheme.palette
     val clipColors = TimelineTheme.clipColors(
         role = if (isLightsTrack) TimelineClipRole.Lights else TimelineClipRole.Midi,
         selected = isSelected
     )
-    val clipShape = RoundedCornerShape(timelineDimensions.clipCornerRadius)
-    val clipHeaderShape = RoundedCornerShape(
-        topStart = timelineDimensions.clipCornerRadius,
-        topEnd = timelineDimensions.clipCornerRadius
-    )
 
     var rangeActive by remember { mutableStateOf(false) }
     var rangeStartMs by remember { mutableStateOf<Long?>(null) }
     var rangeEndMs by remember { mutableStateOf<Long?>(null) }
 
-    val startOffsetPx = (midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()).roundToInt()
-    val fullWidthPx = (midiEntry.durationMs.toDouble() * zoomLevel.toDouble()).toFloat().coerceAtLeast(1f)
-
-    // Screen-space left edge (can be negative when scrolled past clip start).
-    val viewportWidthPx = viewport.viewportWidth.coerceAtLeast(1f).toInt()
-    val screenLeftBasePx = startOffsetPx - scrollOffsetPx.roundToInt()
+    val projectedSpan = projectTimelineSpanPx(
+        startTimeMs = midiEntry.startTimeMs.toDouble(),
+        endTimeMs = midiEntry.endTimeMs.toDouble(),
+        zoomX = zoomLevel,
+    )
+    val startOffsetPx = projectedSpan.startPx
+    val endOffsetPx = projectedSpan.endPx
 
     // State that must be declared before any early return so Compose hook order is stable.
     val dragOffsetPx = remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
@@ -172,21 +169,31 @@ fun MidiClip(
         }
     }
 
-    // Visibility culling and dynamic width cap — placed after all state so hook order is stable.
-    val baseScreenRight = screenLeftBasePx + fullWidthPx
-    if (baseScreenRight < -100 || screenLeftBasePx > viewportWidthPx + 100) return
+    val previewStartOffsetPx = startOffsetPx + resizeLeftDeltaPx.roundToInt()
+    val previewEndOffsetPx = endOffsetPx + resizeRightDeltaPx.roundToInt()
+    val clipWindow = computeVisibleClipWindowPx(
+        contentStartPx = previewStartOffsetPx,
+        contentEndPx = previewEndOffsetPx,
+        viewport = viewport,
+        screenOffsetPx = dragOffsetPx.value.roundToInt(),
+    )
+    if (clipWindow == null || clipWindow.visibleWidthPx <= 0) return
 
-    val overflowLeft = maxOf(0, -screenLeftBasePx)
-    val baseWidthPx = minOf(fullWidthPx, (viewportWidthPx + overflowLeft + 200).toFloat()).coerceAtMost(260_000f)
-
-    // Screen-space final position: content-x minus scrollX, adjusted for drag and resize.
-    val finalOffsetPx = screenLeftBasePx + dragOffsetPx.value.roundToInt() + resizeLeftDeltaPx.roundToInt()
-    val finalWidthPx = (baseWidthPx - resizeLeftDeltaPx + resizeRightDeltaPx).coerceAtLeast(20f)
-    val finalWidthDp = with(LocalDensity.current) { finalWidthPx.toDp() }
+    val clipShape = RoundedCornerShape(
+        topStart = if (clipWindow.isLeftEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        topEnd = if (clipWindow.isRightEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        bottomStart = if (clipWindow.isLeftEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        bottomEnd = if (clipWindow.isRightEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+    )
+    val clipHeaderShape = RoundedCornerShape(
+        topStart = if (clipWindow.isLeftEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+        topEnd = if (clipWindow.isRightEdgeVisible) timelineDimensions.clipCornerRadius else 0.dp,
+    )
+    val finalWidthDp = with(LocalDensity.current) { clipWindow.visibleWidthPx.toDp() }
 
     ContextMenu(
         modifier = Modifier
-            .offset { IntOffset(finalOffsetPx, 0) }
+            .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
             .width(finalWidthDp)
             .height(timelineDimensions.laneHeight),
         trigger = {
@@ -313,11 +320,8 @@ fun MidiClip(
                 .pointerInput(midiEntry.startTimeMs, zoomLevel, bpm, gridType) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            // offset.x is clip-relative (0..clipWidth). Convert to timeline ms
-                            // via content-space position: clipStart_contentX + offset.x.
-                            val clipStartContentX = midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
                             val startMs = GridUtils.snapToGrid(
-                                viewport.contentXToTimeMs((clipStartContentX + offset.x).toFloat()).roundToLong().coerceAtLeast(0L),
+                                viewport.contentXToTimeMs((clipWindow.visibleContentStartPx + offset.x).toFloat()).roundToLong().coerceAtLeast(0L),
                                 zoomLevel, bpm, gridType
                             )
                             rangeStartMs = startMs
@@ -326,9 +330,8 @@ fun MidiClip(
                         },
                         onDrag = { change, _ ->
                             if (rangeActive && rangeStartMs != null) {
-                                val clipStartContentX = midiEntry.startTimeMs.toDouble() * zoomLevel.toDouble()
                                 val currentMs = GridUtils.snapToGrid(
-                                    viewport.contentXToTimeMs((clipStartContentX + change.position.x).toFloat()).roundToLong().coerceAtLeast(0L),
+                                    viewport.contentXToTimeMs((clipWindow.visibleContentStartPx + change.position.x).toFloat()).roundToLong().coerceAtLeast(0L),
                                     zoomLevel, bpm, gridType
                                 )
                                 if (currentMs != rangeEndMs) {
@@ -375,75 +378,85 @@ fun MidiClip(
                         val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
                         val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
                         if (visibleEnd > visibleStart) {
-                            val relStartMs = visibleStart - clipStartMs
-                            val relEndMs = visibleEnd - clipStartMs
-                            val startX = relStartMs * zoomLevel
-                            val width = (relEndMs - relStartMs) * zoomLevel
+                            val startX = projectTimelineSpanPx(
+                                startTimeMs = visibleStart.toDouble(),
+                                endTimeMs = visibleStart.toDouble(),
+                                zoomX = zoomLevel,
+                            ).startPx - clipWindow.visibleContentStartPx
+                            val endX = projectTimelineSpanPx(
+                                startTimeMs = visibleEnd.toDouble(),
+                                endTimeMs = visibleEnd.toDouble(),
+                                zoomX = zoomLevel,
+                            ).startPx - clipWindow.visibleContentStartPx
                             drawRect(
                                 color = timelinePalette.selectionFill,
-                                topLeft = Offset(startX, 0f),
-                                size = Size(width, size.height)
+                                topLeft = Offset(startX.toFloat(), 0f),
+                                size = Size((endX - startX).coerceAtLeast(1).toFloat(), size.height)
                             )
                         }
                     }
                 }
         ) {
             // Left resize handle
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .width(timelineDimensions.resizeHandleWidth)
-                    .fillMaxHeight()
-                    .pointerHoverIcon(PointerIcon.ResizeLeft)
-                    .pointerInput(midiEntry.startTimeMs) {
-                        detectDragGestures(
-                            onDragStart = { onSelectEntry() },
-                            onDragEnd = {
-                                if (resizeLeftDeltaPx != 0f) {
-                                    val rawNewStartMs = (midiEntry.startTimeMs.toDouble() + (resizeLeftDeltaPx / zoomLevel)).roundToLong().coerceAtLeast(0L)
-                                    val snappedStartMs = if (gridIntervalMs > 0) {
-                                        val gridPxSpacing = gridIntervalMs * zoomLevel
-                                        val thresholdPx = (gridPxSpacing * 0.35f).coerceAtLeast(5f)
-                                        GridUtils.snapToGridWithThreshold(rawNewStartMs, zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value, thresholdPx)
-                                    } else rawNewStartMs
-                                    val newDurationMs = (midiEntry.endTimeMs - snappedStartMs).coerceAtLeast(50L)
-                                    onResizeEntry(midiEntry.startTimeMs, snappedStartMs, newDurationMs)
-                                }
-                                resizeLeftDeltaPx = 0f
-                            },
-                            onDragCancel = { resizeLeftDeltaPx = 0f },
-                            onDrag = { change, dragAmount -> change.consume(); resizeLeftDeltaPx += dragAmount.x }
-                        )
-                    }
-            )
+            if (clipWindow.isLeftEdgeVisible) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(timelineDimensions.resizeHandleWidth)
+                        .fillMaxHeight()
+                        .pointerHoverIcon(PointerIcon.ResizeLeft)
+                        .pointerInput(midiEntry.startTimeMs) {
+                            detectDragGestures(
+                                onDragStart = { onSelectEntry() },
+                                onDragEnd = {
+                                    if (resizeLeftDeltaPx != 0f) {
+                                        val rawNewStartMs = (midiEntry.startTimeMs.toDouble() + (resizeLeftDeltaPx / zoomLevel)).roundToLong().coerceAtLeast(0L)
+                                        val snappedStartMs = if (gridIntervalMs > 0) {
+                                            val gridPxSpacing = gridIntervalMs * zoomLevel
+                                            val thresholdPx = (gridPxSpacing * 0.35f).coerceAtLeast(5f)
+                                            GridUtils.snapToGridWithThreshold(rawNewStartMs, zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value, thresholdPx)
+                                        } else rawNewStartMs
+                                        val newDurationMs = (midiEntry.endTimeMs - snappedStartMs).coerceAtLeast(50L)
+                                        onResizeEntry(midiEntry.startTimeMs, snappedStartMs, newDurationMs)
+                                    }
+                                    resizeLeftDeltaPx = 0f
+                                },
+                                onDragCancel = { resizeLeftDeltaPx = 0f },
+                                onDrag = { change, dragAmount -> change.consume(); resizeLeftDeltaPx += dragAmount.x }
+                            )
+                        }
+                )
+            }
             // Right resize handle
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(timelineDimensions.resizeHandleWidth)
-                    .fillMaxHeight()
-                    .pointerHoverIcon(PointerIcon.ResizeRight)
-                    .pointerInput(midiEntry.startTimeMs) {
-                        detectDragGestures(
-                            onDragStart = { onSelectEntry() },
-                            onDragEnd = {
-                                if (resizeRightDeltaPx != 0f) {
-                                    val rawNewEndMs = (midiEntry.endTimeMs.toDouble() + (resizeRightDeltaPx / zoomLevel)).roundToLong().coerceAtLeast(midiEntry.startTimeMs + 50L)
-                                    val snappedEndMs = if (gridIntervalMs > 0) {
-                                        val gridPxSpacing = gridIntervalMs * zoomLevel
-                                        val thresholdPx = (gridPxSpacing * 0.35f).coerceAtLeast(5f)
-                                        GridUtils.snapToGridWithThreshold(rawNewEndMs, zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value, thresholdPx)
-                                    } else rawNewEndMs
-                                    val newDurationMs = (snappedEndMs - midiEntry.startTimeMs).coerceAtLeast(50L)
-                                    onResizeEntry(midiEntry.startTimeMs, midiEntry.startTimeMs, newDurationMs)
-                                }
-                                resizeRightDeltaPx = 0f
-                            },
-                            onDragCancel = { resizeRightDeltaPx = 0f },
-                            onDrag = { change, dragAmount -> change.consume(); resizeRightDeltaPx += dragAmount.x }
-                        )
-                    }
-            )
+            if (clipWindow.isRightEdgeVisible) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(timelineDimensions.resizeHandleWidth)
+                        .fillMaxHeight()
+                        .pointerHoverIcon(PointerIcon.ResizeRight)
+                        .pointerInput(midiEntry.startTimeMs) {
+                            detectDragGestures(
+                                onDragStart = { onSelectEntry() },
+                                onDragEnd = {
+                                    if (resizeRightDeltaPx != 0f) {
+                                        val rawNewEndMs = (midiEntry.endTimeMs.toDouble() + (resizeRightDeltaPx / zoomLevel)).roundToLong().coerceAtLeast(midiEntry.startTimeMs + 50L)
+                                        val snappedEndMs = if (gridIntervalMs > 0) {
+                                            val gridPxSpacing = gridIntervalMs * zoomLevel
+                                            val thresholdPx = (gridPxSpacing * 0.35f).coerceAtLeast(5f)
+                                            GridUtils.snapToGridWithThreshold(rawNewEndMs, zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value, thresholdPx)
+                                        } else rawNewEndMs
+                                        val newDurationMs = (snappedEndMs - midiEntry.startTimeMs).coerceAtLeast(50L)
+                                        onResizeEntry(midiEntry.startTimeMs, midiEntry.startTimeMs, newDurationMs)
+                                    }
+                                    resizeRightDeltaPx = 0f
+                                },
+                                onDragCancel = { resizeRightDeltaPx = 0f },
+                                onDrag = { change, dragAmount -> change.consume(); resizeRightDeltaPx += dragAmount.x }
+                            )
+                        }
+                )
+            }
         }
             }
         }
