@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import dev.anthonyhfm.amethyst.core.midi.platformMidiAccess
@@ -19,6 +20,8 @@ class MainActivity : ComponentActivity() {
         FileKit.init(this)
 
         platformMidiAccess = AndroidMidiAccess(this)
+
+        enableEdgeToEdge()
 
         setContent {
             App()

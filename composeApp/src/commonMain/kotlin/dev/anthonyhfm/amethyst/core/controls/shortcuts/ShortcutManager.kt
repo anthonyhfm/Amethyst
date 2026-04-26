@@ -14,13 +14,12 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.handleRenameShortcut
-import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.Zip
+import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.openFileSaver
@@ -314,17 +313,9 @@ object ShortcutManager {
             )
         )
 
-        GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces
-            .filter { it.path != path }
-            .toMutableList()
-            .apply {
-                add(
-                    index = 0,
-                    element = RecentWorkspace(
-                        title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
-                        path = path
-                    )
-                )
-            }
+        HomeRepository.rememberRecentWorkspace(
+            title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+            path = path,
+        )
     }
 }

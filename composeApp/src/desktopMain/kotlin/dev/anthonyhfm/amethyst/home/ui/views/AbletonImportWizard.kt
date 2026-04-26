@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,12 +45,8 @@ import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.card
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-@OptIn(DelicateCoroutinesApi::class)
 @Composable
 fun AbletonImportWizard(
     path: String,
@@ -60,6 +57,7 @@ fun AbletonImportWizard(
     val viewModel = viewModel { AbletonImportWizardViewModel() }
     val customPalettePath: String by viewModel.customPalettePath.collectAsState()
     val apolloProjPath: String by viewModel.apolloProjPath.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     val sourceName = path.substringAfterLast("/").ifBlank { path }
     val paletteName = customPalettePath.substringAfterLast("/").ifBlank { customPalettePath }
     val apolloProjName = apolloProjPath.substringAfterLast("/").ifBlank { apolloProjPath }
@@ -131,10 +129,9 @@ fun AbletonImportWizard(
                     onStartConversion = {
                         navigator.navigate(HomeNavRoute.LoadingScreen("Translating your Ableton Live-Set"))
 
-                        GlobalScope.launch {
+                        coroutineScope.launch {
                             viewModel.startAbletonImport(path)
                             onOpenWorkspace()
-                            cancel()
                         }
                     },
                 )

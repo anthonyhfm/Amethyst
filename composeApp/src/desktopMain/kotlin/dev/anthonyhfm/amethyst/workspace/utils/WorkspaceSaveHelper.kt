@@ -1,10 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.utils
 
-import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.Zip
+import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.openFileSaver
@@ -60,18 +59,10 @@ object WorkspaceSaveHelper {
             )
         )
 
-        GlobalSettings.recentWorkspaces = GlobalSettings.recentWorkspaces
-            .filter { it.path != path }
-            .toMutableList()
-            .apply {
-                add(
-                    index = 0,
-                    element = RecentWorkspace(
-                        title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
-                        path = path
-                    )
-                )
-            }
+        HomeRepository.rememberRecentWorkspace(
+            title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+            path = path,
+        )
 
         return true
     }

@@ -42,8 +42,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.composeunstyled.Text as UnstyledText
 import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.home.HomeCommandSurface
+import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.home.ui.views.RecentViewContract.Event
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
@@ -160,8 +160,7 @@ fun RecentView(
                                     viewModel.onEvent(Event.OnClickEditProject(project))
                                 },
                                 onDelete = {
-                                    GlobalSettings.recentWorkspaces = recentProjects
-                                        .filterNot { it.path == project.path }
+                                    HomeRepository.removeRecentWorkspace(project.path)
                                     recentProjects = loadRecentProjects()
                                 },
                             )
@@ -448,7 +447,7 @@ private fun buttonContentColor(variant: ButtonVariant): Color {
 }
 
 private fun loadRecentProjects(): List<RecentWorkspace> {
-    return GlobalSettings.recentWorkspaces.sortedByDescending { it.lastOpened }
+    return HomeRepository.recentWorkspaces()
 }
 
 private fun displayFolderPath(path: String): String {
