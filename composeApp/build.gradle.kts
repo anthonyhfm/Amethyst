@@ -19,6 +19,8 @@ kotlin {
         }
     }
 
+    val iosFrameworkBundleId = "dev.anthonyhfm.amethyst.composeapp"
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -26,6 +28,7 @@ kotlin {
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
+            binaryOption("bundleId", iosFrameworkBundleId)
             isStatic = true
         }
     }

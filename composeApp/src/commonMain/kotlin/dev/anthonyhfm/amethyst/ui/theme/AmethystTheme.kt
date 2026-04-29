@@ -50,69 +50,39 @@ val small = ThemeToken<TextStyle>("small")
 val mutedText = ThemeToken<TextStyle>("muted")
 val inlineCode = ThemeToken<TextStyle>("inlineCode")
 
-private val lightColorMap = mapOf(
-    background to Color(0xFFFFFFFF),
-    foreground to Color(0xFF030712),
-    card to Color(0xFFFFFFFF),
-    cardForeground to Color(0xFF030712),
-    popover to Color(0xFFFFFFFF),
-    popoverForeground to Color(0xFF030712),
-    primary to Color(0xFF7C3AED),
-    primaryForeground to Color(0xFFF9FAFB),
-    secondary to Color(0xFFF3F4F6),
-    secondaryForeground to Color(0xFF111827),
-    muted to Color(0xFFF3F4F6),
-    mutedForeground to Color(0xFF6B7280),
-    accent to Color(0xFFF3F4F6),
-    accentForeground to Color(0xFF111827),
-    destructive to Color(0xFFEF4444),
-    destructiveForeground to Color(0xFFF9FAFB),
-    selectionSurface to Color(0xFF2563EB),
-    selectionForeground to Color(0xFFF8FAFC),
-    selectionBorder to Color(0xFF1D4ED8),
-    border to Color(0xFFE5E7EB),
-    input to Color(0xFFE5E7EB),
-    ring to Color(0xFF7C3AED),
-    chart1 to Color(0xFFE76E50),
-    chart2 to Color(0xFF2A9D90),
-    chart3 to Color(0xFF274754),
-    chart4 to Color(0xFFE8C468),
-    chart5 to Color(0xFFF4A362),
-)
-
-private val darkColorMap = mapOf(
-    background to Color(0xFF030712),
-    foreground to Color(0xFFF9FAFB),
-    card to Color(0xFF030712),
-    cardForeground to Color(0xFFF9FAFB),
-    popover to Color(0xFF030712),
-    popoverForeground to Color(0xFFF9FAFB),
-    primary to Color(0xFF6D28D9),
-    primaryForeground to Color(0xFFF9FAFB),
-    secondary to Color(0xFF1F2937),
-    secondaryForeground to Color(0xFFF9FAFB),
-    muted to Color(0xFF1F2937),
-    mutedForeground to Color(0xFF9CA3AF),
-    accent to Color(0xFF1F2937),
-    accentForeground to Color(0xFFF9FAFB),
-    destructive to Color(0xFF7F1D1D),
-    destructiveForeground to Color(0xFFF9FAFB),
-    selectionSurface to Color(0xFF60A5FA),
-    selectionForeground to Color(0xFF0B1220),
-    selectionBorder to Color(0xFF93C5FD),
-    border to Color(0xFF1F2937),
-    input to Color(0xFF1F2937),
-    ring to Color(0xFF6D28D9),
-    chart1 to Color(0xFF2662D9),
-    chart2 to Color(0xFF2EB88A),
-    chart3 to Color(0xFFE88C30),
-    chart4 to Color(0xFFAF57DB),
-    chart5 to Color(0xFFE23670),
+private fun AmethystColorPalette.toTokenMap(): Map<ThemeToken<Color>, Color> = mapOf(
+    dev.anthonyhfm.amethyst.ui.theme.background to this.background,
+    dev.anthonyhfm.amethyst.ui.theme.foreground to this.foreground,
+    dev.anthonyhfm.amethyst.ui.theme.card to this.card,
+    dev.anthonyhfm.amethyst.ui.theme.cardForeground to this.cardForeground,
+    dev.anthonyhfm.amethyst.ui.theme.popover to this.popover,
+    dev.anthonyhfm.amethyst.ui.theme.popoverForeground to this.popoverForeground,
+    dev.anthonyhfm.amethyst.ui.theme.primary to this.primary,
+    dev.anthonyhfm.amethyst.ui.theme.primaryForeground to this.primaryForeground,
+    dev.anthonyhfm.amethyst.ui.theme.secondary to this.secondary,
+    dev.anthonyhfm.amethyst.ui.theme.secondaryForeground to this.secondaryForeground,
+    dev.anthonyhfm.amethyst.ui.theme.muted to this.muted,
+    dev.anthonyhfm.amethyst.ui.theme.mutedForeground to this.mutedForeground,
+    dev.anthonyhfm.amethyst.ui.theme.accent to this.accent,
+    dev.anthonyhfm.amethyst.ui.theme.accentForeground to this.accentForeground,
+    dev.anthonyhfm.amethyst.ui.theme.destructive to this.destructive,
+    dev.anthonyhfm.amethyst.ui.theme.destructiveForeground to this.destructiveForeground,
+    dev.anthonyhfm.amethyst.ui.theme.selectionSurface to this.selectionSurface,
+    dev.anthonyhfm.amethyst.ui.theme.selectionForeground to this.selectionForeground,
+    dev.anthonyhfm.amethyst.ui.theme.selectionBorder to this.selectionBorder,
+    dev.anthonyhfm.amethyst.ui.theme.border to this.border,
+    dev.anthonyhfm.amethyst.ui.theme.input to this.input,
+    dev.anthonyhfm.amethyst.ui.theme.ring to this.ring,
+    dev.anthonyhfm.amethyst.ui.theme.chart1 to this.chart1,
+    dev.anthonyhfm.amethyst.ui.theme.chart2 to this.chart2,
+    dev.anthonyhfm.amethyst.ui.theme.chart3 to this.chart3,
+    dev.anthonyhfm.amethyst.ui.theme.chart4 to this.chart4,
+    dev.anthonyhfm.amethyst.ui.theme.chart5 to this.chart5,
 )
 
 val AmethystLightTheme = buildTheme {
     name = "AmethystLight"
-    properties[colors] = lightColorMap
+    properties[colors] = AmethystLightPalette.toTokenMap()
     properties[chainColorTokens] = lightChainColorMap
     properties[timelineColorTokens] = lightTimelineColorMap
     properties[timelineDimensionTokens] = timelineDimensionMap
@@ -120,7 +90,7 @@ val AmethystLightTheme = buildTheme {
 
 val AmethystDarkTheme = buildTheme {
     name = "AmethystDark"
-    properties[colors] = darkColorMap
+    properties[colors] = AmethystDarkPalette.toTokenMap()
     properties[chainColorTokens] = darkChainColorMap
     properties[timelineColorTokens] = darkTimelineColorMap
     properties[timelineDimensionTokens] = timelineDimensionMap
@@ -128,13 +98,13 @@ val AmethystDarkTheme = buildTheme {
 
 @Composable
 fun AmethystTheme(darkMode: Boolean = true, content: @Composable () -> Unit) {
-    val roboto = rememberRobotoFontFamily()
-    val typ = remember(roboto) { buildAmethystTypography(roboto) }
+    val palette = amethystColorPalette(darkMode)
+    val typ = rememberAmethystTypography()
 
-    val theme = remember(darkMode, typ) {
+    val theme = remember(darkMode, palette, typ) {
         buildTheme {
             name = if (darkMode) "AmethystDark" else "AmethystLight"
-            properties[colors] = if (darkMode) darkColorMap else lightColorMap
+            properties[colors] = palette.toTokenMap()
             properties[chainColorTokens] = if (darkMode) darkChainColorMap else lightChainColorMap
             properties[timelineColorTokens] = if (darkMode) darkTimelineColorMap else lightTimelineColorMap
             properties[timelineDimensionTokens] = timelineDimensionMap

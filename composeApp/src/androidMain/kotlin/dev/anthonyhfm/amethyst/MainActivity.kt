@@ -1,30 +1,59 @@
 package dev.anthonyhfm.amethyst
 
-import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
+import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.view.WindowCompat
 import dev.anthonyhfm.amethyst.core.midi.platformMidiAccess
-import dev.atsushieno.ktmidi.AndroidMidi2Access
+import dev.anthonyhfm.amethyst.ui.theme.ComposeAmethystTheme
 import dev.atsushieno.ktmidi.AndroidMidiAccess
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.init
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         FileKit.init(this)
 
         platformMidiAccess = AndroidMidiAccess(this)
 
-        enableEdgeToEdge()
-
         setContent {
-            App()
+            val darkMode = true
+
+            ApplySystemBarStyle(
+                window = window,
+                darkMode = darkMode,
+            )
+
+            ComposeAmethystTheme(
+                darkMode = darkMode,
+            ) {
+                App()
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApplySystemBarStyle(
+    window: Window,
+    darkMode: Boolean,
+) {
+    SideEffect {
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !darkMode
+            isAppearanceLightNavigationBars = !darkMode
         }
     }
 }
@@ -32,5 +61,7 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    App()
+    ComposeAmethystTheme {
+        App()
+    }
 }

@@ -190,7 +190,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ] && [ -d \"$CI_DERIVED_DATA_PATH/JDK/Home\" ]; then\n  export JAVA_HOME=\"$CI_DERIVED_DATA_PATH/JDK/Home\"\n  export PATH=\"$JAVA_HOME/bin:$PATH\"\nfi\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ]; then\n  export GRADLE_USER_HOME=\"$CI_DERIVED_DATA_PATH/.gradle\"\nfi\n\n# Wenn wir nicht in CI sind, prüfen wir ob JAVA_HOME gesetzt ist,\n# ansonsten versuchen wir es über /usr/libexec/java_home zu finden.\nif [ -z \"$CI_PULL_REQUEST_NUMBER\" ] && [ -z \"$JAVA_HOME\" ]; then\n  if [ -x /usr/libexec/java_home ]; then\n    export JAVA_HOME=$(/usr/libexec/java_home)\n  fi\nfi\n\necho \"JAVA_HOME=$JAVA_HOME\"\njava -version\n\ncd \"$SRCROOT/..\"\nchmod +x ./gradlew\n\n# Bestimme den Build-Typ basierend auf der Xcode-Konfiguration\nif [ \"$CONFIGURATION\" = \"Release\" ]; then\n  export KOTLIN_FRAMEWORK_BUILD_TYPE=Release\nelse\n  export KOTLIN_FRAMEWORK_BUILD_TYPE=Debug\nfi\n\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
+			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\nset -e\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ] && [ -d \"$CI_DERIVED_DATA_PATH/JDK/Home\" ]; then\n  export JAVA_HOME=\"$CI_DERIVED_DATA_PATH/JDK/Home\"\n  export PATH=\"$JAVA_HOME/bin:$PATH\"\nfi\n\nif [ -n \"$CI_DERIVED_DATA_PATH\" ]; then\n  export GRADLE_USER_HOME=\"$CI_DERIVED_DATA_PATH/.gradle\"\nfi\n\n# Wenn wir nicht in CI sind, prüfen wir ob JAVA_HOME gesetzt ist,\n# ansonsten versuchen wir es über /usr/libexec/java_home zu finden.\nif [ -z \"$CI_PULL_REQUEST_NUMBER\" ] && [ -z \"$JAVA_HOME\" ]; then\n  if [ -x /usr/libexec/java_home ]; then\n    export JAVA_HOME=$(/usr/libexec/java_home)\n  fi\nfi\n\necho \"JAVA_HOME=$JAVA_HOME\"\njava -version\n\ncd \"$SRCROOT/..\"\nchmod +x ./gradlew\n\n# Bestimme den Build-Typ basierend auf der Xcode-Konfiguration\nif [ \"$CONFIGURATION\" = \"Release\" ]; then\n  export KOTLIN_FRAMEWORK_BUILD_TYPE=Release\nelse\n  export KOTLIN_FRAMEWORK_BUILD_TYPE=Debug\nfi\n\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -346,7 +346,7 @@
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Amethyst;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -380,7 +380,7 @@
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Amethyst;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
