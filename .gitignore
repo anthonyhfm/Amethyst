@@ -1,5 +1,6 @@
 *.iml
 .kotlin
+.agents
 .gradle
 **/build/
 xcuserdata
@@ -21,3 +22,4 @@ CLAUDE.md
 iosApp/Gemfile.lock
 specs/
 docs/
+skills-lock.json

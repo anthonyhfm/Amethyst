@@ -1,96 +1,51 @@
+//
+//  ContentView.swift
+//  iosApp
+//
+//  Created by Anthony Hofmeister on 30.10.25.
+//  Copyright © 2025 Anthony Hofmeister. All rights reserved.
+//
+
 import UIKit
 import SwiftUI
 import ComposeApp
 
-private struct SwiftTheme {
-    let palette: SwiftAmethystPalette
+// MARK: - Workspace host (KMP Compose)
 
-    init(darkMode: Bool) {
-        palette = AmethystSwiftThemeBridge.shared.palette(darkMode: darkMode)
+private struct WorkspaceView: UIViewControllerRepresentable {
+    let darkMode: Bool
+    let onBack: () -> Void
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        MainViewControllerKt.WorkspaceViewController(darkMode: darkMode, onBack: onBack)
     }
 
-    var background: Color { Color(argb: palette.backgroundArgb) }
-    var foreground: Color { Color(argb: palette.foregroundArgb) }
-    var card: Color { Color(argb: palette.cardArgb) }
-    var primary: Color { Color(argb: palette.primaryArgb) }
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 
-private extension Color {
-    init(argb: Int64) {
-        let value = UInt64(argb)
-        let alpha = Double((value >> 24) & 0xFF) / 255.0
-        let red = Double((value >> 16) & 0xFF) / 255.0
-        let green = Double((value >> 8) & 0xFF) / 255.0
-        let blue = Double(value & 0xFF) / 255.0
-
-        self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
-    }
-}
-
-private struct HomeTabScreen: View {
-    let title: String
-    let theme: SwiftTheme
-
-    var body: some View {
-        ZStack {
-            theme.background
-                .ignoresSafeArea()
-
-            Text(title)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(theme.foreground)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .navigationTitle(title)
-        .toolbarBackground(theme.background, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(theme.card, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-    }
-}
+// MARK: - Root content
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorScheme)  private var colorScheme
 
-    private var theme: SwiftTheme {
-        SwiftTheme(darkMode: colorScheme == .dark)
+    @State private var viewModel = HomeViewModel()
+
+    private var theme: AmethystTheme {
+        AmethystTheme(darkMode: colorScheme == .dark)
     }
 
     var body: some View {
-        TabView {
-            NavigationStack {
-                HomeTabScreen(
-                    title: "Projects",
-                    theme: theme
-                )
-            }
-            .tabItem {
-                Label("Projects", systemImage: "folder")
-            }
-
-            NavigationStack {
-                HomeTabScreen(
-                    title: "Browser",
-                    theme: theme
-                )
-            }
-            .tabItem {
-                Label("Browser", systemImage: "globe")
-            }
-
-            NavigationStack {
-                HomeTabScreen(
-                    title: "Settings",
-                    theme: theme
-                )
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gearshape")
+        Group {
+            if viewModel.isWorkspaceOpen {
+                WorkspaceView(darkMode: colorScheme == .dark) {
+                    viewModel.workspaceClosed()
+                }
+                .ignoresSafeArea()
+            } else {
+                homeTabView
             }
         }
-        .tint(theme.primary)
-        .background(theme.background)
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
         }
@@ -100,4 +55,63 @@ struct ContentView: View {
             }
         }
     }
+
+    // MARK: - Home tab bar
+
+    private var homeTabView: some View {
+        TabView {
+            // Projects tab
+            ProjectsTabView(viewModel: viewModel)
+                .tabItem {
+                    Label("Projects", systemImage: "folder")
+                }
+
+            // Browser tab (work in progress)
+            NavigationStack {
+                ZStack {
+                    theme.background.ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image(systemName: "globe")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text("Work in Progress")
+                            .font(.headline)
+                        Text("Nothing to see here yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("Browser")
+                }
+            }
+            .tabItem {
+                Label("Browser", systemImage: "globe")
+            }
+
+            // Settings tab (work in progress)
+            NavigationStack {
+                ZStack {
+                    theme.background.ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image(systemName: "gearshape")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text("Settings")
+                            .font(.headline)
+                        Text("Coming soon.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("Settings")
+                }
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape")
+            }
+        }
+        .tint(theme.primary)
+        .amethystThemed()
+    }
 }
+
