@@ -5,7 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,7 +40,7 @@ class ViewportLaunchpadPro(
 
         Box(
             modifier = Modifier
-                .size(width = size.width.dp * 40, height = size.height.dp * 40)
+                .requiredSize(width = size.width.dp * 40, height = size.height.dp * 40)
                 .clip(shape)
                 .background(Color(0xFF0d0d0d)),
             contentAlignment = Alignment.Center
