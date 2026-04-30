@@ -27,10 +27,10 @@ fun HomeNavigationDrawer(
     content: @Composable () -> Unit,
 ) {
     val drawerItemColors = NavigationDrawerItemDefaults.colors(
-        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-        selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        selectedTextColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+        selectedIconColor = MaterialTheme.colorScheme.primary,
+        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+        unselectedContainerColor = MaterialTheme.colorScheme.background,
         unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -41,7 +41,7 @@ fun HomeNavigationDrawer(
                 modifier = Modifier
                     .width(240.dp)
                     .fillMaxHeight(),
-                drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                drawerContainerColor = MaterialTheme.colorScheme.background,
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
