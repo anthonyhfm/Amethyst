@@ -10,13 +10,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,39 +51,10 @@ fun SettingsRenderer(isFirstIndex: Boolean, isLastIndex: Boolean, setting: Setti
             .background(MaterialTheme.colorScheme.primaryContainer),
     ) {
         when (setting) {
-            is Setting.Select<*> -> { }
-            is Setting.Slider -> { }
+            is Setting.Select<*> -> SelectSettingContent(setting)
+            is Setting.Slider -> SliderSettingContent(setting)
             is Setting.TextField -> { }
             is Setting.Toggle -> ToggleSettingContent(setting)
         }
-    }
-}
-
-@Composable
-private fun ToggleSettingContent(setting: Setting.Toggle) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = 12.dp),
-
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = setting.title,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            style = MaterialTheme.typography.titleMedium,
-        )
-
-        Switch(
-            checked = setting.flow.collectAsState().value,
-            colors = SwitchDefaults.colors(
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-            ),
-            onCheckedChange = {
-                setting.update(it)
-            },
-        )
     }
 }

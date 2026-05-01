@@ -7,7 +7,7 @@ import dev.anthonyhfm.amethyst.core.util.platform
 object GeneralSettings : SettingsGroup("General") {
     val performanceFPS: Setting.Select<Int> = select(
         key = "framesPerSecond",
-        title = "Frames per Second (FPS)",
+        title = "Refresh rate",
         default = if (platform is Platform.iOS || platform is Platform.Android) 90 else 120,
         options = listOf(60, 90, 120),
         codec = SettingCodec.Int,
