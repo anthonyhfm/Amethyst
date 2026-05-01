@@ -13,7 +13,6 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMiniMk3
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMystrix
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePro
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePush2
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
 import dev.anthonyhfm.amethyst.core.util.Platform
@@ -64,7 +63,6 @@ class AmethystMidiManager {
         LaunchpadDeviceType.LAUNCHPAD_PRO to { LaunchpadDevicePro.identify(it) },
         LaunchpadDeviceType.LAUNCHPAD_MK2 to { LaunchpadDeviceMK2.identify(it) },
         LaunchpadDeviceType.MYSTRIX to { LaunchpadDeviceMystrix.identify(it) },
-        LaunchpadDeviceType.ABLETON_PUSH_2 to { LaunchpadDevicePush2.identify(it) },
     )
 
     @OptIn(ExperimentalUnsignedTypes::class)
@@ -163,10 +161,10 @@ class AmethystMidiManager {
 
                     if (platform is Platform.iOS) {
                         msgCopy.toList().chunked(3).forEach {
-                            onMidiMessage(it.toByteArray(), deviceType)
+                            onMidiMessage(it.toByteArray())
                         }
                     } else {
-                        onMidiMessage(msgCopy, deviceType)
+                        onMidiMessage(msgCopy)
                     }
                 }
 
@@ -196,13 +194,9 @@ class AmethystMidiManager {
         monitorJob = null
     }
 
-    fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray, deviceType: LaunchpadDeviceType?) {
+    fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray) {
         midiInScope.launch {
-            val data = if (deviceType == LaunchpadDeviceType.ABLETON_PUSH_2) {
-                LaunchpadDevicePush2.getMidiInputData(msg)
-            } else {
-                getMidiInputData(msg)
-            }
+            val data = getMidiInputData(msg)
 
             data?.let {
                 if (WorkspaceRepository.mode.value.claimInputs) {
@@ -265,7 +259,6 @@ class AmethystMidiManager {
             LaunchpadDeviceType.LAUNCHPAD_PRO_CFW -> LaunchpadDevicePro(output, true)
             LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(output)
             LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(output)
-            LaunchpadDeviceType.ABLETON_PUSH_2 -> LaunchpadDevicePush2(output)
         }
     }
 

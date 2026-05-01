@@ -11,6 +11,7 @@ object GeneralSettings : SettingsGroup("General") {
         default = if (platform is Platform.iOS || platform is Platform.Android) 90 else 120,
         options = listOf(60, 90, 120),
         codec = SettingCodec.Int,
+        label = { "$it Hz" },
         onUpdate = { Heaven.fps = it },
     )
 

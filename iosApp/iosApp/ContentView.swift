@@ -30,6 +30,7 @@ struct ContentView: View {
     @Environment(\.colorScheme)  private var colorScheme
 
     @State private var viewModel = HomeViewModel()
+    @State private var settingsViewModel = SettingsViewModel()
 
     private var theme: AmethystTheme {
         AmethystTheme(darkMode: colorScheme == .dark)
@@ -88,27 +89,11 @@ struct ContentView: View {
                 Label("Browser", systemImage: "globe")
             }
 
-            // Settings tab (work in progress)
-            NavigationStack {
-                ZStack {
-                    theme.background.ignoresSafeArea()
-                    VStack(spacing: 12) {
-                        Image(systemName: "gearshape")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("Settings")
-                            .font(.headline)
-                        Text("Coming soon.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .navigationTitle("Settings")
+            // Settings tab
+            SettingsTabView(viewModel: settingsViewModel)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
                 }
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gearshape")
-            }
         }
         .tint(theme.primary)
         .amethystThemed()

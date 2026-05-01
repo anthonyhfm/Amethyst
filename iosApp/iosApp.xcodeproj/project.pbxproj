@@ -30,6 +30,7 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9264E1792EB3D9A00031C7A3 /* Utils */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Utils; sourceTree = "<group>"; };
 		AA00000100000000000AA002 /* Home */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Home; sourceTree = "<group>"; };
+		AA00000100000000000AA003 /* Settings */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Settings; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +84,7 @@
 				9237F2762EF4824000BBFCF3 /* iosApp.entitlements */,
 				9264E1792EB3D9A00031C7A3 /* Utils */,
 				AA00000100000000000AA002 /* Home */,
+				AA00000100000000000AA003 /* Settings */,
 				058557BA273AAA24004C7B11 /* Assets.xcassets */,
 				AA00000100000000000AA000 /* AmethystTheme.swift */,
 				7555FF82242A565900829871 /* ContentView.swift */,
@@ -120,6 +122,7 @@
 			fileSystemSynchronizedGroups = (
 				9264E1792EB3D9A00031C7A3 /* Utils */,
 				AA00000100000000000AA002 /* Home */,
+				AA00000100000000000AA003 /* Settings */,
 			);
 			name = iosApp;
 			packageProductDependencies = (
