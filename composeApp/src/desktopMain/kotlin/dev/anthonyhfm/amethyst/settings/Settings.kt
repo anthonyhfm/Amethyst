@@ -19,11 +19,6 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.settings.data.AudioSettings
-import dev.anthonyhfm.amethyst.settings.data.DiscordSettings
-import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
-import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
-import dev.anthonyhfm.amethyst.settings.data.SettingsGroup
 import dev.anthonyhfm.amethyst.settings.data.SettingsRepository
 import dev.anthonyhfm.amethyst.settings.ui.SettingRenderer
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsCategory

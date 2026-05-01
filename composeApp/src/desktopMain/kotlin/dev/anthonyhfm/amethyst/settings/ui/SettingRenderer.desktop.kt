@@ -23,7 +23,7 @@ import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.roundToInt
 
 @Composable
-actual fun SettingRenderer(setting: Setting<*>) {
+fun SettingRenderer(setting: Setting<*>) {
     @Suppress("UNCHECKED_CAST")
     when (setting) {
         is Setting.Toggle -> ToggleSettingItem(setting)
