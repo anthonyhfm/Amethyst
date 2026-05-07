@@ -695,7 +695,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             raw.map { (time, signals) ->
                 val mapped = Pincher.applyPinch(time.toDouble(), totalD, pinch, bilateral).toInt()
                 mapped to signals
-            }.distinctBy { it.first }
+            }.groupBy { it.first }
+                .map { (time, frames) -> time to frames.flatMap { it.second } }
                 .sortedBy { it.first }
                 .let { mappedList ->
                     val withStart = if (mappedList.firstOrNull()?.first != 0) listOf(0 to mappedList.first().second) + mappedList else mappedList

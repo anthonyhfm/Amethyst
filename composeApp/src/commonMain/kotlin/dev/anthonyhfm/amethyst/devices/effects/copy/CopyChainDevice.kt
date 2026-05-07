@@ -727,7 +727,9 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
             return raw.map { (time, signals) ->
                 val mapped = dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher.applyPinch(time.toDouble(), totalD, pinch, bilateral).toInt()
                 mapped to signals
-            }.distinctBy { it.first }.sortedBy { it.first }
+            }.groupBy { it.first }
+                .map { (time, frames) -> time to frames.flatMap { it.second } }
+                .sortedBy { it.first }
         }
         return raw
     }
