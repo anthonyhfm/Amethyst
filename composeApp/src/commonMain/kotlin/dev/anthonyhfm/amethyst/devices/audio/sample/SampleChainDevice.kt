@@ -87,6 +87,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 private data class SampleEnvelopeDragState(
     val beforePoint: TimelineAutomationPoint,
@@ -120,7 +121,11 @@ private const val SampleEnvelopeCurvePathSteps = 16
 class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     override val state = MutableStateFlow(SampleChainDeviceState())
 
-    companion object {
+    companion object : ChainDeviceFactory<SampleChainDeviceState> {
+        override val stateClass = SampleChainDeviceState::class
+        override val serializer = SampleChainDeviceState.serializer()
+        override fun create() = SampleChainDevice()
+
         private const val VOLUME_MIN_DB = -24f
         private const val VOLUME_MAX_DB = 24f
         private const val VOLUME_RANGE_DB = VOLUME_MAX_DB - VOLUME_MIN_DB

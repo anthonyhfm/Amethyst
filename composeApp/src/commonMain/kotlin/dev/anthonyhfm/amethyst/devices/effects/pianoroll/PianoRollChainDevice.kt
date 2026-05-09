@@ -33,6 +33,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 private const val MAX_PITCH_PER_DEVICE = 100
 private const val DEFAULT_DURATION_MS = 4000L
@@ -192,6 +193,12 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
         val x = localPitch % 10
         val y = 9 - (localPitch / 10)
         return Pair(x, y)
+    }
+
+    companion object : ChainDeviceFactory<PianoRollChainDeviceState> {
+        override val stateClass = PianoRollChainDeviceState::class
+        override val serializer = PianoRollChainDeviceState.serializer()
+        override fun create() = PianoRollChainDevice()
     }
 }
 

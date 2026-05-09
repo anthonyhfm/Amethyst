@@ -61,6 +61,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 @Serializable
 enum class GradientSmoothness {
@@ -686,6 +687,12 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
     override fun onChoke() {
         activeRunTokens.clear()
         Heaven.cancelJobsForOwner(this)
+    }
+
+    companion object : ChainDeviceFactory<GradientChainDeviceState> {
+        override val stateClass = GradientChainDeviceState::class
+        override val serializer = GradientChainDeviceState.serializer()
+        override fun create() = GradientChainDevice()
     }
 }
 

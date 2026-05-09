@@ -36,6 +36,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(HoldChainDeviceState())
@@ -350,6 +351,12 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
         Heaven.cancelJobs { job ->
             job.owner is Pair<*, *> && job.owner.first == this
         }
+    }
+
+    companion object : ChainDeviceFactory<HoldChainDeviceState> {
+        override val stateClass = HoldChainDeviceState::class
+        override val serializer = HoldChainDeviceState.serializer()
+        override fun create() = HoldChainDevice()
     }
 }
 

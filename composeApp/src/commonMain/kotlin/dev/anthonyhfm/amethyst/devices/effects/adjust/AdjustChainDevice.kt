@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
     override val state = MutableStateFlow(AdjustChainDeviceState())
@@ -165,6 +166,12 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
         b = (b - s.tint * 0.1f).coerceIn(0f, 1f)
 
         return Color(red = r, green = g, blue = b, alpha = color.alpha)
+    }
+
+    companion object : ChainDeviceFactory<AdjustChainDeviceState> {
+        override val stateClass = AdjustChainDeviceState::class
+        override val serializer = AdjustChainDeviceState.serializer()
+        override fun create() = AdjustChainDevice()
     }
 }
 

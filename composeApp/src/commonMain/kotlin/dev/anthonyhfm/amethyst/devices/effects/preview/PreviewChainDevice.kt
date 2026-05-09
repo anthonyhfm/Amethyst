@@ -43,6 +43,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportE
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class PreviewChainDevice : GenericChainDevice<PreviewChainDeviceState>() {
     override val state = MutableStateFlow(PreviewChainDeviceState)
@@ -175,6 +176,12 @@ class PreviewChainDevice : GenericChainDevice<PreviewChainDeviceState>() {
                 tint = Theme[colors][primaryForeground],
             )
         }
+    }
+
+    companion object : ChainDeviceFactory<PreviewChainDeviceState> {
+        override val stateClass = PreviewChainDeviceState::class
+        override val serializer = PreviewChainDeviceState.serializer()
+        override fun create() = PreviewChainDevice()
     }
 }
 

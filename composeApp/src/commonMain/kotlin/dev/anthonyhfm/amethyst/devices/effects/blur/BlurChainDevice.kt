@@ -44,6 +44,7 @@ import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
     override val state = MutableStateFlow(BlurChainDeviceState())
@@ -290,6 +291,12 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
     )
 
     private fun Color.isLit(): Boolean = red > 0f || green > 0f || blue > 0f
+
+    companion object : ChainDeviceFactory<BlurChainDeviceState> {
+        override val stateClass = BlurChainDeviceState::class
+        override val serializer = BlurChainDeviceState.serializer()
+        override fun create() = BlurChainDevice()
+    }
 }
 
 @Composable

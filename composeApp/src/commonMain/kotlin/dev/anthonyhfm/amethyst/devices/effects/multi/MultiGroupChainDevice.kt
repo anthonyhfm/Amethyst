@@ -67,8 +67,10 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 
-class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
+class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), NestedChainDevice {
     override val state = MutableStateFlow(MultiGroupChainDeviceState())
 
     private val actionLayer = GroupEditorActionLayer(
@@ -628,6 +630,18 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>() {
             atIndex = atIndex,
             selectInsertedGroup = selectInsertedGroup,
         )
+    }
+
+    override fun nestedChains() = state.value.groups.map { it.chain } + listOf(preprocessChain)
+
+    companion object : ChainDeviceFactory<MultiGroupChainDeviceState> {
+        override val stateClass = MultiGroupChainDeviceState::class
+        override val serializer = MultiGroupChainDeviceState.serializer()
+        override fun create() = MultiGroupChainDevice()
+        override fun pack(device: GenericChainDevice<MultiGroupChainDeviceState>): MultiGroupChainDeviceState =
+            (device as MultiGroupChainDevice).packState()
+        override fun unpack(state: MultiGroupChainDeviceState): MultiGroupChainDevice =
+            MultiGroupChainDevice().apply { loadFromState(state) }
     }
 }
 

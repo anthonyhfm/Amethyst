@@ -61,6 +61,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>() {
     override val state = MutableStateFlow(MacroFilterChainDeviceState())
@@ -256,6 +257,12 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
         if (macroValue in state.value.allowedValues) {
             signalExit?.invoke(n)
         }
+    }
+
+    companion object : ChainDeviceFactory<MacroFilterChainDeviceState> {
+        override val stateClass = MacroFilterChainDeviceState::class
+        override val serializer = MacroFilterChainDeviceState.serializer()
+        override fun create() = MacroFilterChainDevice()
     }
 }
 

@@ -34,6 +34,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>() {
     override val state = MutableStateFlow(MacroControlChainDeviceState())
@@ -175,6 +176,12 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                 }
             }
         }
+    }
+
+    companion object : ChainDeviceFactory<MacroControlChainDeviceState> {
+        override val stateClass = MacroControlChainDeviceState::class
+        override val serializer = MacroControlChainDeviceState.serializer()
+        override fun create() = MacroControlChainDevice()
     }
 }
 

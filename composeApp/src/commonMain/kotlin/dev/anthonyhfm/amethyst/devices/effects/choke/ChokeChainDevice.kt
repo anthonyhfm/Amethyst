@@ -51,8 +51,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 
-class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
+class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChainDevice {
     override val state = MutableStateFlow(ChokeChainDeviceState())
 
     init {
@@ -64,7 +66,17 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
         chokeDevicesByChannel.getOrPut(state.value.target) { mutableListOf() }.add(this)
     }
 
-    companion object {
+    companion object : ChainDeviceFactory<ChokeChainDeviceState> {
+        override val stateClass = ChokeChainDeviceState::class
+        override val serializer = ChokeChainDeviceState.serializer()
+        override fun create() = ChokeChainDevice()
+        override fun pack(device: GenericChainDevice<ChokeChainDeviceState>): ChokeChainDeviceState =
+            device.state.value.copy(stateChain = StateChain.pack(device.state.value.chain))
+        override fun unpack(state: ChokeChainDeviceState): ChokeChainDevice =
+            ChokeChainDevice().apply {
+                this.state.update { state.copy(chain = state.stateChain.unpack()) }
+            }
+
         // Map of choke channel to list of choke devices on that channel
         private val chokeDevicesByChannel = mutableMapOf<Int, MutableList<ChokeChainDevice>>()
 
@@ -375,6 +387,8 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>() {
         // Pass signals through to the chain
         state.value.chain.signalEnter(n)
     }
+
+    override fun nestedChains() = listOf(state.value.chain)
 }
 
 @Serializable

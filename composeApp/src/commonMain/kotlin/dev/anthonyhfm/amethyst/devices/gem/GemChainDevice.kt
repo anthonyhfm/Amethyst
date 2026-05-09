@@ -42,6 +42,7 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class GemChainDevice(
     initialState: GemDeviceState = GemDeviceState(),
@@ -324,6 +325,13 @@ class GemChainDevice(
         code = GemDeviceIssueCode.RUNTIME_FAILURE,
         message = message
     )
+
+    companion object : ChainDeviceFactory<GemDeviceState> {
+        override val stateClass = GemDeviceState::class
+        override val serializer = GemDeviceState.serializer()
+        override fun create() = GemChainDevice()
+        override fun unpack(state: GemDeviceState) = GemChainDevice(initialState = state)
+    }
 }
 
 private fun List<GemDeviceIssue>.appendDistinct(issue: GemDeviceIssue): List<GemDeviceIssue> {

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(DelayChainDeviceState())
@@ -125,6 +126,12 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
     override fun onChoke() {
         // Cancel all scheduled Heaven tasks owned by this device
         Heaven.cancelJobsForOwner(this)
+    }
+
+    companion object : ChainDeviceFactory<DelayChainDeviceState> {
+        override val stateClass = DelayChainDeviceState::class
+        override val serializer = DelayChainDeviceState.serializer()
+        override fun create() = DelayChainDevice()
     }
 }
 

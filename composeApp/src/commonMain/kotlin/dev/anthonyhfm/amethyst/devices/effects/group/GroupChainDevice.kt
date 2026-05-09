@@ -119,9 +119,11 @@ import kotlinx.serialization.Serializable
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 
 
-class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
+class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChainDevice {
     override val state = MutableStateFlow(GroupChainDeviceState())
 
     private val actionLayer = GroupEditorActionLayer(
@@ -385,6 +387,18 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>() {
             )
             SelectionManager.select(groupChainItem, single = false)
         }
+    }
+
+    override fun nestedChains() = state.value.groups.map { it.chain }
+
+    companion object : ChainDeviceFactory<GroupChainDeviceState> {
+        override val stateClass = GroupChainDeviceState::class
+        override val serializer = GroupChainDeviceState.serializer()
+        override fun create() = GroupChainDevice()
+        override fun pack(device: GenericChainDevice<GroupChainDeviceState>): GroupChainDeviceState =
+            (device as GroupChainDevice).packState()
+        override fun unpack(state: GroupChainDeviceState): GroupChainDevice =
+            GroupChainDevice().apply { loadFromState(state) }
     }
 }
 

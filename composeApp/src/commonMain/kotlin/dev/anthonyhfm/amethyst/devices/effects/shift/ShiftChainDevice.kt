@@ -29,6 +29,7 @@ import kotlinx.serialization.Serializable
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
     override val state = MutableStateFlow(ShiftChainDeviceState())
@@ -209,6 +210,12 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
             blue = (b1 + m).coerceIn(0f, 1f),
             alpha = color.alpha
         )
+    }
+
+    companion object : ChainDeviceFactory<ShiftChainDeviceState> {
+        override val stateClass = ShiftChainDeviceState::class
+        override val serializer = ShiftChainDeviceState.serializer()
+        override fun create() = ShiftChainDevice()
     }
 }
 

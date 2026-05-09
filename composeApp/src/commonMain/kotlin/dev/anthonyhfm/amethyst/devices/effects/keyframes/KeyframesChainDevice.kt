@@ -53,6 +53,7 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.snapshotFlow
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(KeyframesChainDeviceState())
@@ -933,5 +934,11 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         // Cancel all scheduled Heaven tasks owned by this device
         Heaven.cancelJobsForOwner(this)
         heldSignals.clear()
+    }
+
+    companion object : ChainDeviceFactory<KeyframesChainDeviceContract.KeyframesChainDeviceState> {
+        override val stateClass = KeyframesChainDeviceContract.KeyframesChainDeviceState::class
+        override val serializer = KeyframesChainDeviceContract.KeyframesChainDeviceState.serializer()
+        override fun create() = KeyframesChainDevice()
     }
 }

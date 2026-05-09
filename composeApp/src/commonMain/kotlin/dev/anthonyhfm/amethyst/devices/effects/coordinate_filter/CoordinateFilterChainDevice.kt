@@ -41,6 +41,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportE
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDeviceState>() {
     override val state = MutableStateFlow(CoordinateFilterChainDeviceState())
@@ -281,6 +282,12 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         if (filteredSignals.isNotEmpty()) {
             signalExit?.invoke(filteredSignals)
         }
+    }
+
+    companion object : ChainDeviceFactory<CoordinateFilterChainDeviceState> {
+        override val stateClass = CoordinateFilterChainDeviceState::class
+        override val serializer = CoordinateFilterChainDeviceState.serializer()
+        override fun create() = CoordinateFilterChainDevice()
     }
 }
 

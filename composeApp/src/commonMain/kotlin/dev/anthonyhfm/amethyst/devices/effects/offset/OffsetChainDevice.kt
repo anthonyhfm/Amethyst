@@ -49,6 +49,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
     override val state = MutableStateFlow(OffsetChainDeviceState())
@@ -290,6 +291,12 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
     private fun wrapInRange(value: Int, min: Int, max: Int): Int {
         val size = max - min + 1
         return min + ((value - min).mod(size))
+    }
+
+    companion object : ChainDeviceFactory<OffsetChainDeviceState> {
+        override val stateClass = OffsetChainDeviceState::class
+        override val serializer = OffsetChainDeviceState.serializer()
+        override fun create() = OffsetChainDevice()
     }
 }
 

@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
     private val channels = (1..MAX_CHANNELS).toList()
@@ -194,7 +195,11 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
         receivers.remove(selectionUUID)
     }
 
-    companion object {
+    companion object : ChainDeviceFactory<TransmitChainDeviceState> {
+        override val stateClass = TransmitChainDeviceState::class
+        override val serializer = TransmitChainDeviceState.serializer()
+        override fun create() = TransmitChainDevice()
+
         private const val MAX_CHANNELS = 16
         private val receivers: MutableMap<String, TransmitChainDevice> = mutableMapOf()
 

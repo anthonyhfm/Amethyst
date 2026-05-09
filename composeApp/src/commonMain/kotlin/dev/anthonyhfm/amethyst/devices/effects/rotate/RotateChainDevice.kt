@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
     override val state = MutableStateFlow(RotateChainDeviceState())
@@ -184,6 +185,12 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                 }
             }
         }
+    }
+
+    companion object : ChainDeviceFactory<RotateChainDeviceState> {
+        override val stateClass = RotateChainDeviceState::class
+        override val serializer = RotateChainDeviceState.serializer()
+        override fun create() = RotateChainDevice()
     }
 }
 

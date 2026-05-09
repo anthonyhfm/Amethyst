@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class OpacityChainDevice : LEDChainDevice<OpacityChainDeviceState>() {
     override val state = MutableStateFlow(OpacityChainDeviceState())
@@ -63,6 +64,12 @@ class OpacityChainDevice : LEDChainDevice<OpacityChainDeviceState>() {
             if (signal.color.isLit()) signal.copy(opacity = state.value.opacity)
             else signal  // off signal passes through unmodified (opacity=1f default) to clear its slot
         })
+    }
+
+    companion object : ChainDeviceFactory<OpacityChainDeviceState> {
+        override val stateClass = OpacityChainDeviceState::class
+        override val serializer = OpacityChainDeviceState.serializer()
+        override fun create() = OpacityChainDevice()
     }
 }
 

@@ -30,6 +30,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
     override val state = MutableStateFlow(ColorFilterChainDeviceState())
@@ -243,6 +244,12 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
         if (filtered.isNotEmpty()) {
             signalExit?.invoke(filtered)
         }
+    }
+
+    companion object : ChainDeviceFactory<ColorFilterChainDeviceState> {
+        override val stateClass = ColorFilterChainDeviceState::class
+        override val serializer = ColorFilterChainDeviceState.serializer()
+        override fun create() = ColorFilterChainDevice()
     }
 }
 

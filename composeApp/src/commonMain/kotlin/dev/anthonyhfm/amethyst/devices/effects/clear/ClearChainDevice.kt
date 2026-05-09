@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class ClearChainDevice : LEDChainDevice<ClearChainDeviceState>() {
     override val state = MutableStateFlow(ClearChainDeviceState())
@@ -34,6 +35,12 @@ class ClearChainDevice : LEDChainDevice<ClearChainDeviceState>() {
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
         signalExit?.invoke(n)
+    }
+
+    companion object : ChainDeviceFactory<ClearChainDeviceState> {
+        override val stateClass = ClearChainDeviceState::class
+        override val serializer = ClearChainDeviceState.serializer()
+        override fun create() = ClearChainDevice()
     }
 }
 

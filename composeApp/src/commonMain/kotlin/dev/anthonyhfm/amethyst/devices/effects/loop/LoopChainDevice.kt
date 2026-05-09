@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
     private val activeHoldKeys = mutableSetOf<String>()
@@ -313,6 +314,12 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
         Heaven.cancelJobs { job ->
             job.owner is Pair<*, *> && job.owner.first == this
         }
+    }
+
+    companion object : ChainDeviceFactory<LoopChainDeviceState> {
+        override val stateClass = LoopChainDeviceState::class
+        override val serializer = LoopChainDeviceState.serializer()
+        override fun create() = LoopChainDevice()
     }
 }
 
