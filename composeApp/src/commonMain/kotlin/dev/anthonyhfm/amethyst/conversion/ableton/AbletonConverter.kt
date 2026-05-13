@@ -96,15 +96,14 @@ object AbletonConverter : AmethystConverter {
         isZip = true
 
         zipEntries.clear()
-        val entries = Zip.getEntries(file)
-
-        entries.forEach { entry ->
-            println("Entry: ${entry.path}")
+        val entries = Zip.getEntries(file).filter {
+            !it.path.contains("__MACOSX")
         }
+
         FileHelper.clearCache()
 
         entries.filter {
-            it.path.endsWith(".amxd") && !it.path.contains("__MACOSX")
+            it.path.endsWith(".amxd")
         }.forEach {
             println("Hash (${it.data.toFileHash()}) - ${it.path.substringAfterLast("/")}")
         }

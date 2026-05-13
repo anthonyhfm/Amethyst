@@ -5,6 +5,8 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.dovitate.CycleLightsAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.dovitate.LightspeedAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.AutoPageAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiExtAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GridFilterAdapter
@@ -26,7 +28,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.nameWithoutExtension
 
@@ -99,6 +100,7 @@ class MxDeviceMidiEffectAdapter(
                 }
 
                 "7bd5bf9ea8431c5697b226aa906d87ac",
+                "d56c1f4e81d50a7bfd6481099848e48a",
                 "af7c8717c232587ecea9ee2105eca17c" -> {
                     return DepthsSelectorAdapter(blob, offset).toDeviceStates()
                 }
@@ -156,6 +158,8 @@ class MxDeviceMidiEffectAdapter(
                 "f886850f9aba5cf8ae497f3e58231616",
                 "908c82a8eca07a56eaa35c1b6c6f72be",
                 "5aa613617ae0b0e24cbe715dbe3960e2",
+                "f004d757e3910cc81b317a55e4dd6263",
+                "f2504fe314d81dcc9b57e2466a157033",
                 "d53dcb292a173ab7853183f3cab7620c"-> {
                     return GenericMidiExtAdapter(device, offset).toDeviceStates()
                 }
@@ -169,12 +173,21 @@ class MxDeviceMidiEffectAdapter(
                     return MidiLauncherProAdapter(device, offset).toDeviceStates()
                 }
 
+                "aa743dda3d25332ecf3ae084eb7cbd30" -> {
+                    return LightspeedAdapter(device, offset).toDeviceStates()
+                }
+
+                "93b3690b7e7036ab0ba662e589d7ef37" -> {
+                    return CycleLightsAdapter(device).toDeviceStates()
+                }
+
                 "9f50358372279f946cae0fdac0cfbf56", // Wormhole Lite, unsure if this actually works!
                 "3d3de9b05506f279ad6cfe14d26e0084" -> {
                     return WormholeAdapter(blob).toDeviceStates()
                 }
 
-                "168cda682434227f77d52824814c8235" -> {
+                "168cda682434227f77d52824814c8235",
+                "6a7252ed039bba60831038cbc21dbdd7" -> { //
                     return GridFilterAdapter(blob, offset).toDeviceStates()
                 }
 

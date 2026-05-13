@@ -226,7 +226,7 @@ data class MidiClip(
             @Serializable
             data class KeyTrack(
                 @XmlSerialName("Id")
-                val id: Int,
+                val id: Int = 0,
 
                 @XmlElement
                 @XmlSerialName("Notes")

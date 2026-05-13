@@ -49,10 +49,19 @@ data class MxDeviceMidiEffect(
             @Serializable
             data class MxDFullFileDrop(
                 @SerialName("Id")
-                val id: Int,
+                val id: Int = 0,
                 @XmlElement
-                val ref: FileRefRef
+                val ref: FileRefRef,
+                @XmlElement
+                val name: Name? = null,
             ) {
+                @Serializable
+                @SerialName("Name")
+                data class Name(
+                    @SerialName("Value")
+                    val value: String
+                )
+
                 @Serializable
                 @SerialName("FileRef")
                 data class FileRefRef(

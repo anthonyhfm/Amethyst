@@ -24,7 +24,7 @@ class VelocityArpeggiatorAdapter(
 
         println("Converting Velocity Arpeggiator with rate $gradientRate and velocities $velocities")
 
-        val convertedRateString = rateRangeToTiming(gradientRate)
+        val convertedRateString = rateRangeToTiming(gradientRate.toInt())
         val rateMs = rythmIndexToDuration(convertedRateString, bpm, steps)
 
         return listOf(
@@ -47,7 +47,7 @@ class VelocityArpeggiatorAdapter(
 
     fun getGradientVelocities(): List<Int> {
         return device.macros.map {
-            it.manual.value
+            it.manual.value.toInt()
         }.filter {
             it != 0
         }

@@ -174,6 +174,6 @@ data class MidiEffectGroupDevice(
 
     @Serializable
     data class Macro(
-        val manual: AbletonManual<Int>
+        val manual: AbletonManual<Float>
     )
 }

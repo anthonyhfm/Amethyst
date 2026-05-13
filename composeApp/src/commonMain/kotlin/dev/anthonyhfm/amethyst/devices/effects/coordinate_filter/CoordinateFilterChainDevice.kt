@@ -12,9 +12,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
@@ -114,40 +119,51 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     @Composable
     private fun VirtualDeviceContainer() {
         val original = Heaven.devices.firstOrNull() ?: return
-        val newInstance = when (original) {
-            is ViewportLaunchpadPro -> ViewportLaunchpadPro()
-            is ViewportLaunchpadMk2 -> ViewportLaunchpadMk2()
-            is ViewportLaunchpadX -> ViewportLaunchpadX()
-            is ViewportLaunchpadProMk3 -> ViewportLaunchpadProMk3()
-            is ViewportMystrix -> ViewportMystrix()
-            is ViewportMidiFighter64 -> ViewportMidiFighter64()
+        val currentState by state.collectAsState()
 
-            else -> error("Not supported viewport device type for CoordinateFilter preview")
+        val newInstance = remember(original) {
+            when (original) {
+                is ViewportLaunchpadPro -> ViewportLaunchpadPro()
+                is ViewportLaunchpadMk2 -> ViewportLaunchpadMk2()
+                is ViewportLaunchpadX -> ViewportLaunchpadX()
+                is ViewportLaunchpadProMk3 -> ViewportLaunchpadProMk3()
+                is ViewportMystrix -> ViewportMystrix()
+                is ViewportMidiFighter64 -> ViewportMidiFighter64()
+
+                else -> error("Not supported viewport device type for CoordinateFilter preview")
+            }
         }
 
         fun buildPreviewUpdates(): List<RawLEDUpdate> {
-            return state.value.padFilters
-                .filter { it.launchpadId == original.launchpadId }
-                .map {
-                    val posX = it.localX + original.layout.offsetX
-                    val posY = (original.layout.rows - 1 - it.localY) + original.layout.offsetY
+            return if (currentState.padFilters.isNotEmpty()) {
+                currentState.padFilters
+                    .filter { it.launchpadId == original.launchpadId }
+                    .map {
+                        val posX = it.localX + original.layout.offsetX
+                        val posY = (original.layout.rows - 1 - it.localY) + original.layout.offsetY
+                        RawLEDUpdate(
+                            index = posX + posY * 10,
+                            color = Color.Green
+                        )
+                    }
+            } else {
+                // Legacy fallback: global coordinate pairs (from old saves / Ableton imports)
+                currentState.filters.map { (gx, gy) ->
                     RawLEDUpdate(
-                        index = posX + posY * 10,
+                        index = gx + gy * 10,
                         color = Color.Green
                     )
                 }
+            }
         }
 
         newInstance.onCapturePad = { (down, localX, localY) ->
             if (down) {
                 onSetKeyFilter(device = original, localX = localX, localY = localY)
             }
-
-            newInstance.previewState.clear()
-            newInstance.previewState.sendToPreview(buildPreviewUpdates())
         }
 
-        LaunchedEffect(Unit) {
+        LaunchedEffect(currentState.padFilters, currentState.filters) {
             newInstance.previewState.clear()
             newInstance.previewState.sendToPreview(buildPreviewUpdates())
         }
@@ -157,8 +173,11 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
                 .padding(8.dp)
                 .shadow(elevation = 4.dp, shape = newInstance.shape)
                 .aspectRatio(1f)
+                .clip(newInstance.shape)
         ) {
-            newInstance.Content()
+            ScaleToFit {
+                newInstance.Content()
+            }
         }
     }
 
@@ -288,6 +307,25 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         override val stateClass = CoordinateFilterChainDeviceState::class
         override val serializer = CoordinateFilterChainDeviceState.serializer()
         override fun create() = CoordinateFilterChainDevice()
+    }
+}
+
+@Composable
+private fun ScaleToFit(content: @Composable () -> Unit) {
+    Layout(content = content) { measurables, constraints ->
+        val placeable = measurables.first().measure(Constraints())
+        val scale = if (placeable.width > 0) {
+            constraints.maxWidth.toFloat() / placeable.width
+        } else 1f
+        val scaledWidth = (placeable.width * scale).toInt()
+        val scaledHeight = (placeable.height * scale).toInt()
+        layout(scaledWidth, scaledHeight) {
+            placeable.placeWithLayer(0, 0) {
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
+        }
     }
 }
 
