@@ -3,7 +3,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -28,7 +28,7 @@ import kotlinx.coroutines.runBlocking
  * - ❌ ... more stuff that i dont want to scroll through rn
  */
 class MidiLauncherProAdapter(
-    private val device: MxDeviceMidiEffect,
+    private val device: MxDevice,
     private val offset: IntOffset
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {

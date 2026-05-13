@@ -3,7 +3,8 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.dovitate
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceFileDropList
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
@@ -16,7 +17,7 @@ import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.runBlocking
 
 class LightspeedAdapter(
-    val device: MxDeviceMidiEffect,
+    val device: MxDevice,
     val offset: IntOffset,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
@@ -67,7 +68,7 @@ class LightspeedAdapter(
         )
     }
 
-    fun getKeyframesFromFileDrop(drop: MxDeviceMidiEffect.FileDropList.FileDropList.MxDFullFileDrop): KeyframesChainDeviceContract.KeyframesChainDeviceState? {
+    fun getKeyframesFromFileDrop(drop: MxDeviceFileDropList.FileDropList.MxDFullFileDrop): KeyframesChainDeviceContract.KeyframesChainDeviceState? {
         val fileRef = drop.ref.fileRef
 
         val palette = AbletonConverter.palette

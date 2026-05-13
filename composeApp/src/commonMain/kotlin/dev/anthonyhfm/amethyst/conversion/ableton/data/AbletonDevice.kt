@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiNoteLength
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiPitcher
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceInstrument
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
@@ -28,6 +29,7 @@ interface AbletonDevice {
                 subclass(MidiEffectGroupDevice::class)
                 subclass(DrumGroupDevice::class)
                 subclass(MxDeviceMidiEffect::class)
+                subclass(MxDeviceInstrument::class)
                 subclass(OriginalSimpler::class)
                 subclass(MidiVelocity::class)
                 subclass(MidiNoteLength::class)

@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton
 
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceInstrumentAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.ApolloConverter
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
@@ -176,6 +177,7 @@ object AbletonConverter : AmethystConverter {
 
     fun convertToWorkspace(file: PlatformFile, palettePath: String?): SavableWorkspaceData {
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
+        MxDeviceInstrumentAdapter.fileHashMap.clear()
         isZip = false
 
         this.file = file
@@ -354,6 +356,7 @@ object AbletonConverter : AmethystConverter {
 
         audioMap = emptyMap()
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
+        MxDeviceInstrumentAdapter.fileHashMap.clear()
         projectLayout = null
 
         return SavableWorkspaceData(

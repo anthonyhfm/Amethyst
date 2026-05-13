@@ -6,12 +6,14 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.InstrumentGro
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiEffectGroupAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiNoteLengthAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiVelocityAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceInstrumentAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceInstrument
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiNoteLength
@@ -58,6 +60,12 @@ abstract class AbletonAdapter {
                     )
 
                     is MxDeviceMidiEffect -> MxDeviceMidiEffectAdapter(
+                        device = device,
+                        offset = offset,
+                        outputOffset = outputOffset
+                    )
+
+                    is MxDeviceInstrument -> MxDeviceInstrumentAdapter(
                         device = device,
                         offset = offset,
                         outputOffset = outputOffset

@@ -62,6 +62,8 @@ class MxDeviceMidiEffectAdapter(
             }
         }
 
+        println("$hash ist $path")
+
         try {
             when (hash) {
                 "bd5d1649fed009d5399a9e8e84a0b036",

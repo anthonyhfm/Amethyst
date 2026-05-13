@@ -4,7 +4,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
-import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -13,7 +13,7 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState.
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
 class MultiEffectAdapter (
-    private val device: MxDeviceMidiEffect,
+    private val device: MxDevice,
     private val midiContainer: MidiEffectGroupDevice?,
     private val instrumentContainer: InstrumentGroupDevice?,
     private val drumContainer: DrumGroupDevice?

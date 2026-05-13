@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MaxParam
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class Resonator2Adapter(
     val blob: String,
-    val device: MxDeviceMidiEffect
+    val device: MxDevice
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val palette = AbletonConverter.palette

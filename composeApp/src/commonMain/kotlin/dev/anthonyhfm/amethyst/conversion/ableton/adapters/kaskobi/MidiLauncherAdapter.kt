@@ -4,7 +4,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
-import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -13,7 +13,7 @@ import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.runBlocking
 
 class MidiLauncherAdapter(
-    private val device: MxDeviceMidiEffect,
+    private val device: MxDevice,
     private val offset: IntOffset
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
