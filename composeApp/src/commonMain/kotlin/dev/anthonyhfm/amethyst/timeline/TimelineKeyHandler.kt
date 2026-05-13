@@ -17,6 +17,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.utils.TimelineClipUtils
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 
 object TimelineKeyHandler {
     fun canCopySelection(
@@ -76,6 +77,7 @@ object TimelineKeyHandler {
         if (keyEvent.type != KeyEventType.KeyDown) return false
 
         return when {
+            keyEvent.key == Key.Spacebar && keyEvent.hasNoShortcutModifier() -> handleTogglePlayPause()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.R -> renameSelection()
             keyEvent.key == Key.A && keyEvent.isAltPressed -> handleAutomappingTrigger()
             keyEvent.key == Key.A && keyEvent.hasNoShortcutModifier() -> handleToggleAutomation()
@@ -98,6 +100,21 @@ object TimelineKeyHandler {
 
             else -> false
         }
+    }
+
+    private fun handleTogglePlayPause(): Boolean {
+        if (TimelineRepository.isPlaying.value) {
+            TimelineRepository.pause()
+        } else {
+            val selectionTime = SelectionManager.selections.value
+                .filterIsInstance<Selectable.TimelineTime>()
+                .firstOrNull()
+            if (selectionTime != null) {
+                TimelineRepository.setPlayheadPosition(selectionTime.timeMs)
+            }
+            TimelineRepository.play()
+        }
+        return true
     }
 
     private fun handleAutomappingTrigger(): Boolean {

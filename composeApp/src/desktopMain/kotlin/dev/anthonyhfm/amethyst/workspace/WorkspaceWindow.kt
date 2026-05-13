@@ -69,6 +69,13 @@ fun WorkspaceWindow(
             if (WorkspaceRepository.mode.value.onKeyEvent(it)) return@Window true
             ShortcutManager.handleShortcut(it)
         },
+        onPreviewKeyEvent = {
+            if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Timeline) {
+                WorkspaceRepository.mode.value.onKeyEvent(it)
+            } else {
+                false
+            }
+        },
         icon = when (DesktopPlatform.get()) {
             DesktopPlatform.Windows -> painterResource(Res.drawable.amethyst_windows)
             DesktopPlatform.Linux -> painterResource(Res.drawable.amethyst_linux)
