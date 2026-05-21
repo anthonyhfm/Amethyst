@@ -99,11 +99,16 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
         val selections by SelectionManager.selections.collectAsState()
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
+        println("$selections JOE")
+
         val selectedColor: String? = selections.filterIsInstance<Selectable.GradientStep>()
             .find { it.parent == this }
             ?.selectionUUID
 
-        val selectedGradientColor = deviceState.gradientData.find { it.selectionUUID == selectedColor }
+        println("$selectedColor JOE2")
+
+        var selectedGradientColor = deviceState.gradientData.find { it.selectionUUID == selectedColor }
+        println("$selectedGradientColor JOE3")
 
         val colorPickerState = key(selectedColor) {
             selectedGradientColor?.let {
@@ -155,7 +160,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             isDragging = isDragging.value,
             modifier = Modifier
                 .width(
-                    width = if (selectedColor != null) {
+                    width = if (selectedColor != null && selectedGradientColor != null) {
                         520.dp
                     } else {
                         300.dp
@@ -392,7 +397,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                     }
                 }
 
-                if (selectedColor != null && colorPickerState != null) {
+                if (selectedColor != null && colorPickerState != null && selectedGradientColor != null) {
                     Separator(orientation = SeparatorOrientation.Vertical)
 
                     Column(

@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmI
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -47,6 +48,32 @@ class IrisAdapter (
             is Timing.Rythm -> rythmIndexToDuration(timing.timing.text, bpm, filteredVelocities.size).inWholeMilliseconds
         }
 
+        if (filteredVelocities.size == 1) {
+            val color = palette.getOrElse(filteredVelocities.first()) { index -> Triple(0, 0, 0) }
+
+            return listOf(
+                GroupChainDeviceState(
+                    groups = listOf(
+                        Group(
+                            name = "Single-Color Iris",
+                            stateChain = StateChain(
+                                devices = listOf(
+                                    ColorChainDeviceState(
+                                        r = color.first.toFloat() / 63f,
+                                        g = color.second.toFloat() / 63f,
+                                        b = color.third.toFloat() / 63f,
+                                    ),
+                                    HoldChainDeviceState(
+                                        delayMs = durationMs
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        }
+
         val gradientDevice = GradientChainDeviceState(
             gradientData = List(filteredVelocities.size) { index ->
                 val color = palette.getOrElse(filteredVelocities[index]) { index -> Triple(0, 0, 0) }
@@ -60,6 +87,7 @@ class IrisAdapter (
             },
             timing = timing,
             durationMs = durationMs.toDouble(),
+            gradientSteps = filteredVelocities.size
         )
 
         val loopDevice = LoopChainDeviceState(
