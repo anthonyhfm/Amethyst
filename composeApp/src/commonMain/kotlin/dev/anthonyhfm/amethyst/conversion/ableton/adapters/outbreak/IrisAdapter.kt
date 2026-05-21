@@ -60,6 +60,7 @@ class IrisAdapter (
             },
             timing = timing,
             durationMs = durationMs.toDouble(),
+            gradientSteps = filteredVelocities.size
         )
 
         val loopDevice = LoopChainDeviceState(
