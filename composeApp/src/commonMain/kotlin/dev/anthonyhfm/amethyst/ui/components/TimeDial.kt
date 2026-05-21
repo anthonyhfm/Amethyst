@@ -57,7 +57,6 @@ fun TimeDial(
             enabled = enabled
         )
     } else {
-        // Merke letzten gültigen RythmTiming damit wir bei kurzzeitigem Wechsel (Undo) nicht auf Default fallen
         var lastRythmTiming by remember { mutableStateOf((timing as? Timing.Rythm)?.timing ?: Timing.Rythm.RythmTiming._1_4) }
         val currentRythmTiming = (timing as? Timing.Rythm)?.timing
         if (currentRythmTiming != null && currentRythmTiming != lastRythmTiming) {

@@ -180,7 +180,7 @@ data class MasterTrack(
 @Serializable
 data class MidiClip(
     @XmlSerialName("Id")
-    val id: Int,
+    val id: Int? = null,
 
     @XmlSerialName("Time")
     val time: Float,

@@ -88,6 +88,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Job
@@ -154,6 +155,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     var onNoteUpdate: ((MidiNote, MidiNote) -> Unit)? = null
     var onNoteDelete: ((MidiNote) -> Unit)? = null
     var modeClose: (() -> Unit)? = null
+    var onPlaybackToggle: (() -> Unit)? = null
 
     /**
      * State flow tracking pressed keys: Map<Pair<DeviceIndex, Pitch>, IsPressed>
@@ -213,6 +215,21 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     private fun currentBpm(): Double {
         return timingContextProvider?.invoke()?.bpm ?: WorkspaceRepository.bpm.value
+    }
+
+    private fun handleTogglePlayPause() {
+        if (clipContext != null) {
+            // Timeline-backed: use the timeline engine so all clips play in background
+            if (TimelineRepository.isPlaying.value) {
+                TimelineRepository.pause()
+            } else {
+                TimelineRepository.setPlayheadPosition(entryStartMs)
+                TimelineRepository.play()
+            }
+        } else {
+            // Standalone (chain-backed): delegate to the chain device callback
+            onPlaybackToggle?.invoke()
+        }
     }
 
     private fun timelineEntrySnapshot(): MidiEntry? {
@@ -1297,6 +1314,13 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
         if (event.type == KeyEventType.KeyDown) {
             when (event.key) {
+                Key.Spacebar -> {
+                    if (!event.isCtrlPressed && !event.isMetaPressed) {
+                        handleTogglePlayPause()
+                        return true
+                    }
+                }
+
                 Key.Escape -> { modeClose?.invoke(); return true }
 
                 Key.S -> {

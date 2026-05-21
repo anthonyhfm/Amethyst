@@ -51,6 +51,7 @@ fun GradientEditorBar(
     onGradientDragStart: () -> Unit,
     onGradientDragFinish: () -> Unit,
     onSmoothnessChange: (String, GradientSmoothness) -> Unit,
+    gradientSteps: Int?,
 ) {
     val density = LocalDensity.current
 
@@ -146,10 +147,18 @@ fun GradientEditorBar(
                         }
                     }
 
+                    // Quantize easedT to discrete steps when gradientSteps is set
+                    val steppedT = if (gradientSteps != null && gradientSteps in 2..16) {
+                       val quantizedIndex = (easedT * gradientSteps).toInt().coerceIn(0, gradientSteps - 1)
+                       quantizedIndex.toDouble() / (gradientSteps - 1)
+                    } else {
+                       easedT
+                    }
+
                     val color = Color(
-                        red = (startColor.r + (endColor.r - startColor.r) * easedT.toFloat()).coerceIn(0f, 1f),
-                        green = (startColor.g + (endColor.g - startColor.g) * easedT.toFloat()).coerceIn(0f, 1f),
-                        blue = (startColor.b + (endColor.b - startColor.b) * easedT.toFloat()).coerceIn(0f, 1f)
+                      red = (startColor.r + (endColor.r - startColor.r) * steppedT.toFloat()).coerceIn(0f, 1f),
+                      green = (startColor.g + (endColor.g - startColor.g) * steppedT.toFloat()).coerceIn(0f, 1f),
+                      blue = (startColor.b + (endColor.b - startColor.b) * steppedT.toFloat()).coerceIn(0f, 1f)
                     )
 
                     drawRect(

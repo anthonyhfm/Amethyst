@@ -200,6 +200,8 @@ object AbletonConverter : AmethystConverter {
     }
 
     fun runLiveConversion(name: String, abletonData: Ableton): SavableWorkspaceData {
+        println("Origin: ${abletonData.creator}")
+
         val audioRenderer = OriginalSimplerPrerenderer()
 
         val layout = AbletonLayoutDetector.detectLayout(

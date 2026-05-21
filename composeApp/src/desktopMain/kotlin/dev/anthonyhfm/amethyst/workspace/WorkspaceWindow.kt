@@ -24,6 +24,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
+import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
@@ -70,8 +71,9 @@ fun WorkspaceWindow(
             ShortcutManager.handleShortcut(it)
         },
         onPreviewKeyEvent = {
-            if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Timeline) {
-                WorkspaceRepository.mode.value.onKeyEvent(it)
+            val mode = WorkspaceRepository.mode.value
+            if (mode is WorkspaceContract.WorkspaceMode.Timeline || mode is PianoRollWorkspaceMode) {
+                mode.onKeyEvent(it)
             } else {
                 false
             }

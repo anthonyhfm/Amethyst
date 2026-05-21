@@ -49,6 +49,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -80,7 +81,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
     private data class FadeSignature(
         val gradientHash: Int,
         val fps: Int,
-        val totalTimeBits: Long
+       val totalTimeBits: Long,
+       val gradientSteps: Int?
     )
 
     private var cachedFadeSignature: FadeSignature? = null
@@ -247,7 +249,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                 }
                                 state.update { it.copy(gradientData = updatedColors) }
                                 pushStateChange(before, state.value)
-                            }
+                            },
+                            gradientSteps = deviceState.gradientSteps,
                         )
                     }
 
@@ -321,6 +324,46 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                         it.copy(gate = 0.5f)
                                     }
                                     pushStateChange(before, state.value)
+                                },
+                        )
+
+                       val gradientStepsList = (2..16).toList() + null
+                       val stepsDisplayText = when (deviceState.gradientSteps) {
+                           null -> "INF"
+                           in 2..16 -> deviceState.gradientSteps.toString()
+                           else -> "INF"
+                        }
+                       var beforeSteps = deviceState.gradientSteps
+                       StepTextDial(
+                           headline = "Steps",
+                           value = deviceState.gradientSteps,
+                           steps = gradientStepsList,
+                           text = stepsDisplayText,
+                           onResolveTextValue = { text ->
+                               val parsed = text.trim().toIntOrNull()
+                               if (parsed != null && parsed in 2..16) {
+                                   state.update { it.copy(gradientSteps = parsed) }
+                               } else if (text.trim().equals("inf", ignoreCase = true)) {
+                                   state.update { it.copy(gradientSteps = null) }
+                                }
+                            },
+                           onStartValueChange = {
+                               beforeSteps = state.value.gradientSteps
+                            },
+                           onFinishValueChange = {
+                               pushStateChange(
+                                   before = state.value.copy(gradientSteps = beforeSteps),
+                                   after = state.value.copy(gradientSteps = it)
+                                )
+                            },
+                           onValueChange = { stepValue ->
+                              state.update { old -> old.copy(gradientSteps = stepValue) }
+                            },
+                           modifier = Modifier
+                                .rightClickable {
+                                   val before = state.value
+                                   state.update { it.copy(gradientSteps = null) }
+                                   pushStateChange(before, state.value)
                                 },
                         )
                     }
@@ -496,6 +539,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
         val frameTime = 1000.0 / samplingFps
         val bpm = WorkspaceRepository.bpm.value
         val totalTime = state.value.timing.toMsValue(bpm) * (state.value.gate * 2)
+        val manualSteps = state.value.gradientSteps // null = INF (auto), 2-16 = manual step count
 
         val gradientData = state.value.gradientData.sortedBy { it.position }
 
@@ -506,7 +550,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                 (((((acc * 31 + color.position.toBits()) * 31 + color.r.toBits()) * 31 + color.g.toBits()) * 31 + color.b.toBits()) * 31 + color.smoothness.ordinal)
             },
             fps = samplingFps,
-            totalTimeBits = totalTime.toDouble().toBits()
+           totalTimeBits = totalTime.toDouble().toBits(),
+           gradientSteps = state.value.gradientSteps
         )
         cachedFadeSignature?.let { cachedSig ->
             if (cachedSig == signature) return cachedFade
@@ -522,16 +567,22 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             val next = gradientData[i + 1]
             val fadeType = current.smoothness
             val segmentDurationMs = (next.position - current.position).coerceAtLeast(0f).toDouble() * totalTime
-            val targetFrames = (segmentDurationMs / frameTime).toInt().coerceAtLeast(1)
 
-            if (fadeType == GradientSmoothness.Hold || targetFrames == 0) {
+            val segmentFrames = when {
+               manualSteps != null && manualSteps in 2..16 -> (manualSteps - 1).coerceAtLeast(1)
+                else -> {
+                    val targetFrames = (segmentDurationMs / frameTime).toInt().coerceAtLeast(1)
+                    targetFrames.coerceAtMost(10_000)
+                }
+            }
+
+            if (fadeType == GradientSmoothness.Hold || segmentFrames == 0) {
                 colorStepBuffer.add(Color(current.r, current.g, current.b))
                 stepCountBuffer.add(1)
                 cutoffBuffer.add(1 + cutoffBuffer.last())
             } else {
-                val frames = targetFrames.coerceAtMost(10_000)
-                for (k in 0 until frames) {
-                    val factor = k.toDouble() / frames
+               for (k in 0 until segmentFrames) {
+                   val factor = k.toDouble() / segmentFrames
                     colorStepBuffer.add(Color(
                         red = current.r + (next.r - current.r) * factor.toFloat(),
                         green = current.g + (next.g - current.g) * factor.toFloat(),
@@ -539,8 +590,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                     ))
                 }
 
-                stepCountBuffer.add(frames)
-                cutoffBuffer.add(frames + cutoffBuffer.last())
+               stepCountBuffer.add(segmentFrames)
+               cutoffBuffer.add(segmentFrames + cutoffBuffer.last())
             }
         }
 
@@ -706,6 +757,7 @@ data class GradientChainDeviceState(
     val durationMs: Double = 0.0,
     val gate: Float = 0.5f,
     val loop: Boolean = false,
+    val gradientSteps: Int? = null,
 ) : DeviceState() {
     @Serializable
     data class GradientColor(

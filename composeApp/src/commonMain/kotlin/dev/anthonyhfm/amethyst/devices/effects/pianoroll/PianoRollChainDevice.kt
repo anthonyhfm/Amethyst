@@ -43,6 +43,7 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
     override val state = MutableStateFlow(PianoRollChainDeviceState())
 
     private val customMode: PianoRollWorkspaceMode = PianoRollWorkspaceMode()
+    private var isStandalonePlaying = false
 
     init {
         customMode.onNoteAdd = { note ->
@@ -80,6 +81,15 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
                 device.previewState.clear()
             }
         }
+
+        customMode.onPlaybackToggle = {
+            if (isStandalonePlaying) {
+                Heaven.cancelJobsForOwner(this@PianoRollChainDevice)
+                isStandalonePlaying = false
+            } else {
+                playStandaloneEntry()
+            }
+        }
     }
 
     @LegacyPianoRollPath(
@@ -89,6 +99,65 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
     private fun openLegacyPianoRoll(entry: MidiEntry) {
         customMode.bindLegacyEntry(entry)
         WorkspaceRepository.switchMode(mode = customMode)
+    }
+
+    private fun playStandaloneEntry() {
+        val entry = state.value.midiEntry
+        Heaven.cancelJobsForOwner(this)
+        isStandalonePlaying = true
+
+        val maxEndTimeMs = entry.notes.maxOfOrNull { it.endTimeMs } ?: 0L
+
+        entry.notes.forEach { note ->
+            val (x, y) = pitchToXY(note.pitch)
+            if (note.isGradient) {
+                val gradient = note.led.gradient!!
+                val frameIntervalMs = 1000.0 / Heaven.fps
+                var t = note.startTimeMs.toDouble()
+                while (t < note.endTimeMs.toDouble()) {
+                    val fraction = ((t - note.startTimeMs) / note.durationMs.toDouble()).toFloat().coerceIn(0f, 1f)
+                    val capturedFraction = fraction
+                    Heaven.schedule(t, owner = this) {
+                        val (r, g, b) = GradientInterpolator.interpolate(gradient, capturedFraction)
+                        signalExit?.invoke(listOf(Signal.LED(
+                            origin = this,
+                            x = x,
+                            y = y,
+                            color = Color(r, g, b),
+                            layer = note.led.layer,
+                            blendingMode = note.led.blendingMode
+                        )))
+                    }
+                    t += frameIntervalMs
+                }
+            } else {
+                Heaven.schedule(note.startTimeMs.toDouble(), owner = this) {
+                    signalExit?.invoke(listOf(Signal.LED(
+                        origin = this,
+                        x = x,
+                        y = y,
+                        color = Color(note.led.red, note.led.green, note.led.blue),
+                        layer = note.led.layer,
+                        blendingMode = note.led.blendingMode
+                    )))
+                }
+            }
+            Heaven.schedule(note.endTimeMs.toDouble(), owner = this) {
+                signalExit?.invoke(listOf(Signal.LED(
+                    origin = this,
+                    x = x,
+                    y = y,
+                    color = Color.Black,
+                    layer = note.led.layer,
+                    blendingMode = note.led.blendingMode
+                )))
+            }
+        }
+
+        // When all notes are done, mark as no longer playing
+        Heaven.schedule(maxEndTimeMs.toDouble(), owner = this) {
+            isStandalonePlaying = false
+        }
     }
 
     @Composable

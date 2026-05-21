@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
@@ -27,6 +29,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
@@ -58,32 +62,27 @@ fun AbletonImportWizard(
     val customPalettePath: String by viewModel.customPalettePath.collectAsState()
     val apolloProjPath: String by viewModel.apolloProjPath.collectAsState()
     val coroutineScope = rememberCoroutineScope()
-    val sourceName = path.substringAfterLast("/").ifBlank { path }
     val paletteName = customPalettePath.substringAfterLast("/").ifBlank { customPalettePath }
     val apolloProjName = apolloProjPath.substringAfterLast("/").ifBlank { apolloProjPath }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .padding(24.dp),
+            .background(Color.Black.copy(alpha = 0.45f)),
+
         contentAlignment = Alignment.Center,
     ) {
         BoxWithConstraints(
             modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 620.dp),
+                .fillMaxSize()
         ) {
-            val stackedActions = maxWidth < 440.dp
-            val stackedPalettePicker = maxWidth < 520.dp
-
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Theme[colors][border], DefaultShape)
-                    .background(Theme[colors][card], DefaultShape)
+                    .fillMaxSize()
+                    .background(Theme[colors][card])
                     .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 WizardHeader(
                     onClose = {
@@ -97,14 +96,12 @@ fun AbletonImportWizard(
 
                 Field {
                     FieldLabel("Import source")
-                    TypographyP(sourceName)
                     FieldDescription(path)
                 }
 
                 Separator()
 
                 PaletteSelectionField(
-                    stacked = stackedPalettePicker,
                     paletteName = paletteName,
                     palettePath = customPalettePath,
                     onSelectPalette = { viewModel.onClickImportCustomPalette() },
@@ -113,14 +110,14 @@ fun AbletonImportWizard(
                 Separator()
 
                 ApolloProjSelectionField(
-                    stacked = stackedPalettePicker,
                     apolloProjName = apolloProjName,
                     apolloProjPath = apolloProjPath,
                     onSelectApolloProj = { viewModel.onClickImportApolloProjFile() },
                 )
 
+                Spacer(Modifier.weight(1f))
+
                 WizardActions(
-                    stacked = stackedActions,
                     onCancel = {
                         viewModel.customPalettePath.value = ""
                         viewModel.apolloProjPath.value = ""
@@ -145,15 +142,24 @@ private fun WizardHeader(
     onClose: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.Top,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (platform == Platform.Desktop.MacOS) {
+                    Modifier.padding(top = 16.dp)
+                } else {
+                    Modifier
+                }
+            )
     ) {
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             DialogTitle("Ableton Import Wizard")
+
             DialogDescription("Choose an optional custom palette before converting your Live set into an Amethyst workspace.")
         }
 
@@ -173,7 +179,6 @@ private fun WizardHeader(
 
 @Composable
 private fun PaletteSelectionField(
-    stacked: Boolean,
     paletteName: String,
     palettePath: String,
     onSelectPalette: () -> Unit,
@@ -181,54 +186,29 @@ private fun PaletteSelectionField(
     Field {
         FieldLabel("Custom palette")
 
-        if (stacked) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 PaletteSelectionSummary(
                     paletteName = paletteName,
                     palettePath = palettePath,
                 )
-
-                Button(
-                    onClick = onSelectPalette,
-                    variant = ButtonVariant.Outline,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.UploadFile,
-                        contentDescription = null,
-                        tint = Theme[colors][foreground],
-                    )
-                    Text("Select palette")
-                }
             }
-        } else {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    PaletteSelectionSummary(
-                        paletteName = paletteName,
-                        palettePath = palettePath,
-                    )
-                }
 
-                Button(
-                    onClick = onSelectPalette,
-                    variant = ButtonVariant.Outline,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.UploadFile,
-                        contentDescription = null,
-                        tint = Theme[colors][foreground],
-                    )
-                    Text("Select")
-                }
+            Button(
+                onClick = onSelectPalette,
+                variant = ButtonVariant.Outline,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.UploadFile,
+                    contentDescription = null,
+                    tint = Theme[colors][foreground],
+                )
+                Text("Select")
             }
         }
     }
@@ -243,14 +223,12 @@ private fun PaletteSelectionSummary(
         TypographyP("No custom palette selected")
         FieldDescription("Optional. If omitted, the default Novation palette is used.")
     } else {
-        TypographyP(paletteName)
         TypographyMuted(palettePath)
     }
 }
 
 @Composable
 private fun ApolloProjSelectionField(
-    stacked: Boolean,
     apolloProjName: String,
     apolloProjPath: String,
     onSelectApolloProj: () -> Unit,
@@ -258,27 +236,23 @@ private fun ApolloProjSelectionField(
     Field {
         FieldLabel("Apollo lights project (.approj)")
 
-        if (stacked) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 ApolloProjSelectionSummary(apolloProjName = apolloProjName, apolloProjPath = apolloProjPath)
-                Button(
-                    onClick = onSelectApolloProj,
-                    variant = ButtonVariant.Outline,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(imageVector = Icons.Default.UploadFile, contentDescription = null, tint = Theme[colors][foreground])
-                    Text("Select .approj")
-                }
             }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    ApolloProjSelectionSummary(apolloProjName = apolloProjName, apolloProjPath = apolloProjPath)
-                }
-                Button(onClick = onSelectApolloProj, variant = ButtonVariant.Outline) {
-                    Icon(imageVector = Icons.Default.UploadFile, contentDescription = null, tint = Theme[colors][foreground])
-                    Text("Select")
-                }
+
+            Button(
+                onClick = onSelectApolloProj,
+                variant = ButtonVariant.Outline
+            ) {
+                Icon(imageVector = Icons.Default.UploadFile, contentDescription = null, tint = Theme[colors][foreground])
+                Text("Select")
             }
         }
     }
@@ -290,51 +264,27 @@ private fun ApolloProjSelectionSummary(apolloProjName: String, apolloProjPath: S
         TypographyP("No Apollo project selected")
         FieldDescription("Optional. If set, lights chain will be sourced from the Apollo project instead of Ableton MIDI tracks.")
     } else {
-        TypographyP(apolloProjName)
         TypographyMuted(apolloProjPath)
     }
 }
 
 @Composable
 private fun WizardActions(
-    stacked: Boolean,
     onCancel: () -> Unit,
     onStartConversion: () -> Unit,
 ) {
-    if (stacked) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+    DialogFooter {
+        Button(
+            onClick = onCancel,
+            variant = ButtonVariant.Outline,
         ) {
-            Button(
-                onClick = onStartConversion,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Start Conversion")
-            }
-
-            Button(
-                onClick = onCancel,
-                variant = ButtonVariant.Outline,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Cancel")
-            }
+            Text("Cancel")
         }
-    } else {
-        DialogFooter {
-            Button(
-                onClick = onCancel,
-                variant = ButtonVariant.Outline,
-            ) {
-                Text("Cancel")
-            }
 
-            Button(
-                onClick = onStartConversion,
-            ) {
-                Text("Start Conversion")
-            }
+        Button(
+            onClick = onStartConversion,
+        ) {
+            Text("Start Conversion")
         }
     }
 }
