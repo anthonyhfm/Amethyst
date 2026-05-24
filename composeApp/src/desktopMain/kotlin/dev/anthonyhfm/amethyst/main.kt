@@ -15,6 +15,8 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceWindow
 import io.github.vinceglb.filekit.FileKit
 
 fun main() {
+    initializeSentry()
+
     val platform = DesktopPlatform.get()
 
     if (platform == DesktopPlatform.MacOS) {

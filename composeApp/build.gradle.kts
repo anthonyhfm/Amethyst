@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     kotlin("plugin.serialization") version "2.1.0"
     id("org.jetbrains.kotlinx.atomicfu") version "0.29.0"
+    alias(libs.plugins.sentryKmp)
 }
 
 kotlin {
@@ -66,6 +67,7 @@ kotlin {
             implementation(libs.reorderable)
 
             implementation(libs.kotlinx.serialization.protobuf)
+            implementation(libs.sentry.kotlin.multiplatform)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
             implementation("io.github.vinceglb:filekit-core:0.10.0")

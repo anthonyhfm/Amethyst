@@ -1,9 +1,20 @@
 name: Build & Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g. 0.5.0)'
+        required: true
+        type: string
+      release_name:
+        description: 'Release title (optional, defaults to "Amethyst v<version>")'
+        required: false
+        type: string
+      release_notes:
+        description: 'Release notes / changelog (optional)'
+        required: false
+        type: string
 
 jobs:
   build-windows:
@@ -29,6 +40,8 @@ jobs:
           restore-keys: gradle-windows-
 
       - name: Build MSI
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: ./gradlew :composeApp:packageMsi
 
       - name: Upload Windows artifact
@@ -61,6 +74,8 @@ jobs:
           restore-keys: gradle-macos-
 
       - name: Build DMG
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: ./gradlew :composeApp:packageDmg
 
       - name: Upload macOS artifact
@@ -93,6 +108,8 @@ jobs:
           restore-keys: gradle-linux-
 
       - name: Build DEB
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: ./gradlew :composeApp:packageDeb
 
       - name: Upload Linux artifact
@@ -112,13 +129,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Read Amethyst version
-        id: version
-        run: |
-          VERSION=$(grep 'val amethystVersion' composeApp/src/commonMain/kotlin/dev/anthonyhfm/amethyst/core/util/Version.kt \
-            | sed 's/.*Version(\([0-9]*\), \([0-9]*\), \([0-9]*\)).*/\1.\2.\3/')
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -127,14 +137,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}+build.${{ github.run_number }}
-          name: ${{ github.event.head_commit.message }}
+          tag_name: v${{ inputs.version }}
+          name: ${{ inputs.release_name || format('Amethyst v{0}', inputs.version) }}
           body: |
-            **Build #${{ github.run_number }}** · Amethyst ${{ steps.version.outputs.version }}
+            ${{ inputs.release_notes }}
 
-            Commit: `${{ github.sha }}` · @${{ github.actor }}
-
-            ${{ github.event.head_commit.message }}
+            **Build #${{ github.run_number }}** · Commit: `${{ github.sha }}` · @${{ github.actor }}
           files: |
             release-artifacts/amethyst-windows/*.msi
             release-artifacts/amethyst-macos/*.dmg

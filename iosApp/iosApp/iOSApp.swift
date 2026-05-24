@@ -4,6 +4,7 @@ import ComposeApp
 @main
 struct iOSApp: App {
     init() {
+        SentrySetupKt.initializeSentry()
         Zip.shared.zipAPI = ZipImplementation()
     }
     

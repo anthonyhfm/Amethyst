@@ -1,6 +1,7 @@
 *.iml
 .kotlin
 .agents
+.junie
 .gradle
 **/build/
 xcuserdata

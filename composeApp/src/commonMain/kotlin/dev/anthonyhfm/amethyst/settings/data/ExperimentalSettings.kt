@@ -6,4 +6,10 @@ object ExperimentalSettings : SettingsGroup("Experimental Features") {
         title = "Amethyst Gems",
         default = false,
     )
+
+    val liveCollaboration: Setting.Toggle = toggle(
+        key = "liveCollaboration",
+        title = "Live Collaboration (LAN-Only)",
+        default = false,
+    )
 }

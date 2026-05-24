@@ -21,6 +21,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        initializeSentry()
+
         FileKit.init(this)
 
         platformMidiAccess = AndroidMidiAccess(this)
