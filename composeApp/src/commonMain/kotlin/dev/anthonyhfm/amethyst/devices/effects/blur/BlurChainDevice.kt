@@ -250,10 +250,13 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
                 val nx = x + dx
                 val ny = y + dy
                 val finalPos = when (s.edgeHandling) {
+                    BlurEdgeHandling.None -> Pair(nx, ny)
+
                     BlurEdgeHandling.Clamp -> {
                         if (nx < 0 || nx > 9 || ny < 0 || ny > 9) continue
                         Pair(nx, ny)
                     }
+
                     BlurEdgeHandling.Wrap -> Pair(((nx % 10) + 10) % 10, ((ny % 10) + 10) % 10)
                 }
                 result.add(NeighborResult(finalPos, dist))
@@ -345,6 +348,7 @@ enum class BlurCurve(val label: String) {
 
 @Serializable
 enum class BlurEdgeHandling(val label: String) {
+    None("None"),
     Clamp("Clamp"),
     Wrap("Wrap"),
 }
@@ -355,5 +359,5 @@ data class BlurChainDeviceState(
     val shape: BlurShape = BlurShape.Circle,
     val amount: Float = 1f,
     val curve: BlurCurve = BlurCurve.Linear,
-    val edgeHandling: BlurEdgeHandling = BlurEdgeHandling.Clamp,
+    val edgeHandling: BlurEdgeHandling = BlurEdgeHandling.None,
 ) : DeviceState()
