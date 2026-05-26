@@ -27,7 +27,6 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
-import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceGemAsset
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable

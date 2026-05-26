@@ -39,7 +39,6 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
-import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.SettingsDialog
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
@@ -106,10 +105,6 @@ actual fun WorkspaceTopAppBar(
             KeyframesOptions(mode)
         }
 
-        if (mode is GemEditorWorkspaceMode) {
-            GemEditorOptions(mode)
-        }
-
         BPMChanger()
         CleanupButtons()
 
@@ -145,26 +140,6 @@ private fun AutomappingStatusIndicator(armed: Boolean) {
             color = contentColor,
             style = Theme[typography][small],
         )
-    }
-}
-
-@Composable
-private fun GemEditorOptions(mode: GemEditorWorkspaceMode) {
-    WorkspaceToolbarSurface {
-        Button(
-            onClick = { mode.openNodePalette() },
-            variant = ButtonVariant.Secondary,
-            size = ButtonSize.Small,
-            enabled = mode.canOpenNodePalette,
-        ) {
-            Icon(
-                imageVector = Lucide.Plus,
-                contentDescription = null,
-                tint = workspaceToolbarContentColor(ButtonVariant.Secondary),
-                modifier = Modifier.size(16.dp),
-            )
-            Text("Add Node")
-        }
     }
 }
 

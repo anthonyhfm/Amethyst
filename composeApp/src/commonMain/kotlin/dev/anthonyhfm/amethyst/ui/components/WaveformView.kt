@@ -122,10 +122,14 @@ fun WaveformView(
     val baseline = waveColor.copy(alpha = 0.6f)
     val MAX_BUCKETS = 20_000
 
+    val resolvedChannels = if (channels > 0) channels else 2
+    val resolvedBitDepth = if (bitDepth in listOf(8, 16, 24, 32)) bitDepth else 16
+    val resolvedSampleRate = if (sampleRate > 0) sampleRate else 44100
+
     // Decode PCM → mono floats once per rawData identity change.
-    val samples: FloatArray = remember(rawData, bitDepth, channels) {
+    val samples: FloatArray = remember(rawData, resolvedBitDepth, resolvedChannels) {
         val bytes = rawData ?: return@remember FloatArray(0)
-        pcmToMonoFloats(bytes, bitDepth, channels)
+        pcmToMonoFloats(bytes, resolvedBitDepth, resolvedChannels)
     }
 
     val currentStartPosition by rememberUpdatedState(startPosition)
@@ -338,8 +342,9 @@ fun WaveformView(
 
 
 private fun pcmToMonoFloats(raw: ByteArray, bitDepth: Int, channels: Int): FloatArray {
-    val ch = channels.coerceAtLeast(1)
-    val bps = (bitDepth / 8).coerceAtLeast(1)
+    val ch = if (channels > 0) channels else 2
+    val bd = if (bitDepth in listOf(8, 16, 24, 32)) bitDepth else 16
+    val bps = bd / 8
     val frameSize = bps * ch
     if (raw.size < frameSize) return FloatArray(0)
     val frames = raw.size / frameSize
@@ -351,7 +356,7 @@ private fun pcmToMonoFloats(raw: ByteArray, bitDepth: Int, channels: Int): Float
         var c = 0
         while (c < ch) {
             val off = byteIndex + c * bps
-            val sample = when (bitDepth) {
+            val sample = when (bd) {
                 8  -> { val u = raw[off].toInt() and 0xFF; ((u - 128) / 128f).coerceIn(-1f, 1f) }
                 16 -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f).coerceIn(-1f, 1f) }
                 24 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt(); var v = b0 or (b1 shl 8) or (b2 shl 16); if ((v and 0x800000) != 0) v = v or -0x1000000; (v / 8388608f).coerceIn(-1f, 1f) }

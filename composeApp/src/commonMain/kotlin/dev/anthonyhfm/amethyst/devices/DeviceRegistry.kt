@@ -30,7 +30,6 @@ import dev.anthonyhfm.amethyst.devices.effects.rotate.RotateChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
-import dev.anthonyhfm.amethyst.devices.gem.GemChainDevice
 import kotlin.reflect.KClass
 
 object DeviceRegistry {
@@ -48,7 +47,6 @@ object DeviceRegistry {
         register(CopyChainDevice)
         register(DelayChainDevice)
         register(FlipChainDevice)
-        register(GemChainDevice)
         register(GradientChainDevice)
         register(GroupChainDevice)
         register(HoldChainDevice)

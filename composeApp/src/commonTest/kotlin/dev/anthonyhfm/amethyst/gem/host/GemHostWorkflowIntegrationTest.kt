@@ -23,7 +23,6 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
-import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceGemAsset
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

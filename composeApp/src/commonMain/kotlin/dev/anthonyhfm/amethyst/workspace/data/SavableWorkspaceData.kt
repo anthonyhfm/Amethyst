@@ -36,8 +36,6 @@ data class SavableWorkspaceData(
     val launchpadDevices: List<SavableViewportLaunchpad> = emptyList(),
     @ProtoNumber(10)
     val macros: List<Macro> = listOf(Macro(0)),
-    @ProtoNumber(11)
-    val gemAssets: List<SavableWorkspaceGemAsset> = emptyList(),
 
     @Transient
     var path: String? = null, // This is not serialized, used for file operations

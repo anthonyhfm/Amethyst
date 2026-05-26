@@ -9,8 +9,6 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewWorkspaceMode
-import dev.anthonyhfm.amethyst.gem.ui.GemSelectionWorkspaceMode
-import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
 import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
@@ -57,11 +55,9 @@ object WorkspaceMenuCommandSurface {
     ): WorkspaceMenuEditState {
         return WorkspaceMenuEditState(
             canUndo = when (mode) {
-                is GemEditorWorkspaceMode -> mode.canUndo
                 else -> UndoManager.canUndo()
             },
             canRedo = when (mode) {
-                is GemEditorWorkspaceMode -> mode.canRedo
                 else -> UndoManager.canRedo()
             },
             canCut = when (mode) {
@@ -102,24 +98,12 @@ object WorkspaceMenuCommandSurface {
 
     fun undo(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
-            is GemEditorWorkspaceMode -> {
-                if (!mode.canUndo) return false
-                mode.undo()
-                true
-            }
-
             else -> ShortcutManager.undo()
         }
     }
 
     fun redo(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
-            is GemEditorWorkspaceMode -> {
-                if (!mode.canRedo) return false
-                mode.redo()
-                true
-            }
-
             else -> ShortcutManager.redo()
         }
     }
@@ -203,8 +187,6 @@ object WorkspaceMenuCommandSurface {
                 true
             }
 
-            is GemSelectionWorkspaceMode,
-            is GemEditorWorkspaceMode,
             is GetHelpWorkspaceMode -> {
                 WorkspaceRepository.switchToPreviousMode()
                 true

@@ -20,7 +20,6 @@ import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.desktop.about.showAboutDialog
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
-import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.showSettingsWindow
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
@@ -61,7 +60,6 @@ fun FrameWindowScope.WorkspaceMenuBar() {
     }
     val keyframesMode = mode as? KeyframesWorkspaceMode
     val pianoRollMode = mode as? PianoRollWorkspaceMode
-    val gemEditorMode = mode as? GemEditorWorkspaceMode
 
     var showProjectChangeDialog by remember { mutableStateOf(false) }
     var pendingProjectChangeAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -385,34 +383,6 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                         )
                     }
                 }
-            }
-        }
-
-        if (gemEditorMode != null) {
-            Menu(text = "Gem") {
-                Item(
-                    text = "Add Node",
-                    enabled = gemEditorMode.canOpenNodePalette,
-                    onClick = {
-                        gemEditorMode.openNodePalette()
-                    }
-                )
-
-                Item(
-                    text = "New Asset",
-                    enabled = gemEditorMode.canCreateAsset,
-                    onClick = {
-                        gemEditorMode.createAsset()
-                    }
-                )
-
-                Item(
-                    text = "Discard Changes",
-                    enabled = gemEditorMode.canDiscard,
-                    onClick = {
-                        gemEditorMode.discard()
-                    }
-                )
             }
         }
 

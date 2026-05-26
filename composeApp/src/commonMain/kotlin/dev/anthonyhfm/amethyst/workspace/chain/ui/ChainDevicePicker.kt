@@ -64,10 +64,6 @@ import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
-import dev.anthonyhfm.amethyst.devices.gem.GemChainDevice
-import dev.anthonyhfm.amethyst.gem.GemSignalDomain
-import dev.anthonyhfm.amethyst.gem.host.GemDeviceState
-import dev.anthonyhfm.amethyst.gem.ui.editor.GemEditorWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
@@ -78,12 +74,6 @@ fun ChainDevicePicker(
     onPickComponent: (GenericChainDevice<*>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val gemAssets by WorkspaceRepository.gemAssets.collectAsState()
-    val gemHostDomain = if (sampling) null else GemSignalDomain.LED
-    val compatibleGemAssets = gemAssets
-        .filter { gemHostDomain == null || gemHostDomain in it.definition.host.supportedDomains }
-        .sortedWith(compareBy({ it.metadata.name.lowercase() }, { it.metadata.id.lowercase() }))
-
     NavigableChainContextMenu(
         expanded = visible,
         onDismissRequest = onDismiss
@@ -100,61 +90,6 @@ fun ChainDevicePicker(
                     ChainContextMenuSubmenuItem("Transform", icon = Icons.TwoTone.Transform, onClick = { onNavigate("transform") })
                     ChainContextMenuSubmenuItem("Effects", icon = Icons.TwoTone.Science, onClick = { onNavigate("effects") })
                     ChainContextMenuSubmenuItem("Misc", icon = Icons.TwoTone.Adjust, onClick = { onNavigate("misc") })
-
-                    if (WorkspaceRepository.mode.value is WorkspaceMode.LightsChain && ExperimentalSettings.extensions.value) {
-                        ChainContextMenuSubmenuItem("Gems", icon = Icons.TwoTone.Diamond, onClick = { onNavigate("gems") })
-                    }
-                }
-                "gems" -> {
-                    ChainContextMenuItem(
-                        "New Gem",
-                        icon = Icons.TwoTone.Add,
-                        onClick = {
-                            val asset = WorkspaceRepository.createGemAsset(gemHostDomain)
-                            val device = GemChainDevice(
-                                initialState = GemDeviceState.fromAsset(
-                                    asset = asset,
-                                    hostDomain = gemHostDomain ?: GemSignalDomain.LED
-                                )
-                            )
-                            onPickComponent(device)
-                            WorkspaceRepository.switchMode(
-                                GemEditorWorkspaceMode(
-                                    initialAssetId = asset.metadata.id,
-                                    entryContext = GemEditorWorkspaceMode.EntryContext.HostDevice(
-                                        preferredHostDomain = gemHostDomain ?: GemSignalDomain.LED,
-                                        referencedAssetId = asset.metadata.id,
-                                        referencedAssetName = asset.metadata.name
-                                    )
-                                )
-                            )
-                        }
-                    )
-                    if (compatibleGemAssets.isEmpty()) {
-                        ChainContextMenuItem(
-                            label = "No compatible Gems",
-                            icon = Icons.TwoTone.Diamond,
-                            enabled = false,
-                            onClick = {}
-                        )
-                    } else {
-                        compatibleGemAssets.forEach { asset ->
-                            ChainContextMenuItem(
-                                label = asset.metadata.name.ifBlank { asset.metadata.id.ifBlank { "Unnamed Gem" } },
-                                icon = Icons.TwoTone.Diamond,
-                                onClick = {
-                                    onPickComponent(
-                                        GemChainDevice(
-                                            initialState = GemDeviceState.fromAsset(
-                                                asset = asset,
-                                                hostDomain = gemHostDomain ?: GemSignalDomain.LED
-                                            )
-                                        )
-                                    )
-                                }
-                            )
-                        }
-                    }
                 }
                 "container" -> {
                     ChainContextMenuItem("Group", icon = Icons.TwoTone.Group, onClick = { onPickComponent(GroupChainDevice()) })
@@ -208,34 +143,6 @@ fun ChainDevicePicker(
                     ChainContextMenuSubmenuItem("Filter", icon = Icons.TwoTone.Filter, onClick = { onNavigate("filter") })
                     ChainContextMenuSubmenuItem("Timing", icon = Icons.TwoTone.Timer, onClick = { onNavigate("timing") })
                     ChainContextMenuSubmenuItem("Misc", icon = Icons.TwoTone.Adjust, onClick = { onNavigate("misc") })
-                }
-                "gems-editor" -> {
-                    if (compatibleGemAssets.isEmpty()) {
-                        ChainContextMenuItem(
-                            label = "No compatible Gems",
-                            icon = Icons.TwoTone.Diamond,
-                            enabled = false,
-                            onClick = {}
-                        )
-                    } else {
-                        compatibleGemAssets.forEach { asset ->
-                            ChainContextMenuItem(
-                                label = asset.metadata.name.ifBlank { asset.metadata.id.ifBlank { "Unnamed Gem" } },
-                                icon = Icons.TwoTone.Diamond,
-                                onClick = {
-                                    WorkspaceRepository.switchMode(
-                                        GemEditorWorkspaceMode(
-                                            initialAssetId = asset.metadata.id,
-                                            entryContext = GemEditorWorkspaceMode.EntryContext.Workspace(
-                                                sourceLabel = "Sampling Chain",
-                                                preferredHostDomain = gemHostDomain
-                                            )
-                                        )
-                                    )
-                                }
-                            )
-                        }
-                    }
                 }
                 "container" -> {
                     ChainContextMenuItem("Group", icon = Icons.TwoTone.Group, onClick = { onPickComponent(GroupChainDevice()) })
