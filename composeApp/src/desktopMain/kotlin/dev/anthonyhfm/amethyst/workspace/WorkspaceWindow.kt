@@ -65,7 +65,6 @@ fun WorkspaceWindow(
         ),
         onKeyEvent = {
             updateFromKeyEvent(it)
-            AutomappingManager.handleKeyEvent(it)
 
             // Mode-specific handlers have priority over global shortcuts.
             if (WorkspaceRepository.mode.value.onKeyEvent(it)) return@Window true

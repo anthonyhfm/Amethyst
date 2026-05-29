@@ -141,7 +141,7 @@ actual fun WorkspaceTopAppBar(
         actions = {
             if (automappingState.isActive) {
                 Text(
-                    text = if (automappingState.isTriggerHeld) "AUTO!" else "Auto",
+                    text = "AUTO!",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )

@@ -145,13 +145,13 @@ abstract class LaunchpadViewportElement(
             backgroundHoverColor = actionButtonBgHover,
         )
 
-        LaunchpadActionButton(
+        /*LaunchpadActionButton(
             onClick = { styleDialogState.visible = true },
             icon = Lucide.Palette,
             contentDescription = "Style",
             backgroundColor = actionButtonBg,
             backgroundHoverColor = actionButtonBgHover,
-        )
+        )*/
 
         LaunchpadActionButton(
             onClick = { rotationDegrees.floatValue += 90f },

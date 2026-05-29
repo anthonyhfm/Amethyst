@@ -61,6 +61,8 @@ import dev.anthonyhfm.amethyst.ui.theme.accentForeground
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
+import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
@@ -86,7 +88,7 @@ actual fun WorkspaceTopAppBar(
 
         if (automappingState.isActive) {
             AutomappingStatusIndicator(
-                armed = automappingState.isTriggerHeld,
+                armed = true,
             )
         }
 
@@ -125,18 +127,18 @@ actual fun WorkspaceTopAppBar(
 
 @Composable
 private fun AutomappingStatusIndicator(armed: Boolean) {
-    val backgroundColor = if (armed) Theme[colors][accent] else Theme[colors][secondary]
-    val contentColor = if (armed) Theme[colors][accentForeground] else Theme[colors][foreground]
+    val backgroundColor = if (armed) Theme[colors][selectionSurface] else Theme[colors][secondary]
+    val contentColor = if (armed) Theme[colors][selectionForeground] else Theme[colors][foreground]
 
     Row(
         modifier = Modifier
             .clip(SmallShape)
             .background(backgroundColor)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "AUTOMAPPING ACTIVE!",
+            text = "AUTOMAPPING ACTIVE",
             color = contentColor,
             style = Theme[typography][small],
         )

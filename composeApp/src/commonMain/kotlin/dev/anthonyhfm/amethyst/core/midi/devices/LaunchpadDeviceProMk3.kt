@@ -15,7 +15,13 @@ class LaunchpadDeviceProMk3(
     }
 
     override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
-        updates.chunked(78).forEach { chunked ->
+        updates.filter {
+            it.index in 1 until 8
+        }.map {
+            it.copy(
+                index = (100 + it.index).toByte()
+            )
+        }.plus(updates).chunked(78).forEach { chunked ->
             sendMidi(getEffectSysEx(chunked))
         }
     }
