@@ -17,7 +17,7 @@ import dev.anthonyhfm.amethyst.ui.theme.colors
 fun OSXTitleBar() {
     Spacer(
         modifier = Modifier
-            .height(26.dp)
+            .height(32.dp)
             .fillMaxWidth()
             .background(Theme[colors][background])
             .zIndex(9999f)

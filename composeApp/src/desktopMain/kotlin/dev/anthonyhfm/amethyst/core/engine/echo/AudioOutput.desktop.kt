@@ -14,8 +14,9 @@ actual object AudioOutput {
     private var device: Long = 0L
     private var context: Long = 0L
     private val activeSources = ConcurrentHashMap<String, AudioSource>()
-    private var isInitialized = false
+    @Volatile private var isInitialized = false
     private var processingJob: Job? = null
+    private var lastMasterVolume = -1f
     private val audioQueue = ConcurrentLinkedQueue<QueuedAudio>()
 
     private const val SAMPLE_RATE = 44100
@@ -67,11 +68,14 @@ actual object AudioOutput {
         val sourceId: Int,
         val bufferIds: IntArray,
         val audioKey: String?,
-        val origin: Any?
+        val origin: Any?,
+        var gain: Float,
+        var pan: Float
     ) {
         fun cleanup() {
             try {
                 AL10.alSourceStop(sourceId)
+                AL10.alSourcei(sourceId, AL10.AL_BUFFER, 0)
                 AL10.alDeleteSources(sourceId)
                 AL10.alDeleteBuffers(bufferIds)
             } catch (e: Exception) {
@@ -85,7 +89,9 @@ actual object AudioOutput {
             return sourceId == other.sourceId &&
                    bufferIds.contentEquals(other.bufferIds) &&
                    audioKey == other.audioKey &&
-                   origin == other.origin
+                   origin == other.origin &&
+                   gain == other.gain &&
+                   pan == other.pan
         }
 
         override fun hashCode(): Int {
@@ -93,12 +99,16 @@ actual object AudioOutput {
             result = 31 * result + bufferIds.contentHashCode()
             result = 31 * result + (audioKey?.hashCode() ?: 0)
             result = 31 * result + (origin?.hashCode() ?: 0)
+            result = 31 * result + gain.hashCode()
+            result = 31 * result + pan.hashCode()
             return result
         }
     }
 
     init {
-        initializeOpenAL()
+        CoroutineScope(Dispatchers.IO).launch {
+            initializeOpenAL()
+        }
     }
 
     private fun initializeOpenAL() {
@@ -180,6 +190,15 @@ actual object AudioOutput {
                 try {
                     processAudioQueue()
                     cleanupFinishedSources()
+
+                    val currentVolume = AudioSettings.masterVolume.value
+                    if (currentVolume != lastMasterVolume) {
+                        lastMasterVolume = currentVolume
+                        activeSources.values.forEach { source ->
+                            applyPlaybackSettings(source.sourceId, source.gain, source.pan)
+                        }
+                    }
+
                     delay(processingDelay)
                 } catch (e: Exception) {
                     // Continue processing
@@ -245,7 +264,7 @@ actual object AudioOutput {
             }
 
             AL10.alSourcef(alSourceId, AL10.AL_PITCH, 1.0f)
-            AL10.alSourcef(alSourceId, AL10.AL_GAIN, 0.9f * AudioSettings.masterVolume.value)
+            AL10.alSourcef(alSourceId, AL10.AL_GAIN, 0.4f * AudioSettings.masterVolume.value)
             AL10.alSource3f(alSourceId, AL10.AL_POSITION, 0.0f, 0.0f, 0.0f)
             AL10.alSourcei(alSourceId, AL10.AL_LOOPING, AL10.AL_FALSE)
 
@@ -268,7 +287,7 @@ actual object AudioOutput {
                 MemoryUtil.memFree(buffer)
             }
 
-            val audioSource = AudioSource(alSourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin)
+            val audioSource = AudioSource(alSourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin, queuedAudio.gain, queuedAudio.pan)
             val key = generateSourceKey(queuedAudio.audioKey, queuedAudio.origin)
             activeSources[key]?.cleanup()
             activeSources[key] = audioSource
@@ -314,7 +333,7 @@ actual object AudioOutput {
                 MemoryUtil.memFree(buffer)
             }
 
-            val audioSource = AudioSource(alSourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin)
+            val audioSource = AudioSource(alSourceId, bufferIds, queuedAudio.audioKey, queuedAudio.origin, queuedAudio.gain, queuedAudio.pan)
             val key = generateSourceKey(queuedAudio.audioKey, queuedAudio.origin)
             activeSources[key]?.cleanup()
             activeSources[key] = audioSource
@@ -411,6 +430,8 @@ actual object AudioOutput {
     actual fun update(sourceId: String, gain: Float, pan: Float) {
         activeSources[sourceId]?.let { audioSource ->
             try {
+                audioSource.gain = gain
+                audioSource.pan = pan
                 applyPlaybackSettings(
                     sourceId = audioSource.sourceId,
                     gain = gain,
@@ -466,7 +487,7 @@ actual object AudioOutput {
         AL10.alSourcef(
             sourceId,
             AL10.AL_GAIN,
-            0.9f * AudioSettings.masterVolume.value * gain.coerceAtLeast(0f)
+            0.4f * AudioSettings.masterVolume.value * gain.coerceAtLeast(0f)
         )
         AL10.alSourcei(sourceId, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE)
         AL10.alSourcef(sourceId, AL10.AL_REFERENCE_DISTANCE, 1.0f)

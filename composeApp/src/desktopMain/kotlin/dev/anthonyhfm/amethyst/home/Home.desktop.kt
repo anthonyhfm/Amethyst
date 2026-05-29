@@ -31,6 +31,14 @@ import dev.anthonyhfm.amethyst.home.ui.views.RecentView
 import dev.anthonyhfm.amethyst.home.ui.views.SettingsView
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
+import io.github.kdroidfilter.nucleus.updater.NucleusUpdater
+import io.github.kdroidfilter.nucleus.updater.provider.GitHubProvider
+import io.github.kdroidfilter.nucleus.nativehttp.NativeHttpClient
+import dev.anthonyhfm.amethyst.core.util.amethystVersion
+import dev.anthonyhfm.amethyst.core.util.displayString
+import dev.anthonyhfm.amethyst.home.ui.views.UpdateView
+import io.github.kdroidfilter.nucleus.updater.UpdateResult
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 actual fun Home(
@@ -38,6 +46,23 @@ actual fun Home(
 ) {
     val navigator = rememberNavController()
     var useWidescreenLayout: Boolean by remember { mutableStateOf(false) }
+
+    val updater = remember {
+        NucleusUpdater {
+            provider = GitHubProvider(owner = "anthonyhfm", repo = "Amethyst")
+            currentVersion = amethystVersion.displayString
+            httpClient = NativeHttpClient.create()
+        }
+    }
+    var updateResult by remember { mutableStateOf<UpdateResult.Available?>(null) }
+
+    LaunchedEffect(Unit) {
+        val result = updater.checkForUpdates()
+        if (result is UpdateResult.Available) {
+            updateResult = result
+            navigator.navigate(HomeNavRoute.UpdatePrompt(version = result.info.version))
+        }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -133,6 +158,23 @@ actual fun Home(
                     )
                 ) {
                     LoadingScreenView(it.toRoute<HomeNavRoute.LoadingScreen>().text)
+                }
+
+                dialog<HomeNavRoute.UpdatePrompt>(
+                    dialogProperties = DialogProperties(
+                        dismissOnBackPress = false,
+                        dismissOnClickOutside = false,
+                        usePlatformDefaultWidth = false,
+                    )
+                ) {
+                    val route = it.toRoute<HomeNavRoute.UpdatePrompt>()
+
+                    UpdateView(
+                        version = route.version,
+                        updater = updater,
+                        updateResult = updateResult,
+                        onDismiss = { navigator.popBackStack() }
+                    )
                 }
             }
         }

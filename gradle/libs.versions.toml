@@ -27,6 +27,7 @@ material3Version = "1.11.0-alpha01"
 multiplatformSettings = "1.3.0"
 reorderable = "2.4.3"
 sentry-kmp = "0.26.0"
+nucleus = "1.15.6"
 
 [libraries]
 coremidi4j = { module = "uk.co.xfactory-librarians:coremidi4j", version.ref = "coremidi4j" }
@@ -45,6 +46,12 @@ lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifec
 multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatformSettings" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 sentry-kotlin-multiplatform = { module = "io.sentry:sentry-kotlin-multiplatform", version.ref = "sentry-kmp" }
+nucleus-core-runtime = { module = "io.github.kdroidfilter:nucleus.core-runtime", version.ref = "nucleus" }
+nucleus-aot-runtime = { module = "io.github.kdroidfilter:nucleus.aot-runtime", version.ref = "nucleus" }
+nucleus-updater-runtime = { module = "io.github.kdroidfilter:nucleus.updater-runtime", version.ref = "nucleus" }
+nucleus-native-http = { module = "io.github.kdroidfilter:nucleus.native-http", version.ref = "nucleus" }
+nucleus-taskbar-progress = { module = "io.github.kdroidfilter:nucleus.taskbar-progress", version.ref = "nucleus" }
+nucleus-decorated-window = { module = "io.github.kdroidfilter:nucleus.decorated-window-core", version.ref = "nucleus" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -53,3 +60,4 @@ composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-mu
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 sentryKmp = { id = "io.sentry.kotlin.multiplatform.gradle", version.ref = "sentry-kmp" }
+nucleus = { id = "io.github.kdroidfilter.nucleus", version.ref = "nucleus" }

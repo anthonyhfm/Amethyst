@@ -53,6 +53,7 @@ fun WorkspaceWindow(
                 showSaveDialog = true
                 pendingClose = true
             } else {
+                AudioOutput.stopAll()
                 WorkspaceRepository.clean()
                 onClose()
             }
@@ -111,6 +112,7 @@ fun WorkspaceWindow(
                         coroutineScope.launch {
                             val saved = WorkspaceSaveHelper.saveWorkspace()
                             if (saved && pendingClose) {
+                                AudioOutput.stopAll()
                                 WorkspaceRepository.clean()
                                 onClose()
                             }
@@ -121,6 +123,7 @@ fun WorkspaceWindow(
                     onDontSave = {
                         showSaveDialog = false
                         if (pendingClose) {
+                            AudioOutput.stopAll()
                             WorkspaceRepository.clean()
                             onClose()
                         }

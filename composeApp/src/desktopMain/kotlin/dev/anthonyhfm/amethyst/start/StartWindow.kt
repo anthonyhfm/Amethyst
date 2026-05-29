@@ -30,6 +30,16 @@ import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import org.jetbrains.compose.resources.painterResource
 import javax.swing.UIManager
 import kotlin.system.exitProcess
+import dev.anthonyhfm.amethyst.core.util.amethystVersion
+import dev.anthonyhfm.amethyst.core.util.displayString
+import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import java.io.File
+import androidx.compose.material3.*
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.*
 
 @Composable
 fun StartWindow(

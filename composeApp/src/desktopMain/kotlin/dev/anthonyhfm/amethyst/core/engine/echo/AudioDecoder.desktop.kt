@@ -22,9 +22,14 @@ actual object AudioDecoder {
         sampleStart: Long?,
         sampleEnd: Long?
     ): Signal.AudioSignal? = withContext(Dispatchers.IO) {
-        val file = File(filePath)
-        if (!file.exists()) return@withContext null
-        decodeAudioData(file.readBytes(), file.name, sampleStart, sampleEnd)
+        try {
+            val file = File(filePath)
+            if (!file.exists()) return@withContext null
+            decodeAudioData(file.readBytes(), file.name, sampleStart, sampleEnd)
+        } catch (e: Throwable) {
+            println("AudioDecoder: Failed to decode audio file '$filePath': ${e.message}")
+            null
+        }
     }
 
     actual suspend fun decodeAudioData(
@@ -33,12 +38,17 @@ actual object AudioDecoder {
         sampleStart: Long?,
         sampleEnd: Long?
     ): Signal.AudioSignal? = withContext(Dispatchers.IO) {
-        val ext = fileName.substringAfterLast('.', "").lowercase()
-        when (ext) {
-            "wav"  -> decodeWav(audioData, sampleStart, sampleEnd)
-            "flac" -> decodeFlac(audioData, sampleStart, sampleEnd)
-            "mp3", "ogg", "m4a", "aac", "aif", "aiff" -> decodeViaJavaSound(audioData, sampleStart, sampleEnd)
-            else -> null
+        try {
+            val ext = fileName.substringAfterLast('.', "").lowercase()
+            when (ext) {
+                "wav"  -> decodeWav(audioData, sampleStart, sampleEnd)
+                "flac" -> decodeFlac(audioData, sampleStart, sampleEnd)
+                "mp3", "ogg", "m4a", "aac", "aif", "aiff" -> decodeViaJavaSound(audioData, sampleStart, sampleEnd)
+                else -> null
+            }
+        } catch (e: Throwable) {
+            println("AudioDecoder: Failed to decode audio data for '$fileName': ${e.message}")
+            null
         }
     }
 
@@ -48,8 +58,9 @@ actual object AudioDecoder {
 
     private fun decodeWav(bytes: ByteArray, sampleStart: Long?, sampleEnd: Long?): Signal.AudioSignal? {
         val info = sniffWavInfo(bytes)
-        if (info != null && info.audioFormat == 3 && info.bitsPerSample == 32) {
-            return decodeWavFloat32Manual(bytes, info, sampleStart, sampleEnd)
+        if (info != null) {
+            val decoded = decodeWavManual(bytes, info, sampleStart, sampleEnd)
+            if (decoded != null) return decoded
         }
 
         return decodeViaJavaSound(bytes, sampleStart, sampleEnd)
@@ -87,7 +98,13 @@ actual object AudioDecoder {
         }
         if (fmtOff < 0 || dataOff < 0) return null
 
-        val audioFormat = (bytes[fmtOff].toInt() and 0xFF) or ((bytes[fmtOff+1].toInt() and 0xFF) shl 8)
+        var audioFormat = (bytes[fmtOff].toInt() and 0xFF) or ((bytes[fmtOff+1].toInt() and 0xFF) shl 8)
+        if (audioFormat == 0xFFFE && fmtOff + 26 <= bytes.size) {
+            val subFormat = (bytes[fmtOff+24].toInt() and 0xFF) or ((bytes[fmtOff+25].toInt() and 0xFF) shl 8)
+            if (subFormat == 1 || subFormat == 3) {
+                audioFormat = subFormat
+            }
+        }
         val channels = (bytes[fmtOff+2].toInt() and 0xFF) or ((bytes[fmtOff+3].toInt() and 0xFF) shl 8)
         val sampleRate = rd32(fmtOff + 4)
         val bitsPerSample = (bytes[fmtOff+14].toInt() and 0xFF) or ((bytes[fmtOff+15].toInt() and 0xFF) shl 8)
@@ -95,37 +112,100 @@ actual object AudioDecoder {
         return WavInfo(audioFormat, channels, sampleRate, bitsPerSample, dataOff, dataSize)
     }
 
-    private fun decodeWavFloat32Manual(
+    private fun decodeWavManual(
         bytes: ByteArray,
         info: WavInfo,
         sampleStart: Long?,
         sampleEnd: Long?
-    ): Signal.AudioSignal {
+    ): Signal.AudioSignal? {
         val ch = if (info.channels >= 1) info.channels else 2
-        val frameSize = 4 * ch
+        val srcBps = info.bitsPerSample / 8
+        if (srcBps <= 0) return null
+
+        val frameSize = srcBps * ch
         val totalFrames = info.dataSize / frameSize
         val startF = (sampleStart ?: 0L).coerceAtLeast(0L)
         val endF = (sampleEnd ?: totalFrames.toLong()).coerceAtMost(totalFrames.toLong())
-        if (startF >= endF) return Signal.AudioSignal("AudioDecoder.WAV32FLOAT", ByteArray(0), info.sampleRate, ch, 16, 0)
+        if (startF >= endF) return Signal.AudioSignal("AudioDecoder.WAV_MANUAL", ByteArray(0), info.sampleRate, ch, 16, 0)
 
         val startByte = info.dataOffset + (startF * frameSize).toInt()
         val frames = (endF - startF).toInt()
-        val out = ByteArray(frames * ch * 2)
 
+        // Safety check to ensure we don't read out of bounds of the input array
+        val maxRequiredBytes = startByte + frames * frameSize
+        if (maxRequiredBytes > bytes.size) {
+            val availableBytes = (bytes.size - startByte).coerceAtLeast(0)
+            val availableFrames = availableBytes / frameSize
+            if (availableFrames <= 0) {
+                return Signal.AudioSignal("AudioDecoder.WAV_MANUAL", ByteArray(0), info.sampleRate, ch, 16, 0)
+            }
+            return decodeWavManual(bytes, info.copy(dataSize = availableFrames * frameSize), sampleStart, sampleEnd)
+        }
+
+        val out = ByteArray(frames * ch * 2)
         var inPos = startByte
         var outPos = 0
-        repeat(frames * ch) {
-            val b0 = bytes[inPos].toInt() and 0xFF
-            val b1 = bytes[inPos+1].toInt() and 0xFF
-            val b2 = bytes[inPos+2].toInt() and 0xFF
-            val b3 = bytes[inPos+3].toInt() and 0xFF
-            val bits = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
-            val f = java.lang.Float.intBitsToFloat(bits).coerceIn(-1.0f, 1.0f)
-            val s = (f * 32767.0f).toInt().coerceIn(-32768, 32767)
-            out[outPos] = (s and 0xFF).toByte()
-            out[outPos + 1] = ((s ushr 8) and 0xFF).toByte()
-            inPos += 4
-            outPos += 2
+
+        try {
+            if (info.audioFormat == 3 && info.bitsPerSample == 32) {
+                // 32-bit Float
+                repeat(frames * ch) {
+                    val b0 = bytes[inPos].toInt() and 0xFF
+                    val b1 = bytes[inPos+1].toInt() and 0xFF
+                    val b2 = bytes[inPos+2].toInt() and 0xFF
+                    val b3 = bytes[inPos+3].toInt() and 0xFF
+                    val bits = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
+                    val f = java.lang.Float.intBitsToFloat(bits).coerceIn(-1.0f, 1.0f)
+                    val s = (f * 32767.0f).toInt().coerceIn(-32768, 32767)
+                    out[outPos] = (s and 0xFF).toByte()
+                    out[outPos + 1] = ((s ushr 8) and 0xFF).toByte()
+                    inPos += 4
+                    outPos += 2
+                }
+            } else if (info.audioFormat == 1) {
+                // PCM formats
+                when (info.bitsPerSample) {
+                    16 -> {
+                        // 16-bit PCM is already in the target format
+                        System.arraycopy(bytes, startByte, out, 0, out.size)
+                    }
+                    24 -> {
+                        // 24-bit PCM: convert to 16-bit by dropping the LSB (first byte)
+                        repeat(frames * ch) {
+                            out[outPos] = bytes[inPos + 1]
+                            out[outPos + 1] = bytes[inPos + 2]
+                            inPos += 3
+                            outPos += 2
+                        }
+                    }
+                    8 -> {
+                        // 8-bit PCM is unsigned in WAV (0 to 255, where 128 is center)
+                        repeat(frames * ch) {
+                            val s8 = (bytes[inPos].toInt() and 0xFF) - 128
+                            val s16 = s8 * 256
+                            out[outPos] = (s16 and 0xFF).toByte()
+                            out[outPos + 1] = ((s16 ushr 8) and 0xFF).toByte()
+                            inPos += 1
+                            outPos += 2
+                        }
+                    }
+                    32 -> {
+                        // 32-bit PCM: convert to 16-bit by taking the upper 2 bytes
+                        repeat(frames * ch) {
+                            out[outPos] = bytes[inPos + 2]
+                            out[outPos + 1] = bytes[inPos + 3]
+                            inPos += 4
+                            outPos += 2
+                        }
+                    }
+                    else -> return null // Unsupported bits per sample for manual PCM decoding
+                }
+            } else {
+                return null // Unsupported format for manual decoding (e.g. A-law, u-law, etc.)
+            }
+        } catch (e: Throwable) {
+            println("AudioDecoder: Failed during manual WAV decoding: ${e.message}")
+            return null
         }
 
         val bytesPerSample = 2 * ch
@@ -133,7 +213,7 @@ actual object AudioDecoder {
         val durationMs = (totalSamples * 1000L) / info.sampleRate
 
         return Signal.AudioSignal(
-            origin = "AudioDecoder.WAV32FLOAT",
+            origin = "AudioDecoder.WAV_MANUAL",
             rawData = out,
             sampleRate = info.sampleRate,
             channels = ch,

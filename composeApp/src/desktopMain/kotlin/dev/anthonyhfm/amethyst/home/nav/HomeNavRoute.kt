@@ -33,4 +33,9 @@ sealed interface HomeNavRoute {
     data class LoadingScreen(
         val text: String
     ) : HomeNavRoute
+
+    @Serializable
+    data class UpdatePrompt(
+        val version: String
+    ) : HomeNavRoute
 }

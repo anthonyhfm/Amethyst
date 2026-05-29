@@ -24,6 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -39,16 +44,16 @@ jobs:
           key: gradle-windows-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-windows-
 
-      - name: Build MSI
+      - name: Build NSIS
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageMsi
+        run: ./gradlew :composeApp:packageReleaseNsis
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: amethyst-windows
-          path: composeApp/build/compose/binaries/main/msi/*.msi
+          path: composeApp/build/compose/binaries/main-release/nsis/*.exe
           if-no-files-found: error
 
   build-macos:
@@ -57,6 +62,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -76,13 +86,13 @@ jobs:
       - name: Build DMG
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageDmg
+        run: ./gradlew :composeApp:packageReleaseDmg
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: amethyst-macos
-          path: composeApp/build/compose/binaries/main/dmg/*.dmg
+          path: composeApp/build/compose/binaries/main-release/dmg/*.dmg
           if-no-files-found: error
 
   build-linux:
@@ -91,6 +101,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -110,13 +125,13 @@ jobs:
       - name: Build DEB
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageDeb
+        run: ./gradlew :composeApp:packageReleaseDeb
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: amethyst-linux
-          path: composeApp/build/compose/binaries/main/deb/*.deb
+          path: composeApp/build/compose/binaries/main-release/deb/*.deb
           if-no-files-found: error
 
   release:
@@ -144,7 +159,7 @@ jobs:
 
             **Build #${{ github.run_number }}** · Commit: `${{ github.sha }}` · @${{ github.actor }}
           files: |
-            release-artifacts/amethyst-windows/*.msi
+            release-artifacts/amethyst-windows/*.exe
             release-artifacts/amethyst-macos/*.dmg
             release-artifacts/amethyst-linux/*.deb
           fail_on_unmatched_files: true

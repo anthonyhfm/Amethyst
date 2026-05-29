@@ -1,4 +1,4 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import io.github.kdroidfilter.nucleus.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -10,6 +10,7 @@ plugins {
     kotlin("plugin.serialization") version "2.1.0"
     id("org.jetbrains.kotlinx.atomicfu") version "0.29.0"
     alias(libs.plugins.sentryKmp)
+    alias(libs.plugins.nucleus)
 }
 
 kotlin {
@@ -97,6 +98,14 @@ kotlin {
             implementation(libs.flatlaf)
             implementation("io.github.vyfor:kpresence:0.6.5")
 
+            // Nucleus runtime
+            implementation(libs.nucleus.core.runtime)
+            implementation(libs.nucleus.aot.runtime)
+            implementation(libs.nucleus.updater.runtime)
+            implementation(libs.nucleus.native.http)
+            implementation(libs.nucleus.taskbar.progress)
+            implementation(libs.nucleus.decorated.window)
+
             // LWJGL Platform Detection
             val lwjglVersion = "3.3.6"
             val lwjglNatives = when (org.gradle.internal.os.OperatingSystem.current()) {
@@ -153,46 +162,41 @@ dependencies {
     debugImplementation(compose.uiTooling)
 }
 
-compose.desktop {
-    application {
-        mainClass = "dev.anthonyhfm.amethyst.MainKt"
+nucleus.application {
+    mainClass = "dev.anthonyhfm.amethyst.MainKt"
+    
+    jvmArgs += listOf(
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.net=ALL-UNNAMED",
+        "--add-opens=java.base/java.nio=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+        "-Dorg.lwjgl.util.Debug=false"
+    )
 
-        jvmArgs += listOf(
-            "--add-opens=java.base/java.lang=ALL-UNNAMED",
-            "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
-            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-            "--add-opens=java.base/java.io=ALL-UNNAMED",
-            "--add-opens=java.base/java.net=ALL-UNNAMED",
-            "--add-opens=java.base/java.nio=ALL-UNNAMED",
-            "--add-opens=java.base/java.util=ALL-UNNAMED",
-            "--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED",
-            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-            "-Dorg.lwjgl.util.Debug=false"
-        )
+    nativeDistributions {
+        packageName = "Amethyst"
+        packageVersion = "1.0.0"
 
-        nativeDistributions {
-            packageName = "Amethyst"
-            packageVersion = "1.0.0"
+        targetFormats(TargetFormat.Dmg, TargetFormat.Nsis, TargetFormat.Deb)
 
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+        includeAllModules = true
 
-            includeAllModules = true
+        macOS {
+            iconFile.set(project.file("../icons/amethyst_macos.icns"))
+        }
 
-            macOS {
-                iconFile.set(project.file("../icons/amethyst_macos.icns"))
-                dockName = "Amethyst"
-            }
+        windows {
+            iconFile.set(project.file("../icons/amethyst_windows.ico"))
+        }
 
-            windows {
-                iconFile.set(project.file("../icons/amethyst_windows.ico"))
-                menu = true
-                shortcut = true
-            }
-
-            linux {
-                modules("jdk.security.auth")
-                iconFile.set(project.file("../icons/amethyst_linux.png"))
-            }
+        linux {
+            modules("jdk.security.auth")
+            iconFile.set(project.file("../icons/amethyst_linux.png"))
         }
     }
 }
