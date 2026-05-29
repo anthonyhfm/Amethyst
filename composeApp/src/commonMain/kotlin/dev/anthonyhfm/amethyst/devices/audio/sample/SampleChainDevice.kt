@@ -244,32 +244,29 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                     maxFadeMs = MAX_FADE_MS,
                     modifier = Modifier.fillMaxSize()
                 )
-            }
 
-            SampleVolumeEnvelopeEditor(
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .fillMaxWidth()
-                    .height(SampleEnvelopeHeightDp.dp),
-                lane = deviceState.volumeAutomationLane
-                    ?: TimelineAutomationLane(target = TimelineTrackAutomationTarget.VOLUME),
-                durationMs = deviceState.totalDurationMs,
-                onLaneCommitted = { beforeLane, afterLane ->
-                    val normalizedBeforeLane = beforeLane
-                        .normalized()
-                        .takeIf { it.points.isNotEmpty() }
-                    val normalizedAfterLane = afterLane
-                        .normalized()
-                        .takeIf { it.points.isNotEmpty() }
-                    pushStateChange(
-                        before = state.value.copy(volumeAutomationLane = normalizedBeforeLane),
-                        after = state.value.copy(volumeAutomationLane = normalizedAfterLane)
-                    )
-                    state.update { currentState ->
-                        currentState.copy(volumeAutomationLane = normalizedAfterLane)
+                SampleVolumeEnvelopeEditor(
+                    modifier = Modifier.fillMaxSize(),
+                    lane = deviceState.volumeAutomationLane
+                        ?: TimelineAutomationLane(target = TimelineTrackAutomationTarget.VOLUME),
+                    durationMs = deviceState.totalDurationMs,
+                    onLaneCommitted = { beforeLane, afterLane ->
+                        val normalizedBeforeLane = beforeLane
+                            .normalized()
+                            .takeIf { it.points.isNotEmpty() }
+                        val normalizedAfterLane = afterLane
+                            .normalized()
+                            .takeIf { it.points.isNotEmpty() }
+                        pushStateChange(
+                            before = state.value.copy(volumeAutomationLane = normalizedBeforeLane),
+                            after = state.value.copy(volumeAutomationLane = normalizedAfterLane)
+                        )
+                        state.update { currentState ->
+                            currentState.copy(volumeAutomationLane = normalizedAfterLane)
+                        }
                     }
-                }
-            )
+                )
+            }
 
             // Controls: Fade In | Fade Out | Volume  (Start/End via waveform handles)
             Row(
@@ -631,9 +628,6 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
 
         Box(
             modifier = modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(Theme[colors][secondary])
-                .border(1.dp, Theme[colors][border], RoundedCornerShape(6.dp))
                 .pointerInput(normalizedLane.points, normalizedDurationMs) {
                     awaitEachGesture {
                         val down = awaitFirstDown(

@@ -252,6 +252,21 @@ object AutomappingManager {
         return null
     }
 
+    fun isMappingActive(): Boolean {
+        val target = resolveActiveTarget() ?: return false
+        val mode = WorkspaceRepository.mode.value
+        val effectiveDomain = when (mode) {
+            is WorkspaceContract.WorkspaceMode.Timeline -> target.domain
+            else -> return false
+        }
+        val selectedClip = resolveAutomappingSelectedClip(
+            domain = effectiveDomain,
+            tracks = TimelineRepository.tracks.value,
+            selections = SelectionManager.selections.value,
+        )
+        return selectedClip != null
+    }
+
     fun tryCommitPadMapping(
         device: LaunchpadViewportElement,
         globalX: Int,
@@ -279,23 +294,24 @@ object AutomappingManager {
             return false
         }
 
-        val toggled = AutomappingChainMutation.toggleClipOnPad(
-            targetGroup = target.group,
-            launchpadId = device.launchpadId,
-            localX = localX,
-            localY = localY,
-            clip = selectedClip,
-        )
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            val toggled = AutomappingChainMutation.toggleClipOnPad(
+                targetGroup = target.group,
+                launchpadId = device.launchpadId,
+                localX = localX,
+                localY = localY,
+                clip = selectedClip,
+            )
 
-        if (!toggled) return false
-
-        _revision.update { it + 1 }
-
-        flashPad(
-            globalX = globalX,
-            globalY = globalY,
-            identifier = "${device.launchpadId}:$localX:$localY",
-        )
+            if (toggled) {
+                _revision.update { it + 1 }
+                flashPad(
+                    globalX = globalX,
+                    globalY = globalY,
+                    identifier = "${device.launchpadId}:$localX:$localY",
+                )
+            }
+        }
         return true
     }
 

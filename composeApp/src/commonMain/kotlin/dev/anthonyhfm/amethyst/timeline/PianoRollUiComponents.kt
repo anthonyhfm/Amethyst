@@ -64,7 +64,6 @@ internal fun PianoRollHeader(
     clipBeats: Float,
     metrics: PianoRollMetrics,
     beatsPerBar: Int,
-    canvasWidthDp: Dp,
     viewport: EditorViewportState,
     onTap: (Offset) -> Unit
 ) {
@@ -79,7 +78,7 @@ internal fun PianoRollHeader(
                 .background(palette.rulerSurface)
         )
 
-        // Viewport clip — the ruler content is shifted by viewport.scrollX to mirror the note grid
+        // Viewport clip — the ruler content is drawn in screen space
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -88,9 +87,7 @@ internal fun PianoRollHeader(
         ) {
             Box(
                 modifier = Modifier
-                    .width(canvasWidthDp)
-                    .height(40.dp)
-                    .offset { IntOffset(-viewport.scrollX.roundToInt(), 0) }
+                    .fillMaxSize()
                     .pointerInput(Unit) {
                         detectTapGestures { offset -> latestOnTap(offset) }
                     }
@@ -99,7 +96,7 @@ internal fun PianoRollHeader(
                     clipBeats = clipBeats,
                     metrics = metrics,
                     beatsPerBar = beatsPerBar,
-                    canvasWidthDp = canvasWidthDp
+                    viewport = viewport
                 )
             }
         }
@@ -121,7 +118,8 @@ internal fun Modifier.pianoRollGridBackground(
     metrics: PianoRollMetrics,
     beatsPerBar: Int,
     gridResolution: GridResolution,
-    colors: PianoRollGridColors
+    colors: PianoRollGridColors,
+    viewport: EditorViewportState
 ): Modifier = drawBehind {
     val widthPx = size.width
     val heightPx = size.height
@@ -142,8 +140,8 @@ internal fun Modifier.pianoRollGridBackground(
         drawLine(colors.pitchSeparatorColor, Offset(0f, y), Offset(widthPx, y), 1f)
     }
 
-    // Clip start (t=0) and end (t=durationMs) x positions, accounting for OOB overhang
-    val clipStartX = metrics.timeMsToXPx(0)
+    // Clip start (t=0) and end (t=durationMs) screen x positions, accounting for OOB overhang
+    val clipStartX = viewport.contentToScreenX(metrics.timeMsToXPx(0))
     val clipEndX = clipStartX + clipBeats * metrics.pixelsPerBeatPx
 
     // Shade OOB regions (before clip start and after clip end)
@@ -217,9 +215,10 @@ internal fun PianoRollSelectedTimeCursor(
 ) {
     selectedTimeMs ?: return
 
-    val xPx by remember(selectedTimeMs, viewport.zoomX, oobOverhangMs) {
+    val screenX by remember(selectedTimeMs, viewport.zoomX, viewport.scrollX, oobOverhangMs) {
         androidx.compose.runtime.derivedStateOf {
-            viewport.clipTimeMsToContentX(selectedTimeMs.toDouble(), oobOverhangMs)
+            val contentX = viewport.clipTimeMsToContentX(selectedTimeMs.toDouble(), oobOverhangMs)
+            viewport.contentToScreenX(contentX)
         }
     }
     val density = LocalDensity.current
@@ -227,7 +226,7 @@ internal fun PianoRollSelectedTimeCursor(
 
     Box(
         modifier = Modifier
-            .offset { IntOffset((xPx - with(density) { 1.5.dp.toPx() }).toInt(), 0) }
+            .offset { IntOffset((screenX - with(density) { 1.5.dp.toPx() }).toInt(), 0) }
             .width(3.dp)
             .height(rowHeight)
             .background(cursorColor)
@@ -238,6 +237,7 @@ internal fun PianoRollSelectedTimeCursor(
 internal fun NoteBox(
     note: MidiNote,
     metrics: PianoRollMetrics,
+    viewport: EditorViewportState,
     isSelected: Boolean,
     activeTool: TimelineEditorTool,
     clipDurationMs: Long = Long.MAX_VALUE,
@@ -263,6 +263,7 @@ internal fun NoteBox(
     val latestOnResizeRightEnd by rememberUpdatedState(onResizeRightEnd)
     val baseY = metrics.pitchToYPx(note.pitch)
     val baseX = metrics.timeMsToXPx(note.startTimeMs)
+    val screenX = viewport.contentToScreenX(baseX)
     val baseWidthPx = metrics.durationMsToWidthPx(note.durationMs)
     val snappedDragOffsetY = if (dragOffset.y != 0f) {
         val pitchSteps = round(dragOffset.y / metrics.noteHeightPx).toInt()
@@ -271,7 +272,7 @@ internal fun NoteBox(
         0f
     }
 
-    val currentX = baseX + dragOffset.x + resizeLeftDelta
+    val currentX = screenX + dragOffset.x + resizeLeftDelta
     val currentY = baseY + snappedDragOffsetY
     val currentWidthPx = (baseWidthPx - resizeLeftDelta + resizeRightDelta).coerceAtLeast(20f)
 
@@ -417,10 +418,11 @@ internal fun NoteBox(
 internal fun DraftNoteBox(
     note: MidiNote,
     metrics: PianoRollMetrics,
+    viewport: EditorViewportState,
 ) {
     val density = LocalDensity.current
     val y = metrics.pitchToYPx(note.pitch)
-    val x = metrics.timeMsToXPx(note.startTimeMs)
+    val x = viewport.contentToScreenX(metrics.timeMsToXPx(note.startTimeMs))
     val widthPx = metrics.durationMsToWidthPx(note.durationMs)
 
     Box(
@@ -519,7 +521,7 @@ internal fun TimelineRuler(
     clipBeats: Float,
     metrics: PianoRollMetrics,
     beatsPerBar: Int,
-    canvasWidthDp: Dp
+    viewport: EditorViewportState
 ) {
     val textMeasurer = rememberTextMeasurer()
     val palette = TimelineTheme.palette
@@ -530,13 +532,12 @@ internal fun TimelineRuler(
 
     Canvas(
         modifier = Modifier
-            .width(canvasWidthDp)
-            .fillMaxHeight()
+            .fillMaxSize()
             .background(backgroundColor)
     ) {
         val heightPx = size.height
         val totalBeats = clipBeats.toInt() + 1
-        val clipStartX = metrics.timeMsToXPx(0)
+        val clipStartX = viewport.contentToScreenX(metrics.timeMsToXPx(0))
 
         for (beatIndex in 0 until totalBeats) {
             val x = clipStartX + beatIndex * metrics.pixelsPerBeatPx

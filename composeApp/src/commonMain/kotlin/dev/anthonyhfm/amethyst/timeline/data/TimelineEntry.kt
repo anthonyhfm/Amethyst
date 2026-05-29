@@ -214,10 +214,16 @@ data class MidiEntry(
     private val lastSentGradientColor = mutableMapOf<MidiNote, Triple<Float, Float, Float>>()
 
     private fun pitchToXY(pitch: Int): Pair<Int, Int> {
+        val deviceIndex = pitch / 100
         val localPitch = pitch % 100
         val x = localPitch % 10
         val y = 9 - (localPitch / 10)
-        return Pair(x, y)
+        
+        val device = Heaven.devices.getOrNull(deviceIndex)
+        val globalX = x + (device?.position?.value?.x?.toInt() ?: 0)
+        val globalY = y + (device?.position?.value?.y?.toInt() ?: 0)
+        
+        return Pair(globalX, globalY)
     }
 
     override fun start(startAt: Long?, automation: TimelineTrackAutomationState) {

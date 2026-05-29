@@ -214,17 +214,23 @@ class AmethystMidiManager {
 
                     val x = it.pitch % 10
                     val y = it.pitch / 10
+
+                    val (visX, visY) = dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.rotateMidiCoordinate(x, y, layout, rotationDegrees.floatValue)
+
                     val posX = offset.x.toInt()
                     val posY = offset.y.toInt()
-                    val globalX = posX + x
-                    val globalY = posY + (9 - y)
+                    val globalX = posX + visX
+                    val globalY = posY + (9 - visY)
 
-                    if (it.velocity != 0) {
-                        AutomappingManager.tryCommitPadMapping(
-                            device = this@onMidiMessage,
-                            globalX = globalX,
-                            globalY = globalY,
-                        )
+                    if (AutomappingManager.isMappingActive()) {
+                        if (it.velocity != 0) {
+                            AutomappingManager.tryCommitPadMapping(
+                                device = this@onMidiMessage,
+                                globalX = globalX,
+                                globalY = globalY,
+                            )
+                        }
+                        return@let
                     }
 
                     WorkspaceRepository.samplingChain.signalEnter(

@@ -22,34 +22,34 @@ internal object AutomappingChainMutation {
         val targetState = StateChain.packDevice(targetDevice)
         val padFilter = LaunchpadPadFilter(launchpadId, localX, localY)
 
-        val devices = targetGroup.chain.devices.value
+        // 1. Locate all CoordinateFilterChainDevices and get the first one (or create)
+        val allCoordFilters = targetGroup.chain.devices.value.filterIsInstance<CoordinateFilterChainDevice>()
+        val coordFilter = allCoordFilters.firstOrNull() ?: CoordinateFilterChainDevice()
         
-        // 1. Ensure CoordinateFilterChainDevice exists
-        val coordFilter = devices.filterIsInstance<CoordinateFilterChainDevice>().firstOrNull() ?: run {
-            val newFilter = CoordinateFilterChainDevice()
-            targetGroup.chain.add(newFilter, 0, fromUser = false)
-            newFilter
-        }
+        // 2. Locate all clip devices
+        val allClipDevices = targetGroup.chain.devices.value.filter { it is SampleChainDevice || it is PianoRollChainDevice }
+        val existingClipDevice = allClipDevices.firstOrNull()
         
-        // 2. Locate existing clip device
-        val existingClipDevice = targetGroup.chain.devices.value.find { it is SampleChainDevice || it is PianoRollChainDevice }
-        
-        if (existingClipDevice != null) {
-            val existingState = StateChain.packDevice(existingClipDevice)
-            if (existingState != targetState) {
-                // The user selected a DIFFERENT clip but is mapping to the SAME group.
-                // Replace the existing clip device with the new one.
-                val idx = targetGroup.chain.devices.value.indexOf(existingClipDevice)
-                targetGroup.chain.remove(existingClipDevice.selectionUUID)
-                targetGroup.chain.add(targetDevice, idx.coerceAtLeast(1), fromUser = false)
-            }
+        // 3. Determine final clip device
+        val finalClipDevice = if (existingClipDevice != null && StateChain.packDevice(existingClipDevice) == targetState) {
+            existingClipDevice
         } else {
-            // No clip device found. Add it right after the CoordinateFilterChainDevice.
-            val coordIdx = targetGroup.chain.devices.value.indexOf(coordFilter)
-            targetGroup.chain.add(targetDevice, coordIdx + 1, fromUser = false)
+            targetDevice
         }
         
-        // 3. Toggle the pad in the CoordinateFilterChainDevice
+        // 4. Forcefully remove ALL of them to clean up any duplicates from older bugs
+        allCoordFilters.forEach { 
+            targetGroup.chain.remove(it.selectionUUID, fromUser = false) 
+        }
+        allClipDevices.forEach { 
+            targetGroup.chain.remove(it.selectionUUID, fromUser = false) 
+        }
+        
+        // 5. Re-insert them in the EXACT order: [CoordinateFilter, ClipDevice]
+        targetGroup.chain.add(coordFilter, 0, fromUser = false)
+        targetGroup.chain.add(finalClipDevice, 1, fromUser = false)
+        
+        // 6. Toggle the pad in the CoordinateFilterChainDevice
         val currentFilters = coordFilter.state.value.padFilters
         if (currentFilters.contains(padFilter)) {
             // Remove

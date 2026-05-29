@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -303,11 +304,30 @@ fun HexColorEditor(
     state: ColorPickerState,
     modifier: Modifier = Modifier,
 ) {
-    val hex = state.hex
+    var textFieldValue by remember { mutableStateOf(TextFieldValue(state.hex.uppercase())) }
+    var lastColor by remember { mutableStateOf(state.color) }
+
+    if (state.color != lastColor) {
+        val newHex = state.hex.uppercase()
+        if (textFieldValue.text != newHex) {
+            textFieldValue = textFieldValue.copy(text = newHex)
+        }
+        lastColor = state.color
+    }
 
     BasicTextField(
-        value = hex.uppercase(),
-        onValueChange = { state.setHex(it) },
+        value = textFieldValue,
+        onValueChange = { newValue ->
+            // Keep prefix "#" if possible, limit length to 9 to prevent long pastes
+            var text = newValue.text
+            if (!text.startsWith("#")) {
+                text = "#" + text.replace("#", "")
+            }
+            text = text.uppercase().take(9)
+            
+            textFieldValue = newValue.copy(text = text)
+            state.setHex(text)
+        },
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(
             color = MaterialTheme.colorScheme.onBackground,

@@ -232,7 +232,26 @@ abstract class LaunchpadViewportElement(
                 localX = translatedX - position.value.x.toInt(),
                 localY = translatedY - position.value.y.toInt()
             )
-            else -> sendGenericPadDown(translatedX, translatedY)
+            else -> {
+                if (mode.claimInputs) {
+                    val localX = translatedX - position.value.x.toInt()
+                    val localY = translatedY - position.value.y.toInt()
+                    val pitch = (9 - localY) * 10 + localX
+                    
+                    val offset = position.value.copy(
+                        x = position.value.x - layout.offsetX,
+                        y = position.value.y - layout.offsetY
+                    )
+                    
+                    val data = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
+                        pitch = pitch,
+                        velocity = 127
+                    )
+                    mode.onMidiInput(data, offset).invoke()
+                } else {
+                    sendGenericPadDown(translatedX, translatedY)
+                }
+            }
         }
     }
 
@@ -257,14 +276,46 @@ abstract class LaunchpadViewportElement(
                 localY = translatedY - position.value.y.toInt()
             )
             else -> {
-                val previousPad = lastDragPad
-                if (previousPad != Pair(translatedX, translatedY)) {
-                    previousPad?.let { (oldX, oldY) ->
-                        sendGenericPadUp(oldX, oldY)
+                if (mode.claimInputs) {
+                    val localX = translatedX - position.value.x.toInt()
+                    val localY = translatedY - position.value.y.toInt()
+                    val pitch = (9 - localY) * 10 + localX
+                    
+                    val offset = position.value.copy(
+                        x = position.value.x - layout.offsetX,
+                        y = position.value.y - layout.offsetY
+                    )
+                    
+                    val previousPad = lastDragPad
+                    if (previousPad != Pair(translatedX, translatedY)) {
+                        previousPad?.let { (oldX, oldY) ->
+                            val oldLocalX = oldX - position.value.x.toInt()
+                            val oldLocalY = oldY - position.value.y.toInt()
+                            val oldPitch = (9 - oldLocalY) * 10 + oldLocalX
+                            val oldData = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
+                                pitch = oldPitch,
+                                velocity = 0
+                            )
+                            mode.onMidiInput(oldData, offset).invoke()
+                        }
+                        
+                        val data = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
+                            pitch = pitch,
+                            velocity = 127
+                        )
+                        mode.onMidiInput(data, offset).invoke()
+                        lastDragPad = Pair(translatedX, translatedY)
                     }
+                } else {
+                    val previousPad = lastDragPad
+                    if (previousPad != Pair(translatedX, translatedY)) {
+                        previousPad?.let { (oldX, oldY) ->
+                            sendGenericPadUp(oldX, oldY)
+                        }
 
-                    sendGenericPadDown(translatedX, translatedY)
-                    lastDragPad = Pair(translatedX, translatedY)
+                        sendGenericPadDown(translatedX, translatedY)
+                        lastDragPad = Pair(translatedX, translatedY)
+                    }
                 }
             }
         }
@@ -279,8 +330,27 @@ abstract class LaunchpadViewportElement(
             is KeyframesWorkspaceMode -> mode.virtualDeviceDragEnd()
             is CoordinateFilterWorkspaceMode -> mode.virtualDeviceDragEnd()
             else -> {
-                lastDragPad?.let { (x, y) ->
-                    sendGenericPadUp(x, y)
+                if (mode.claimInputs) {
+                    lastDragPad?.let { (x, y) ->
+                        val localX = x - position.value.x.toInt()
+                        val localY = y - position.value.y.toInt()
+                        val pitch = (9 - localY) * 10 + localX
+                        
+                        val offset = position.value.copy(
+                            x = position.value.x - layout.offsetX,
+                            y = position.value.y - layout.offsetY
+                        )
+                        
+                        val data = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
+                            pitch = pitch,
+                            velocity = 0
+                        )
+                        mode.onMidiInput(data, offset).invoke()
+                    }
+                } else {
+                    lastDragPad?.let { (x, y) ->
+                        sendGenericPadUp(x, y)
+                    }
                 }
             }
         }
@@ -289,9 +359,10 @@ abstract class LaunchpadViewportElement(
     }
 
     private fun translateToDeviceCoordinates(x: Int, y: Int): Pair<Int, Int> {
+        val (rotatedX, rotatedY) = rotatePadCoordinates(x, y, layout, rotationDegrees.floatValue)
         return Pair(
-            x + position.value.x.toInt(),
-            (layout.rows - 1) - y + position.value.y.toInt()
+            rotatedX + position.value.x.toInt(),
+            (layout.rows - 1) - rotatedY + position.value.y.toInt()
         )
     }
 
@@ -301,11 +372,14 @@ abstract class LaunchpadViewportElement(
             return
         }
 
-        AutomappingManager.tryCommitPadMapping(
-            device = this,
-            globalX = x,
-            globalY = y,
-        )
+        if (AutomappingManager.isMappingActive()) {
+            AutomappingManager.tryCommitPadMapping(
+                device = this,
+                globalX = x,
+                globalY = y,
+            )
+            return
+        }
 
         WorkspaceRepository.lightsChain.signalEnter(
             Signal.LED(
@@ -330,6 +404,10 @@ abstract class LaunchpadViewportElement(
     fun sendGenericPadUp(x: Int, y: Int) {
         if (onCapturePad != null) {
             onCapturePad?.invoke(Triple(false, x, y))
+            return
+        }
+
+        if (AutomappingManager.isMappingActive()) {
             return
         }
 
