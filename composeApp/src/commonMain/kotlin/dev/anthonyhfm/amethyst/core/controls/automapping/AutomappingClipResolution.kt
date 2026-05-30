@@ -10,7 +10,6 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
 data class AutomappingTarget(
     val parentDeviceSelectionUUID: String,
-    val groupId: String,
 )
 
 enum class AutomappingChainDomain {

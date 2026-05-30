@@ -322,6 +322,7 @@ object WorkspaceRepository {
         _macros.update { workspaceData.macros }
 
         TimelineRepository.loadTracks(workspaceData.timelineData)
+        AudioSourceLibrary.load(workspaceData.audioSources)
         migrateAudioEntries()
 
         Heaven.devices = workspaceData.launchpadDevices.map { savedDevice ->
@@ -435,6 +436,7 @@ object WorkspaceRepository {
                     positionY = device.position.value.y
                 )
             },
+            audioSources = AudioSourceLibrary.all(),
         )
     }
 

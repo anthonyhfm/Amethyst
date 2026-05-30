@@ -191,64 +191,21 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
         }
     }
 
+    override fun signalEnter(n: List<Signal>) {
+        super.signalEnter(n)
+        
+        n.filterIsInstance<Signal.Midi>().forEach { signal ->
+            if (signal.velocity != 0) {
+                playStandaloneEntry()
+            }
+        }
+    }
+
     override fun ledSignalEnter(n: List<Signal.LED>) {
         // When an LED signal enters, play the MIDI entry
         n.forEach { signal ->
             if (signal.color != Color.Black) {
-                // Cancel any previous scheduled jobs
-                Heaven.cancelJobsForOwner(this)
-
-                // Schedule all notes to play
-                state.value.midiEntry.notes.forEach { note ->
-                    val (x, y) = pitchToXY(note.pitch)
-
-                    if (note.isGradient) {
-                        // Schedule per-frame color signals across the note duration
-                        val gradient = note.led.gradient!!
-                        val frameIntervalMs = 1000.0 / Heaven.fps
-                        var t = note.startTimeMs.toDouble()
-                        while (t < note.endTimeMs.toDouble()) {
-                            val fraction = ((t - note.startTimeMs) / note.durationMs.toDouble()).toFloat().coerceIn(0f, 1f)
-                            val capturedFraction = fraction
-                            Heaven.schedule(t, owner = this) {
-                                val (r, g, b) = GradientInterpolator.interpolate(gradient, capturedFraction)
-                                signalExit?.invoke(listOf(Signal.LED(
-                                    origin = this,
-                                    x = x,
-                                    y = y,
-                                    color = Color(r, g, b),
-                                    layer = note.led.layer,
-                                    blendingMode = note.led.blendingMode
-                                )))
-                            }
-                            t += frameIntervalMs
-                        }
-                    } else {
-                        // Schedule note on (solid color)
-                        Heaven.schedule(note.startTimeMs.toDouble(), owner = this) {
-                            signalExit?.invoke(listOf(Signal.LED(
-                                origin = this,
-                                x = x,
-                                y = y,
-                                color = Color(note.led.red, note.led.green, note.led.blue),
-                                layer = note.led.layer,
-                                blendingMode = note.led.blendingMode
-                            )))
-                        }
-                    }
-
-                    // Schedule note off (always)
-                    Heaven.schedule(note.endTimeMs.toDouble(), owner = this) {
-                        signalExit?.invoke(listOf(Signal.LED(
-                            origin = this,
-                            x = x,
-                            y = y,
-                            color = Color.Black,
-                            layer = note.led.layer,
-                            blendingMode = note.led.blendingMode
-                        )))
-                    }
-                }
+                playStandaloneEntry()
             }
         }
     }

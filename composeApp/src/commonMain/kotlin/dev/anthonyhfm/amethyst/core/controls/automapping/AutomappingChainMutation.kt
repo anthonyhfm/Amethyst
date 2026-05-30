@@ -6,13 +6,15 @@ import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilte
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.LaunchpadPadFilter
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.coroutines.flow.update
 
 internal object AutomappingChainMutation {
     
     fun toggleClipOnPad(
-        targetGroup: Group,
+        parentDevice: GenericChainDevice<*>,
         launchpadId: String,
         localX: Int,
         localY: Int,
@@ -22,41 +24,54 @@ internal object AutomappingChainMutation {
         val targetState = StateChain.packDevice(targetDevice)
         val padFilter = LaunchpadPadFilter(launchpadId, localX, localY)
 
-        // 1. Locate all CoordinateFilterChainDevices and get the first one (or create)
-        val allCoordFilters = targetGroup.chain.devices.value.filterIsInstance<CoordinateFilterChainDevice>()
-        val coordFilter = allCoordFilters.firstOrNull() ?: CoordinateFilterChainDevice()
-        
-        // 2. Locate all clip devices
-        val allClipDevices = targetGroup.chain.devices.value.filter { it is SampleChainDevice || it is PianoRollChainDevice }
-        val existingClipDevice = allClipDevices.firstOrNull()
-        
-        // 3. Determine final clip device
-        val finalClipDevice = if (existingClipDevice != null && StateChain.packDevice(existingClipDevice) == targetState) {
-            existingClipDevice
+        val groups = when (parentDevice) {
+            is GroupChainDevice -> parentDevice.state.value.groups
+            is MultiGroupChainDevice -> parentDevice.state.value.groups
+            else -> return false
+        }
+
+        // 1. Find a group that exactly maps to THIS clip
+        val matchingGroup = groups.find { group ->
+            val allClipDevices = group.chain.devices.value.filter { it is SampleChainDevice || it is PianoRollChainDevice }
+            val existingClipDevice = allClipDevices.firstOrNull()
+            existingClipDevice != null && StateChain.packDevice(existingClipDevice) == targetState
+        }
+
+        if (matchingGroup != null) {
+            // Modify this group
+            val coordFilter = matchingGroup.chain.devices.value.filterIsInstance<CoordinateFilterChainDevice>().firstOrNull() ?: CoordinateFilterChainDevice().also {
+                matchingGroup.chain.add(it, 0, fromUser = false)
+            }
+            
+            val currentFilters = coordFilter.state.value.padFilters
+            if (currentFilters.contains(padFilter)) {
+                // Remove pad
+                coordFilter.state.update { it.copy(padFilters = currentFilters - padFilter) }
+                
+                // If it was the last pad, delete the whole group
+                if (coordFilter.state.value.padFilters.isEmpty()) {
+                    when (parentDevice) {
+                        is GroupChainDevice -> parentDevice.removeGroupById(matchingGroup.id)
+                        is MultiGroupChainDevice -> parentDevice.removeGroupById(matchingGroup.id)
+                    }
+                }
+            } else {
+                // Add pad
+                coordFilter.state.update { it.copy(padFilters = currentFilters + padFilter) }
+            }
         } else {
-            targetDevice
-        }
-        
-        // 4. Forcefully remove ALL of them to clean up any duplicates from older bugs
-        allCoordFilters.forEach { 
-            targetGroup.chain.remove(it.selectionUUID, fromUser = false) 
-        }
-        allClipDevices.forEach { 
-            targetGroup.chain.remove(it.selectionUUID, fromUser = false) 
-        }
-        
-        // 5. Re-insert them in the EXACT order: [CoordinateFilter, ClipDevice]
-        targetGroup.chain.add(coordFilter, 0, fromUser = false)
-        targetGroup.chain.add(finalClipDevice, 1, fromUser = false)
-        
-        // 6. Toggle the pad in the CoordinateFilterChainDevice
-        val currentFilters = coordFilter.state.value.padFilters
-        if (currentFilters.contains(padFilter)) {
-            // Remove
-            coordFilter.state.update { it.copy(padFilters = currentFilters - padFilter) }
-        } else {
-            // Add
-            coordFilter.state.update { it.copy(padFilters = currentFilters + padFilter) }
+            // Create a new group
+            val newGroup = Group(name = "Mapped")
+            val coordFilter = CoordinateFilterChainDevice()
+            coordFilter.state.update { it.copy(padFilters = listOf(padFilter)) }
+            
+            newGroup.chain.add(coordFilter, 0, fromUser = false)
+            newGroup.chain.add(targetDevice, 1, fromUser = false)
+            
+            when (parentDevice) {
+                is GroupChainDevice -> parentDevice.addGroup(newGroup)
+                is MultiGroupChainDevice -> parentDevice.addGroup(newGroup)
+            }
         }
         
         return true

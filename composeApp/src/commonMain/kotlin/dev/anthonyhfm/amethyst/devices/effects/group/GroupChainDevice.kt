@@ -83,24 +83,19 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
             isSelected = isSelected,
             leadingStripContent = {
                 val automappingState by AutomappingManager.state.collectAsState()
-                val openedGroup = deviceState.groups.getOrNull(deviceState.openedGroupIndex)
-                if (openedGroup != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 6.dp),
-                    ) {
-                        AutomappingToggleButton(
-                            active = automappingState.activeTarget?.parentDeviceSelectionUUID == selectionUUID &&
-                                automappingState.activeTarget?.groupId == openedGroup.id,
-                            onClick = {
-                                AutomappingManager.toggleTarget(
-                                    parentDevice = this@GroupChainDevice,
-                                    groupId = openedGroup.id,
-                                )
-                            },
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 6.dp),
+                ) {
+                    AutomappingToggleButton(
+                        active = automappingState.activeTarget?.parentDeviceSelectionUUID == selectionUUID,
+                        onClick = {
+                            AutomappingManager.toggleTarget(
+                                parentDevice = this@GroupChainDevice,
+                            )
+                        },
+                    )
                 }
             },
             groupList = {
@@ -137,7 +132,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
     }
 
     override fun onStateRestored() {
-        AutomappingManager.clearTargetIfMissing(this, state.value.groups)
+        AutomappingManager.clearTargetIfMissing(this)
     }
 
     private fun moveGroup(fromIndex: Int, toIndex: Int) {
@@ -250,7 +245,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
                 openedGroupIndex = newOpenedGroupIndex
             )
         }
-        AutomappingManager.clearTargetIfMissing(this, state.value.groups)
+        AutomappingManager.clearTargetIfMissing(this)
     }
 
     fun duplicateGroups(selectedIndices: List<Int>) {
@@ -267,6 +262,14 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
 
     fun createGroupWithUndo(index: Int? = null) {
         actionLayer.createGroupWithUndo(index)
+    }
+
+    fun addGroup(group: Group) {
+        actionLayer.insertGroupWithUndo(group, selectInsertedGroup = false)
+    }
+
+    fun removeGroupById(id: String) {
+        actionLayer.removeGroupById(id)
     }
 
     fun packState(): GroupChainDeviceState {

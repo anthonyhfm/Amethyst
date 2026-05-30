@@ -68,12 +68,23 @@ object AutomappingManager {
                     selections = selections,
                 ) ?: return@combine clearShotgunLayer()
 
-                val mappedPads = gatherMappedPads(
-                    chain = target.group.chain,
-                    targetState = buildChainDeviceFromAutomappingClip(selectedClip)?.let { 
-                        StateChain.packDevice(it)
+                val mappedPads = mutableMapOf<LaunchpadPadFilter, Boolean>()
+                val targetDevice = target.parentDevice
+                val groups = when (targetDevice) {
+                    is GroupChainDevice -> targetDevice.state.value.groups
+                    is MultiGroupChainDevice -> targetDevice.state.value.groups
+                    else -> emptyList()
+                }
+                
+                groups.forEach { group ->
+                    val groupPads = gatherMappedPads(
+                        chain = group.chain,
+                        targetState = buildChainDeviceFromAutomappingClip(selectedClip)?.let { StateChain.packDevice(it) }
+                    )
+                    groupPads.forEach { (filter, hasClip) ->
+                        mappedPads[filter] = mappedPads[filter] == true || hasClip
                     }
-                )
+                }
                 val signals = mutableListOf<Signal>()
 
                 Heaven.devices.forEach { device ->
@@ -187,10 +198,9 @@ object AutomappingManager {
         return false
     }
 
-    fun toggleTarget(parentDevice: GroupChainDevice, groupId: String) {
+    fun toggleTarget(parentDevice: GenericChainDevice<*>) {
         _state.update { currentState ->
-            val isSameTarget = currentState.activeTarget?.parentDeviceSelectionUUID == parentDevice.selectionUUID &&
-                currentState.activeTarget.groupId == groupId
+            val isSameTarget = currentState.activeTarget?.parentDeviceSelectionUUID == parentDevice.selectionUUID
 
             currentState.copy(
                 activeTarget = if (isSameTarget) {
@@ -198,7 +208,6 @@ object AutomappingManager {
                 } else {
                     AutomappingTarget(
                         parentDeviceSelectionUUID = parentDevice.selectionUUID,
-                        groupId = groupId,
                     )
                 }
             )
@@ -224,13 +233,8 @@ object AutomappingManager {
 
     fun clearTargetIfMissing(
         parentDevice: GenericChainDevice<*>,
-        groups: List<Group>,
     ) {
-        val activeTarget = state.value.activeTarget ?: return
-        if (activeTarget.parentDeviceSelectionUUID != parentDevice.selectionUUID) return
-        if (groups.none { group -> group.id == activeTarget.groupId }) {
-            clearTarget()
-        }
+        // Obsolete function, retained for API compatibility
     }
 
     fun resolveActiveTarget(): ResolvedAutomappingTarget? {
@@ -296,7 +300,7 @@ object AutomappingManager {
 
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
             val toggled = AutomappingChainMutation.toggleClipOnPad(
-                targetGroup = target.group,
+                parentDevice = target.parentDevice,
                 launchpadId = device.launchpadId,
                 localX = localX,
                 localY = localY,
@@ -322,21 +326,12 @@ object AutomappingManager {
     ): ResolvedAutomappingTarget? {
         chain.devices.value.forEach { device ->
             if (device.selectionUUID == target.parentDeviceSelectionUUID) {
-                val groupDevice = device as? GroupChainDevice ?: return null
-                val groupIndex = groupDevice.state.value.groups.indexOfFirst { group ->
-                    group.id == target.groupId
-                }
-
-                if (groupIndex >= 0) {
+                if (device is GroupChainDevice || device is MultiGroupChainDevice) {
                     return ResolvedAutomappingTarget(
                         domain = domain,
-                        parentDevice = groupDevice,
-                        groupIndex = groupIndex,
-                        group = groupDevice.state.value.groups[groupIndex],
+                        parentDevice = device,
                     )
                 }
-
-                return null
             }
 
             when (device) {
@@ -407,7 +402,5 @@ data class AutomappingState(
 
 data class ResolvedAutomappingTarget(
     val domain: AutomappingChainDomain,
-    val parentDevice: GroupChainDevice,
-    val groupIndex: Int,
-    val group: Group,
+    val parentDevice: GenericChainDevice<*>,
 )

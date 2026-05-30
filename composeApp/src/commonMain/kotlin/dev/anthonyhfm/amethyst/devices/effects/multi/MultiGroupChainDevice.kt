@@ -28,6 +28,7 @@ import com.composeunstyled.theme.Theme
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
+import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -139,21 +140,43 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
                 modifier = Modifier.width(180.dp),
                 titleBarModifier = LocalTitleBarModifier.current,
             ) {
-                Column {
-                    Box(modifier = Modifier.weight(1f)) {
-                        GroupEditorList(
-                            parentDevice = this@MultiGroupChainDevice,
-                            groups = deviceState.groups,
-                            openedGroupIndex = deviceState.openedGroupIndex,
-                            uiState = editorUiState,
-                            actions = editorActions,
-                        )
+                Row {
+                    GroupEditorRail(
+                        isSelected = isSelected,
+                    ) {
+                        val automappingState by AutomappingManager.state.collectAsState()
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 6.dp),
+                        ) {
+                            dev.anthonyhfm.amethyst.devices.effects.group.editor.AutomappingToggleButton(
+                                active = automappingState.activeTarget?.parentDeviceSelectionUUID == selectionUUID,
+                                onClick = {
+                                    AutomappingManager.toggleTarget(
+                                        parentDevice = this@MultiGroupChainDevice,
+                                    )
+                                },
+                            )
+                        }
                     }
 
-                    MultiGroupModeFooter(
-                        deviceState = deviceState,
-                        onModeSelected = ::setMode,
-                    )
+                    Column {
+                        Box(modifier = Modifier.weight(1f)) {
+                            GroupEditorList(
+                                parentDevice = this@MultiGroupChainDevice,
+                                groups = deviceState.groups,
+                                openedGroupIndex = deviceState.openedGroupIndex,
+                                uiState = editorUiState,
+                                actions = editorActions,
+                            )
+                        }
+
+                        MultiGroupModeFooter(
+                            deviceState = deviceState,
+                            onModeSelected = ::setMode,
+                        )
+                    }
                 }
             }
 
@@ -618,6 +641,14 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
 
     fun createGroupWithUndo(index: Int? = null) {
         actionLayer.createGroupWithUndo(index)
+    }
+
+    fun addGroup(group: Group) {
+        actionLayer.insertGroupWithUndo(group, selectInsertedGroup = false)
+    }
+
+    fun removeGroupById(id: String) {
+        actionLayer.removeGroupById(id)
     }
 
     fun insertGroupWithUndo(

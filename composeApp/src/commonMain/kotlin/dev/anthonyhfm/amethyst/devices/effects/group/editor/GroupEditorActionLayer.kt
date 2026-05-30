@@ -91,6 +91,11 @@ internal class GroupEditorActionLayer<State : DeviceState>(
         removeGroups(listOf(index))
     }
 
+    fun removeGroupById(id: String) {
+        val index = groupsOf(stateFlow.value).indexOfFirst { it.id == id }
+        if (index != -1) removeGroup(index)
+    }
+
     fun removeGroups(indices: List<Int>) {
         val beforeState = stateFlow.value
         val beforeGroups = groupsOf(beforeState)
@@ -325,7 +330,7 @@ internal class GroupEditorActionLayer<State : DeviceState>(
         if (afterState == beforeState) return
 
         stateFlow.value = afterState
-        AutomappingManager.clearTargetIfMissing(device, afterGroups)
+        AutomappingManager.clearTargetIfMissing(device)
         desiredSelectedGroupIds?.let { groupIds ->
             restoreGroupSelectionForDevice(
                 device = device,
