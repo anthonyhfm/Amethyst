@@ -293,6 +293,12 @@ internal class GroupEditorActionLayer<State : DeviceState>(
     ) {
         if (newGroups.isEmpty()) return
 
+        newGroups.forEach { group ->
+            group.chain.signalExit = { signal ->
+                device.signalExit?.invoke(signal)
+            }
+        }
+
         val beforeState = stateFlow.value
         val beforeGroups = groupsOf(beforeState)
         val safeInsertIndex = insertIndex.coerceIn(0, beforeGroups.size)
