@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.core.midi.data.ProjectDeviceConfig
 import dev.anthonyhfm.amethyst.core.engine.heaven.Screen
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
@@ -154,7 +155,10 @@ abstract class LaunchpadViewportElement(
         )*/
 
         LaunchpadActionButton(
-            onClick = { rotationDegrees.floatValue += 90f },
+            onClick = {
+                rotationDegrees.floatValue += 90f
+                DeviceSyncCoordinator.onDeviceRotationChanged(this)
+            },
             icon = Lucide.RotateCw,
             contentDescription = "Rotate 90°",
             backgroundColor = actionButtonBg,

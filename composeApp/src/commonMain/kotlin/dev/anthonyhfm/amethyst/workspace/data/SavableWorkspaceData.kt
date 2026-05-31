@@ -47,7 +47,8 @@ data class SavableWorkspaceData(
         val positionX: Float,
         val positionY: Float,
         val type: ViewportDeviceType,
-        val id: String = UUID.randomUUID()
+        val id: String = UUID.randomUUID(),
+        val rotationDegrees: Float = 0f
     ) {
         enum class ViewportDeviceType {
             LAUNCHPAD_PRO,

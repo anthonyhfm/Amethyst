@@ -40,6 +40,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -49,6 +51,8 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
+import dev.anthonyhfm.amethyst.workspace.ui.components.CursorOverlay
 import dev.anthonyhfm.amethyst.ui.components.primitives.FullShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.theme.background
@@ -88,6 +92,8 @@ fun WorkspaceViewport(
     val originForeground = Color(0xFFABB2BF).copy(alpha = 0.82f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
     val selections by SelectionManager.selections.collectAsState()
+    val remoteFocuses by CollaborationPresence.remoteFocuses.collectAsState()
+    val remoteCursors by CollaborationPresence.remoteCursors.collectAsState()
     val workspaceMode by WorkspaceRepository.mode.collectAsState()
 
     LaunchedEffect(elements.size, viewportSize.value) {
@@ -139,6 +145,21 @@ fun WorkspaceViewport(
                             val zoomDelta = -scrollDelta.y * 0.05f
                             val mousePosition = event.changes.first().position
                             onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, mousePosition))
+                        }
+                    }
+                }
+            }
+            .pointerInput("collaboration-cursor", viewportState.offset, viewportState.zoom) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val position = event.changes.firstOrNull()?.position ?: continue
+                        val isMove = event.type == PointerEventType.Move || event.buttons.isPrimaryPressed
+                        if (isMove) {
+                            CollaborationPresence.sendCursorMoved(
+                                x = (position.x - viewportState.offset.x) / viewportState.zoom,
+                                y = (position.y - viewportState.offset.y) / viewportState.zoom
+                            )
                         }
                     }
                 }
@@ -236,6 +257,11 @@ fun WorkspaceViewport(
 
         elements.forEachIndexed { index, element ->
             val selected = selections.any { it.selectionUUID == element.selectionUUID }
+            val focusingUser = remoteFocuses.entries
+                .firstOrNull { it.value == element.selectionUUID }
+                ?.key
+                ?.let { userId -> remoteCursors[userId]?.user }
+            val focusColor = focusingUser?.let { Color(it.color) }
 
             var draggingOffset by remember { mutableStateOf(Offset.Zero) }
 
@@ -256,6 +282,8 @@ fun WorkspaceViewport(
                         other = if (selected) {
                             Modifier
                                 .border((2 / viewportState.zoom).dp, selectionColor, element.shape)
+                        } else if (focusColor != null) {
+                            Modifier.border((2 / viewportState.zoom).dp, focusColor, element.shape)
                         } else Modifier
                     )
                     .pointerInput(Unit) {
@@ -301,6 +329,7 @@ fun WorkspaceViewport(
                             },
                             onDragEnd = {
                                 draggingOffset = Offset.Zero
+                                onEvent(WorkspaceContract.Event.OnViewportElementMoveFinished(element.selectionUUID))
                             },
                             onDragCancel = {
                                 draggingOffset = Offset.Zero
@@ -403,5 +432,17 @@ fun WorkspaceViewport(
                 )
             }
         }
+
+        CursorOverlay(
+            cursors = remoteCursors.mapValues { (_, cursor) ->
+                cursor.copy(
+                    x = cursor.x * viewportState.zoom + viewportState.offset.x,
+                    y = cursor.y * viewportState.zoom + viewportState.offset.y
+                )
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(20_000f),
+        )
     }
 }

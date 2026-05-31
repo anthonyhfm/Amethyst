@@ -3,6 +3,10 @@ package dev.anthonyhfm.amethyst.home.ui.views
 import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
+import dev.anthonyhfm.amethyst.core.network.CollaborationManager
+import dev.anthonyhfm.amethyst.core.network.lan.DiscoveredSession
+import dev.anthonyhfm.amethyst.core.network.lan.LanDiscoveryService
+import dev.anthonyhfm.amethyst.core.network.user.LocalUserRepository
 import dev.anthonyhfm.amethyst.core.util.BaseViewModel
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
@@ -21,7 +25,23 @@ import kotlinx.coroutines.launch
 class RecentViewModel(
     private val navigator: NavHostController,
     private val snackbarHostState: SnackbarHostState
-) : BaseViewModel<Nothing?, RecentViewContract.Event, RecentViewContract.Effect>(null) {
+) : BaseViewModel<RecentViewContract.State, RecentViewContract.Event, RecentViewContract.Effect>(
+    RecentViewContract.State()
+) {
+    init {
+        viewModelScope.launch {
+            updateState(state.value.copy(isDiscovering = true))
+            LanDiscoveryService.discoverSessions().collect { sessions ->
+                updateState(
+                    state.value.copy(
+                        discoveredSessions = sessions,
+                        isDiscovering = true
+                    )
+                )
+            }
+        }
+    }
+
     override fun onEvent(event: RecentViewContract.Event) {
         when (event) {
             is RecentViewContract.Event.OnClickOpenProject -> {
@@ -113,6 +133,25 @@ class RecentViewModel(
             is RecentViewContract.Event.OnClickEditProject -> {
                 navigator.navigate(HomeNavRoute.ProjectEdit(projectPath = event.project.path))
             }
+
+            is RecentViewContract.Event.OnClickJoinSession -> {
+                viewModelScope.launch {
+                    try {
+                        LocalUserRepository.setUsername(event.userName)
+                        val result = CollaborationManager.joinSession(
+                            hostAddress = event.session.hostAddress,
+                            localUser = LocalUserRepository.localUser.value
+                        )
+                        result.getOrThrow()
+                        triggerEffect(RecentViewContract.Effect.OpenWorkspace)
+                    } catch (exception: Exception) {
+                        snackbarHostState.showSnackbar(
+                            message = "Failed to join shared workspace",
+                            withDismissAction = true,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -147,6 +186,11 @@ class RecentViewModel(
 }
 
 sealed interface RecentViewContract {
+    data class State(
+        val discoveredSessions: List<DiscoveredSession> = emptyList(),
+        val isDiscovering: Boolean = false
+    )
+
     sealed interface Event {
         data object OnClickOpenProject : Event
         data object OnClickNewProject : Event
@@ -158,6 +202,11 @@ sealed interface RecentViewContract {
         data class OnClickEditProject(
             val project: RecentWorkspace
         ): Event
+
+        data class OnClickJoinSession(
+            val session: DiscoveredSession,
+            val userName: String
+        ) : Event
     }
 
     sealed interface Effect {

@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
+import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -355,6 +356,8 @@ internal class GroupEditorActionLayer<State : DeviceState>(
                     afterSelectedGroupIds = afterSelectedGroupIds,
                 )
             )
+            ChainSyncCoordinator.onGroupStateChanged(device, beforeState, afterState)
+            ChainSyncCoordinator.onDeviceStateChanged(device, afterState)
         }
     }
 

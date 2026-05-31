@@ -119,17 +119,12 @@ fun TimelineLane(
     } else {
         Modifier
             .pointerInput(track, zoomLevel, bpm, gridType) {
-                var lastClickTime = 0L
-                var lastClickPos: Offset? = null
-                val doubleThresholdMs = 250L
-                val moveTolerancePx = 20f
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
                             val change = event.changes.firstOrNull() ?: continue
                             val pos = change.position
-                            val time = change.uptimeMillis
                             val headerHit = findHeaderEntryHit(
                                 track,
                                 currentViewport.value.screenToContentX(pos.x),
@@ -139,40 +134,16 @@ fun TimelineLane(
                             )
                             if (headerHit != null) {
                                 onSelectEntry(headerHit)
-                                lastClickTime = 0L
-                                lastClickPos = null
                                 change.consume()
                                 continue
                             }
-                            val isLights = track is MidiTimelineTrack
                             val snappedMs = computeSnappedTimeFromContentX(
                                 currentViewport.value.screenToContentX(pos.x),
                                 currentViewport.value.zoomX,
                                 bpm,
                                 gridType
                             )
-                            val isDouble = isLights &&
-                                lastClickTime != 0L &&
-                                (time - lastClickTime) in 1..doubleThresholdMs &&
-                                lastClickPos?.let { prev ->
-                                    val dx = pos.x - prev.x
-                                    val dy = pos.y - prev.y
-                                    (dx * dx + dy * dy) <= moveTolerancePx * moveTolerancePx
-                                } == true
-                            if (isDouble) {
-                                onDoubleClickLane(snappedMs)
-                                lastClickTime = 0L
-                                lastClickPos = null
-                            } else {
-                                onSelectTime(snappedMs)
-                                if (isLights) {
-                                    lastClickTime = time
-                                    lastClickPos = pos
-                                } else {
-                                    lastClickTime = 0L
-                                    lastClickPos = null
-                                }
-                            }
+                            onSelectTime(snappedMs)
                             change.consume()
                         }
                     }

@@ -50,9 +50,18 @@ abstract class AmethystConnectProvider {
         when (event) {
             is ConnectEvent.UserJoined -> {
                 val current = _session.value ?: return
-                if (current.participants.none { it.id == event.user.id }) {
-                    _session.value = current.copy(participants = current.participants + event.user)
+                val host = if (event.user.role == AmethystConnectContract.ConnectRole.HOST) {
+                    event.user
+                } else {
+                    current.host
                 }
+                val participants = (current.participants.filterNot { it.id == event.user.id } + event.user)
+                    .distinctBy { it.id }
+                    .sortedWith(compareBy<ConnectUser> { it.role != AmethystConnectContract.ConnectRole.HOST }.thenBy { it.name })
+                _session.value = current.copy(
+                    host = host,
+                    participants = participants
+                )
             }
 
             is ConnectEvent.UserLeft -> {
@@ -80,4 +89,8 @@ abstract class AmethystConnectProvider {
     abstract suspend fun leave()
 
     abstract suspend fun send(event: ConnectEvent)
+
+    open suspend fun sendToUser(userId: String, event: ConnectEvent) {
+        send(event)
+    }
 }

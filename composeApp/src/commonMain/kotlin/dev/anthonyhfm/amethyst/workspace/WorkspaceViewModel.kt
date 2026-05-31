@@ -7,6 +7,8 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiManager
+import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
+import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadIdealised
@@ -17,6 +19,8 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -51,15 +55,18 @@ class WorkspaceViewModel(
         }
 
         viewModelScope.launch {
-            state.collect { state ->
-                Heaven.devices = state.viewportElements
+            state
+                .map { it.viewportElements }
+                .distinctUntilChanged()
+                .collect { viewportElements ->
+                    Heaven.devices = viewportElements
 
-                if (state.viewportElements.size == 1) {
-                    amethystMidiManager.startAutoDetectLoop()
-                } else {
-                    amethystMidiManager.stopAutoDetectLoop()
+                    if (viewportElements.size == 1) {
+                        amethystMidiManager.startAutoDetectLoop()
+                    } else {
+                        amethystMidiManager.stopAutoDetectLoop()
+                    }
                 }
-            }
         }
 
         viewModelScope.launch {
@@ -101,9 +108,21 @@ class WorkspaceViewModel(
                 }
 
                 state.update {
-                    it.copy(mode = newMode)
+                    it.copy(
+                        mode = newMode,
+                        viewportElements = Heaven.devices
+                    )
                 }
             }
+        }
+
+        viewModelScope.launch {
+            SelectionManager.selections
+                .map { selections -> selections.firstOrNull()?.selectionUUID }
+                .distinctUntilChanged()
+                .collect { focusedElementId ->
+                    CollaborationPresence.sendFocusedElement(focusedElementId)
+                }
         }
     }
 
@@ -142,6 +161,8 @@ class WorkspaceViewModel(
                         viewportElements = it.viewportElements.plus(device)
                     )
                 }
+
+                DeviceSyncCoordinator.onDevicePlaced(device)
             }
 
             is WorkspaceContract.Event.ChangeViewportElementPosition -> {
@@ -156,6 +177,11 @@ class WorkspaceViewModel(
                 }
 
                 WorkspaceRepository.updateWorkspaceBounds()
+            }
+
+            is WorkspaceContract.Event.OnViewportElementMoveFinished -> {
+                val element = state.value.viewportElements.firstOrNull { it.selectionUUID == event.uuid } ?: return
+                DeviceSyncCoordinator.onDeviceMoved(element)
             }
 
             is WorkspaceContract.Event.OnPanViewport -> {
@@ -216,6 +242,9 @@ class WorkspaceViewModel(
                 val element = state.value.viewportElements.find { it.selectionUUID == event.uuid }
 
                 element?.deviceConfig?.launchpadDevice?.midiOutput?.close()
+                element?.let {
+                    DeviceSyncCoordinator.onDeviceRemoved(it.launchpadId)
+                }
 
                 SelectionManager.clear()
 

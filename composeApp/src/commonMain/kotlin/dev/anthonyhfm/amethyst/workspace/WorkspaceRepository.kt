@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.core.data.settings.RecentColorRGB
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
+import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
@@ -44,6 +45,7 @@ import dev.anthonyhfm.amethyst.workspace.data.WorkspaceMeta
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadIdealised
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
 object WorkspaceRepository {
     private fun Throwable.isRecoverablePlatformInitFailure(): Boolean {
@@ -158,10 +160,36 @@ object WorkspaceRepository {
         }
     }
 
-    fun setBpm(bpm: Double) {
-        _bpm.update {
-            bpm
+    /**
+     * When [fromRemote] is true the change arrived via the network and must not be re-broadcast.
+     * The [WorkspaceEventBroadcaster] reads this flag to suppress the next identical emission.
+     */
+    @Volatile var isApplyingRemoteUpdate: Boolean = false
+        private set
+
+    fun markRemoteUpdateConsumed() {
+        isApplyingRemoteUpdate = false
+    }
+
+    fun setBpm(bpm: Double, fromRemote: Boolean = false, undoable: Boolean = true) {
+        val before = _bpm.value
+        if (undoable && !fromRemote && before != bpm) {
+            UndoManager.addAction(
+                UndoableAction.WorkspaceBpmChange(
+                    beforeBpm = before,
+                    afterBpm = bpm
+                )
+            )
         }
+        isApplyingRemoteUpdate = fromRemote
+        _bpm.update { bpm }
+        if (!fromRemote) isApplyingRemoteUpdate = false
+    }
+
+    fun setProjectName(name: String, fromRemote: Boolean = false) {
+        isApplyingRemoteUpdate = fromRemote
+        _projectName.update { name }
+        if (!fromRemote) isApplyingRemoteUpdate = false
     }
 
     fun updateAutoPlaySettings(showButtonPresses: Boolean, showLights: Boolean) {
@@ -175,26 +203,56 @@ object WorkspaceRepository {
         }
     }
 
-    fun setGridType(type: GridUtils.GridType) { _gridType.update { type } }
+    fun setGridType(type: GridUtils.GridType, fromRemote: Boolean = false) {
+        isApplyingRemoteUpdate = fromRemote
+        _gridType.update { type }
+        if (!fromRemote) isApplyingRemoteUpdate = false
+    }
 
-    fun setMacroValue(index: Int, macro: Macro) {
+    fun setMacroValue(index: Int, macro: Macro, fromRemote: Boolean = false, undoable: Boolean = true) {
         if (index < 0 || index >= _macros.value.size) {
             println("Macro index out of bounds: $index")
+            return
         }
 
-        _macros.update { currentMacros ->
-            currentMacros.toMutableList().apply {
-                this[index] = macro
-            }
+        val before = _macros.value
+        val after = before.toMutableList().apply {
+            this[index] = macro
         }
+        if (undoable && !fromRemote && before != after) {
+            UndoManager.addAction(
+                UndoableAction.WorkspaceMacrosChange(
+                    beforeMacros = before,
+                    afterMacros = after
+                )
+            )
+        }
+        isApplyingRemoteUpdate = fromRemote
+        _macros.update { after }
+        if (!fromRemote) isApplyingRemoteUpdate = false
+    }
+
+    /**
+     * Replaces the entire macro list at once.
+     * Used by [WorkspaceEventReceiver] to apply a remote [ConnectEvent.MacrosChanged] atomically.
+     */
+    fun setMacros(macros: List<Macro>, fromRemote: Boolean = false, undoable: Boolean = true) {
+        val before = _macros.value
+        if (undoable && !fromRemote && before != macros) {
+            UndoManager.addAction(
+                UndoableAction.WorkspaceMacrosChange(
+                    beforeMacros = before,
+                    afterMacros = macros
+                )
+            )
+        }
+        isApplyingRemoteUpdate = fromRemote
+        _macros.update { macros }
+        if (!fromRemote) isApplyingRemoteUpdate = false
     }
 
     fun addMacro(macro: Macro) {
-        _macros.update { currentMacros ->
-            currentMacros.toMutableList().apply {
-                add(macro)
-            }
-        }
+        setMacros(_macros.value + macro)
     }
 
     fun removeMacro(index: Int) {
@@ -202,11 +260,73 @@ object WorkspaceRepository {
             println("Macro index out of bounds: $index")
             return
         }
-        _macros.update { currentMacros ->
-            currentMacros.toMutableList().apply {
-                removeAt(index)
-            }
+        setMacros(_macros.value.toMutableList().apply { removeAt(index) })
+    }
+
+    suspend fun addVirtualDevice(
+        element: LaunchpadViewportElement,
+        fromRemote: Boolean = false
+    ): Boolean {
+        if (Heaven.devices.any { it.launchpadId == element.launchpadId }) return false
+
+        Heaven.devices = Heaven.devices + element
+        if (!fromRemote) {
+            DeviceSyncCoordinator.onDevicePlaced(element)
         }
+        deviceRefresh.emit(Unit)
+        updateWorkspaceBounds()
+        return true
+    }
+
+    suspend fun removeVirtualDeviceById(
+        uuid: String,
+        fromRemote: Boolean = false
+    ): Boolean {
+        val element = Heaven.devices.firstOrNull { it.selectionUUID == uuid || it.launchpadId == uuid }
+            ?: return false
+
+        element.deviceConfig.launchpadDevice?.midiOutput?.close()
+        if (!fromRemote) {
+            DeviceSyncCoordinator.onDeviceRemoved(element.launchpadId)
+        }
+
+        Heaven.devices = Heaven.devices.filterNot { it.selectionUUID == uuid || it.launchpadId == uuid }
+        deviceRefresh.emit(Unit)
+        updateWorkspaceBounds()
+        return true
+    }
+
+    suspend fun moveVirtualDevice(
+        deviceId: String,
+        position: Offset,
+        fromRemote: Boolean = false
+    ): Boolean {
+        val element = Heaven.devices.firstOrNull { it.launchpadId == deviceId || it.selectionUUID == deviceId }
+            ?: return false
+
+        element.position.value = position
+        if (!fromRemote) {
+            DeviceSyncCoordinator.onDeviceMoved(element)
+        }
+        deviceRefresh.emit(Unit)
+        updateWorkspaceBounds()
+        return true
+    }
+
+    suspend fun updateVirtualDeviceRotation(
+        deviceId: String,
+        rotationDegrees: Float,
+        fromRemote: Boolean = false
+    ): Boolean {
+        val element = Heaven.devices.firstOrNull { it.launchpadId == deviceId || it.selectionUUID == deviceId }
+            ?: return false
+
+        element.rotationDegrees.floatValue = rotationDegrees
+        if (!fromRemote) {
+            DeviceSyncCoordinator.onDeviceRotationChanged(element)
+        }
+        deviceRefresh.emit(Unit)
+        return true
     }
 
     fun updateWorkspaceBounds() {
@@ -225,13 +345,9 @@ object WorkspaceRepository {
     }
 
     fun removeVirtualDevice(uuid: String) {
-        Heaven.devices = Heaven.devices.filterNot { it.selectionUUID == uuid }
-
         runBlocking {
-            deviceRefresh.emit(Unit)
+            removeVirtualDeviceById(uuid)
         }
-
-        updateWorkspaceBounds()
     }
 
     fun resetMulti() {
@@ -338,6 +454,7 @@ object WorkspaceRepository {
 
             device.apply {
                 position.value = Offset(savedDevice.positionX, savedDevice.positionY)
+                rotationDegrees.floatValue = savedDevice.rotationDegrees
                 if (savedDevice.id.isNotEmpty()) launchpadId = savedDevice.id
             }
         }
@@ -433,7 +550,8 @@ object WorkspaceRepository {
                         else -> { TODO("Could not serialize virtual launchpad element for the workspace") }
                     },
                     positionX = device.position.value.x,
-                    positionY = device.position.value.y
+                    positionY = device.position.value.y,
+                    rotationDegrees = device.rotationDegrees.floatValue
                 )
             },
             audioSources = AudioSourceLibrary.all(),

@@ -5,8 +5,8 @@ import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.editor.currentGroupsForDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.editor.restoreGroupSelectionForDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
-import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +47,15 @@ object UndoManager {
 
         undoStack.add(action)
         redoStack.clear()
+        if (action is UndoableAction.MovedChainDevice) {
+            ChainSyncCoordinator.onDeviceMoved(
+                chainBefore = action.chainBefore,
+                chainAfter = action.chainAfter,
+                device = action.device,
+                fromIndex = action.fromIndex,
+                toIndex = action.toIndex
+            )
+        }
         publishState()
     }
 
@@ -57,6 +66,16 @@ object UndoManager {
             when (action) {
                 is UndoableAction.WorkspaceModeChange -> {
                     WorkspaceRepository.switchMode(action.beforeMode, undoable = false)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.WorkspaceBpmChange -> {
+                    WorkspaceRepository.setBpm(action.beforeBpm, fromRemote = true, undoable = false)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.WorkspaceMacrosChange -> {
+                    WorkspaceRepository.setMacros(action.beforeMacros, fromRemote = true, undoable = false)
                     redoStack.add(action)
                 }
 
@@ -543,6 +562,7 @@ object UndoManager {
             }
 
             publishState()
+            ChainSyncCoordinator.onUndoAction(action, isUndo = true)
         }
     }
 
@@ -553,6 +573,16 @@ object UndoManager {
             when (action) {
                 is UndoableAction.WorkspaceModeChange -> {
                     WorkspaceRepository.switchMode(action.afterMode, undoable = false)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.WorkspaceBpmChange -> {
+                    WorkspaceRepository.setBpm(action.afterBpm, fromRemote = true, undoable = false)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.WorkspaceMacrosChange -> {
+                    WorkspaceRepository.setMacros(action.afterMacros, fromRemote = true, undoable = false)
                     undoStack.add(action)
                 }
 
@@ -1037,6 +1067,7 @@ object UndoManager {
             }
 
             publishState()
+            ChainSyncCoordinator.onUndoAction(action, isUndo = false)
         }
     }
 

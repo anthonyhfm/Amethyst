@@ -9,14 +9,14 @@ import dev.anthonyhfm.amethyst.core.engine.elements.SignalReceiver
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
-import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDeviceState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
 abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalReceiver(), Selectable {
-    override val selectionUUID: String = UUID.randomUUID()
+    override var selectionUUID: String = UUID.randomUUID()
 
     abstract val state: MutableStateFlow<State>
 
@@ -48,6 +48,8 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
                     afterState = after
                 )
             )
+
+            ChainSyncCoordinator.onDeviceStateChanged(this, after)
         }
     }
 }

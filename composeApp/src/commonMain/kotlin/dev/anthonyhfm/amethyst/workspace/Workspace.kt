@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.Timeline
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
@@ -37,6 +38,7 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
 import dev.anthonyhfm.amethyst.workspace.ui.components.AutoPlayButtons
+import dev.anthonyhfm.amethyst.workspace.ui.components.ActivityToastOverlay
 import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
@@ -46,6 +48,7 @@ fun Workspace(onBack: () -> Unit = {}) {
     val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
 
     val state by viewModel.state.collectAsState()
+    val activityToasts by CollaborationPresence.activityToasts.collectAsState()
 
     Scaffold(
         modifier = Modifier
@@ -89,6 +92,14 @@ fun Workspace(onBack: () -> Unit = {}) {
                 onEvent = {
                     viewModel.onEvent(it)
                 }
+            )
+
+            ActivityToastOverlay(
+                toasts = activityToasts,
+                onDismiss = CollaborationPresence::dismissToast,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(24.dp),
             )
 
             AnimatedVisibility(

@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -45,6 +46,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
+import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
@@ -70,6 +72,8 @@ fun WorkspaceChainEditor(
 ) {
     val density = LocalDensity.current.density
     val dragAndDropState = rememberDragAndDropState<GenericChainDevice<*>>()
+    val remoteFocuses by CollaborationPresence.remoteFocuses.collectAsState()
+    val remoteCursors by CollaborationPresence.remoteCursors.collectAsState()
     var chain: Chain? by remember { mutableStateOf(null) }
 
     LaunchedEffect(WorkspaceRepository.mode.collectAsState().value) {
@@ -211,19 +215,35 @@ fun WorkspaceChainEditor(
                                             )
 
                                             AnimatedInsertedDevice(id = device.selectionUUID) {
-                                                when (device) {
-                                                    is GroupChainDevice -> {
-                                                        device.Content(
-                                                            dragAndDropState = dragAndDropState
-                                                        )
+                                                val hasRemoteFocus = remoteFocuses.values.any { it == device.selectionUUID }
+                                                val remoteFocusColor = remoteFocuses.entries
+                                                    .firstOrNull { it.value == device.selectionUUID }
+                                                    ?.key
+                                                    ?.let { userId -> remoteCursors[userId]?.user?.color }
+                                                    ?.let { Color(it) }
+                                                    ?: Color(0xFF7C3AED)
+
+                                                Box(
+                                                    modifier = if (hasRemoteFocus) {
+                                                        Modifier.border(2.dp, remoteFocusColor, DefaultShape)
+                                                    } else {
+                                                        Modifier
                                                     }
-                                                    is MultiGroupChainDevice -> {
-                                                        device.Content(
-                                                            dragAndDropState = dragAndDropState
-                                                        )
-                                                    }
-                                                    else -> {
-                                                        device.Content()
+                                                ) {
+                                                    when (device) {
+                                                        is GroupChainDevice -> {
+                                                            device.Content(
+                                                                dragAndDropState = dragAndDropState
+                                                            )
+                                                        }
+                                                        is MultiGroupChainDevice -> {
+                                                            device.Content(
+                                                                dragAndDropState = dragAndDropState
+                                                            )
+                                                        }
+                                                        else -> {
+                                                            device.Content()
+                                                        }
                                                     }
                                                 }
                                             }

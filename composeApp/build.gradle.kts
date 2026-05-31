@@ -82,6 +82,10 @@ kotlin {
             implementation("com.mikepenz:multiplatform-markdown-renderer:0.40.2")
             implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.40.2")
 
+            // Ktor WebSocket Client (commonMain — used by LanConnectProvider client mode)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.websockets)
+
             kotlin("stdlib")
         }
         commonTest.dependencies {
@@ -98,6 +102,11 @@ kotlin {
             implementation(libs.flatlaf)
             implementation("io.github.vyfor:kpresence:0.6.5")
 
+            // Ktor WebSocket Server + CIO engine (JVM/Desktop only)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.websockets)
             // Nucleus runtime
             implementation(libs.nucleus.core.runtime)
             implementation(libs.nucleus.aot.runtime)

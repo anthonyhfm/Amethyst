@@ -53,6 +53,7 @@ import dev.anthonyhfm.amethyst.ui.theme.large
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import io.github.kdroidfilter.nucleus.core.runtime.ExecutableRuntime
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
@@ -74,10 +75,12 @@ fun WidescreenNavBar(
         }
     }
 
-    val primaryItems = listOf(
-        NavRailItem.RECENT,
-        NavRailItem.BROWSER,
-    )
+    val primaryItems = mutableListOf(NavRailItem.RECENT)
+
+    if (ExecutableRuntime.isDev()) {
+        primaryItems.add(NavRailItem.BROWSER)
+    }
+
     val secondaryItems = listOf(
         NavRailItem.SETTINGS,
         NavRailItem.ABOUT,

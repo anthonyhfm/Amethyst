@@ -87,4 +87,6 @@ object DeviceRegistry {
             ?: error("No factory registered for device state: ${state::class.simpleName}")
         return factory.unpack(state)
     }
+
+    fun createFromState(state: DeviceState): GenericChainDevice<*> = unpack(state)
 }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
@@ -55,6 +56,8 @@ class Chain : SignalReceiver() {
                     creationIndex = insertIndex
                 )
             )
+
+            ChainSyncCoordinator.onDevicePlaced(this, device, insertIndex)
         }
         reroute()
     }
@@ -70,6 +73,8 @@ class Chain : SignalReceiver() {
                         originalIndex = index
                     )
                 )
+
+                ChainSyncCoordinator.onDeviceRemoved(this, deviceToRemove.selectionUUID)
             }
             devices.value = devices.value.toMutableList().apply { removeAt(index) }
             deviceToRemove.onRemovedFromChain()
@@ -89,6 +94,8 @@ class Chain : SignalReceiver() {
                         originalIndex = deviceIndex
                     )
                 )
+
+                ChainSyncCoordinator.onDeviceRemoved(this, uuid)
             }
             devices.value = devices.value.toMutableList().apply { removeAll { it.selectionUUID == uuid } }
             deviceToRemove.onRemovedFromChain()
@@ -118,4 +125,3 @@ class Chain : SignalReceiver() {
         return null
     }
 }
-

@@ -4,25 +4,33 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Anchor
@@ -35,7 +43,11 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Settings
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
+import com.composeunstyled.rememberDialogState
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.core.network.CollaborationManager
+import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectContract.ConnectionState
+import dev.anthonyhfm.amethyst.core.network.user.LocalUserRepository
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
@@ -49,9 +61,15 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialog
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogCancel
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
 import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenuContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenuRadioItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.Input
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
@@ -67,6 +85,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlinx.coroutines.launch
 
 @Composable
 actual fun WorkspaceTopAppBar(
@@ -75,7 +94,16 @@ actual fun WorkspaceTopAppBar(
     onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val automappingState by AutomappingManager.state.collectAsState()
+    val collaborationState by CollaborationManager.connectionState.collectAsState()
+    val session by CollaborationManager.session.collectAsState()
+    val connectLocalUser by CollaborationManager.localUser.collectAsState()
+    val localUser by LocalUserRepository.localUser.collectAsState()
     var showSettingsDialog by remember { mutableStateOf(false) }
+    val shareDialogState = rememberDialogState()
+    val scope = rememberCoroutineScope()
+    val isHosting = CollaborationManager.isHosting
+    val isConnected = collaborationState is ConnectionState.Connected
+    val isConnecting = collaborationState is ConnectionState.Connecting
 
     Row(
         modifier = Modifier
@@ -111,6 +139,49 @@ actual fun WorkspaceTopAppBar(
         CleanupButtons()
 
         WorkspaceToolbarSurface(contentPadding = PaddingValues(4.dp)) {
+            if (collaborationState is ConnectionState.Connected) {
+                UserRoster(
+                    (session?.participants.orEmpty() + listOfNotNull(connectLocalUser))
+                        .distinctBy { it.id }
+                )
+                Separator(
+                    modifier = Modifier.height(20.dp),
+                    orientation = SeparatorOrientation.Vertical,
+                )
+            }
+
+            if (isConnecting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = Theme[colors][accent],
+                )
+            } else {
+                WorkspaceToolbarIconButton(
+                    onClick = {
+                        if (isHosting) {
+                            scope.launch { CollaborationManager.leaveSession() }
+                        } else if (isConnected) {
+                            scope.launch { CollaborationManager.leaveSession() }
+                        } else {
+                            shareDialogState.visible = true
+                        }
+                    },
+                    imageVector = Icons.Default.Share,
+                    contentDescription = when {
+                        isHosting -> "Stop sharing"
+                        isConnected -> "Leave shared workspace"
+                        else -> "Share workspace"
+                    },
+                    variant = when {
+                        isHosting -> ButtonVariant.Default
+                        isConnected -> ButtonVariant.Secondary
+                        else -> ButtonVariant.Ghost
+                    },
+                    modifier = if (isHosting) Modifier.scale(1.04f) else Modifier,
+                )
+            }
+
             WorkspaceToolbarIconButton(
                 onClick = { showSettingsDialog = true },
                 imageVector = Lucide.Settings,
@@ -123,6 +194,79 @@ actual fun WorkspaceTopAppBar(
         visible = showSettingsDialog,
         onDismiss = { showSettingsDialog = false },
     )
+
+    ShareWorkspaceDialog(
+        visible = shareDialogState.visible,
+        defaultSessionName = WorkspaceRepository.projectName.collectAsState().value ?: "Amethyst Workspace",
+        initialUserName = localUser.name,
+        onDismiss = { shareDialogState.visible = false },
+        onShare = { sessionName, userName ->
+            scope.launch {
+                LocalUserRepository.setUsername(userName)
+                CollaborationManager.startHosting(
+                    sessionName = sessionName.ifBlank { "Amethyst Workspace" },
+                    localUser = LocalUserRepository.localUser.value
+                )
+                shareDialogState.visible = false
+            }
+        },
+    )
+}
+
+@Composable
+private fun ShareWorkspaceDialog(
+    visible: Boolean,
+    defaultSessionName: String,
+    initialUserName: String,
+    onDismiss: () -> Unit,
+    onShare: (sessionName: String, userName: String) -> Unit,
+) {
+    val dialogState = rememberDialogState()
+    var sessionName by remember(defaultSessionName) { mutableStateOf(defaultSessionName) }
+    var userName by remember(initialUserName) { mutableStateOf(initialUserName) }
+
+    LaunchedEffect(visible) {
+        dialogState.visible = visible
+    }
+
+    AlertDialog(
+        state = dialogState,
+        onDismiss = onDismiss,
+    ) {
+        AlertDialogHeader {
+            AlertDialogTitle("Share workspace")
+        }
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Input(
+                value = sessionName,
+                onValueChange = { sessionName = it },
+                placeholder = "Session name",
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Input(
+                value = userName,
+                onValueChange = { userName = it },
+                placeholder = "Your name",
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        AlertDialogFooter {
+            AlertDialogCancel(onClick = onDismiss) {
+                Text("Cancel")
+            }
+            Button(
+                onClick = { onShare(sessionName.trim(), userName.trim()) },
+                size = ButtonSize.Small,
+                enabled = sessionName.isNotBlank() && userName.isNotBlank(),
+            ) {
+                Text("Share")
+            }
+        }
+    }
 }
 
 @Composable

@@ -22,6 +22,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
+import com.composables.icons.lucide.Wifi
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -41,13 +42,21 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.composeunstyled.Text as UnstyledText
+import com.composeunstyled.rememberDialogState
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.core.network.lan.DiscoveredSession
+import dev.anthonyhfm.amethyst.core.network.user.LocalUserRepository
 import dev.anthonyhfm.amethyst.home.HomeCommandSurface
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.home.ui.views.RecentViewContract.Event
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialog
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogCancel
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
 import dev.anthonyhfm.amethyst.ui.components.primitives.Card
 import dev.anthonyhfm.amethyst.ui.components.primitives.CardContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.CardDescription
@@ -58,6 +67,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenuContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.DropdownMenuTrigger
+import dev.anthonyhfm.amethyst.ui.components.primitives.Input
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
 import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyH2
 import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyLead
@@ -92,6 +102,9 @@ fun RecentView(
     }
 
     var recentProjects: List<RecentWorkspace> by remember { mutableStateOf(loadRecentProjects()) }
+    var joiningSession by remember { mutableStateOf<DiscoveredSession?>(null) }
+    val state by viewModel.state.collectAsState()
+    val localUser by LocalUserRepository.localUser.collectAsState()
 
     val currentBackStackEntry by navigator.currentBackStackEntryFlow.collectAsState(initial = navigator.currentBackStackEntry)
     LaunchedEffect(currentBackStackEntry) {
@@ -133,23 +146,29 @@ fun RecentView(
                 onCreateProject = { viewModel.onEvent(Event.OnClickNewProject) },
             )
 
-            if (recentProjects.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.BottomStart,
+            ScrollArea(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    EmptyRecentProjectsCard()
-                }
-            } else {
-                ScrollArea(
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
+                    if (state.discoveredSessions.isNotEmpty()) {
+                        TypographyMuted("Available on the network")
+                        state.discoveredSessions.forEach { session ->
+                            DiscoveredSessionCard(
+                                session = session,
+                                onJoin = { joiningSession = session },
+                            )
+                        }
+                    }
+
+                    if (recentProjects.isEmpty()) {
+                        EmptyRecentProjectsCard()
+                    } else {
+                        TypographyMuted("Recently opened")
                         recentProjects.forEachIndexed { index, project ->
                             RecentProjectCard(
                                 project = project,
@@ -176,6 +195,116 @@ fun RecentView(
                 .align(Alignment.BottomCenter)
                 .padding(24.dp),
         )
+
+        joiningSession?.let { session ->
+            JoinSessionDialog(
+                session = session,
+                initialUserName = localUser.name,
+                onDismiss = { joiningSession = null },
+                onJoin = { userName ->
+                    viewModel.onEvent(Event.OnClickJoinSession(session, userName))
+                    joiningSession = null
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiscoveredSessionCard(
+    session: DiscoveredSession,
+    onJoin: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(1.dp, DefaultShape)
+            .clip(DefaultShape)
+            .border(1.dp, Theme[colors][border], DefaultShape)
+            .background(Theme[colors][card])
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = Lucide.Wifi,
+            contentDescription = null,
+            tint = Color(session.session.host.color),
+            modifier = Modifier.size(20.dp),
+        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = session.session.name,
+                style = Theme[typography][p],
+                fontWeight = FontWeight.SemiBold,
+                color = Theme[colors][cardForeground],
+            )
+            Text(
+                text = "Host: ${session.session.host.name.ifBlank { "Unknown" }} · ${session.session.participants.size} participants",
+                style = Theme[typography][small],
+                color = Theme[colors][mutedForeground],
+            )
+        }
+
+        Button(
+            onClick = onJoin,
+            size = ButtonSize.Small,
+        ) {
+            UnstyledText("Join")
+        }
+    }
+}
+
+@Composable
+private fun JoinSessionDialog(
+    session: DiscoveredSession,
+    initialUserName: String,
+    onDismiss: () -> Unit,
+    onJoin: (String) -> Unit,
+) {
+    val dialogState = rememberDialogState()
+    var userName by remember(initialUserName) { mutableStateOf(initialUserName) }
+
+    LaunchedEffect(Unit) {
+        dialogState.visible = true
+    }
+
+    AlertDialog(
+        state = dialogState,
+        onDismiss = onDismiss,
+    ) {
+        AlertDialogHeader {
+            AlertDialogTitle("Join ${session.session.name}")
+        }
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            TypographyMuted("Host: ${session.session.host.name.ifBlank { "Unknown" }}")
+            Input(
+                value = userName,
+                onValueChange = { userName = it },
+                placeholder = "Your name",
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        AlertDialogFooter {
+            AlertDialogCancel(onClick = onDismiss) {
+                UnstyledText("Cancel")
+            }
+            Button(
+                onClick = { onJoin(userName.trim()) },
+                size = ButtonSize.Small,
+                enabled = userName.isNotBlank(),
+            ) {
+                UnstyledText("Join")
+            }
+        }
     }
 }
 

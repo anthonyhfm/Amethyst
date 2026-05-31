@@ -728,12 +728,12 @@ class TimelineViewModel : ViewModel() {
     }
 
     /**
-     * Handle an arrangement open request on a MIDI track by creating or opening an entry.
+     * Handle an arrangement open request on a MIDI track by opening an existing entry.
      */
     fun onDoubleClickMidiTrack(trackIndex: Int, timeMs: Long) {
         val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
         
-        // Check if there's an existing entry at this time
+        // Only open the Piano Roll if there's an existing entry at this time
         val existingEntry = track.entries.values.firstOrNull { entry ->
             timeMs >= entry.startTimeMs && timeMs < entry.endTimeMs
         }
@@ -741,31 +741,6 @@ class TimelineViewModel : ViewModel() {
         if (existingEntry != null) {
             val clipContext = TimelineClipContext.midi(trackIndex, existingEntry)
             enterPianoRollForEntry(clipContext, existingEntry)
-        } else {
-            // Create a new empty MIDI entry at the double-click position
-            val defaultDuration = 4000L // 4 seconds default
-            val newEntry = MidiEntry(
-                startTimeMs = timeMs,
-                durationMs = defaultDuration,
-                notes = emptyList(),
-                name = "Lights Clip"
-            )
-            val before = track.entries.values.toList()
-            
-            track.addEntry(newEntry)
-            val after = track.entries.values.toList()
-            
-            val currentTracks = _tracks.value.toMutableList()
-            val newTrack = track.copyWithEntries()
-            currentTracks[trackIndex] = newTrack
-            publishTrackSnapshot(currentTracks.toList())
-            
-            UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
-            
-            println("Created new lights clip at ${timeMs}ms on track $trackIndex")
-            
-            val clipContext = TimelineClipContext.midi(trackIndex, newEntry)
-            enterPianoRollForEntry(clipContext, newEntry)
         }
     }
 

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,7 +36,15 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
 fun BPMChanger() {
-    var bpmText: String by remember { mutableStateOf(WorkspaceRepository.bpm.value.toString()) }
+    val bpm by WorkspaceRepository.bpm.collectAsState()
+    var bpmText: String by remember { mutableStateOf(bpm.toString()) }
+    var isFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(bpm, isFocused) {
+        if (!isFocused) {
+            bpmText = bpm.toString()
+        }
+    }
 
     WorkspaceToolbarSurface(
         modifier = Modifier.width(120.dp),
@@ -85,7 +95,11 @@ fun BPMChanger() {
                 modifier = Modifier
                     .width(56.dp)
                     .onFocusChanged {
+                        isFocused = it.isFocused
                         WorkspaceRepository.isInputFocused = it.isFocused
+                        if (!it.isFocused) {
+                            bpmText = WorkspaceRepository.bpm.value.toString()
+                        }
                     },
             )
         }

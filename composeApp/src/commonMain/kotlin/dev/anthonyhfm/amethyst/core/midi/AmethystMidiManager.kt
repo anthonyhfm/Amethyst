@@ -272,12 +272,14 @@ class AmethystMidiManager {
         if (autoDetectJob?.isActive == true) return
 
         val device = Heaven.devices.singleOrNull() ?: return
+        val inputs = midiAccess.inputs.toList()
+        val outputs = midiAccess.outputs.toList()
 
         val inputValid = device.deviceConfig.input?.details?.id?.let { id ->
-            midiAccess.inputs.any { it.id == id }
+            inputs.any { it.id == id }
         } ?: false
         val outputValid = device.deviceConfig.launchpadDevice?.midiOutput?.details?.id?.let { id ->
-            midiAccess.outputs.any { it.id == id }
+            outputs.any { it.id == id }
         } ?: false
 
         if (!inputValid || !outputValid) {
@@ -287,7 +289,7 @@ class AmethystMidiManager {
         }
 
         if (device.deviceConfig.input != null && device.deviceConfig.launchpadDevice != null) return
-        if (midiAccess.inputs.count() == 0 || midiAccess.outputs.count() == 0) return
+        if (inputs.isEmpty() || outputs.isEmpty()) return
 
         autoDetectJob = midiInScope.launch {
             val detection = shotgunDetectLaunchpad()
@@ -308,9 +310,9 @@ class AmethystMidiManager {
 
     @OptIn(ExperimentalUnsignedTypes::class)
     private suspend fun shotgunDetectLaunchpad(): DetectedLaunchpad? {
-        val inputs = midiAccess.inputs
-        val outputs = midiAccess.outputs
-        if (inputs.count() == 0 || outputs.count() == 0) return null
+        val inputs = midiAccess.inputs.toList()
+        val outputs = midiAccess.outputs.toList()
+        if (inputs.isEmpty() || outputs.isEmpty()) return null
 
         for (outputPort in outputs) {
             val openedInputs = mutableListOf<Pair<MidiPortDetails, MidiInput>>()
