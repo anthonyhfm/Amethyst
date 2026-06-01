@@ -67,8 +67,7 @@ fun AbletonImportWizard(
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f)),
+            .fillMaxSize(),
 
         contentAlignment = Alignment.Center,
     ) {
@@ -80,7 +79,8 @@ fun AbletonImportWizard(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Theme[colors][card])
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .padding(top = 8.dp),
 
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {

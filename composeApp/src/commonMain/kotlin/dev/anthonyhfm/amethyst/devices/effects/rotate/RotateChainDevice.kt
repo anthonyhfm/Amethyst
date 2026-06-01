@@ -12,11 +12,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
@@ -32,10 +35,10 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
-import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
     override val state = MutableStateFlow(RotateChainDeviceState())
@@ -77,6 +80,32 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Checkbox(
+                        checked = deviceState.isolate,
+                        onCheckedChange = { checked ->
+                            val before = state.value
+                            state.update {
+                                it.copy(isolate = checked)
+                            }
+
+                            pushStateChange(before, state.value)
+                        },
+                        size = 18.dp,
+                        iconSize = 14.dp,
+                    )
+
+                    Text(
+                        text = "Isolate",
+                        style = Theme[typography][small],
+                        color = Theme[colors][foreground]
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Checkbox(
                         checked = deviceState.bypass,
                         onCheckedChange = { checked ->
                             val before = state.value
@@ -101,15 +130,17 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val bounds = WorkspaceRepository.bounds
-        val rightEdgeX = bounds.first.x + bounds.second.width - 1
-        val bottomEdgeY = bounds.first.y + bounds.second.height - 1
+        val state = state.value
 
-        val rotatedSignals = n.map {
-            when (state.value.mode) {
+        val rotatedSignals = n.map { signal ->
+            val bounds = resolveBounds(signal, state.isolate)
+            val rightEdgeX = bounds.first.x + bounds.second.width - 1
+            val bottomEdgeY = bounds.first.y + bounds.second.height - 1
+
+            when (state.mode) {
                 RotateChainDeviceState.RotateMode.DEGREES_90 -> {
-                    val relativeX = it.x - bounds.first.x
-                    val relativeY = it.y - bounds.first.y
+                    val relativeX = signal.x - bounds.first.x
+                    val relativeY = signal.y - bounds.first.y
 
                     val rotatedRelativeX = relativeY
                     val rotatedRelativeY = bounds.second.width - 1 - relativeX
@@ -117,22 +148,22 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                     val rotatedX = bounds.first.x + rotatedRelativeX
                     val rotatedY = bounds.first.y + rotatedRelativeY
 
-                    it.copy(x = rotatedX, y = rotatedY)
+                    signal.copy(x = rotatedX, y = rotatedY)
                 }
 
                 RotateChainDeviceState.RotateMode.DEGREES_180 -> {
-                    val distanceFromRight = rightEdgeX - it.x
-                    val distanceFromBottom = bottomEdgeY - it.y
+                    val distanceFromRight = rightEdgeX - signal.x
+                    val distanceFromBottom = bottomEdgeY - signal.y
 
                     val rotatedX = bounds.first.x + distanceFromRight
                     val rotatedY = bounds.first.y + distanceFromBottom
 
-                    it.copy(x = rotatedX, y = rotatedY)
+                    signal.copy(x = rotatedX, y = rotatedY)
                 }
 
                 RotateChainDeviceState.RotateMode.DEGREES_270 -> {
-                    val relativeX = it.x - bounds.first.x
-                    val relativeY = it.y - bounds.first.y
+                    val relativeX = signal.x - bounds.first.x
+                    val relativeY = signal.y - bounds.first.y
 
                     val rotatedRelativeX = bounds.second.height - 1 - relativeY
                     val rotatedRelativeY = relativeX
@@ -140,16 +171,32 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                     val rotatedX = bounds.first.x + rotatedRelativeX
                     val rotatedY = bounds.first.y + rotatedRelativeY
 
-                    it.copy(x = rotatedX, y = rotatedY)
+                    signal.copy(x = rotatedX, y = rotatedY)
                 }
             }
         }
 
         signalExit?.invoke(rotatedSignals.toMutableList().apply {
-            if (state.value.bypass) {
+            if (state.bypass) {
                 addAll(n)
             }
         })
+    }
+
+    private fun resolveBounds(signal: Signal.LED, isolate: Boolean): Pair<IntOffset, IntSize> {
+        if (!isolate) return WorkspaceRepository.bounds
+
+        val device = signal.origin as? LaunchpadViewportElement ?: return WorkspaceRepository.bounds
+        return Pair(
+            first = IntOffset(
+                x = device.position.value.x.toInt(),
+                y = device.position.value.y.toInt(),
+            ),
+            second = IntSize(
+                width = device.layout.cols,
+                height = device.layout.rows,
+            )
+        )
     }
 
     @Composable
@@ -204,6 +251,7 @@ private val RotateChainDeviceState.RotateMode.label: String
 @Serializable
 data class RotateChainDeviceState(
     val bypass: Boolean = false,
+    val isolate: Boolean = false,
     val mode: RotateMode = RotateMode.DEGREES_90,
 ) : DeviceState() {
     enum class RotateMode {

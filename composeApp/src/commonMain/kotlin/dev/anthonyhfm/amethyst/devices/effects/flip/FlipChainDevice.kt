@@ -12,11 +12,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
@@ -30,11 +33,12 @@ import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
-import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
     override val state = MutableStateFlow(FlipChainDeviceState())
@@ -76,6 +80,32 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Checkbox(
+                        checked = deviceState.isolate,
+                        onCheckedChange = { checked ->
+                            val before = state.value
+                            state.update {
+                                it.copy(isolate = checked)
+                            }
+
+                            pushStateChange(before, state.value)
+                        },
+                        size = 18.dp,
+                        iconSize = 14.dp,
+                    )
+
+                    Text(
+                        text = "Isolate",
+                        style = Theme[typography][small],
+                        color = Theme[colors][foreground]
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Checkbox(
                         checked = deviceState.bypass,
                         onCheckedChange = { checked ->
                             val before = state.value
@@ -100,41 +130,72 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val signals = mutableListOf<Signal.LED>()
+        val state = state.value
 
-        if (state.value.bypass) {
-            signals.addAll(n.map { it.copy() })
+        val flippedSignals = n.map { signal ->
+            val bounds = resolveBounds(signal, state.isolate)
+            val rightEdgeX = bounds.first.x + bounds.second.width - 1
+            val bottomEdgeY = bounds.first.y + bounds.second.height - 1
+
+            when (state.mode) {
+                FlipChainDeviceState.FlipMode.HORIZONTAL -> {
+                    val flippedX = bounds.first.x + (rightEdgeX - signal.x)
+
+                    signal.copy(x = flippedX)
+                }
+
+                FlipChainDeviceState.FlipMode.VERTICAL -> {
+                    val flippedY = bounds.first.y + (bottomEdgeY - signal.y)
+
+                    signal.copy(y = flippedY)
+                }
+
+                FlipChainDeviceState.FlipMode.DIAGONAL_PLUS -> {
+                    val relativeX = signal.x - bounds.first.x
+                    val relativeY = signal.y - bounds.first.y
+
+                    val flippedX = bounds.first.x + relativeY
+                    val flippedY = bounds.first.y + relativeX
+
+                    signal.copy(x = flippedX, y = flippedY)
+                }
+
+                FlipChainDeviceState.FlipMode.DIAGONAL_MINUS -> {
+                    val relativeX = signal.x - bounds.first.x
+                    val relativeY = signal.y - bounds.first.y
+
+                    val flippedRelativeX = bounds.second.height - 1 - relativeY
+                    val flippedRelativeY = bounds.second.width - 1 - relativeX
+
+                    val flippedX = bounds.first.x + flippedRelativeX
+                    val flippedY = bounds.first.y + flippedRelativeY
+
+                    signal.copy(x = flippedX, y = flippedY)
+                }
+            }
         }
 
-        signals.addAll(n.flatMap { signal ->
-            if (signal.x + signal.y * 10 == 100) {
-                return@flatMap if (state.value.bypass) emptyList() else listOf(signal.copy())
+        signalExit?.invoke(flippedSignals.toMutableList().apply {
+            if (state.bypass) {
+                addAll(n)
             }
-
-            var x = signal.x
-            var y = signal.y
-
-            when (state.value.mode) {
-                FlipChainDeviceState.FlipMode.HORIZONTAL -> x = 9 - x
-                FlipChainDeviceState.FlipMode.VERTICAL -> y = 9 - y
-                FlipChainDeviceState.FlipMode.DIAGONAL_PLUS -> {
-                    val temp = x
-                    x = y
-                    y = temp
-                }
-                FlipChainDeviceState.FlipMode.DIAGONAL_MINUS -> {
-                    x = 9 - x
-                    y = 9 - y
-                    val temp = x
-                    x = y
-                    y = temp
-                }
-            }
-
-            listOf(signal.copy(x = x, y = y))
         })
+    }
 
-        signalExit?.invoke(signals)
+    private fun resolveBounds(signal: Signal.LED, isolate: Boolean): Pair<IntOffset, IntSize> {
+        if (!isolate) return WorkspaceRepository.bounds
+
+        val device = signal.origin as? LaunchpadViewportElement ?: return WorkspaceRepository.bounds
+        return Pair(
+            first = IntOffset(
+                x = device.position.value.x.toInt(),
+                y = device.position.value.y.toInt(),
+            ),
+            second = IntSize(
+                width = device.layout.cols,
+                height = device.layout.rows,
+            )
+        )
     }
 
     @Composable
@@ -190,6 +251,7 @@ private val FlipChainDeviceState.FlipMode.label: String
 @Serializable
 data class FlipChainDeviceState(
     val bypass: Boolean = false,
+    val isolate: Boolean = false,
     val mode: FlipMode = FlipMode.HORIZONTAL,
 ) : DeviceState() {
     enum class FlipMode {

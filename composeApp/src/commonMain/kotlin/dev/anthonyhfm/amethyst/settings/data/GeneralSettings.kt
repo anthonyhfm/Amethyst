@@ -9,7 +9,7 @@ object GeneralSettings : SettingsGroup("General") {
         key = "framesPerSecond",
         title = "Refresh rate",
         default = if (platform is Platform.iOS || platform is Platform.Android) 90 else 120,
-        options = listOf(60, 90, 120),
+        options = listOf(60, 90, 120, 180, 240),
         codec = SettingCodec.Int,
         label = { "$it Hz" },
         onUpdate = { Heaven.fps = it },

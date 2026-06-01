@@ -37,7 +37,7 @@ final class SettingsViewModel {
     // MARK: - Static option lists
     // Mirrors GeneralSettings.performanceFPS.options and gradientSmoothness.options.
 
-    let fpsOptions: [Int32] = [60, 90, 120]
+    let fpsOptions: [Int32] = [60, 90, 120, 180, 240]
 
     // (value, display label) pairs — mirrors the KMP label lambda: "(it * 100).toInt()%"
     let gradientSmoothnessOptions: [(value: Float, label: String)] = [
