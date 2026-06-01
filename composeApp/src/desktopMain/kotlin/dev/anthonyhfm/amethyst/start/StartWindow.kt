@@ -59,7 +59,6 @@ fun StartWindow(
             height = 550.dp,
             position = WindowPosition.Aligned(Alignment.Center)
         ),
-        resizable = false,
         icon = when (DesktopPlatform.get()) {
             DesktopPlatform.Windows -> painterResource(Res.drawable.amethyst_windows)
             DesktopPlatform.Linux -> painterResource(Res.drawable.amethyst_linux)
@@ -76,7 +75,7 @@ fun StartWindow(
             } else false
         }
     ) {
-        androidx.compose.runtime.LaunchedEffect(Unit) {
+        LaunchedEffect(Unit) {
             window.minimumSize = java.awt.Dimension(750, 550)
         }
 
