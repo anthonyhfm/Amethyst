@@ -12,6 +12,7 @@ import androidx.compose.material.icons.twotone.Flip
 import androidx.compose.material.icons.twotone.Gradient
 import androidx.compose.material.icons.twotone.Group
 import androidx.compose.material.icons.twotone.Layers
+import androidx.compose.material.icons.twotone.LayersClear
 import androidx.compose.material.icons.twotone.LineAxis
 import androidx.compose.material.icons.twotone.Loop
 import androidx.compose.material.icons.twotone.MyLocation
@@ -63,6 +64,7 @@ import dev.anthonyhfm.amethyst.devices.effects.color_filter.ColorFilterChainDevi
 import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -129,6 +131,7 @@ fun ChainDevicePicker(
                     ChainContextMenuItem("Opacity", icon = Icons.TwoTone.Opacity, onClick = { onPickComponent(OpacityChainDevice()) })
                 }
                 "misc" -> {
+                    ChainContextMenuItem("Clear", icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
                     ChainContextMenuItem("Macro Control", icon = Icons.TwoTone.Adjust, onClick = { onPickComponent(MacroControlChainDevice()) })
                     ChainContextMenuItem("Preview", icon = Icons.TwoTone.Preview, onClick = { onPickComponent(PreviewChainDevice()) })
                     ChainContextMenuItem("Transmit", icon = Icons.AutoMirrored.TwoTone.Send, onClick = { onPickComponent(TransmitChainDevice()) })
@@ -158,6 +161,7 @@ fun ChainDevicePicker(
                     ChainContextMenuItem("Loop", icon = Icons.TwoTone.Loop, onClick = { onPickComponent(LoopChainDevice()) })
                 }
                 "misc" -> {
+                    ChainContextMenuItem("Clear", icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
                     ChainContextMenuItem("Macro Control", icon = Icons.TwoTone.Adjust, onClick = { onPickComponent(MacroControlChainDevice()) })
                 }
             }
