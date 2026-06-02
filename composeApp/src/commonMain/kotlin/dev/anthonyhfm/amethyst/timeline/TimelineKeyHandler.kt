@@ -102,15 +102,22 @@ object TimelineKeyHandler {
         }
     }
 
-    private fun handleTogglePlayPause(): Boolean {
+    internal fun handleTogglePlayPause(): Boolean {
         if (TimelineRepository.isPlaying.value) {
             TimelineRepository.pause()
         } else {
-            val selectionTime = SelectionManager.selections.value
-                .filterIsInstance<Selectable.TimelineTime>()
-                .firstOrNull()
-            if (selectionTime != null) {
-                TimelineRepository.setPlayheadPosition(selectionTime.timeMs)
+            val selectedEntry = SelectionManager.selections.value
+                .filterIsInstance<Selectable.TimelineEntryItem>()
+                .minByOrNull { it.entryStartMs }
+            if (selectedEntry != null) {
+                TimelineRepository.setPlayheadPosition(selectedEntry.entryStartMs)
+            } else {
+                val selectionTime = SelectionManager.selections.value
+                    .filterIsInstance<Selectable.TimelineTime>()
+                    .firstOrNull()
+                if (selectionTime != null) {
+                    TimelineRepository.setPlayheadPosition(selectionTime.timeMs)
+                }
             }
             TimelineRepository.play()
         }
