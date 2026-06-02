@@ -24,8 +24,8 @@ class WorkspaceEventBroadcaster(
             WorkspaceRepository.bpm
                 .drop(1)
                 .collect { bpm ->
-                    if (WorkspaceRepository.isApplyingRemoteUpdate) {
-                        WorkspaceRepository.markRemoteUpdateConsumed()
+                    if (WorkspaceRepository.isApplyingRemoteBpmUpdate) {
+                        WorkspaceRepository.markRemoteBpmUpdateConsumed()
                     } else {
                         provider.send(ConnectEvent.BpmChanged(bpm))
                         triggerVerification()
@@ -38,8 +38,8 @@ class WorkspaceEventBroadcaster(
                 .drop(1)
                 .filterNotNull()
                 .collect { name ->
-                    if (WorkspaceRepository.isApplyingRemoteUpdate) {
-                        WorkspaceRepository.markRemoteUpdateConsumed()
+                    if (WorkspaceRepository.isApplyingRemoteProjectNameUpdate) {
+                        WorkspaceRepository.markRemoteProjectNameUpdateConsumed()
                     } else {
                         provider.send(ConnectEvent.ProjectNameChanged(name))
                         triggerVerification()
@@ -51,8 +51,8 @@ class WorkspaceEventBroadcaster(
             WorkspaceRepository.macros
                 .drop(1)
                 .collect { macros ->
-                    if (WorkspaceRepository.isApplyingRemoteUpdate) {
-                        WorkspaceRepository.markRemoteUpdateConsumed()
+                    if (WorkspaceRepository.isApplyingRemoteMacrosUpdate) {
+                        WorkspaceRepository.markRemoteMacrosUpdateConsumed()
                     } else {
                         provider.send(ConnectEvent.MacrosChanged(macros))
                         triggerVerification()
@@ -64,8 +64,8 @@ class WorkspaceEventBroadcaster(
             WorkspaceRepository.gridType
                 .drop(1)
                 .collect { gridType ->
-                    if (WorkspaceRepository.isApplyingRemoteUpdate) {
-                        WorkspaceRepository.markRemoteUpdateConsumed()
+                    if (WorkspaceRepository.isApplyingRemoteGridTypeUpdate) {
+                        WorkspaceRepository.markRemoteGridTypeUpdateConsumed()
                     } else {
                         provider.send(ConnectEvent.GridTypeChanged(gridTypeToNetworkKey(gridType)))
                         triggerVerification()

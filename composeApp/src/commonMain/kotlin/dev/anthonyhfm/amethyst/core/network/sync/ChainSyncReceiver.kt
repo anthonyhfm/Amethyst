@@ -83,10 +83,12 @@ class ChainSyncReceiver(
         val device = DeviceRegistry.createFromState(event.initialState)
         device.selectionUUID = event.deviceId
         chain.add(device, atIndex = event.atIndex, fromUser = false)
+        ChainSyncCoordinator.refreshDeviceStateObservers()
     }
 
     private fun handleDeviceRemoved(event: ConnectEvent.ChainDeviceRemoved) {
         event.chainPath.resolveChain(event.parentPath)?.remove(event.deviceId, fromUser = false)
+        ChainSyncCoordinator.refreshDeviceStateObservers()
     }
 
     private fun handleDeviceMoved(event: ConnectEvent.ChainDeviceMoved) {
@@ -101,6 +103,7 @@ class ChainSyncReceiver(
         fromChain.remove(device.selectionUUID, fromUser = false)
         val targetIndex = event.toIndex.coerceIn(0, toChain.devices.value.size)
         toChain.add(device, atIndex = targetIndex, fromUser = false)
+        ChainSyncCoordinator.refreshDeviceStateObservers()
     }
 
     private fun handleStateChanged(event: ConnectEvent.DeviceStateChanged) {
@@ -108,30 +111,40 @@ class ChainSyncReceiver(
             requestResync()
             return
         }
-        if (restoreNestedState(device, event.state)) return
+        ChainSyncCoordinator.suppressNextDeviceStateBroadcast(device.selectionUUID, count = 3)
+        if (restoreNestedState(device, event.state)) {
+            ChainSyncCoordinator.refreshDeviceStateObservers()
+            return
+        }
         setDeviceState(device, event.state)
         device.onStateRestored()
+        ChainSyncCoordinator.refreshDeviceStateObservers()
     }
 
     private fun handleGroupCreated(event: ConnectEvent.GroupCreated) {
         val device = event.chainPath.resolveRootChain().resolve(event.devicePath) ?: return
         val group = Group(name = event.groupName)
+        ChainSyncCoordinator.suppressNextDeviceStateBroadcast(device.selectionUUID)
         when (device) {
             is GroupChainDevice -> device.addGroupInternal(event.groupIndex, group)
             is MultiGroupChainDevice -> device.addGroupInternal(event.groupIndex, group)
         }
+        ChainSyncCoordinator.refreshDeviceStateObservers()
     }
 
     private fun handleGroupRemoved(event: ConnectEvent.GroupRemoved) {
         val device = event.chainPath.resolveRootChain().resolve(event.devicePath) ?: return
+        ChainSyncCoordinator.suppressNextDeviceStateBroadcast(device.selectionUUID)
         when (device) {
             is GroupChainDevice -> device.removeGroupInternal(event.groupIndex)
             is MultiGroupChainDevice -> device.removeGroupInternal(event.groupIndex)
         }
+        ChainSyncCoordinator.refreshDeviceStateObservers()
     }
 
     private fun handleGroupReordered(event: ConnectEvent.GroupReordered) {
         val device = event.chainPath.resolveRootChain().resolve(event.devicePath) ?: return
+        ChainSyncCoordinator.suppressNextDeviceStateBroadcast(device.selectionUUID)
         when (device) {
             is GroupChainDevice -> {
                 val groups = device.state.value.groups.move(event.fromIndex, event.toIndex) ?: return
@@ -154,10 +167,12 @@ class ChainSyncReceiver(
                 }
             }
         }
+        ChainSyncCoordinator.refreshDeviceStateObservers()
     }
 
     private fun handleGroupRenamed(event: ConnectEvent.GroupRenamed) {
         val device = event.chainPath.resolveRootChain().resolve(event.devicePath) ?: return
+        ChainSyncCoordinator.suppressNextDeviceStateBroadcast(device.selectionUUID)
         when (device) {
             is GroupChainDevice -> device.state.update { state ->
                 if (event.groupIndex !in state.groups.indices) {

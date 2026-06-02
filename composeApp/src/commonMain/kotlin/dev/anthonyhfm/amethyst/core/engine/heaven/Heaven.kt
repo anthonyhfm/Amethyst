@@ -65,7 +65,7 @@ object Heaven {
         }
     }
 
-    var devices: List<LaunchpadViewportElement> = emptyList()
+    @Volatile var devices: List<LaunchpadViewportElement> = emptyList()
         set(value) {
             field = value
             wake()

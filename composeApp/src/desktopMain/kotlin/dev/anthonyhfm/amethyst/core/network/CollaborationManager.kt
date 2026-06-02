@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.core.network.sync.TimelineSyncReceiver
 import dev.anthonyhfm.amethyst.core.network.sync.WorkspaceEventBroadcaster
 import dev.anthonyhfm.amethyst.core.network.sync.WorkspaceEventReceiver
 import dev.anthonyhfm.amethyst.core.network.sync.WorkspaceSyncCoordinator
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +43,12 @@ object CollaborationManager {
         get() = localUser.value?.role == ConnectRole.HOST && isActive
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile private var syncCompletedDeferred: CompletableDeferred<Unit>? = null
+
+    private fun onFullSyncCompleted() {
+        syncCompletedDeferred?.complete(Unit)
+    }
 
     private var workspaceBroadcaster: WorkspaceEventBroadcaster? = null
     private var workspaceReceiver: WorkspaceEventReceiver? = null
@@ -69,11 +76,32 @@ object CollaborationManager {
         hostAddress: String,
         localUser: ConnectUser
     ): Result<ConnectSession> {
+        val deferred = CompletableDeferred<Unit>()
+        syncCompletedDeferred = deferred
+
+        // Start sync receivers BEFORE joining so they are subscribed to _events before
+        // any incoming events (e.g. FullStateSync) can arrive on the WebSocket.
+        startSync(hosting = false)
         val result = provider.join(hostAddress, localUser)
-        if (result.isSuccess) {
-            startSync(hosting = false)
+        if (!result.isSuccess) {
+            stopSync()
+            syncCompletedDeferred = null
+            return result
         }
-        return result
+
+        return try {
+            // Wait for full state sync to be completed and applied
+            kotlinx.coroutines.withTimeout(10000) { // 10 seconds timeout
+                deferred.await()
+            }
+            result
+        } catch (e: Exception) {
+            stopSync()
+            syncCompletedDeferred = null
+            Result.failure(Exception("Failed to complete initial state sync: ${e.message}", e))
+        } finally {
+            syncCompletedDeferred = null
+        }
     }
 
     suspend fun leaveSession() {
@@ -89,7 +117,9 @@ object CollaborationManager {
     private fun startSync(hosting: Boolean) {
         stopSync()
 
-        workspaceReceiver = WorkspaceEventReceiver(provider, scope).also { it.start() }
+        workspaceReceiver = WorkspaceEventReceiver(provider, scope) {
+            onFullSyncCompleted()
+        }.also { it.start() }
         deviceReceiver = DeviceSyncReceiver(provider, scope).also { it.start() }
         chainReceiver = ChainSyncReceiver(provider, scope).also { it.start() }
         CollaborationPresence.attach(provider, scope)

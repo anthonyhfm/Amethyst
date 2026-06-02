@@ -8,17 +8,17 @@ import dev.anthonyhfm.amethyst.core.network.connect.toChainAddress
 import dev.anthonyhfm.amethyst.devices.DeviceRegistry
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
-@OptIn(FlowPreview::class)
 class ChainSyncBroadcaster(
     private val provider: AmethystConnectProvider,
     private val scope: CoroutineScope
@@ -29,33 +29,66 @@ class ChainSyncBroadcaster(
         val state: DeviceState
     )
 
-    private val stateChanges = MutableSharedFlow<PendingStateChange>(
-        extraBufferCapacity = 32,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    private data class ObservedDevice(
+        val device: GenericChainDevice<*>,
+        val job: Job
     )
-    private var stateJob: Job? = null
+
+    private val pendingStateChanges = mutableMapOf<String, PendingStateChange>()
+    private val pendingStateJobs = mutableMapOf<String, Job>()
+    private val observedDevices = mutableMapOf<String, ObservedDevice>()
+    private var scanJob: Job? = null
 
     fun start() {
-        if (stateJob != null) return
-        stateJob = scope.launch {
-            stateChanges
-                .debounce(50)
-                .collect { pending ->
-                    provider.send(
-                        ConnectEvent.DeviceStateChanged(
-                            chainPath = pending.chainPath,
-                            path = pending.path,
-                            state = pending.state
-                        )
-                    )
-                    WorkspaceSyncCoordinator.triggerVerification()
-                }
+        if (scanJob != null) return
+        refreshDeviceStateObservers()
+        scanJob = scope.launch {
+            while (true) {
+                delay(500)
+                refreshDeviceStateObservers()
+            }
         }
     }
 
     fun stop() {
-        stateJob?.cancel()
-        stateJob = null
+        scanJob?.cancel()
+        scanJob = null
+        pendingStateJobs.values.forEach { it.cancel() }
+        pendingStateJobs.clear()
+        pendingStateChanges.clear()
+        observedDevices.values.forEach { it.job.cancel() }
+        observedDevices.clear()
+    }
+
+    fun refreshDeviceStateObservers() {
+        val devices = collectCurrentDevices()
+        val currentIds = devices.map { it.selectionUUID }.toSet()
+
+        observedDevices
+            .filter { (deviceId, observed) -> deviceId !in currentIds || devices.firstOrNull { it.selectionUUID == deviceId } !== observed.device }
+            .keys
+            .toList()
+            .forEach { deviceId ->
+                observedDevices.remove(deviceId)?.job?.cancel()
+            }
+
+        devices.forEach { device ->
+            if (observedDevices[device.selectionUUID]?.device === device) return@forEach
+            observedDevices[device.selectionUUID]?.job?.cancel()
+            observedDevices[device.selectionUUID] = ObservedDevice(
+                device = device,
+                job = scope.launch {
+                    device.state
+                        .drop(1)
+                        .collect { state ->
+                            if (ChainSyncCoordinator.shouldSuppressDeviceStateBroadcast(device.selectionUUID)) {
+                                return@collect
+                            }
+                            onDeviceStateChanged(device, state)
+                        }
+                }
+            )
+        }
     }
 
     fun onDevicePlaced(chain: Chain, device: GenericChainDevice<*>, atIndex: Int) {
@@ -71,6 +104,7 @@ class ChainSyncBroadcaster(
                 )
             )
             WorkspaceSyncCoordinator.triggerVerification()
+            refreshDeviceStateObservers()
         }
     }
 
@@ -85,6 +119,7 @@ class ChainSyncBroadcaster(
                 )
             )
             WorkspaceSyncCoordinator.triggerVerification()
+            refreshDeviceStateObservers()
         }
     }
 
@@ -129,6 +164,7 @@ class ChainSyncBroadcaster(
                 )
             }
             WorkspaceSyncCoordinator.triggerVerification()
+            refreshDeviceStateObservers()
         }
     }
 
@@ -142,7 +178,10 @@ class ChainSyncBroadcaster(
         }
         val path = lightsPath ?: samplingPath ?: return
 
-        stateChanges.tryEmit(PendingStateChange(chainPath, path, DeviceRegistry.pack(device)))
+        enqueueStateChange(
+            deviceId = device.selectionUUID,
+            pending = PendingStateChange(chainPath, path, DeviceRegistry.pack(device))
+        )
     }
 
     fun onGroupStateChanged(device: GenericChainDevice<*>, before: DeviceState, after: DeviceState) {
@@ -158,6 +197,54 @@ class ChainSyncBroadcaster(
         scope.launch {
             groupEvents(chainPath, path, before, after).forEach { provider.send(it) }
             WorkspaceSyncCoordinator.triggerVerification()
+            refreshDeviceStateObservers()
+        }
+    }
+
+    private fun enqueueStateChange(deviceId: String, pending: PendingStateChange) {
+        pendingStateChanges[deviceId] = pending
+        pendingStateJobs[deviceId]?.cancel()
+        pendingStateJobs[deviceId] = scope.launch {
+            delay(50)
+            val latest = pendingStateChanges.remove(deviceId) ?: return@launch
+            pendingStateJobs.remove(deviceId)
+            provider.send(
+                ConnectEvent.DeviceStateChanged(
+                    chainPath = latest.chainPath,
+                    path = latest.path,
+                    state = latest.state
+                )
+            )
+            WorkspaceSyncCoordinator.triggerVerification()
+        }
+    }
+
+    private fun collectCurrentDevices(): List<GenericChainDevice<*>> {
+        val devices = mutableListOf<GenericChainDevice<*>>()
+        collectDevices(dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.lightsChain, devices)
+        collectDevices(dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.samplingChain, devices)
+        return devices.distinctBy { it.selectionUUID }
+    }
+
+    private fun collectDevices(chain: Chain, devices: MutableList<GenericChainDevice<*>>) {
+        chain.devices.value.forEach { device ->
+            devices += device
+            when (device) {
+                is GroupChainDevice -> {
+                    device.state.value.groups.forEach { group ->
+                        collectDevices(group.chain, devices)
+                    }
+                }
+
+                is MultiGroupChainDevice -> {
+                    device.state.value.groups.forEach { group ->
+                        collectDevices(group.chain, devices)
+                    }
+                    collectDevices(device.preprocessChain, devices)
+                }
+
+                is ChokeChainDevice -> collectDevices(device.state.value.chain, devices)
+            }
         }
     }
 

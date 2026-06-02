@@ -936,6 +936,10 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         heldSignals.clear()
     }
 
+    override fun onStateRestored() {
+        renderAnimation()
+    }
+
     companion object : ChainDeviceFactory<KeyframesChainDeviceContract.KeyframesChainDeviceState> {
         override val stateClass = KeyframesChainDeviceContract.KeyframesChainDeviceState::class
         override val serializer = KeyframesChainDeviceContract.KeyframesChainDeviceState.serializer()

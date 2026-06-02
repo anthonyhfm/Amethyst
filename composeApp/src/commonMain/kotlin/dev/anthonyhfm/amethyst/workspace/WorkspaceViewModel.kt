@@ -168,20 +168,22 @@ class WorkspaceViewModel(
             is WorkspaceContract.Event.ChangeViewportElementPosition -> {
                 if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) return
 
+                var movedElement: dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement? = null
                 state.update {
                     it.copy(
                         viewportElements = it.viewportElements.toMutableList().apply {
                             this[event.index].position.value = event.offset
+                            movedElement = this[event.index]
                         }
                     )
                 }
 
+                movedElement?.let { DeviceSyncCoordinator.onDeviceMoved(it) }
                 WorkspaceRepository.updateWorkspaceBounds()
             }
 
             is WorkspaceContract.Event.OnViewportElementMoveFinished -> {
-                val element = state.value.viewportElements.firstOrNull { it.selectionUUID == event.uuid } ?: return
-                DeviceSyncCoordinator.onDeviceMoved(element)
+                WorkspaceRepository.updateWorkspaceBounds()
             }
 
             is WorkspaceContract.Event.OnPanViewport -> {

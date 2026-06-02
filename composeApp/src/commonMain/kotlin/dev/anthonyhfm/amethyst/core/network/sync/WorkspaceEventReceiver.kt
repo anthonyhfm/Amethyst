@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 
 class WorkspaceEventReceiver(
     private val provider: AmethystConnectProvider,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val onFullStateSyncApplied: () -> Unit = {}
 ) {
     private var job: Job? = null
 
@@ -49,7 +50,7 @@ class WorkspaceEventReceiver(
                         WorkspaceSyncCoordinator.triggerVerification()
                     }
 
-                    is ConnectEvent.FullStateSync ->
+                    is ConnectEvent.FullStateSync -> {
                         handleWorkspaceSnapshot(
                             workspaceData = event.workspaceData,
                             bpm = event.bpm,
@@ -57,6 +58,8 @@ class WorkspaceEventReceiver(
                             macros = event.macros,
                             source = "FullStateSync"
                         )
+                        onFullStateSyncApplied()
+                    }
 
                     is ConnectEvent.RequestResync ->
                         handleRequestResync(event)
@@ -112,7 +115,7 @@ class WorkspaceEventReceiver(
                 SavableWorkspaceData.serializer(),
                 workspaceData
             )
-            WorkspaceRepository.loadWorkspace(data)
+            WorkspaceRepository.loadWorkspace(data, fromRemote = true)
             WorkspaceRepository.setBpm(bpm, fromRemote = true, undoable = false)
             WorkspaceRepository.setProjectName(projectName, fromRemote = true)
             WorkspaceRepository.setMacros(macros, fromRemote = true, undoable = false)

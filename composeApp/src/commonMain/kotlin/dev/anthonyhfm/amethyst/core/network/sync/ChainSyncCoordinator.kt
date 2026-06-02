@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 
 object ChainSyncCoordinator {
     private var broadcaster: ChainSyncBroadcaster? = null
+    private val suppressedDeviceStateBroadcasts = mutableMapOf<String, Int>()
 
     fun attach(broadcaster: ChainSyncBroadcaster) {
         this.broadcaster = broadcaster
@@ -38,6 +39,24 @@ object ChainSyncCoordinator {
 
     fun onDeviceStateChanged(device: GenericChainDevice<*>, state: DeviceState) {
         broadcaster?.onDeviceStateChanged(device, state)
+    }
+
+    fun refreshDeviceStateObservers() {
+        broadcaster?.refreshDeviceStateObservers()
+    }
+
+    fun suppressNextDeviceStateBroadcast(deviceId: String, count: Int = 1) {
+        suppressedDeviceStateBroadcasts[deviceId] = (suppressedDeviceStateBroadcasts[deviceId] ?: 0) + count
+    }
+
+    fun shouldSuppressDeviceStateBroadcast(deviceId: String): Boolean {
+        val remaining = suppressedDeviceStateBroadcasts[deviceId] ?: return false
+        if (remaining <= 1) {
+            suppressedDeviceStateBroadcasts.remove(deviceId)
+        } else {
+            suppressedDeviceStateBroadcasts[deviceId] = remaining - 1
+        }
+        return true
     }
 
     fun onGroupStateChanged(device: GenericChainDevice<*>, before: DeviceState, after: DeviceState) {

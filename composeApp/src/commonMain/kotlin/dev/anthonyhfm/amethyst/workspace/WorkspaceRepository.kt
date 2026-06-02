@@ -81,7 +81,7 @@ object WorkspaceRepository {
         }
     }
 
-    val deviceRefresh: MutableSharedFlow<Unit> = MutableSharedFlow()
+    val deviceRefresh: MutableSharedFlow<Unit> = MutableSharedFlow(replay = 1)
 
     var lightsChain: Chain = Chain()
         private set
@@ -160,16 +160,19 @@ object WorkspaceRepository {
         }
     }
 
-    /**
-     * When [fromRemote] is true the change arrived via the network and must not be re-broadcast.
-     * The [WorkspaceEventBroadcaster] reads this flag to suppress the next identical emission.
-     */
-    @Volatile var isApplyingRemoteUpdate: Boolean = false
+    @Volatile var isApplyingRemoteBpmUpdate: Boolean = false
+        private set
+    @Volatile var isApplyingRemoteProjectNameUpdate: Boolean = false
+        private set
+    @Volatile var isApplyingRemoteMacrosUpdate: Boolean = false
+        private set
+    @Volatile var isApplyingRemoteGridTypeUpdate: Boolean = false
         private set
 
-    fun markRemoteUpdateConsumed() {
-        isApplyingRemoteUpdate = false
-    }
+    fun markRemoteBpmUpdateConsumed() { isApplyingRemoteBpmUpdate = false }
+    fun markRemoteProjectNameUpdateConsumed() { isApplyingRemoteProjectNameUpdate = false }
+    fun markRemoteMacrosUpdateConsumed() { isApplyingRemoteMacrosUpdate = false }
+    fun markRemoteGridTypeUpdateConsumed() { isApplyingRemoteGridTypeUpdate = false }
 
     fun setBpm(bpm: Double, fromRemote: Boolean = false, undoable: Boolean = true) {
         val before = _bpm.value
@@ -181,15 +184,15 @@ object WorkspaceRepository {
                 )
             )
         }
-        isApplyingRemoteUpdate = fromRemote
+        isApplyingRemoteBpmUpdate = fromRemote
         _bpm.update { bpm }
-        if (!fromRemote) isApplyingRemoteUpdate = false
+        if (!fromRemote) isApplyingRemoteBpmUpdate = false
     }
 
     fun setProjectName(name: String, fromRemote: Boolean = false) {
-        isApplyingRemoteUpdate = fromRemote
+        isApplyingRemoteProjectNameUpdate = fromRemote
         _projectName.update { name }
-        if (!fromRemote) isApplyingRemoteUpdate = false
+        if (!fromRemote) isApplyingRemoteProjectNameUpdate = false
     }
 
     fun updateAutoPlaySettings(showButtonPresses: Boolean, showLights: Boolean) {
@@ -204,9 +207,9 @@ object WorkspaceRepository {
     }
 
     fun setGridType(type: GridUtils.GridType, fromRemote: Boolean = false) {
-        isApplyingRemoteUpdate = fromRemote
+        isApplyingRemoteGridTypeUpdate = fromRemote
         _gridType.update { type }
-        if (!fromRemote) isApplyingRemoteUpdate = false
+        if (!fromRemote) isApplyingRemoteGridTypeUpdate = false
     }
 
     fun setMacroValue(index: Int, macro: Macro, fromRemote: Boolean = false, undoable: Boolean = true) {
@@ -227,9 +230,9 @@ object WorkspaceRepository {
                 )
             )
         }
-        isApplyingRemoteUpdate = fromRemote
+        isApplyingRemoteMacrosUpdate = fromRemote
         _macros.update { after }
-        if (!fromRemote) isApplyingRemoteUpdate = false
+        if (!fromRemote) isApplyingRemoteMacrosUpdate = false
     }
 
     /**
@@ -246,9 +249,9 @@ object WorkspaceRepository {
                 )
             )
         }
-        isApplyingRemoteUpdate = fromRemote
+        isApplyingRemoteMacrosUpdate = fromRemote
         _macros.update { macros }
-        if (!fromRemote) isApplyingRemoteUpdate = false
+        if (!fromRemote) isApplyingRemoteMacrosUpdate = false
     }
 
     /**
@@ -400,7 +403,14 @@ object WorkspaceRepository {
         recursiveResetMulti(samplingChain)
     }
 
-    fun loadWorkspace(workspaceData: SavableWorkspaceData) {
+    fun loadWorkspace(workspaceData: SavableWorkspaceData, fromRemote: Boolean = false) {
+        if (fromRemote) {
+            isApplyingRemoteBpmUpdate = true
+            isApplyingRemoteProjectNameUpdate = true
+            isApplyingRemoteMacrosUpdate = true
+            isApplyingRemoteGridTypeUpdate = true
+            TimelineRepository.isApplyingRemoteUpdate = true
+        }
         AutomappingManager.reset()
 
         // Store only metadata in memory
@@ -487,8 +497,10 @@ object WorkspaceRepository {
             workspaceData.title
         }
 
-        _mode.update {
-            WorkspaceContract.WorkspaceMode.Performance()
+        if (!fromRemote) {
+            _mode.update {
+                WorkspaceContract.WorkspaceMode.Performance()
+            }
         }
     }
 
