@@ -173,6 +173,14 @@ dependencies {
 
 nucleus.application {
     mainClass = "dev.anthonyhfm.amethyst.MainKt"
+
+    buildTypes {
+        release {
+            proguard {
+                configurationFiles.from(project.file("proguard-rules.pro"))
+            }
+        }
+    }
     
     jvmArgs += listOf(
         "--add-opens=java.base/java.lang=ALL-UNNAMED",
@@ -191,7 +199,7 @@ nucleus.application {
         packageName = "Amethyst"
         packageVersion = "1.0.0"
 
-        targetFormats(TargetFormat.Dmg, TargetFormat.Nsis, TargetFormat.Deb)
+        targetFormats(TargetFormat.Dmg, TargetFormat.Nsis, TargetFormat.Deb, TargetFormat.AppImage)
 
         includeAllModules = true
 
