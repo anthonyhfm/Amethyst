@@ -8,6 +8,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 
@@ -19,7 +21,9 @@ actual fun Modifier.rightClickable(onRightClick: (position: Offset) -> Unit): Mo
                 val event = awaitPointerEvent()
 
                 if (event.type == PointerEventType.Press &&
-                    event.buttons.isSecondaryPressed) {
+                    event.buttons.isSecondaryPressed &&
+                    !event.keyboardModifiers.isMetaPressed &&
+                    !event.keyboardModifiers.isCtrlPressed) {
                     event.changes.forEach { e -> e.consume() }
 
                     onRightClick(event.changes.first().position)
