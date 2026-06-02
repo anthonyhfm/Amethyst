@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -86,12 +87,15 @@ fun TimelineView(
             )
         }
 
+        val verticalScrollState = rememberScrollState()
+
         Row(
             modifier = Modifier
                 .fillMaxSize(),
         ) {
             TrackListView(
                 tracks = tracks,
+                verticalScrollState = verticalScrollState,
                 onTrackVolumeChange = { trackIndex, value ->
                     viewModel.setTrackBaseAutomation(trackIndex, TimelineTrackAutomationTarget.VOLUME, value)
                 },
@@ -108,6 +112,7 @@ fun TimelineView(
             TimelineLaneView(
                 modifier = Modifier.weight(1f),
                 viewModel = viewModel,
+                verticalScrollState = verticalScrollState,
                 onOpenMidiEntryAtTime = { trackIndex, timeMs ->
                     viewModel.onDoubleClickMidiTrack(trackIndex, timeMs)
                 },

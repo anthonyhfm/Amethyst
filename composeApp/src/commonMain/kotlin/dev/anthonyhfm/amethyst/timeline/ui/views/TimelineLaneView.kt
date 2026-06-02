@@ -1,10 +1,14 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +49,7 @@ import dev.anthonyhfm.amethyst.timeline.utils.computeTimelineContentWidthPx
 fun TimelineLaneView(
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel,
+    verticalScrollState: ScrollState = rememberScrollState(),
     onOpenMidiEntryAtTime: (trackIndex: Int, timeMs: Long) -> Unit = { _, _ -> },
     onCreateMidiEntry: (trackIndex: Int, startMs: Long, endMs: Long) -> Unit = { _, _, _ -> }
 ) {
@@ -128,7 +133,7 @@ fun TimelineLaneView(
                             val isZoomModifier = event.keyboardModifiers.isMetaPressed || event.keyboardModifiers.isCtrlPressed
                             if (!isZoomModifier) {
                                 val change = event.changes.firstOrNull()
-                                val deltaX = (change?.scrollDelta?.x ?: 0f) + (change?.scrollDelta?.y ?: 0f)
+                                val deltaX = change?.scrollDelta?.x ?: 0f
                                 if (deltaX != 0f) {
                                     viewModel.updateViewport { currentViewport ->
                                         val liveViewport = viewportWithTimelineMetrics(currentViewport)
@@ -218,6 +223,9 @@ fun TimelineLaneView(
         val selections by SelectionManager.selections.collectAsState()
 
         Column(
+            modifier = Modifier
+                .verticalScroll(verticalScrollState)
+                .padding(bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(timelineDimensions.laneSpacing)
         ) {
             tracks.timelineTrackRows().forEach { trackRow ->

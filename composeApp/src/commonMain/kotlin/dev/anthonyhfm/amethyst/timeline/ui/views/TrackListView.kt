@@ -3,6 +3,9 @@ package dev.anthonyhfm.amethyst.timeline.ui.views
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +37,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,6 +94,7 @@ import kotlin.math.roundToInt
 @Composable
 fun TrackListView(
     tracks: List<TimelineTrack<*>>,
+    verticalScrollState: ScrollState = rememberScrollState(),
     onTrackVolumeChange: (trackIndex: Int, value: Float) -> Unit = { _, _ -> },
     onTrackSoloToggle: (trackIndex: Int) -> Unit = {},
     onTrackMuteToggle: (trackIndex: Int) -> Unit = {},
@@ -120,7 +123,9 @@ fun TrackListView(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 6.dp),
+                .verticalScroll(verticalScrollState)
+                .padding(horizontal = 6.dp)
+                .padding(bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(timelineDimensions.laneSpacing),
         ) {
             tracks.timelineTrackRows().forEach { trackRow ->
