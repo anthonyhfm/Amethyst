@@ -23,6 +23,7 @@ import io.ktor.websocket.DefaultWebSocketSession
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -39,6 +40,9 @@ class LanConnectProvider : AmethystConnectProvider() {
     companion object {
         const val SERVER_PORT = 7842
         const val WS_PATH = "/session"
+
+        /** Backoff delays (ms) for each successive reconnect attempt (max 5 attempts). */
+        private val RECONNECT_DELAYS = longArrayOf(1_000, 2_000, 4_000, 8_000, 16_000)
     }
 
     private var server: io.ktor.server.engine.EmbeddedServer<*, *>? = null
@@ -46,11 +50,17 @@ class LanConnectProvider : AmethystConnectProvider() {
     private val connectedClients = ConcurrentHashMap<String, DefaultWebSocketSession>()
     private val sessionMutex = Mutex()
 
+    /** Maps a joining client's userId to a deferred that completes when ReadyForSync arrives. */
+    private val pendingStateSyncMap = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
+
     private val httpClient = HttpClient(CIO) {
         install(WebSockets)
     }
 
     private var clientSession: DefaultWebSocketSession? = null
+
+    /** Set to false by [leave] to distinguish intentional disconnects from accidental drops. */
+    @Volatile private var shouldReconnect = false
 
     override suspend fun host(sessionName: String, localUser: ConnectUser): Result<ConnectSession> {
         return runCatching {
@@ -84,8 +94,10 @@ class LanConnectProvider : AmethystConnectProvider() {
             val guestUser = localUser.copy(role = ConnectRole.GUEST)
             updateLocalUser(guestUser)
 
-            connectToHost(address, guestUser)
+            shouldReconnect = true
+            connectToHost(address, guestUser, attempt = 0)
 
+            // Placeholder until the host sends SessionSnapshot with the real metadata.
             val placeholderSession = ConnectSession(
                 id = "pending",
                 name = address,
@@ -101,6 +113,7 @@ class LanConnectProvider : AmethystConnectProvider() {
     }
 
     override suspend fun leave() {
+        shouldReconnect = false
         val localId = localUser.value?.id
         val isHost = localUser.value?.role == ConnectRole.HOST
 
@@ -142,9 +155,7 @@ class LanConnectProvider : AmethystConnectProvider() {
     private suspend fun sendRaw(json: String) {
         when (localUser.value?.role) {
             ConnectRole.HOST -> broadcastToClients(json, excludeId = null)
-            ConnectRole.GUEST -> {
-                clientSession?.send(Frame.Text(json))
-            }
+            ConnectRole.GUEST -> clientSession?.send(Frame.Text(json))
             null -> Unit
         }
     }
@@ -171,30 +182,41 @@ class LanConnectProvider : AmethystConnectProvider() {
             for (frame in wsSession.incoming) {
                 if (frame !is Frame.Text) continue
                 val json = frame.readText()
-
                 val event = runCatching { json.decodeToConnectEvent() }.getOrNull() ?: continue
 
-                if (event is ConnectEvent.UserJoined && clientUserId == null) {
-                    clientUserId = event.user.id
-                    sessionMutex.withLock {
-                        connectedClients[clientUserId] = wsSession
+                when {
+                    event is ConnectEvent.UserJoined && clientUserId == null -> {
+                        clientUserId = event.user.id
+                        sessionMutex.withLock { connectedClients[clientUserId] = wsSession }
+
+                        handleEvent(event)
+                        broadcastToClients(json, excludeId = clientUserId)
+
+                        val readyDeferred = CompletableDeferred<Unit>()
+                        pendingStateSyncMap[clientUserId] = readyDeferred
+
+                        scope.launch(CoroutineName("full-state-sync-$clientUserId")) {
+                            sendParticipantSnapshotTo(wsSession)
+                            sendSessionSnapshotTo(wsSession)
+                            readyDeferred.await()
+                            sendFullStateSyncTo(wsSession)
+                            pendingStateSyncMap.remove(clientUserId)
+                        }
                     }
 
-                    handleEvent(event)
-
-                    broadcastToClients(json, excludeId = clientUserId)
-
-                    scope.launch(CoroutineName("full-state-sync-$clientUserId")) {
-                        sendParticipantSnapshotTo(wsSession)
-                        sendFullStateSyncTo(wsSession)
+                    event is ConnectEvent.ReadyForSync -> {
+                        pendingStateSyncMap[event.userId]?.complete(Unit)
                     }
-                } else {
-                    handleEvent(event)
-                    broadcastToClients(json, excludeId = clientUserId)
+
+                    else -> {
+                        handleEvent(event)
+                        broadcastToClients(json, excludeId = clientUserId)
+                    }
                 }
             }
         } finally {
             val id = clientUserId ?: return
+            pendingStateSyncMap.remove(id)?.cancel()
             sessionMutex.withLock { connectedClients.remove(id) }
             val leftEvent = ConnectEvent.UserLeft(id)
             handleEvent(leftEvent)
@@ -203,14 +225,19 @@ class LanConnectProvider : AmethystConnectProvider() {
     }
 
     private suspend fun sendParticipantSnapshotTo(wsSession: DefaultWebSocketSession) {
-        session.value
-            ?.participants
-            .orEmpty()
-            .forEach { user ->
-                runCatching {
-                    wsSession.send(Frame.Text(ConnectEvent.UserJoined(user).encodeToString()))
-                }
+        session.value?.participants.orEmpty().forEach { user ->
+            runCatching {
+                wsSession.send(Frame.Text(ConnectEvent.UserJoined(user).encodeToString()))
             }
+        }
+    }
+
+    /** Sends the real session metadata so the guest can replace its placeholder session. */
+    private suspend fun sendSessionSnapshotTo(wsSession: DefaultWebSocketSession) {
+        val currentSession = session.value ?: return
+        runCatching {
+            wsSession.send(Frame.Text(ConnectEvent.SessionSnapshot(currentSession).encodeToString()))
+        }
     }
 
     private suspend fun broadcastToClients(json: String, excludeId: String?) {
@@ -224,12 +251,8 @@ class LanConnectProvider : AmethystConnectProvider() {
     }
 
     private suspend fun sendFullStateSyncTo(wsSession: DefaultWebSocketSession) {
-        delay(150)
-
         val syncEvent = buildFullStateSyncEvent() ?: return
-        runCatching {
-            wsSession.send(Frame.Text(syncEvent.encodeToString()))
-        }
+        runCatching { wsSession.send(Frame.Text(syncEvent.encodeToString())) }
     }
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -252,17 +275,15 @@ class LanConnectProvider : AmethystConnectProvider() {
         }
     }
 
-    private fun connectToHost(address: String, guestUser: ConnectUser) {
-        scope.launch(CoroutineName("lan-client")) {
+    private fun connectToHost(address: String, guestUser: ConnectUser, attempt: Int) {
+        scope.launch(CoroutineName("lan-client-attempt-$attempt")) {
             try {
-                httpClient.webSocket(
-                    host = address,
-                    port = SERVER_PORT,
-                    path = WS_PATH
-                ) {
+                httpClient.webSocket(host = address, port = SERVER_PORT, path = WS_PATH) {
                     clientSession = this
 
                     send(Frame.Text(ConnectEvent.UserJoined(guestUser).encodeToString()))
+
+                    var handshakeDone = false
 
                     try {
                         for (frame in incoming) {
@@ -270,18 +291,48 @@ class LanConnectProvider : AmethystConnectProvider() {
                             val json = frame.readText()
                             val event = runCatching { json.decodeToConnectEvent() }.getOrNull()
                                 ?: continue
-                            handleEvent(event)
+
+                            if (!handshakeDone && event is ConnectEvent.SessionSnapshot) {
+                                handshakeDone = true
+                                handleEvent(event)
+                                if (connectionState.value is ConnectionState.Reconnecting) {
+                                    updateConnectionState(ConnectionState.Connected(event.session))
+                                }
+                                send(Frame.Text(ConnectEvent.ReadyForSync(guestUser.id).encodeToString()))
+                            } else {
+                                handleEvent(event)
+                            }
                         }
                     } finally {
                         clientSession = null
                         if (connectionState.value is ConnectionState.Connected) {
-                            updateConnectionState(ConnectionState.Disconnected("Connection lost"))
+                            scheduleReconnect(address, guestUser, attempt)
                         }
                     }
                 }
             } catch (e: Exception) {
                 clientSession = null
-                updateConnectionState(ConnectionState.Error(e))
+                if (shouldReconnect) {
+                    scheduleReconnect(address, guestUser, attempt)
+                } else {
+                    updateConnectionState(ConnectionState.Error(e))
+                }
+            }
+        }
+    }
+
+    private fun scheduleReconnect(address: String, guestUser: ConnectUser, previousAttempt: Int) {
+        if (!shouldReconnect) return
+        val nextAttempt = previousAttempt + 1
+        if (nextAttempt > RECONNECT_DELAYS.size) {
+            updateConnectionState(ConnectionState.Disconnected("Could not reconnect after ${RECONNECT_DELAYS.size} attempts"))
+            return
+        }
+        updateConnectionState(ConnectionState.Reconnecting(nextAttempt))
+        scope.launch(CoroutineName("lan-reconnect-$nextAttempt")) {
+            delay(RECONNECT_DELAYS[nextAttempt - 1])
+            if (shouldReconnect) {
+                connectToHost(address, guestUser, nextAttempt)
             }
         }
     }

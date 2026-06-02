@@ -65,6 +65,17 @@ object TimelineRepository {
 
     val tracks: MutableStateFlow<List<TimelineTrack<*>>> = MutableStateFlow(emptyList())
 
+    /**
+     * Set to true before applying a remote track update so the
+     * [dev.anthonyhfm.amethyst.core.network.sync.TimelineSyncBroadcaster]
+     * can skip re-broadcasting the incoming change. Call [markRemoteUpdateConsumed] to reset.
+     */
+    @Volatile var isApplyingRemoteUpdate: Boolean = false
+
+    fun markRemoteUpdateConsumed() {
+        isApplyingRemoteUpdate = false
+    }
+
     private val _playheadPositionMs = MutableStateFlow(0L)
     val playheadPositionMs: StateFlow<Long> = _playheadPositionMs.asStateFlow()
 

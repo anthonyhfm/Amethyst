@@ -48,19 +48,14 @@ class WorkspaceEventBroadcaster(
         }
 
         jobs += scope.launch {
-            var lastSize = WorkspaceRepository.macros.value.size
             WorkspaceRepository.macros
                 .drop(1)
                 .collect { macros ->
                     if (WorkspaceRepository.isApplyingRemoteUpdate) {
                         WorkspaceRepository.markRemoteUpdateConsumed()
-                        lastSize = macros.size
                     } else {
-                        if (macros.size != lastSize) {
-                            lastSize = macros.size
-                            provider.send(ConnectEvent.MacrosChanged(macros))
-                            triggerVerification()
-                        }
+                        provider.send(ConnectEvent.MacrosChanged(macros))
+                        triggerVerification()
                     }
                 }
         }

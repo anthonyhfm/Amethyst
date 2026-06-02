@@ -4,8 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectContract.ConnectEvent
 import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectProvider
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
-import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -83,9 +82,8 @@ class DeviceSyncReceiver(
             }
             ConnectEvent.DeviceProperty.STYLE -> {
                 val element = dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.devices.firstOrNull { it.launchpadId == event.deviceId || it.selectionUUID == event.deviceId }
-                if (element is ViewportMidiFighter64) {
-                    val style = SavableWorkspaceData.SavableViewportLaunchpad.MidiFighter64.MidiFighter64Style.valueOf(event.value)
-                    element.style = style
+                if (element is LaunchpadViewportElement) {
+                    element.applyNetworkStyle(event.value)
                     WorkspaceRepository.deviceRefresh.emit(Unit)
                 }
             }

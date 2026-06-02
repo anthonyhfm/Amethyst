@@ -14,6 +14,8 @@ import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncReceiver
 import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncReceiver
+import dev.anthonyhfm.amethyst.core.network.sync.TimelineSyncBroadcaster
+import dev.anthonyhfm.amethyst.core.network.sync.TimelineSyncReceiver
 import dev.anthonyhfm.amethyst.core.network.sync.WorkspaceEventBroadcaster
 import dev.anthonyhfm.amethyst.core.network.sync.WorkspaceEventReceiver
 import dev.anthonyhfm.amethyst.core.network.sync.WorkspaceSyncCoordinator
@@ -47,6 +49,8 @@ object CollaborationManager {
     private var deviceReceiver: DeviceSyncReceiver? = null
     private var chainBroadcaster: ChainSyncBroadcaster? = null
     private var chainReceiver: ChainSyncReceiver? = null
+    private var timelineBroadcaster: TimelineSyncBroadcaster? = null
+    private var timelineReceiver: TimelineSyncReceiver? = null
 
     suspend fun startHosting(
         sessionName: String,
@@ -102,6 +106,9 @@ object CollaborationManager {
             it.start()
             ChainSyncCoordinator.attach(it)
         }
+
+        timelineReceiver = TimelineSyncReceiver(provider, scope).also { it.start() }
+        timelineBroadcaster = TimelineSyncBroadcaster(provider, scope).also { it.start() }
     }
 
     private fun stopSync() {
@@ -126,6 +133,12 @@ object CollaborationManager {
             ChainSyncCoordinator.detach(it)
         }
         chainBroadcaster = null
+
+        timelineBroadcaster?.stop()
+        timelineBroadcaster = null
+
+        timelineReceiver?.stop()
+        timelineReceiver = null
 
         CollaborationPresence.detach()
     }

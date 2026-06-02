@@ -76,6 +76,10 @@ abstract class AmethystConnectProvider {
                 _connectionState.value = ConnectionState.Disconnected()
             }
 
+            is ConnectEvent.SessionSnapshot -> {
+                _session.value = event.session
+            }
+
             else -> Unit
         }
 

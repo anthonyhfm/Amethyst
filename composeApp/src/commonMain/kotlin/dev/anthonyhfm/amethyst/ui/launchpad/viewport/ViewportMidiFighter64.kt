@@ -77,6 +77,11 @@ class ViewportMidiFighter64(
 
     override val hasStyleOptions: Boolean = true
 
+    override fun applyNetworkStyle(key: String) {
+        val styleValue = MidiFighter64Style.entries.firstOrNull { it.name == key } ?: return
+        style = styleValue
+    }
+
     @Composable
     override fun StyleConfigContent(onDismiss: () -> Unit) {
         Column(

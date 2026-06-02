@@ -37,7 +37,7 @@ class WorkspaceEventReceiver(
                     }
 
                     is ConnectEvent.MacrosChanged -> {
-                        WorkspaceRepository.syncMacrosSize(event.macros, fromRemote = true)
+                        WorkspaceRepository.setMacros(event.macros, fromRemote = true, undoable = false)
                         WorkspaceSyncCoordinator.triggerVerification()
                     }
 

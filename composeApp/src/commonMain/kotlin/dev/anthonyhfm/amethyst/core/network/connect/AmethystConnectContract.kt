@@ -231,6 +231,44 @@ object AmethystConnectContract {
             val groupIndex: Int,
             val newName: String
         ) : ConnectEvent
+
+        @Serializable
+        data class SessionSnapshot(val session: ConnectSession) : ConnectEvent
+
+        @Serializable
+        data class ReadyForSync(val userId: String) : ConnectEvent
+
+        @Serializable
+        data class TimelineTrackUpdated(
+            val trackIndex: Int,
+            val serializedTrack: ByteArray
+        ) : ConnectEvent {
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (other !is TimelineTrackUpdated) return false
+                return trackIndex == other.trackIndex && serializedTrack.contentEquals(other.serializedTrack)
+            }
+            override fun hashCode(): Int = 31 * trackIndex.hashCode() + serializedTrack.contentHashCode()
+        }
+
+        @Serializable
+        data class TimelineTrackAdded(
+            val trackIndex: Int,
+            val serializedTrack: ByteArray
+        ) : ConnectEvent {
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (other !is TimelineTrackAdded) return false
+                return trackIndex == other.trackIndex && serializedTrack.contentEquals(other.serializedTrack)
+            }
+            override fun hashCode(): Int = 31 * trackIndex.hashCode() + serializedTrack.contentHashCode()
+        }
+
+        @Serializable
+        data class TimelineTrackRemoved(val trackIndex: Int) : ConnectEvent
+
+        @Serializable
+        data class TimelineTracksReordered(val fromIndex: Int, val toIndex: Int) : ConnectEvent
     }
 
     sealed interface ConnectionState {
@@ -238,6 +276,7 @@ object AmethystConnectContract {
         data object Connecting : ConnectionState
         data class Connected(val session: ConnectSession) : ConnectionState
         data class Disconnected(val reason: String? = null) : ConnectionState
+        data class Reconnecting(val attempt: Int) : ConnectionState
         data class Error(val cause: Throwable) : ConnectionState
     }
 }

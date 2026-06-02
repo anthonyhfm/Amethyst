@@ -214,6 +214,12 @@ abstract class LaunchpadViewportElement(
 
     open val hasStyleOptions: Boolean = false
 
+    /**
+     * Called by the network layer when a remote peer changes this device's style.
+     * Subclasses with style options should override this to apply the given [key].
+     */
+    open fun applyNetworkStyle(key: String) {}
+
     @Composable
     open fun StyleConfigContent(onDismiss: () -> Unit) {}
 
