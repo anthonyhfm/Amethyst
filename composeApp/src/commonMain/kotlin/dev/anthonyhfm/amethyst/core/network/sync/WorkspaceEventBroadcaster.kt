@@ -15,6 +15,7 @@ class WorkspaceEventBroadcaster(
     private val scope: CoroutineScope
 ) {
     private val jobs = mutableListOf<Job>()
+    private var verificationJob: Job? = null
 
     fun start() {
         if (jobs.isNotEmpty()) return
@@ -27,6 +28,7 @@ class WorkspaceEventBroadcaster(
                         WorkspaceRepository.markRemoteUpdateConsumed()
                     } else {
                         provider.send(ConnectEvent.BpmChanged(bpm))
+                        triggerVerification()
                     }
                 }
         }
@@ -40,18 +42,25 @@ class WorkspaceEventBroadcaster(
                         WorkspaceRepository.markRemoteUpdateConsumed()
                     } else {
                         provider.send(ConnectEvent.ProjectNameChanged(name))
+                        triggerVerification()
                     }
                 }
         }
 
         jobs += scope.launch {
+            var lastSize = WorkspaceRepository.macros.value.size
             WorkspaceRepository.macros
                 .drop(1)
                 .collect { macros ->
                     if (WorkspaceRepository.isApplyingRemoteUpdate) {
                         WorkspaceRepository.markRemoteUpdateConsumed()
+                        lastSize = macros.size
                     } else {
-                        provider.send(ConnectEvent.MacrosChanged(macros))
+                        if (macros.size != lastSize) {
+                            lastSize = macros.size
+                            provider.send(ConnectEvent.MacrosChanged(macros))
+                            triggerVerification()
+                        }
                     }
                 }
         }
@@ -64,6 +73,7 @@ class WorkspaceEventBroadcaster(
                         WorkspaceRepository.markRemoteUpdateConsumed()
                     } else {
                         provider.send(ConnectEvent.GridTypeChanged(gridTypeToNetworkKey(gridType)))
+                        triggerVerification()
                     }
                 }
         }
@@ -72,17 +82,32 @@ class WorkspaceEventBroadcaster(
     fun stop() {
         jobs.forEach { it.cancel() }
         jobs.clear()
+        verificationJob?.cancel()
+        verificationJob = null
     }
 
     fun onBpmChanged(bpm: Double) {
         scope.launch {
             provider.send(ConnectEvent.BpmChanged(bpm))
+            triggerVerification()
         }
     }
 
     fun onMacrosChanged(macros: List<Macro>) {
         scope.launch {
             provider.send(ConnectEvent.MacrosChanged(macros))
+            triggerVerification()
+        }
+    }
+
+    fun triggerVerification() {
+        if (provider.localUser.value?.role != dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectContract.ConnectRole.HOST) return
+
+        verificationJob?.cancel()
+        verificationJob = scope.launch {
+            kotlinx.coroutines.delay(1000)
+            val hash = WorkspaceRepository.getVerificationHash()
+            provider.send(ConnectEvent.StateVerification(hash))
         }
     }
 }

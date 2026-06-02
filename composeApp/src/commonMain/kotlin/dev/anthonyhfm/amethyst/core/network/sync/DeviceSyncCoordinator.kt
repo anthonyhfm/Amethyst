@@ -30,4 +30,8 @@ object DeviceSyncCoordinator {
     fun onDeviceRotationChanged(element: LaunchpadViewportElement) {
         broadcaster?.onDeviceRotationChanged(element)
     }
+
+    fun onDeviceStyleChanged(element: LaunchpadViewportElement, styleName: String) {
+        broadcaster?.onDeviceStyleChanged(element, styleName)
+    }
 }

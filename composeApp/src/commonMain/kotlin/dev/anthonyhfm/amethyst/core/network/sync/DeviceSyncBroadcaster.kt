@@ -21,12 +21,14 @@ class DeviceSyncBroadcaster(
                     positionY = element.position.value.y
                 )
             )
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 
     fun onDeviceRemoved(deviceId: String) {
         scope.launch {
             provider.send(ConnectEvent.DeviceRemoved(deviceId))
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 
@@ -39,6 +41,7 @@ class DeviceSyncBroadcaster(
                     positionY = element.position.value.y
                 )
             )
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 
@@ -51,6 +54,20 @@ class DeviceSyncBroadcaster(
                     value = element.rotationDegrees.floatValue.toString()
                 )
             )
+            WorkspaceSyncCoordinator.triggerVerification()
+        }
+    }
+
+    fun onDeviceStyleChanged(element: LaunchpadViewportElement, styleName: String) {
+        scope.launch {
+            provider.send(
+                ConnectEvent.DevicePropertyChanged(
+                    deviceId = element.launchpadId,
+                    property = ConnectEvent.DeviceProperty.STYLE,
+                    value = styleName
+                )
+            )
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 }

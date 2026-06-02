@@ -23,20 +23,31 @@ class WorkspaceEventReceiver(
         job = scope.launch {
             provider.events.collect { event ->
                 when (event) {
-                    is ConnectEvent.BpmChanged ->
+                    is ConnectEvent.StateVerification ->
+                        handleStateVerification(event)
+
+                    is ConnectEvent.BpmChanged -> {
                         WorkspaceRepository.setBpm(event.bpm, fromRemote = true)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
 
-                    is ConnectEvent.ProjectNameChanged ->
+                    is ConnectEvent.ProjectNameChanged -> {
                         WorkspaceRepository.setProjectName(event.name, fromRemote = true)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
 
-                    is ConnectEvent.MacrosChanged ->
-                        WorkspaceRepository.setMacros(event.macros, fromRemote = true)
+                    is ConnectEvent.MacrosChanged -> {
+                        WorkspaceRepository.syncMacrosSize(event.macros, fromRemote = true)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
 
-                    is ConnectEvent.GridTypeChanged ->
+                    is ConnectEvent.GridTypeChanged -> {
                         WorkspaceRepository.setGridType(
                             gridTypeFromNetworkKey(event.gridTypeKey),
                             fromRemote = true
                         )
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
 
                     is ConnectEvent.FullStateSync ->
                         handleWorkspaceSnapshot(
@@ -68,6 +79,24 @@ class WorkspaceEventReceiver(
     fun stop() {
         job?.cancel()
         job = null
+    }
+
+    private fun handleStateVerification(event: ConnectEvent.StateVerification) {
+        val role = provider.localUser.value?.role
+        if (role == ConnectRole.HOST) return
+
+        val localHash = WorkspaceRepository.getVerificationHash()
+        if (localHash != event.expectedHash) {
+            println("Workspace state mismatch detected! Expected: ${event.expectedHash}, got: $localHash. Requesting resync.")
+            requestResync()
+        }
+    }
+
+    private fun requestResync() {
+        val userId = provider.localUser.value?.id ?: return
+        scope.launch {
+            provider.send(ConnectEvent.RequestResync(userId))
+        }
     }
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)

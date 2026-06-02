@@ -130,6 +130,9 @@ object AmethystConnectContract {
         }
 
         @Serializable
+        data class StateVerification(val expectedHash: Int) : ConnectEvent
+
+        @Serializable
         data class BpmChanged(val bpm: Double) : ConnectEvent
 
         @Serializable
@@ -168,7 +171,8 @@ object AmethystConnectContract {
 
         @Serializable
         enum class DeviceProperty {
-            ROTATION
+            ROTATION,
+            STYLE
         }
 
         @Serializable

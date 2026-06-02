@@ -95,7 +95,9 @@ object ChainSyncCoordinator {
             }
 
             is UndoableAction.WorkspaceMacrosChange -> {
-                WorkspaceSyncCoordinator.onMacrosChanged(if (isUndo) action.beforeMacros else action.afterMacros)
+                if (action.beforeMacros.size != action.afterMacros.size) {
+                    WorkspaceSyncCoordinator.onMacrosChanged(if (isUndo) action.beforeMacros else action.afterMacros)
+                }
             }
 
             else -> Unit

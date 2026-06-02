@@ -251,6 +251,22 @@ object WorkspaceRepository {
         if (!fromRemote) isApplyingRemoteUpdate = false
     }
 
+    /**
+     * Synchronizes only the addition and removal of macros from a remote update,
+     * preserving the local macro values of existing macros.
+     */
+    fun syncMacrosSize(remoteMacros: List<Macro>, fromRemote: Boolean = true) {
+        val current = _macros.value
+        if (current.size == remoteMacros.size) return
+
+        val newMacros = if (remoteMacros.size > current.size) {
+            current + remoteMacros.drop(current.size)
+        } else {
+            current.take(remoteMacros.size)
+        }
+        setMacros(newMacros, fromRemote = fromRemote, undoable = false)
+    }
+
     fun addMacro(macro: Macro) {
         setMacros(_macros.value + macro)
     }
@@ -636,6 +652,19 @@ object WorkspaceRepository {
         _projectName.update { null }
         previousMode = WorkspaceContract.WorkspaceMode.Layout()
         _gridType.update { GridUtils.GridType.Flexible.Medium }
+    }
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    fun getVerificationHash(): Int {
+        val data = saveWorkspace()
+        val hashableData = data.copy(
+            macros = data.macros.map { Macro(0) }
+        )
+        val bytes = dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf.encodeToByteArray(
+            SavableWorkspaceData.serializer(),
+            hashableData
+        )
+        return bytes.contentHashCode()
     }
 
     private fun chainContainsChain(root: Chain, target: Chain): Boolean {

@@ -4,6 +4,8 @@ import androidx.compose.ui.geometry.Offset
 import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectContract.ConnectEvent
 import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectProvider
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
+import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -20,10 +22,22 @@ class DeviceSyncReceiver(
         job = scope.launch {
             provider.events.collect { event ->
                 when (event) {
-                    is ConnectEvent.DevicePlaced -> handleDevicePlaced(event)
-                    is ConnectEvent.DeviceRemoved -> handleDeviceRemoved(event)
-                    is ConnectEvent.DeviceMoved -> handleDeviceMoved(event)
-                    is ConnectEvent.DevicePropertyChanged -> handleDevicePropertyChanged(event)
+                    is ConnectEvent.DevicePlaced -> {
+                        handleDevicePlaced(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.DeviceRemoved -> {
+                        handleDeviceRemoved(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.DeviceMoved -> {
+                        handleDeviceMoved(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.DevicePropertyChanged -> {
+                        handleDevicePropertyChanged(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
                     else -> Unit
                 }
             }
@@ -65,6 +79,14 @@ class DeviceSyncReceiver(
                         rotationDegrees = rotation,
                         fromRemote = true
                     )
+                }
+            }
+            ConnectEvent.DeviceProperty.STYLE -> {
+                val element = dev.anthonyhfm.amethyst.core.engine.heaven.Heaven.devices.firstOrNull { it.launchpadId == event.deviceId || it.selectionUUID == event.deviceId }
+                if (element is ViewportMidiFighter64) {
+                    val style = SavableWorkspaceData.SavableViewportLaunchpad.MidiFighter64.MidiFighter64Style.valueOf(event.value)
+                    element.style = style
+                    WorkspaceRepository.deviceRefresh.emit(Unit)
                 }
             }
         }

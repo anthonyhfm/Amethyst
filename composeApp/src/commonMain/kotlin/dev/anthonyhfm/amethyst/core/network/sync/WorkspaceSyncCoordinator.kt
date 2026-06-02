@@ -22,4 +22,8 @@ object WorkspaceSyncCoordinator {
     fun onMacrosChanged(macros: List<Macro>) {
         broadcaster?.onMacrosChanged(macros)
     }
+
+    fun triggerVerification() {
+        broadcaster?.triggerVerification()
+    }
 }

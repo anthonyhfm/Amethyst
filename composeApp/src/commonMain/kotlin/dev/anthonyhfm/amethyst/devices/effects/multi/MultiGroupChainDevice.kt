@@ -547,7 +547,9 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
             )
         }
 
-        preprocessChain = savedState.preprocessChain.unpack()
+        val unpackedPreprocess = savedState.preprocessChain.unpack()
+        preprocessChain.devices.value = unpackedPreprocess.devices.value
+        preprocessChain.reroute()
 
         state.update {
             it.copy(

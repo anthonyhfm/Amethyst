@@ -117,7 +117,10 @@ class ViewportMidiFighter64(
                             .height(240.dp)
                             .border(2.dp, borderColor, DefaultShape)
                             .background(cardBackground, DefaultShape)
-                            .clickable { style = styleOption }
+                            .clickable {
+                                style = styleOption
+                                dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator.onDeviceStyleChanged(this@ViewportMidiFighter64, styleOption.name)
+                            }
                             .padding(16.dp),
 
                         verticalArrangement = Arrangement.spacedBy(12.dp),

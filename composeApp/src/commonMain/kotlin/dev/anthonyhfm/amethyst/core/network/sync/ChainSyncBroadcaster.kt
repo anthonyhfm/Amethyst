@@ -48,6 +48,7 @@ class ChainSyncBroadcaster(
                             state = pending.state
                         )
                     )
+                    WorkspaceSyncCoordinator.triggerVerification()
                 }
         }
     }
@@ -69,6 +70,7 @@ class ChainSyncBroadcaster(
                     initialState = DeviceRegistry.pack(device)
                 )
             )
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 
@@ -82,6 +84,7 @@ class ChainSyncBroadcaster(
                     deviceId = deviceId
                 )
             )
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 
@@ -125,6 +128,7 @@ class ChainSyncBroadcaster(
                     )
                 )
             }
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 
@@ -153,6 +157,7 @@ class ChainSyncBroadcaster(
 
         scope.launch {
             groupEvents(chainPath, path, before, after).forEach { provider.send(it) }
+            WorkspaceSyncCoordinator.triggerVerification()
         }
     }
 

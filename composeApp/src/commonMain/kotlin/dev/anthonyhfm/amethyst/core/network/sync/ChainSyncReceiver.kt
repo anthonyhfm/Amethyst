@@ -33,14 +33,38 @@ class ChainSyncReceiver(
         job = scope.launch {
             provider.events.collect { event ->
                 when (event) {
-                    is ConnectEvent.ChainDevicePlaced -> handleDevicePlaced(event)
-                    is ConnectEvent.ChainDeviceRemoved -> handleDeviceRemoved(event)
-                    is ConnectEvent.ChainDeviceMoved -> handleDeviceMoved(event)
-                    is ConnectEvent.DeviceStateChanged -> handleStateChanged(event)
-                    is ConnectEvent.GroupCreated -> handleGroupCreated(event)
-                    is ConnectEvent.GroupRemoved -> handleGroupRemoved(event)
-                    is ConnectEvent.GroupReordered -> handleGroupReordered(event)
-                    is ConnectEvent.GroupRenamed -> handleGroupRenamed(event)
+                    is ConnectEvent.ChainDevicePlaced -> {
+                        handleDevicePlaced(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.ChainDeviceRemoved -> {
+                        handleDeviceRemoved(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.ChainDeviceMoved -> {
+                        handleDeviceMoved(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.DeviceStateChanged -> {
+                        handleStateChanged(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.GroupCreated -> {
+                        handleGroupCreated(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.GroupRemoved -> {
+                        handleGroupRemoved(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.GroupReordered -> {
+                        handleGroupReordered(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+                    is ConnectEvent.GroupRenamed -> {
+                        handleGroupRenamed(event)
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
                     else -> Unit
                 }
             }
