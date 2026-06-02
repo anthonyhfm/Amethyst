@@ -155,6 +155,9 @@ data class EditorViewportState(
  * @return A scale factor > 0; pass directly as the [scaleDelta] argument.
  */
 fun wheelZoomScaleFactor(scrollDelta: Float, sensitivity: Float = 0.7f): Float {
-    val normalized = (scrollDelta / 10f).coerceIn(-1f, 1f)
-    return (1f + normalized * sensitivity).coerceAtLeast(0.1f)
+    // Continuous exponential zoom factor.
+    // Perfectly symmetric (zoomIn(x) * zoomOut(x) = 1.0) and incredibly smooth on macOS trackpads.
+    val factor = kotlin.math.exp(scrollDelta * 0.09f * sensitivity)
+    return factor.coerceIn(0.1f, 10f)
 }
+

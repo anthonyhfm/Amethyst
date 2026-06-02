@@ -122,7 +122,7 @@ fun ProjectCreationDialog(
                             onValueChange = {
                                 viewModel.onEvent(ProjectCreationDialogContract.Event.OnChangeAuthor(it))
                             },
-                            placeholder = "anthonyhfm",
+                            placeholder = "creator",
                             modifier = Modifier.fillMaxWidth(),
                         )
                         FieldDescription("Saved as your default author. Leave it blank to fall back to “Unknown Author”.")

@@ -65,6 +65,7 @@ import dev.anthonyhfm.amethyst.timeline.migration.LegacyPianoRollPath
 import dev.anthonyhfm.amethyst.timeline.migration.PianoRollCutoverSupport
 import dev.anthonyhfm.amethyst.timeline.transforms.PianoRollTransforms
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.timeline.viewport.wheelZoomScaleFactor
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
@@ -2121,8 +2122,7 @@ private fun PianoRollEditor(
                                                 val deltaY = change?.scrollDelta?.y ?: 0f
                                                 val deltaX = change?.scrollDelta?.x ?: 0f
                                                 if (isZoomModifier && deltaY != 0f) {
-                                                    val direction = if (deltaY > 0f) -1f else 1f
-                                                    val factor = 1f + 0.1f * direction
+                                                    val factor = wheelZoomScaleFactor(-deltaY)
                                                     // cursorX is viewport-relative (no scroll subtraction needed)
                                                     val cursorX = resolveViewportRelativeCursorX(
                                                         trackedPointerX = lastPointerX,

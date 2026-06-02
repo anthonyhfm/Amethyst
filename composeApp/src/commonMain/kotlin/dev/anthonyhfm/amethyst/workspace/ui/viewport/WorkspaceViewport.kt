@@ -42,6 +42,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -136,15 +139,29 @@ fun WorkspaceViewport(
                     }
                 )
             }
-            .pointerInput("scroll") {
+            .pointerInput(viewportState.zoom) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        val scrollDelta = event.changes.firstOrNull()?.scrollDelta
-                        if (scrollDelta != null && scrollDelta.y != 0f) {
-                            val zoomDelta = -scrollDelta.y * 0.05f
-                            val mousePosition = event.changes.first().position
-                            onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, mousePosition))
+                        val change = event.changes.firstOrNull()
+                        val scrollDelta = change?.scrollDelta
+                        if (scrollDelta != null && (scrollDelta.x != 0f || scrollDelta.y != 0f)) {
+                            val isZoomModifier = event.keyboardModifiers.isMetaPressed || event.keyboardModifiers.isCtrlPressed
+                            if (isZoomModifier && scrollDelta.y != 0f) {
+                                // Zooming: smooth exponential zoom for trackpad and scroll-wheel
+                                val factor = kotlin.math.exp(-scrollDelta.y * 0.05f)
+                                val zoomDelta = viewportState.zoom * (factor - 1f)
+                                val mousePosition = change.position
+                                onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, mousePosition))
+                            } else if (!isZoomModifier) {
+                                // Panning: allow buttery smooth two-finger panning on trackpads and mouse-wheel scrolling
+                                val isHorizontalModifier = event.keyboardModifiers.isShiftPressed
+                                val panX = if (isHorizontalModifier && scrollDelta.x == 0f) scrollDelta.y else scrollDelta.x
+                                val panY = if (isHorizontalModifier) 0f else scrollDelta.y
+                                val panOffset = Offset(-panX * 15f, -panY * 15f)
+                                onEvent(WorkspaceContract.Event.OnPanViewport(panOffset))
+                            }
+                            change.consume()
                         }
                     }
                 }

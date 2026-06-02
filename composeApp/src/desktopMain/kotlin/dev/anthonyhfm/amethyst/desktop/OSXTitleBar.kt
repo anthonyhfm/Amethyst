@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.composeunstyled.theme.Theme
+import com.formdev.flatlaf.util.SystemInfo
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 
@@ -17,7 +18,7 @@ import dev.anthonyhfm.amethyst.ui.theme.colors
 fun OSXTitleBar() {
     Spacer(
         modifier = Modifier
-            .height(32.dp)
+            .height(26.dp)
             .fillMaxWidth()
             .background(Theme[colors][background])
             .zIndex(9999f)

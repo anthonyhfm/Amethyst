@@ -197,6 +197,8 @@ nucleus.application {
 
         macOS {
             iconFile.set(project.file("../icons/amethyst_macos.icns"))
+
+            macOsSdkVersion = null
         }
 
         windows {
