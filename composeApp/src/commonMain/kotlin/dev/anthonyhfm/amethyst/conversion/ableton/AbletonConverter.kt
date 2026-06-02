@@ -377,23 +377,20 @@ object AbletonConverter : AmethystConverter {
             ),
             launchpadDevices = if (layout is AbletonLayout.Single) {
                 listOf(
-                    SavableWorkspaceData.SavableViewportLaunchpad(
+                    SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
                         positionX = 0f,
-                        positionY = 0f,
-                        type = SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                        positionY = 0f
                     )
                 )
             } else {
                 listOf(
-                    SavableWorkspaceData.SavableViewportLaunchpad(
+                    SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
                         positionX = 0f,
-                        positionY = 0f,
-                        type = SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                        positionY = 0f
                     ),
-                    SavableWorkspaceData.SavableViewportLaunchpad(
+                    SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
                         positionX = 10f,
-                        positionY = 0f,
-                        type = SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
+                        positionY = 0f
                     )
                 )
             }

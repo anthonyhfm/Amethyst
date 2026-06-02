@@ -442,14 +442,14 @@ object WorkspaceRepository {
         migrateAudioEntries()
 
         Heaven.devices = workspaceData.launchpadDevices.map { savedDevice ->
-            val device = when (savedDevice.type) {
-                SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO -> ViewportLaunchpadPro()
-                SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_IDEALISED -> ViewportLaunchpadIdealised()
-                SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO_MK3 -> ViewportLaunchpadProMk3()
-                SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_X -> ViewportLaunchpadX()
-                SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_MK2 -> ViewportLaunchpadMk2()
-                SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MYSTRIX -> ViewportMystrix()
-                SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MIDIFIGHTER64 -> ViewportMidiFighter64()
+            val device = when (savedDevice) {
+                is SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro -> ViewportLaunchpadPro()
+                is SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadIdealised -> ViewportLaunchpadIdealised()
+                is SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadProMk3 -> ViewportLaunchpadProMk3()
+                is SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadX -> ViewportLaunchpadX()
+                is SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadMk2 -> ViewportLaunchpadMk2()
+                is SavableWorkspaceData.SavableViewportLaunchpad.Mystrix -> ViewportMystrix()
+                is SavableWorkspaceData.SavableViewportLaunchpad.MidiFighter64 -> ViewportMidiFighter64(initialStyle = savedDevice.style)
             }
 
             device.apply {
@@ -537,22 +537,52 @@ object WorkspaceRepository {
                 autoPlayShowLights = workspaceMeta?.settings?.autoPlayShowLights ?: true
             ),
             launchpadDevices = Heaven.devices.map { device ->
-                SavableWorkspaceData.SavableViewportLaunchpad(
-                    id = device.launchpadId,
-                    type = when (device) {
-                        is ViewportLaunchpadPro -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO
-                        is ViewportLaunchpadIdealised -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_IDEALISED
-                        is ViewportLaunchpadProMk3 -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO_MK3
-                        is ViewportLaunchpadX -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_X
-                        is ViewportLaunchpadMk2 -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_MK2
-                        is ViewportMystrix -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MYSTRIX
-                        is ViewportMidiFighter64 -> SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.MIDIFIGHTER64
-                        else -> { TODO("Could not serialize virtual launchpad element for the workspace") }
-                    },
-                    positionX = device.position.value.x,
-                    positionY = device.position.value.y,
-                    rotationDegrees = device.rotationDegrees.floatValue
-                )
+                when (device) {
+                    is ViewportLaunchpadPro -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
+                        id = device.launchpadId,
+                        positionX = device.position.value.x,
+                        positionY = device.position.value.y,
+                        rotationDegrees = device.rotationDegrees.floatValue
+                    )
+                    is ViewportLaunchpadIdealised -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadIdealised(
+                        id = device.launchpadId,
+                        positionX = device.position.value.x,
+                        positionY = device.position.value.y,
+                        rotationDegrees = device.rotationDegrees.floatValue
+                    )
+                    is ViewportLaunchpadProMk3 -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadProMk3(
+                        id = device.launchpadId,
+                        positionX = device.position.value.x,
+                        positionY = device.position.value.y,
+                        rotationDegrees = device.rotationDegrees.floatValue
+                    )
+                    is ViewportLaunchpadX -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadX(
+                        id = device.launchpadId,
+                        positionX = device.position.value.x,
+                        positionY = device.position.value.y,
+                        rotationDegrees = device.rotationDegrees.floatValue
+                    )
+                    is ViewportLaunchpadMk2 -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadMk2(
+                        id = device.launchpadId,
+                        positionX = device.position.value.x,
+                        positionY = device.position.value.y,
+                        rotationDegrees = device.rotationDegrees.floatValue
+                    )
+                    is ViewportMystrix -> SavableWorkspaceData.SavableViewportLaunchpad.Mystrix(
+                        id = device.launchpadId,
+                        positionX = device.position.value.x,
+                        positionY = device.position.value.y,
+                        rotationDegrees = device.rotationDegrees.floatValue
+                    )
+                    is ViewportMidiFighter64 -> SavableWorkspaceData.SavableViewportLaunchpad.MidiFighter64(
+                        id = device.launchpadId,
+                        positionX = device.position.value.x,
+                        positionY = device.position.value.y,
+                        rotationDegrees = device.rotationDegrees.floatValue,
+                        style = device.style
+                    )
+                    else -> { TODO("Could not serialize virtual launchpad element for the workspace") }
+                }
             },
             audioSources = AudioSourceLibrary.all(),
         )

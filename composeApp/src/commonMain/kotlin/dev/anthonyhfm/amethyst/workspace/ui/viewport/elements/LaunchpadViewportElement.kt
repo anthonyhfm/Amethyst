@@ -146,13 +146,15 @@ abstract class LaunchpadViewportElement(
             backgroundHoverColor = actionButtonBgHover,
         )
 
-        /*LaunchpadActionButton(
-            onClick = { styleDialogState.visible = true },
-            icon = Lucide.Palette,
-            contentDescription = "Style",
-            backgroundColor = actionButtonBg,
-            backgroundHoverColor = actionButtonBgHover,
-        )*/
+        if (hasStyleOptions) {
+            LaunchpadActionButton(
+                onClick = { styleDialogState.visible = true },
+                icon = Lucide.Palette,
+                contentDescription = "Style",
+                backgroundColor = actionButtonBg,
+                backgroundHoverColor = actionButtonBgHover,
+            )
+        }
 
         LaunchpadActionButton(
             onClick = {
@@ -178,6 +180,7 @@ abstract class LaunchpadViewportElement(
                 DialogHeader {
                     DialogTitle("Style")
                 }
+                StyleConfigContent(onDismiss = { styleDialogState.visible = false })
             }
         }
 
@@ -208,6 +211,11 @@ abstract class LaunchpadViewportElement(
             }
         }
     }
+
+    open val hasStyleOptions: Boolean = false
+
+    @Composable
+    open fun StyleConfigContent(onDismiss: () -> Unit) {}
 
     @Composable
     abstract override fun Content()

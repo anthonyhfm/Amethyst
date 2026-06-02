@@ -147,10 +147,9 @@ object HomeRepository {
                 title = name.trim(),
                 author = normalizeAuthor(author),
                 launchpadDevices = listOf(
-                    SavableWorkspaceData.SavableViewportLaunchpad(
+                    SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
                         positionX = 0f,
-                        positionY = 0f,
-                        type = SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType.LAUNCHPAD_PRO,
+                        positionY = 0f
                     )
                 )
             )
