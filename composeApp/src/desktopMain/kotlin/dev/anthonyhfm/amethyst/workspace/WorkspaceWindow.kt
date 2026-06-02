@@ -14,6 +14,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
@@ -24,6 +28,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
@@ -72,10 +77,16 @@ fun WorkspaceWindow(
         },
         onPreviewKeyEvent = {
             val mode = WorkspaceRepository.mode.value
-            if (mode is WorkspaceContract.WorkspaceMode.Timeline || mode is PianoRollWorkspaceMode) {
-                mode.onKeyEvent(it)
-            } else {
-                false
+            when {
+                mode is WorkspaceContract.WorkspaceMode.Timeline || mode is PianoRollWorkspaceMode -> {
+                    mode.onKeyEvent(it)
+                }
+
+                mode is KeyframesWorkspaceMode && (it.key == Key.Escape || ((it.isCtrlPressed || it.isMetaPressed) && it.key == Key.W)) -> {
+                    mode.onKeyEvent(it)
+                }
+
+                else -> false
             }
         },
         icon = when (DesktopPlatform.get()) {

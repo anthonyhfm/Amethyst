@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.RepeatsCo
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
@@ -263,13 +264,13 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 }
 
                 Key.Escape -> {
-                    modeClose?.invoke()
+                    requestClose()
                     return true
                 }
 
                 Key.W -> {
                     if (event.isCtrlPressed || event.isMetaPressed) {
-                        modeClose?.invoke()
+                        requestClose()
                         return true
                     }
                 }
@@ -306,5 +307,10 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     fun close() {
         modeClose?.invoke()
+    }
+
+    private fun requestClose() {
+        modeClose?.invoke()
+        WorkspaceRepository.switchToPreviousMode()
     }
 }

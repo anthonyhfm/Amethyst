@@ -224,7 +224,7 @@ object ShortcutManager {
 
         // Escape — clear selection (fallback, only if something is selected)
         if (keyEvent.key == Key.Escape) {
-            if (SelectionManager.selections.value.isNotEmpty()) {
+            if (WorkspaceRepository.mode.value.selectable && SelectionManager.selections.value.isNotEmpty()) {
                 SelectionManager.clear()
                 return true
             }
