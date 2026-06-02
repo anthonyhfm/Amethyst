@@ -3,7 +3,10 @@ package dev.anthonyhfm.amethyst.home
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +24,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
-import dev.anthonyhfm.amethyst.home.ui.layout.AdaptiveNavigationLayout
 import dev.anthonyhfm.amethyst.home.ui.views.AbletonImportWizard
 import dev.anthonyhfm.amethyst.home.ui.views.AboutView
 import dev.anthonyhfm.amethyst.home.ui.views.BrowserView
@@ -39,6 +41,9 @@ import dev.anthonyhfm.amethyst.core.util.displayString
 import dev.anthonyhfm.amethyst.home.ui.views.UpdateView
 import io.github.kdroidfilter.nucleus.updater.UpdateResult
 import androidx.compose.runtime.LaunchedEffect
+import dev.anthonyhfm.amethyst.home.ui.components.WidescreenNavBar
+import dev.anthonyhfm.amethyst.ui.components.primitives.SidebarProvider
+import dev.anthonyhfm.amethyst.ui.components.primitives.rememberSidebarState
 
 @Composable
 actual fun Home(
@@ -69,112 +74,120 @@ actual fun Home(
             .fillMaxWidth()
             .background(Theme[colors][background])
     ) {
-        useWidescreenLayout = maxWidth > 700.dp
+        val sidebarState = rememberSidebarState(initialOpen = true)
 
-        AdaptiveNavigationLayout(
-            navigator = navigator,
-            isWidescreen = useWidescreenLayout,
+        SidebarProvider(
+            state = sidebarState,
+            modifier = Modifier.fillMaxSize(),
         ) {
-            NavHost(
-                navController = navigator,
-                startDestination = HomeNavRoute.Recent,
-                enterTransition = { EnterTransition.None },
-                exitTransition = { ExitTransition.None },
+            WidescreenNavBar(navigator)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
             ) {
-                composable<HomeNavRoute.Recent> {
-                    RecentView(
-                        navigator = navigator,
-                        onOpenWorkspace = {
-                            onOpenWorkspace()
-                        },
-                    )
-                }
-
-                composable<HomeNavRoute.Browser> {
-                    BrowserView()
-                }
-
-                composable<HomeNavRoute.Settings> {
-                    SettingsView()
-                }
-
-                composable<HomeNavRoute.About> {
-                    AboutView()
-                }
-
-                dialog<HomeNavRoute.ProjectCreation>(
-                    dialogProperties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                    )
+                NavHost(
+                    navController = navigator,
+                    startDestination = HomeNavRoute.Recent,
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
                 ) {
-                    ProjectCreationDialog(
-                        navigator = navigator,
-                        openWorkspace = {
-                            onOpenWorkspace()
-                        }
-                    )
-                }
+                    composable<HomeNavRoute.Recent> {
+                        RecentView(
+                            navigator = navigator,
+                            onOpenWorkspace = {
+                                onOpenWorkspace()
+                            },
+                        )
+                    }
 
-                dialog<HomeNavRoute.ProjectEdit>(
-                    dialogProperties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                    )
-                ) {
-                    val route = it.toRoute<HomeNavRoute.ProjectEdit>()
-                    
-                    ProjectCreationDialog(
-                        navigator = navigator,
-                        openWorkspace = {
-                            navigator.popBackStack()
-                        },
-                        projectPath = route.projectPath
-                    )
-                }
+                    composable<HomeNavRoute.Browser> {
+                        BrowserView()
+                    }
 
-                dialog<HomeNavRoute.AbletonImportWizard>(
-                    dialogProperties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                    )
-                ) {
-                    val route = it.toRoute<HomeNavRoute.AbletonImportWizard>()
+                    composable<HomeNavRoute.Settings> {
+                        SettingsView()
+                    }
 
-                    AbletonImportWizard(
-                        path = route.liveSetPath,
-                        navigator = navigator,
-                        onOpenWorkspace = {
-                            onOpenWorkspace()
-                        },
-                        onCancel = {
-                            navigator.popBackStack()
-                        }
-                    )
-                }
+                    composable<HomeNavRoute.About> {
+                        AboutView()
+                    }
 
-                dialog<HomeNavRoute.LoadingScreen>(
-                    dialogProperties = DialogProperties(
-                        dismissOnBackPress = false,
-                        dismissOnClickOutside = false,
-                        usePlatformDefaultWidth = false,
-                    )
-                ) {
-                    LoadingScreenView(it.toRoute<HomeNavRoute.LoadingScreen>().text)
-                }
+                    dialog<HomeNavRoute.ProjectCreation>(
+                        dialogProperties = DialogProperties(
+                            usePlatformDefaultWidth = false,
+                        )
+                    ) {
+                        ProjectCreationDialog(
+                            navigator = navigator,
+                            openWorkspace = {
+                                onOpenWorkspace()
+                            }
+                        )
+                    }
 
-                dialog<HomeNavRoute.UpdatePrompt>(
-                    dialogProperties = DialogProperties(
-                        dismissOnBackPress = false,
-                        dismissOnClickOutside = false,
-                        usePlatformDefaultWidth = false,
-                    )
-                ) {
-                    val route = it.toRoute<HomeNavRoute.UpdatePrompt>()
+                    dialog<HomeNavRoute.ProjectEdit>(
+                        dialogProperties = DialogProperties(
+                            usePlatformDefaultWidth = false,
+                        )
+                    ) {
+                        val route = it.toRoute<HomeNavRoute.ProjectEdit>()
 
-                    UpdateView(
-                        version = route.version,
-                        updater = updater,
-                        updateResult = updateResult,
-                        onDismiss = { navigator.popBackStack() }
-                    )
+                        ProjectCreationDialog(
+                            navigator = navigator,
+                            openWorkspace = {
+                                navigator.popBackStack()
+                            },
+                            projectPath = route.projectPath
+                        )
+                    }
+
+                    dialog<HomeNavRoute.AbletonImportWizard>(
+                        dialogProperties = DialogProperties(
+                            usePlatformDefaultWidth = false,
+                        )
+                    ) {
+                        val route = it.toRoute<HomeNavRoute.AbletonImportWizard>()
+
+                        AbletonImportWizard(
+                            path = route.liveSetPath,
+                            navigator = navigator,
+                            onOpenWorkspace = {
+                                onOpenWorkspace()
+                            },
+                            onCancel = {
+                                navigator.popBackStack()
+                            }
+                        )
+                    }
+
+                    dialog<HomeNavRoute.LoadingScreen>(
+                        dialogProperties = DialogProperties(
+                            dismissOnBackPress = false,
+                            dismissOnClickOutside = false,
+                            usePlatformDefaultWidth = false,
+                        )
+                    ) {
+                        LoadingScreenView(it.toRoute<HomeNavRoute.LoadingScreen>().text)
+                    }
+
+                    dialog<HomeNavRoute.UpdatePrompt>(
+                        dialogProperties = DialogProperties(
+                            dismissOnBackPress = false,
+                            dismissOnClickOutside = false,
+                            usePlatformDefaultWidth = false,
+                        )
+                    ) {
+                        val route = it.toRoute<HomeNavRoute.UpdatePrompt>()
+
+                        UpdateView(
+                            version = route.version,
+                            updater = updater,
+                            updateResult = updateResult,
+                            onDismiss = { navigator.popBackStack() }
+                        )
+                    }
                 }
             }
         }

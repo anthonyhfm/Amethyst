@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package dev.anthonyhfm.amethyst.workspace.data
 
 import dev.anthonyhfm.amethyst.core.util.Version
@@ -7,6 +9,7 @@ import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -62,71 +65,71 @@ data class SavableWorkspaceData(
 
         @Serializable
         data class LaunchpadPro(
-            override val positionX: Float,
-            override val positionY: Float,
-            override val id: String = UUID.randomUUID(),
-            override val rotationDegrees: Float = 0f,
+            @ProtoNumber(1) override val positionX: Float,
+            @ProtoNumber(2) override val positionY: Float,
+            @ProtoNumber(3) override val id: String = UUID.randomUUID(),
+            @ProtoNumber(4) override val rotationDegrees: Float = 0f,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_PRO
         }
 
         @Serializable
         data class LaunchpadProMk3(
-            override val positionX: Float,
-            override val positionY: Float,
-            override val id: String = UUID.randomUUID(),
-            override val rotationDegrees: Float = 0f,
+            @ProtoNumber(1) override val positionX: Float,
+            @ProtoNumber(2) override val positionY: Float,
+            @ProtoNumber(3) override val id: String = UUID.randomUUID(),
+            @ProtoNumber(4) override val rotationDegrees: Float = 0f,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_PRO_MK3
         }
 
         @Serializable
         data class LaunchpadX(
-            override val positionX: Float,
-            override val positionY: Float,
-            override val id: String = UUID.randomUUID(),
-            override val rotationDegrees: Float = 0f,
+            @ProtoNumber(1) override val positionX: Float,
+            @ProtoNumber(2) override val positionY: Float,
+            @ProtoNumber(3) override val id: String = UUID.randomUUID(),
+            @ProtoNumber(4) override val rotationDegrees: Float = 0f,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_X
         }
 
         @Serializable
         data class LaunchpadIdealised(
-            override val positionX: Float,
-            override val positionY: Float,
-            override val id: String = UUID.randomUUID(),
-            override val rotationDegrees: Float = 0f,
+            @ProtoNumber(1) override val positionX: Float,
+            @ProtoNumber(2) override val positionY: Float,
+            @ProtoNumber(3) override val id: String = UUID.randomUUID(),
+            @ProtoNumber(4) override val rotationDegrees: Float = 0f,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_IDEALISED
         }
 
         @Serializable
         data class LaunchpadMk2(
-            override val positionX: Float,
-            override val positionY: Float,
-            override val id: String = UUID.randomUUID(),
-            override val rotationDegrees: Float = 0f,
+            @ProtoNumber(1) override val positionX: Float,
+            @ProtoNumber(2) override val positionY: Float,
+            @ProtoNumber(3) override val id: String = UUID.randomUUID(),
+            @ProtoNumber(4) override val rotationDegrees: Float = 0f,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_MK2
         }
 
         @Serializable
         data class Mystrix(
-            override val positionX: Float,
-            override val positionY: Float,
-            override val id: String = UUID.randomUUID(),
-            override val rotationDegrees: Float = 0f,
+            @ProtoNumber(1) override val positionX: Float,
+            @ProtoNumber(2) override val positionY: Float,
+            @ProtoNumber(3) override val id: String = UUID.randomUUID(),
+            @ProtoNumber(4) override val rotationDegrees: Float = 0f,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.MYSTRIX
         }
 
         @Serializable
         data class MidiFighter64(
-            override val positionX: Float,
-            override val positionY: Float,
-            override val id: String = UUID.randomUUID(),
-            override val rotationDegrees: Float = 0f,
-            val style: MidiFighter64Style = MidiFighter64Style.Black,
+            @ProtoNumber(1) override val positionX: Float,
+            @ProtoNumber(2) override val positionY: Float,
+            @ProtoNumber(3) override val id: String = UUID.randomUUID(),
+            @ProtoNumber(4) override val rotationDegrees: Float = 0f,
+            @ProtoNumber(5) val style: MidiFighter64Style = MidiFighter64Style.Black,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.MIDIFIGHTER64
 
