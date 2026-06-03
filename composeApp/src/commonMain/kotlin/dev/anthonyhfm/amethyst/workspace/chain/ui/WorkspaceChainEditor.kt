@@ -54,6 +54,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollAreaState
+import dev.anthonyhfm.amethyst.ui.components.primitives.rememberScrollAreaState
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollBarOrientation
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.chainBorder
@@ -68,6 +70,7 @@ import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
 @Composable
 fun WorkspaceChainEditor(
     devices: List<GenericChainDevice<*>>,
+    scrollState: ScrollAreaState = rememberScrollAreaState(),
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
     val density = LocalDensity.current.density
@@ -107,6 +110,7 @@ fun WorkspaceChainEditor(
                 .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape)
                 .padding(bottom = 10.dp),
             orientation = ScrollBarOrientation.Horizontal,
+            state = scrollState,
         ) {
             Row(
                 modifier = Modifier.padding(top = 12.dp, end = 12.dp, bottom = 12.dp),

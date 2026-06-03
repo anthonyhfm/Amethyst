@@ -42,6 +42,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.components.ActivityToastOverlay
 import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
+import dev.anthonyhfm.amethyst.ui.components.primitives.rememberScrollAreaState
 
 @Composable
 fun Workspace(onBack: () -> Unit = {}) {
@@ -49,6 +50,9 @@ fun Workspace(onBack: () -> Unit = {}) {
 
     val state by viewModel.state.collectAsState()
     val activityToasts by CollaborationPresence.activityToasts.collectAsState()
+
+    val lightsChainScrollState = rememberScrollAreaState()
+    val samplingChainScrollState = rememberScrollAreaState()
 
     Scaffold(
         modifier = Modifier
@@ -144,6 +148,7 @@ fun Workspace(onBack: () -> Unit = {}) {
             ) {
                 WorkspaceChainEditor(
                     devices = WorkspaceRepository.lightsChain.devices.value,
+                    scrollState = lightsChainScrollState,
                     onEvent = { viewModel.onEvent(it) }
                 )
             }
@@ -157,6 +162,7 @@ fun Workspace(onBack: () -> Unit = {}) {
             ) {
                 WorkspaceChainEditor(
                     devices = WorkspaceRepository.samplingChain.devices.value,
+                    scrollState = samplingChainScrollState,
                     onEvent = { viewModel.onEvent(it) }
                 )
             }

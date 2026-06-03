@@ -23,11 +23,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -46,37 +49,65 @@ import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+/**
+ * A [BringIntoViewSpec] that never scrolls in response to focus/bring-into-view requests.
+ * Prevents unwanted scroll shifts when clicking interactive children inside a ScrollArea.
+ */
+private object NoBringIntoViewSpec : androidx.compose.foundation.gestures.BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float = 0f
+}
+
 enum class ScrollBarOrientation {
     Vertical,
     Horizontal,
+}
+
+@Stable
+class ScrollAreaState(initialValue: Int = 0) {
+    var scrollValue by mutableIntStateOf(initialValue)
+    var maxScrollValue by mutableIntStateOf(0)
+
+    var scrollAccumulator: Float = 0f
+
+    val scrollableState = ScrollableState { delta ->
+        scrollAccumulator += delta
+        val intDelta = scrollAccumulator.roundToInt()
+        scrollAccumulator -= intDelta.toFloat()
+
+        val newValue = (scrollValue + intDelta).coerceIn(0, maxScrollValue)
+        val consumed = newValue - scrollValue
+        scrollValue = newValue
+        consumed.toFloat()
+    }
+
+    companion object {
+        val Saver: Saver<ScrollAreaState, Int> = Saver(
+            save = { it.scrollValue },
+            restore = { ScrollAreaState(it) }
+        )
+    }
+}
+
+@Composable
+fun rememberScrollAreaState(initialValue: Int = 0): ScrollAreaState {
+    return rememberSaveable(saver = ScrollAreaState.Saver) {
+        ScrollAreaState(initialValue)
+    }
 }
 
 @Composable
 fun ScrollArea(
     modifier: Modifier = Modifier,
     orientation: ScrollBarOrientation = ScrollBarOrientation.Vertical,
+    state: ScrollAreaState = rememberScrollAreaState(),
     content: @Composable BoxScope.() -> Unit,
 ) {
     val areaInteractionSource = remember { MutableInteractionSource() }
     val areaHovered by areaInteractionSource.collectIsHoveredAsState()
 
-    var scrollValue by remember { mutableIntStateOf(0) }
-    var maxScrollValue by remember { mutableIntStateOf(0) }
-
-    // Use ScrollableState directly — unlike horizontalScroll/verticalScroll, Modifier.scrollable()
-    // does not attach a BringIntoViewResponder, so clicking focusable children won't move the view.
-    val scrollableState = remember {
-        ScrollableState { delta ->
-            val newValue = (scrollValue + delta.toInt()).coerceIn(0, maxScrollValue)
-            val consumed = newValue - scrollValue
-            scrollValue = newValue
-            consumed.toFloat()
-        }
-    }
-
     var isScrolling by remember { mutableStateOf(false) }
-    LaunchedEffect(scrollableState.isScrollInProgress) {
-        if (scrollableState.isScrollInProgress) {
+    LaunchedEffect(state.scrollableState.isScrollInProgress) {
+        if (state.scrollableState.isScrollInProgress) {
             isScrolling = true
         } else {
             delay(1200L)
@@ -85,9 +116,9 @@ fun ScrollArea(
     }
 
     // Clamp scroll position when content shrinks
-    LaunchedEffect(maxScrollValue) {
-        if (scrollValue > maxScrollValue) {
-            scrollValue = maxScrollValue
+    LaunchedEffect(state.maxScrollValue) {
+        if (state.scrollValue > state.maxScrollValue) {
+            state.scrollValue = state.maxScrollValue
         }
     }
 
@@ -109,10 +140,12 @@ fun ScrollArea(
             modifier = Modifier
                 .fillMaxSize()
                 .scrollable(
-                    state = scrollableState,
+                    state = state.scrollableState,
                     orientation = scrollOrientation,
+                    overscrollEffect = null,
                     reverseDirection = reverseDirection,
                     flingBehavior = flingBehavior,
+                    bringIntoViewSpec = NoBringIntoViewSpec,
                 )
                 .layout { measurable, constraints ->
                     val childConstraints = when (orientation) {
@@ -129,7 +162,7 @@ fun ScrollArea(
                         ScrollBarOrientation.Horizontal -> placeable.width
                     }
                     val newMax = (contentSize - viewportSize).coerceAtLeast(0)
-                    if (maxScrollValue != newMax) maxScrollValue = newMax
+                    if (state.maxScrollValue != newMax) state.maxScrollValue = newMax
 
                     layout(
                         width = when (orientation) {
@@ -141,7 +174,7 @@ fun ScrollArea(
                             ScrollBarOrientation.Horizontal -> placeable.height
                         }
                     ) {
-                        val offset = scrollValue.coerceIn(0, newMax)
+                        val offset = state.scrollValue.coerceIn(0, newMax)
                         when (orientation) {
                             ScrollBarOrientation.Vertical -> placeable.place(0, -offset)
                             ScrollBarOrientation.Horizontal -> placeable.place(-offset, 0)
@@ -157,9 +190,9 @@ fun ScrollArea(
         }
 
         ScrollBar(
-            scrollValue = scrollValue,
-            maxScrollValue = maxScrollValue,
-            onScrollTo = { scrollValue = it.coerceIn(0, maxScrollValue) },
+            scrollValue = state.scrollValue,
+            maxScrollValue = state.maxScrollValue,
+            onScrollTo = { state.scrollValue = it.coerceIn(0, state.maxScrollValue) },
             orientation = orientation,
             visible = visible,
             modifier = Modifier.align(alignment),
