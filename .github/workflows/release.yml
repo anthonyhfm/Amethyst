@@ -67,7 +67,7 @@ jobs:
           repository: ${{ secrets.ML_GRAPHICS_REPOSITORY }}
           token: ${{ secrets.ML_GRAPHICS_TOKEN }}
           path: ml3-graphics
-          sparse-checkout: devices
+          sparse-checkout: launchpad
 
       - name: Copy ML Graphics
         shell: bash
