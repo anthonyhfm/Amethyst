@@ -99,6 +99,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -126,8 +129,8 @@ import com.composables.icons.lucide.RotateCw
 import com.composables.icons.lucide.Snail
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PinchGraph
 
-private fun currentCellDurationMs(currentResolution: GridResolution, bpm: Double): Long =
-    ((60000.0 / bpm).toLong() / currentResolution.snapDivisionsPerBeat).coerceAtLeast(1L)
+private fun currentCellDurationMs(currentResolution: GridResolution): Long =
+    (MS_PER_BEAT / currentResolution.snapDivisionsPerBeat).coerceAtLeast(1L)
 
 class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     override val displayName: String = "Piano Roll"
@@ -1430,6 +1433,25 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     }
                 }
 
+                Key.One -> {
+                    if (event.isMetaPressed || event.isCtrlPressed) {
+                        val currentOrdinal = gridResolution.ordinal
+                        val nextOrdinal = (currentOrdinal + 1).coerceAtMost(GridResolution.entries.size - 1)
+                        gridResolution = GridResolution.entries[nextOrdinal]
+                        gridResolutionLocked = true
+                        return true
+                    }
+                }
+                Key.Two -> {
+                    if (event.isMetaPressed || event.isCtrlPressed) {
+                        val currentOrdinal = gridResolution.ordinal
+                        val prevOrdinal = (currentOrdinal - 1).coerceAtLeast(0)
+                        gridResolution = GridResolution.entries[prevOrdinal]
+                        gridResolutionLocked = true
+                        return true
+                    }
+                }
+
                 Key.W -> {
                     if (event.isCtrlPressed || event.isMetaPressed) {
                         modeClose?.invoke()
@@ -1819,6 +1841,8 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
         return false
     }
 
+    private val midiFeedbackScope = CoroutineScope(Dispatchers.Default)
+
     override fun onMidiInput(data: MidiInputData, offset: Offset): () -> Unit = {
         val deviceIndex = Heaven.devices.indexOfFirst { 
             val expectedOffset = it.position.value.copy(
@@ -1839,6 +1863,21 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
                 } else {
                     this.remove(key)
                 }
+            }
+        }
+
+        if (deviceIndex >= 0) {
+            val colorToShow = if (gradientMode && workingGradient != null) Color.White else selectedColor
+            val signalColor = if (isPressed) colorToShow else Color.Transparent
+            val signal = Signal.LED(
+                origin = this,
+                x = data.pitch % 10,
+                y = data.pitch / 10,
+                color = signalColor,
+                layer = 100000 // high layer to override default rendering
+            )
+            midiFeedbackScope.launch {
+                Heaven.devices.getOrNull(deviceIndex)?.screen?.midiEnter(signal)
             }
         }
     }
@@ -1886,7 +1925,7 @@ private fun PianoRollEditor(
     )
 
     val launchpadCount = launchpads.size.coerceAtLeast(1)
-    val totalPitches = launchpadCount * 100
+    val totalPitches = 100
 
     val noteHeightDp: Dp = 22.dp
     // Derive effective pixels-per-beat from the viewport's horizontal zoom.
@@ -1896,9 +1935,10 @@ private fun PianoRollEditor(
 
     val clipBeats = entry.durationMs.toFloat() / MS_PER_BEAT.toFloat()
 
-    // Extend the visible time range 25% (or at least 2 s) on each side of the clip
-    val oobOverhangMs = (entry.durationMs * 0.25).toLong().coerceAtLeast(2000L)
-    val totalBeatsWithOverhang = (entry.durationMs + 2 * oobOverhangMs).toFloat() / MS_PER_BEAT.toFloat()
+    // Extend the visible time range 25% (or at least 2 s) past the clip, but not before it
+    val oobOverhangMs = 0L
+    val oobOverhangRightMs = (entry.durationMs * 0.25).toLong().coerceAtLeast(2000L)
+    val totalBeatsWithOverhang = (entry.durationMs + oobOverhangRightMs).toFloat() / MS_PER_BEAT.toFloat()
 
     val metrics = remember(totalPitches, density, gridResolution, effectivePixelsPerBeatDp, oobOverhangMs) {
         PianoRollMetrics(totalPitches, noteHeightDp, effectivePixelsPerBeatDp, density, gridResolution, oobOffsetMs = oobOverhangMs)
@@ -1949,11 +1989,8 @@ private fun PianoRollEditor(
     var viewportWidthPx by remember { mutableStateOf(0) }
     var lastPointerX by remember { mutableStateOf<Float?>(null) }
 
-    fun snapSelectedTimeMs(timeMs: Long, currentResolution: GridResolution, bpm: Double): Long {
-        val gridIntervalMs = currentCellDurationMs(
-            currentResolution = currentResolution,
-            bpm = bpm,
-        )
+    fun snapSelectedTimeMs(timeMs: Long, currentResolution: GridResolution): Long {
+        val gridIntervalMs = currentCellDurationMs(currentResolution)
         return ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
     }
 
@@ -1990,16 +2027,11 @@ private fun PianoRollEditor(
             onTap = { offset ->
                 // offset.x is screen-space since we tap the viewport directly
                 val contentX = viewport.screenToContentX(offset.x)
-                val timeMs = snapClipTimeToGrid(
-                    viewport.contentXToClipTimeMs(contentX, oobOverhangMs),
-                    gridResolution,
+                val timeMs = snapSelectedTimeMs(
+                    viewport.contentXToClipTimeMs(contentX, oobOverhangMs).toLong(),
+                    gridResolution
                 )
-                val snappedTimeMs = snapSelectedTimeMs(
-                    timeMs = timeMs,
-                    currentResolution = gridResolution,
-                    bpm = currentBpm(),
-                )
-                onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
+                onSelectedTimeMsChange(timeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
             }
         )
 
@@ -2217,9 +2249,8 @@ private fun PianoRollEditor(
                                                                  latestGridResolution,
                                                              )
                                                             val snappedTimeMs = snapSelectedTimeMs(
-                                                                timeMs = timeMs,
-                                                                currentResolution = latestGridResolution,
-                                                                bpm = latestCurrentBpm(),
+                                                                timeMs,
+                                                                latestGridResolution
                                                             )
                                                             onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
                                                         }
@@ -2250,8 +2281,7 @@ private fun PianoRollEditor(
                                                     }
 
                                                     val cellDurationMs = currentCellDurationMs(
-                                                        currentResolution = latestGridResolution,
-                                                        bpm = latestCurrentBpm(),
+                                                        currentResolution = latestGridResolution
                                                     )
                                                     val anchorCellStartMs = floorClipTimeToGrid(
                                                          latestViewport.screenXToClipTimeMs(down.position.x, latestOobOverhangMs),

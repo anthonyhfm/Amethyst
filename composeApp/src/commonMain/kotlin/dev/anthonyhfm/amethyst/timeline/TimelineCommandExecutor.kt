@@ -525,7 +525,7 @@ object TimelineCommandExecutor {
     ): TimelineCommandResult {
         val track = TimelineRepository.tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return TimelineCommandResult()
         val existing = track.entries[entryStartTime] ?: return TimelineCommandResult()
-        val updatedEntry = normalizeMidiEntry(transform(existing))
+        val updatedEntry = transform(existing)
         if (updatedEntry == existing) return TimelineCommandResult()
 
         val before = track.entries.sortedMidiEntriesCopy()
@@ -534,16 +534,6 @@ object TimelineCommandExecutor {
         }.sortedMidiEntriesCopy()
 
         return TimelineCommandResult(didChange = applyMidiChange(trackIndex, before, after))
-    }
-
-    private fun normalizeMidiEntry(entry: MidiEntry): MidiEntry {
-        val maxNoteEnd = entry.notes.maxOfOrNull(MidiNote::endTimeMs) ?: entry.durationMs
-        val normalizedDuration = maxOf(entry.durationMs, maxNoteEnd)
-        return if (normalizedDuration == entry.durationMs) {
-            entry
-        } else {
-            entry.copy(durationMs = normalizedDuration)
-        }
     }
 
     private fun audioEntriesMatch(before: List<AudioEntry>, after: List<AudioEntry>): Boolean {
