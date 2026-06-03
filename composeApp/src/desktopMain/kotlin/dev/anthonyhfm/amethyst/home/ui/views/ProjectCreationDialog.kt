@@ -71,16 +71,13 @@ fun ProjectCreationDialog(
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 560.dp),
-        ) {
+        BoxWithConstraints {
             val stackedActions = maxWidth < 420.dp
             val isEditing = projectPath != null
 
             Column(
                 modifier = Modifier
+                    .widthIn(max = 560.dp)
                     .fillMaxWidth()
                     .border(1.dp, Theme[colors][border], DefaultShape)
                     .background(Theme[colors][card], DefaultShape)
@@ -122,10 +119,10 @@ fun ProjectCreationDialog(
                             onValueChange = {
                                 viewModel.onEvent(ProjectCreationDialogContract.Event.OnChangeAuthor(it))
                             },
-                            placeholder = "creator",
+                            placeholder = "Unknown Author",
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        FieldDescription("Saved as your default author. Leave it blank to fall back to “Unknown Author”.")
+                        FieldDescription("Saved as your default author.")
                     }
                 }
 

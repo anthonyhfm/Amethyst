@@ -1,13 +1,16 @@
 package dev.anthonyhfm.amethyst.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
@@ -64,20 +67,31 @@ private fun <T : Any> SelectSettingItem(setting: Setting.Select<T>) {
 private fun SliderSettingItem(setting: Setting.Slider) {
     val value by setting.flow.collectAsState()
     SettingsItem(title = setting.title) {
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = "${(value * 100f).roundToInt()}%",
-                style = Theme[typography][small].copy(color = Theme[colors][foreground]),
-            )
-            Slider(
-                value = value,
-                valueRange = setting.range,
-                onValueChange = { setting.update(it) },
-                modifier = Modifier.width(220.dp),
-            )
+            Box(modifier = Modifier.width(220.dp)) {
+                Slider(
+                    value = value,
+                    valueRange = setting.range,
+                    onValueChange = { setting.update(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Box(
+                modifier = Modifier.width(40.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text(
+                    text = "${(value * 100f).roundToInt()}%",
+                    modifier = Modifier.fillMaxWidth(),
+                    style = Theme[typography][small].copy(
+                        color = Theme[colors][foreground],
+                        textAlign = TextAlign.End,
+                    ),
+                )
+            }
         }
     }
 }

@@ -54,15 +54,15 @@ struct SettingsTabView: View {
     private var audioSection: some View {
         Section("Audio") {
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Master Volume")
-                    Spacer()
+                Text("Master Volume")
+                HStack(spacing: 12) {
+                    Slider(value: $viewModel.masterVolume, in: 0...1)
+                        .tint(theme.primary)
                     Text("\(Int(viewModel.masterVolume * 100))%")
+                        .frame(width: 40, alignment: .trailing)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Slider(value: $viewModel.masterVolume, in: 0...1)
-                    .tint(theme.primary)
             }
             .listRowBackground(theme.muted)
         }

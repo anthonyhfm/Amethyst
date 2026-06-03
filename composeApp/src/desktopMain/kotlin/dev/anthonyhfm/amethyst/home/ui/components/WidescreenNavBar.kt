@@ -5,6 +5,7 @@ import amethyst.composeapp.generated.resources.amethyst_studio_logo
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -96,19 +97,24 @@ fun WidescreenNavBar(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    SidebarBrandMark(size = 42.dp)
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text(
-                            text = "Amethyst",
-                            style = Theme[typography][large].copy(color = Theme[colors][foreground]),
-                        )
-                        Text(
-                            text = "Studio Home",
-                            style = Theme[typography][small].copy(color = Theme[colors][mutedForeground]),
-                        )
+                        SidebarBrandMark(size = 42.dp)
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                text = "Amethyst",
+                                style = Theme[typography][large].copy(color = Theme[colors][foreground]),
+                            )
+                            Text(
+                                text = "Studio Home",
+                                style = Theme[typography][small].copy(color = Theme[colors][mutedForeground]),
+                            )
+                        }
                     }
 
                     SidebarTrigger()
