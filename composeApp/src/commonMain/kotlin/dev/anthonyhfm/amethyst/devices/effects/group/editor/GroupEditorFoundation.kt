@@ -81,6 +81,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ClipboardPaste
@@ -579,7 +580,9 @@ private fun ReorderableItemScope.GroupEditorListItem(
                             .weight(1f)
                             .align(Alignment.CenterVertically)
                             .padding(start = 6.dp),
-                        color = itemTextColor
+                        color = itemTextColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
 
                     Box(
