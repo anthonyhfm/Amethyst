@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -32,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.settings.data.Setting
 
@@ -44,38 +48,47 @@ internal fun SliderSettingContent(setting: Setting.Slider) {
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
     ) {
-        Row(
+        Text(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = setting.title,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                style = MaterialTheme.typography.titleMedium,
-            )
-
-            Text(
-                text = "${(current * 100).toInt()}%",
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-
-        Slider(
-            value = setting.flow.collectAsState().value,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-            ),
-            onValueChange = {
-                setting.update(it)
-            }
+                .height(56.dp)
+                .padding(top = 8.dp),
+            text = setting.title,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            style = MaterialTheme.typography.titleMedium,
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Slider(
+                modifier = Modifier.weight(1f),
+                value = setting.flow.collectAsState().value,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                ),
+                onValueChange = {
+                    setting.update(it)
+                }
+            )
+
+            Box(
+                modifier = Modifier.width(40.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = "${(current * 100).toInt()}%",
+                    textAlign = TextAlign.End,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
     }
