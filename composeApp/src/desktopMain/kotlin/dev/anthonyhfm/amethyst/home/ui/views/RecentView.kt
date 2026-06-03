@@ -484,9 +484,9 @@ private fun EmptyRecentProjectsCard(
             CardDescription("Open an existing `.ame` workspace or create a new project to start building your next performance.")
         }
 
-        CardContent {
-            TypographyMuted("Use the actions in the header above to open an existing workspace or create your first project.")
-        }
+        // CardContent {
+        //     TypographyMuted("Open an existing `.ame` workspace or create a new project to start building your next performance.")
+        // }
     }
 }
 
