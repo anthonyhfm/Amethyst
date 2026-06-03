@@ -34,16 +34,20 @@ object UnipadAutoPlay {
 
                 // on / o — button press (down)
                 cmd == "on" || cmd == "o" -> {
-                    val x = data.getOrNull(1)?.toIntOrNull() ?: return@forEach
-                    val y = data.getOrNull(2)?.toIntOrNull() ?: return@forEach
+                    val rawX = data.getOrNull(1)?.toIntOrNull() ?: return@forEach
+                    val rawY = data.getOrNull(2)?.toIntOrNull() ?: return@forEach
+                    val x = rawY
+                    val y = rawX
                     val current = actions.getOrPut(currentTime) { emptyList() }
                     actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = true)
                 }
 
                 // off / f — button release (up)
                 cmd == "off" || cmd == "f" -> {
-                    val x = data.getOrNull(1)?.toIntOrNull() ?: return@forEach
-                    val y = data.getOrNull(2)?.toIntOrNull() ?: return@forEach
+                    val rawX = data.getOrNull(1)?.toIntOrNull() ?: return@forEach
+                    val rawY = data.getOrNull(2)?.toIntOrNull() ?: return@forEach
+                    val x = rawY
+                    val y = rawX
                     val current = actions.getOrPut(currentTime) { emptyList() }
                     actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = false)
                 }
@@ -51,8 +55,10 @@ object UnipadAutoPlay {
                 // touch / t — press + immediate release
                 cmd == "touch" || cmd == "t" -> {
                     // Docs: touch x y -> data[1]=x, data[2]=y
-                    val x = data.getOrNull(1)?.toIntOrNull() ?: return@forEach
-                    val y = data.getOrNull(2)?.toIntOrNull() ?: return@forEach
+                    val rawX = data.getOrNull(1)?.toIntOrNull() ?: return@forEach
+                    val rawY = data.getOrNull(2)?.toIntOrNull() ?: return@forEach
+                    val x = rawY
+                    val y = rawX
                     val current = actions.getOrPut(currentTime) { emptyList() }
                     actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = true)
                 }

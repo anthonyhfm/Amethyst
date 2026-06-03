@@ -35,13 +35,11 @@ object UnipadConverter : AmethystConverter {
 
         println("Entries in zip: ${entries.size}")
 
-        // Detect root prefix: some ZIPs wrap everything in a subdirectory.
-        // Find the info file, then strip whatever leading path it lives under.
         val rawInfoKey = entries.keys.firstOrNull { key ->
             val lower = key.lowercase()
             lower == "info" || lower.endsWith("/info")
         } ?: throw IllegalArgumentException("UniPack is missing required 'info' file")
-        val rootPrefix = rawInfoKey.dropLast("info".length) // e.g. "MyProject/" or ""
+        val rootPrefix = rawInfoKey.dropLast("info".length)
 
         if (rootPrefix.isNotEmpty()) {
             println("Detected ZIP root prefix: '$rootPrefix' — re-indexing entries")
@@ -57,6 +55,7 @@ object UnipadConverter : AmethystConverter {
             val lower = key.lowercase()
             lower == "info" || lower.endsWith("/info")
         } ?: throw IllegalArgumentException("UniPack is missing required 'info' file")
+
         val infoMap: Map<String, String> = entries[infoKey]?.data
             ?.decodeToString()
             ?.replace("\r\n", "\n")
@@ -71,6 +70,7 @@ object UnipadConverter : AmethystConverter {
             } ?: emptyMap()
 
         val chain = infoMap["chain"]?.toIntOrNull() ?: 1
+
         require(chain in 1..24) {
             "UniPack 'chain' value is $chain, must be in range 1–24"
         }

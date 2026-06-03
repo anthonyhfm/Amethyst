@@ -121,8 +121,10 @@ object KeyLED {
                     )
                 } else {
                     // Docs: on x y color  → inst[1]=x, inst[2]=y
-                    val x = inst[1].toIntOrNull() ?: return@forEach
-                    val y = inst[2].toIntOrNull() ?: return@forEach
+                    val rawX = inst[1].toIntOrNull() ?: return@forEach
+                    val rawY = inst[2].toIntOrNull() ?: return@forEach
+                    val x = rawY
+                    val y = 9 - rawX
                     currentFrame = currentFrame.copy(
                         entries = currentFrame.entries
                             .filter { it.x != x || it.y != y }
@@ -148,8 +150,10 @@ object KeyLED {
                             .plus(KeyframesChainDeviceContract.KeyframesEntry(x = cx, y = cy, r = 0f, g = 0f, b = 0f))
                     )
                 } else {
-                    val x = inst[1].toIntOrNull() ?: return@forEach
-                    val y = inst[2].toIntOrNull() ?: return@forEach
+                    val rawX = inst[1].toIntOrNull() ?: return@forEach
+                    val rawY = inst[2].toIntOrNull() ?: return@forEach
+                    val x = rawY
+                    val y = 9 - rawX
                     currentFrame = currentFrame.copy(
                         entries = currentFrame.entries
                             .filter { it.x != x || it.y != y }
@@ -203,32 +207,27 @@ object KeyLED {
     fun createChain(page: Int, entries: List<String>): StateChain {
         val groups = mutableListOf<Group>()
 
-        // Parse each entry path into its components.
-        // File name format (inside keyLED/): chain x y [loop]
-        // The full path is "keyLED/chain x y [loop]", so splitting the whole path by ' ' gives:
-        //   ["keyLED/chain", "x", "y"]          → no loop  (3 parts)
-        //   ["keyLED/chain", "x", "y", "loop"]  → with loop count (4 parts)
         data class LedEntry(val path: String, val x: Int, val y: Int, val loop: Int)
 
         val parsed = entries.mapNotNull { path ->
             val parts = path.split(" ")
-            // parts[0] = "keyLED/<chain>", parts[1] = x, parts[2] = y, parts[3] = loop (opt)
-            val x = parts.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
-            val y = parts.getOrNull(2)?.toIntOrNull() ?: return@mapNotNull null
+
+            val rawX = parts.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
+            val rawY = parts.getOrNull(2)?.toIntOrNull() ?: return@mapNotNull null
+            val x = rawY
+            val y = 9 - rawX
             val loop = parts.getOrNull(3)?.toIntOrNull() ?: 1
             LedEntry(path = path, x = x, y = y, loop = loop)
         }
 
-        // Group by coordinate — multiple entries at the same (x, y) → circular queue
         parsed.groupBy { Pair(it.x, it.y) }.values.forEachIndexed { index, group ->
             val x = group.first().x
             val y = group.first().y
 
             if (group.size > 1) {
-                // Multi animation (circular queue)
                 val multiGroups = group.mapNotNull { ledEntry ->
                     val keyLED = UnipadConverter.entries[ledEntry.path]?.data ?: return@mapNotNull null
-                    println("Decoding KeyLED (multi): ${ledEntry.path}")
+
                     Group(
                         name = ledEntry.path,
                         stateChain = StateChain(
@@ -244,6 +243,7 @@ object KeyLED {
                             stateChain = StateChain(
                                 devices = listOf(
                                     CoordinateFilterChainDeviceState(filters = listOf(Pair(x, y))),
+
                                     MultiGroupChainDeviceState(groups = multiGroups)
                                 )
                             )
@@ -251,7 +251,6 @@ object KeyLED {
                     )
                 }
             } else {
-                // Single animation
                 val ledEntry = group.first()
                 val keyLED = UnipadConverter.entries[ledEntry.path]?.data ?: return@forEachIndexed
                 println("Decoding KeyLED: ${ledEntry.path}")
@@ -262,6 +261,7 @@ object KeyLED {
                         stateChain = StateChain(
                             devices = listOf(
                                 CoordinateFilterChainDeviceState(filters = listOf(Pair(x, y))),
+
                                 convertToKeyframes(keyLED)
                             )
                         )

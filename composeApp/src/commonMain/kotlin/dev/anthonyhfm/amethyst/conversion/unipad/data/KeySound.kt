@@ -102,7 +102,9 @@ object KeySound {
         // Docs: chain x y soundFile [loop] [wormhole]  — field[1]=x, field[2]=y
         validEntries.map {
             val f = it.split(" ")
-            "${f[0]} ${f[1]} ${f[2]}"
+            val rx = f[2].toInt()
+            val ry = f[1].toInt()
+            "${f[0]} $rx $ry"
         }.distinct().forEachIndexed { index, entry ->
             val f = entry.split(" ")
             val x = f[1].toInt()
@@ -110,7 +112,9 @@ object KeySound {
 
             val matchingEntries = validEntries.filter { line ->
                 val lf = line.split(" ")
-                lf[1].toInt() == x && lf[2].toInt() == y
+                val lx = lf[2].toInt()
+                val ly = lf[1].toInt()
+                lx == x && ly == y
             }
 
             if (matchingEntries.size > 1) {
