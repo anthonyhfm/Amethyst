@@ -71,16 +71,13 @@ fun ProjectCreationDialog(
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 560.dp),
-        ) {
+        BoxWithConstraints {
             val stackedActions = maxWidth < 420.dp
             val isEditing = projectPath != null
 
             Column(
                 modifier = Modifier
+                    .widthIn(max = 560.dp)
                     .fillMaxWidth()
                     .border(1.dp, Theme[colors][border], DefaultShape)
                     .background(Theme[colors][card], DefaultShape)
