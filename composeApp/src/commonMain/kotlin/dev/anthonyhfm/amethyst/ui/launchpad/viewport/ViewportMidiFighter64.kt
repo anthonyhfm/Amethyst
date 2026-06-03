@@ -162,9 +162,9 @@ class ViewportMidiFighter64(
 
         LaunchedEffect(style) {
             val fileName = if (style == MidiFighter64Style.White) {
-                "files/devices/MF64/MIDI_Fighter_64_White_ml.png"
+                "files/launchpad/MF64/MIDI_Fighter_64_White_ml.png"
             } else {
-                "files/devices/MF64/MIDI_Fighter_64_Black_ml.png"
+                "files/launchpad/MF64/MIDI_Fighter_64_Black_ml.png"
             }
             
             deviceBitmap = Res.readBytes(fileName).decodeToImageBitmap()

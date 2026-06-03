@@ -57,9 +57,9 @@ class ViewportLaunchpadMk2(
         var ledspotsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
 
         LaunchedEffect(Unit) {
-            buttonsBitmap = Res.readBytes("files/devices/LP2/LP2_Buttons_Layer_ml.png").decodeToImageBitmap()
-            deviceBitmap = Res.readBytes("files/devices/LP2/LP2_Device_Layer_ml.png").decodeToImageBitmap()
-            ledspotsBitmap = Res.readBytes("files/devices/LP2/LP2_Spots_Layer_ml.png").decodeToImageBitmap()
+            buttonsBitmap = Res.readBytes("files/launchpad/LP2/LP2_Buttons_Layer_ml.png").decodeToImageBitmap()
+            deviceBitmap = Res.readBytes("files/launchpad/LP2/LP2_Device_Layer_ml.png").decodeToImageBitmap()
+            ledspotsBitmap = Res.readBytes("files/launchpad/LP2/LP2_Spots_Layer_ml.png").decodeToImageBitmap()
         }
 
         if (buttonsBitmap != null && deviceBitmap != null && ledspotsBitmap != null) {

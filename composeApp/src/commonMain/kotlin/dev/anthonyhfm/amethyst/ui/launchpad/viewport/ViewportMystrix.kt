@@ -57,9 +57,9 @@ class ViewportMystrix(
         var ledspotsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
 
         LaunchedEffect(Unit) {
-            buttonsBitmap = Res.readBytes("files/devices/Mystrix/Mystrix_Buttons_Layer_ml.png").decodeToImageBitmap()
-            deviceBitmap = Res.readBytes("files/devices/Mystrix/Mystrix_Device_Layer_ml.png").decodeToImageBitmap()
-            ledspotsBitmap = Res.readBytes("files/devices/Mystrix/Mystrix_Spots_Layer_ml.png").decodeToImageBitmap()
+            buttonsBitmap = Res.readBytes("files/launchpad/Mystrix/Mystrix_Buttons_Layer_ml.png").decodeToImageBitmap()
+            deviceBitmap = Res.readBytes("files/launchpad/Mystrix/Mystrix_Device_Layer_ml.png").decodeToImageBitmap()
+            ledspotsBitmap = Res.readBytes("files/launchpad/Mystrix/Mystrix_Spots_Layer_ml.png").decodeToImageBitmap()
         }
 
         if (buttonsBitmap != null && deviceBitmap != null && ledspotsBitmap != null) {
