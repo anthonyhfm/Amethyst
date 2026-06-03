@@ -16,10 +16,53 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+
 jobs:
-  build-windows:
-    name: Build (Windows)
-    runs-on: windows-latest
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            task: packageReleaseNsis
+            artifact-dir: nsis
+            artifact-ext: exe
+            artifact-name: amethyst-windows
+
+          - os: macos-26
+            name: macOS ARM
+            task: packageReleaseDmg
+            artifact-dir: dmg
+            artifact-ext: dmg
+            artifact-name: amethyst-macos-arm
+
+          - os: macos-15-intel
+            name: macOS Intel
+            task: packageReleaseDmg
+            artifact-dir: dmg
+            artifact-ext: dmg
+            artifact-name: amethyst-macos-intel
+
+          - os: ubuntu-latest
+            name: Linux DEB
+            task: packageReleaseDeb
+            artifact-dir: deb
+            artifact-ext: deb
+            artifact-name: amethyst-linux-deb
+
+          - os: ubuntu-latest
+            name: Linux AppImage
+            task: packageReleaseAppImage
+            artifact-dir: app
+            artifact-ext: AppImage
+            artifact-name: amethyst-linux-appimage
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,241 +79,36 @@ jobs:
         shell: bash
         run: mkdir -p composeApp/src/commonMain/composeResources/files && cp -r ml3-graphics/. composeApp/src/commonMain/composeResources/files/
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Nucleus
+        uses: kdroidFilter/Nucleus/.github/actions/setup-nucleus@main
         with:
-          node-version: 18
+          packaging-tools: 'true'
+          setup-gradle: 'true'
+          setup-node: 'true'
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-windows-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-windows-
-
-      - name: Build NSIS
+      - name: Build
+        shell: bash
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageReleaseNsis
+        run: ./gradlew :composeApp:${{ matrix.task }}
 
-      - name: Upload Windows artifact
+      - name: Rename artifact
+        shell: bash
+        run: |
+          for f in composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/*.${{ matrix.artifact-ext }}; do
+            mv "$f" "composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/${{ matrix.artifact-name }}-${{ inputs.version }}.${{ matrix.artifact-ext }}"
+          done
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: amethyst-windows
-          path: composeApp/build/compose/binaries/main-release/nsis/*.exe
-          if-no-files-found: error
-
-  build-macos-arm:
-    name: Build (macOS Apple Silicon)
-    runs-on: macos-26
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Fetch ML Graphics
-        uses: actions/checkout@v4
-        with:
-          repository: anthonyhfm/ml3-graphics-amethyst
-          token: ${{ secrets.ML_GRAPHICS_TOKEN }}
-          path: ml3-graphics
-          sparse-checkout: devices
-
-      - name: Copy ML Graphics
-        run: mkdir -p composeApp/src/commonMain/composeResources/files && cp -r ml3-graphics/. composeApp/src/commonMain/composeResources/files/
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-macos-arm-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-macos-arm-
-
-      - name: Build DMG
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageReleaseDmg
-
-      - name: Upload macOS Apple Silicon artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: amethyst-macos-arm
-          path: composeApp/build/compose/binaries/main-release/dmg/*.dmg
-          if-no-files-found: error
-
-  build-macos-intel:
-    name: Build (macOS Intel)
-    runs-on: macos-13
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Fetch ML Graphics
-        uses: actions/checkout@v4
-        with:
-          repository: anthonyhfm/ml3-graphics-amethyst
-          token: ${{ secrets.ML_GRAPHICS_TOKEN }}
-          path: ml3-graphics
-          sparse-checkout: devices
-
-      - name: Copy ML Graphics
-        run: mkdir -p composeApp/src/commonMain/composeResources/files && cp -r ml3-graphics/. composeApp/src/commonMain/composeResources/files/
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-macos-intel-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-macos-intel-
-
-      - name: Build DMG
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageReleaseDmg
-
-      - name: Upload macOS Intel artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: amethyst-macos-intel
-          path: composeApp/build/compose/binaries/main-release/dmg/*.dmg
-          if-no-files-found: error
-
-  build-linux-deb:
-    name: Build (Linux DEB)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Fetch ML Graphics
-        uses: actions/checkout@v4
-        with:
-          repository: anthonyhfm/ml3-graphics-amethyst
-          token: ${{ secrets.ML_GRAPHICS_TOKEN }}
-          path: ml3-graphics
-          sparse-checkout: devices
-
-      - name: Copy ML Graphics
-        run: mkdir -p composeApp/src/commonMain/composeResources/files && cp -r ml3-graphics/. composeApp/src/commonMain/composeResources/files/
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-linux-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-linux-
-
-      - name: Build DEB
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageReleaseDeb
-
-      - name: Upload Linux DEB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: amethyst-linux-deb
-          path: composeApp/build/compose/binaries/main-release/deb/*.deb
-          if-no-files-found: error
-
-  build-linux-appimage:
-    name: Build (Linux AppImage)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Fetch ML Graphics
-        uses: actions/checkout@v4
-        with:
-          repository: anthonyhfm/ml3-graphics-amethyst
-          token: ${{ secrets.ML_GRAPHICS_TOKEN }}
-          path: ml3-graphics
-          sparse-checkout: devices
-
-      - name: Copy ML Graphics
-        run: mkdir -p composeApp/src/commonMain/composeResources/files && cp -r ml3-graphics/. composeApp/src/commonMain/composeResources/files/
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-linux-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-linux-
-
-      - name: Build AppImage
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:packageReleaseAppImage
-
-      - name: Upload Linux AppImage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: amethyst-linux-appimage
-          path: composeApp/build/compose/binaries/main-release/app/*
+          name: release-assets-${{ matrix.artifact-name }}
+          path: composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/*.${{ matrix.artifact-ext }}
           if-no-files-found: error
 
   release:
     name: Create Release
-    needs: [build-windows, build-macos-arm, build-macos-intel, build-linux-deb, build-linux-appimage]
+    needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -282,6 +120,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+          pattern: release-assets-*
+
+      - name: Generate update YML
+        uses: kdroidFilter/Nucleus/.github/actions/generate-update-yml@main
+        with:
+          artifacts-path: release-artifacts
+          version: ${{ inputs.version }}
+          channel: latest
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -293,9 +139,10 @@ jobs:
 
             **Build #${{ github.run_number }}** · Commit: `${{ github.sha }}` · @${{ github.actor }}
           files: |
-            release-artifacts/amethyst-windows/*.exe
-            release-artifacts/amethyst-macos-arm/*.dmg
-            release-artifacts/amethyst-macos-intel/*.dmg
-            release-artifacts/amethyst-linux-deb/*.deb
-            release-artifacts/amethyst-linux-appimage/*
-          fail_on_unmatched_files: true
+            release-artifacts/release-assets-amethyst-windows/*.exe
+            release-artifacts/release-assets-amethyst-macos-arm/*.dmg
+            release-artifacts/release-assets-amethyst-macos-intel/*.dmg
+            release-artifacts/release-assets-amethyst-linux-deb/*.deb
+            release-artifacts/release-assets-amethyst-linux-appimage/*.AppImage
+            update-*.yml
+          fail_on_unmatched_files: false

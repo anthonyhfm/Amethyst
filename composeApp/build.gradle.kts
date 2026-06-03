@@ -217,6 +217,7 @@ nucleus.application {
         linux {
             modules("jdk.security.auth")
             iconFile.set(project.file("../icons/amethyst_linux.png"))
+            debMaintainer = "contact@anthonyhfm.dev"
         }
     }
 }
