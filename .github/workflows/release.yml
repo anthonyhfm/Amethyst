@@ -56,12 +56,6 @@ jobs:
             artifact-ext: deb
             artifact-name: amethyst-linux-deb
 
-          - os: ubuntu-latest
-            name: Linux AppImage
-            task: packageReleaseAppImage
-            artifact-dir: app
-            artifact-ext: AppImage
-            artifact-name: amethyst-linux-appimage
 
     steps:
       - name: Checkout
@@ -95,15 +89,22 @@ jobs:
       - name: Rename artifact
         shell: bash
         run: |
-          for f in composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/*.${{ matrix.artifact-ext }}; do
-            mv "$f" "composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/${{ matrix.artifact-name }}-${{ inputs.version }}.${{ matrix.artifact-ext }}"
-          done
+          mkdir -p "composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}"
+          src=$(find composeApp/build/compose/binaries/main-release -name "*.${{ matrix.artifact-ext }}" -type f | head -1)
+          if [ -z "$src" ]; then
+            echo "ERROR: No .${{ matrix.artifact-ext }} file found in build output!"
+            find composeApp/build/compose/binaries/main-release -type f
+            exit 1
+          fi
+          dst="composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/${{ matrix.artifact-name }}-${{ inputs.version }}.${{ matrix.artifact-ext }}"
+          mv "$src" "$dst"
+          echo "Renamed: $src → $dst"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-assets-${{ matrix.artifact-name }}
-          path: composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/*.${{ matrix.artifact-ext }}
+          path: composeApp/build/compose/binaries/main-release/${{ matrix.artifact-dir }}/${{ matrix.artifact-name }}-${{ inputs.version }}.${{ matrix.artifact-ext }}
           if-no-files-found: error
 
   release:
