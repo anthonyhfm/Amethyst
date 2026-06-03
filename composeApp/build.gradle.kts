@@ -1,3 +1,4 @@
+import io.github.kdroidfilter.nucleus.desktop.application.dsl.DmgContentType
 import io.github.kdroidfilter.nucleus.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -208,6 +209,17 @@ nucleus.application {
             iconFile.set(project.file("../icons/amethyst_macos.icns"))
 
             macOsSdkVersion = null
+
+            dmg {
+                title = "Amethyst Installer"
+                background.set(project.file("../icons/amethyst_dmg.png"))
+                iconSize = 128
+                iconTextSize = 12
+
+                content(x = 143, y = 140, type = DmgContentType.File, name = "Amethyst.app")
+                content(x = 143, y = 455, type = DmgContentType.Link, path = "/Applications")
+
+            }
         }
 
         windows {
