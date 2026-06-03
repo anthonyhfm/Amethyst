@@ -47,7 +47,7 @@ object ShortcutManager {
     fun canCopySelection(
         selections: List<Selectable> = SelectionManager.selections.value
     ): Boolean {
-        return selections.isNotEmpty() && selections.none { it is Selectable.GroupChainItem }
+        return selections.isNotEmpty()
     }
 
     fun copySelection(
@@ -76,7 +76,11 @@ object ShortcutManager {
         if (clipboard == null) return false
 
         val hasGroupSelection = selections.any { it is Selectable.GroupChainItem }
-        return !hasGroupSelection || (clipboard !is ClipboardData.GroupChainItem && clipboard !is ClipboardData.ChainDevice)
+        return when (clipboard) {
+            is ClipboardData.GroupChainItem -> hasGroupSelection
+            is ClipboardData.ChainDevice -> !hasGroupSelection
+            else -> !hasGroupSelection
+        }
     }
 
     fun pasteClipboard(
