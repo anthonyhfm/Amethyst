@@ -177,7 +177,7 @@ nucleus.application {
     buildTypes {
         release {
             proguard {
-                configurationFiles.from(project.file("proguard-rules.pro"))
+                isEnabled = false
             }
         }
     }
