@@ -46,6 +46,7 @@ class AmethystMidiManager {
 
     val midiInScope = CoroutineScope(Dispatchers.IO.limitedParallelism(4))
     private var autoDetectJob: Job? = null
+    private var autoConfigureJob: Job? = null
     private var monitorJob: Job? = null
 
     private data class DetectedLaunchpad(
@@ -138,16 +139,21 @@ class AmethystMidiManager {
             deviceConfig.input?.close()
             deviceConfig.launchpadDevice?.midiOutput?.close()
 
+            savedInputPortId = event.inputPort?.id
+            savedInputPortName = event.inputPort?.name
+            savedOutputPortId = event.outputPort?.id
+            savedOutputPortName = event.outputPort?.name
+
             midiInScope.launch {
                 var inputDevice: MidiInput? = null
                 var outputDevice: MidiOutput? = null
 
                 event.inputPort?.let { input ->
-                    inputDevice = midiAccess.openInput(input.id)
+                    inputDevice = runCatching { midiAccess.openInput(input.id) }.getOrNull()
                 }
 
                 event.outputPort?.let { output ->
-                    outputDevice = midiAccess.openOutput(output.id)
+                    outputDevice = runCatching { midiAccess.openOutput(output.id) }.getOrNull()
                 }
 
                 var deviceType: LaunchpadDeviceType? = null
@@ -183,7 +189,7 @@ class AmethystMidiManager {
 
         monitorJob = midiInScope.launch {
             while (isActive) {
-                autoConfigureSingleDeviceIfPossible()
+                autoConfigureDevices()
                 delay(2000)
             }
         }
@@ -268,43 +274,136 @@ class AmethystMidiManager {
         }
     }
 
-    fun autoConfigureSingleDeviceIfPossible() {
-        if (autoDetectJob?.isActive == true) return
+    fun autoConfigureDevices() {
+        if (autoConfigureJob?.isActive == true) return
 
-        val device = Heaven.devices.singleOrNull() ?: return
+        val allDevices = Heaven.devices
+        if (allDevices.isEmpty()) return
+
         val inputs = midiAccess.inputs.toList()
         val outputs = midiAccess.outputs.toList()
 
-        val inputValid = device.deviceConfig.input?.details?.id?.let { id ->
-            inputs.any { it.id == id }
-        } ?: false
-        val outputValid = device.deviceConfig.launchpadDevice?.midiOutput?.details?.id?.let { id ->
-            outputs.any { it.id == id }
-        } ?: false
+        for (device in allDevices) {
+            val inputValid = device.deviceConfig.input?.details?.id?.let { id ->
+                inputs.any { it.id == id }
+            } ?: false
+            val outputValid = device.deviceConfig.launchpadDevice?.midiOutput?.details?.id?.let { id ->
+                outputs.any { it.id == id }
+            } ?: false
 
-        if (!inputValid || !outputValid) {
-            device.deviceConfig.input?.close()
-            device.deviceConfig.launchpadDevice?.midiOutput?.close()
-            device.deviceConfig = ProjectDeviceConfig()
+            val incomplete = (device.deviceConfig.input != null && device.deviceConfig.launchpadDevice == null) ||
+                             (device.deviceConfig.input == null && device.deviceConfig.launchpadDevice != null)
+
+            if ((device.deviceConfig.input != null && !inputValid) ||
+                (device.deviceConfig.launchpadDevice != null && !outputValid) ||
+                incomplete) {
+                device.deviceConfig.input?.close()
+                device.deviceConfig.launchpadDevice?.midiOutput?.close()
+                device.deviceConfig = ProjectDeviceConfig()
+            }
         }
 
-        if (device.deviceConfig.input != null && device.deviceConfig.launchpadDevice != null) return
-        if (inputs.isEmpty() || outputs.isEmpty()) return
+        val claimedInputs = allDevices.mapNotNull { it.deviceConfig.input?.details?.id }.toSet()
+        val claimedOutputs = allDevices.mapNotNull { it.deviceConfig.launchpadDevice?.midiOutput?.details?.id }.toSet()
 
-        autoDetectJob = midiInScope.launch {
-            val detection = shotgunDetectLaunchpad()
+        val disconnectedDevices = allDevices.filter { device ->
+            device.deviceConfig.input == null || device.deviceConfig.launchpadDevice == null
+        }
+        if (disconnectedDevices.isEmpty()) return
 
-            detection?.let {
-                changeDeviceConfig(
-                    WorkspaceContract.Event.OnChangeDeviceConfig(
-                        uuid = device.selectionUUID,
-                        inputPort = it.inputPort,
-                        outputPort = it.outputPort,
+        autoConfigureJob = midiInScope.launch {
+            val availableInputs = inputs.filterNot { it.id in claimedInputs }.toMutableList()
+            val availableOutputs = outputs.filterNot { it.id in claimedOutputs }.toMutableList()
+
+            for (device in disconnectedDevices) {
+                val targetInputId = device.savedInputPortId
+                val targetInputName = device.savedInputPortName
+                val targetOutputId = device.savedOutputPortId
+                val targetOutputName = device.savedOutputPortName
+
+                if (targetInputId == null && targetInputName == null &&
+                    targetOutputId == null && targetOutputName == null) {
+                    continue
+                }
+
+                val matchedInput = if (targetInputId != null) {
+                    availableInputs.firstOrNull { it.id == targetInputId }
+                } else null
+                val matchedInputFinal = matchedInput ?: if (targetInputName != null) {
+                    availableInputs.firstOrNull { it.name == targetInputName }
+                } else null
+
+                val matchedOutput = if (targetOutputId != null) {
+                    availableOutputs.firstOrNull { it.id == targetOutputId }
+                } else null
+                val matchedOutputFinal = matchedOutput ?: if (targetOutputName != null) {
+                    availableOutputs.firstOrNull { it.name == targetOutputName }
+                } else null
+
+                if (matchedInputFinal != null || matchedOutputFinal != null) {
+                    val inputDevice = matchedInputFinal?.let { runCatching { midiAccess.openInput(it.id) }.getOrNull() }
+                    val outputDevice = matchedOutputFinal?.let { runCatching { midiAccess.openOutput(it.id) }.getOrNull() }
+
+                    var deviceType: LaunchpadDeviceType? = null
+                    if (inputDevice != null && outputDevice != null) {
+                        deviceType = detect(inputDevice, outputDevice)
+                    }
+
+                    inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
+                        val msgCopy = bytes.copyOf()
+                        if (platform is Platform.iOS) {
+                            msgCopy.toList().chunked(3).forEach {
+                                device.onMidiMessage(it.toByteArray())
+                            }
+                        } else {
+                            device.onMidiMessage(msgCopy)
+                        }
+                    }
+
+                    device.deviceConfig.input?.close()
+                    device.deviceConfig.launchpadDevice?.midiOutput?.close()
+
+                    device.deviceConfig = device.deviceConfig.copy(
+                        input = inputDevice,
+                        launchpadDevice = outputDevice?.let { output ->
+                            deviceType?.mapLaunchpadDevice(output)
+                        }
                     )
-                )
+
+                    matchedInputFinal?.let { availableInputs.remove(it) }
+                    matchedOutputFinal?.let { availableOutputs.remove(it) }
+                }
+            }
+
+            if (allDevices.size == 1 &&
+                allDevices[0].deviceConfig.input == null &&
+                allDevices[0].deviceConfig.launchpadDevice == null) {
+
+                val device = allDevices[0]
+                val targetInputId = device.savedInputPortId
+                val targetInputName = device.savedInputPortName
+                val targetOutputId = device.savedOutputPortId
+                val targetOutputName = device.savedOutputPortName
+
+                if (targetInputId == null && targetInputName == null &&
+                    targetOutputId == null && targetOutputName == null) {
+
+                    if (availableInputs.isNotEmpty() && availableOutputs.isNotEmpty()) {
+                        val detection = shotgunDetectLaunchpad()
+                        detection?.let {
+                            changeDeviceConfig(
+                                WorkspaceContract.Event.OnChangeDeviceConfig(
+                                    uuid = device.selectionUUID,
+                                    inputPort = it.inputPort,
+                                    outputPort = it.outputPort,
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }.apply {
-            invokeOnCompletion { autoDetectJob = null }
+            invokeOnCompletion { autoConfigureJob = null }
         }
     }
 

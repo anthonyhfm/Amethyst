@@ -490,6 +490,10 @@ object WorkspaceRepository {
                 position.value = Offset(savedDevice.positionX, savedDevice.positionY)
                 rotationDegrees.floatValue = savedDevice.rotationDegrees
                 if (savedDevice.id.isNotEmpty()) launchpadId = savedDevice.id
+                savedInputPortId = savedDevice.inputPortId
+                savedInputPortName = savedDevice.inputPortName
+                savedOutputPortId = savedDevice.outputPortId
+                savedOutputPortName = savedDevice.outputPortName
             }
         }
 
@@ -576,49 +580,82 @@ object WorkspaceRepository {
                 autoPlayShowLights = workspaceMeta?.settings?.autoPlayShowLights ?: true
             ),
             launchpadDevices = Heaven.devices.map { device ->
+                val inputPortId = device.deviceConfig.input?.details?.id ?: device.savedInputPortId
+                val inputPortName = device.deviceConfig.input?.details?.name ?: device.savedInputPortName
+                val outputPortId = device.deviceConfig.launchpadDevice?.midiOutput?.details?.id ?: device.savedOutputPortId
+                val outputPortName = device.deviceConfig.launchpadDevice?.midiOutput?.details?.name ?: device.savedOutputPortName
+
                 when (device) {
                     is ViewportLaunchpadPro -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
                         id = device.launchpadId,
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
-                        rotationDegrees = device.rotationDegrees.floatValue
+                        rotationDegrees = device.rotationDegrees.floatValue,
+                        inputPortId = inputPortId,
+                        inputPortName = inputPortName,
+                        outputPortId = outputPortId,
+                        outputPortName = outputPortName
                     )
                     is ViewportLaunchpadIdealised -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadIdealised(
                         id = device.launchpadId,
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
-                        rotationDegrees = device.rotationDegrees.floatValue
+                        rotationDegrees = device.rotationDegrees.floatValue,
+                        inputPortId = inputPortId,
+                        inputPortName = inputPortName,
+                        outputPortId = outputPortId,
+                        outputPortName = outputPortName
                     )
                     is ViewportLaunchpadProMk3 -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadProMk3(
                         id = device.launchpadId,
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
-                        rotationDegrees = device.rotationDegrees.floatValue
+                        rotationDegrees = device.rotationDegrees.floatValue,
+                        inputPortId = inputPortId,
+                        inputPortName = inputPortName,
+                        outputPortId = outputPortId,
+                        outputPortName = outputPortName
                     )
                     is ViewportLaunchpadX -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadX(
                         id = device.launchpadId,
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
-                        rotationDegrees = device.rotationDegrees.floatValue
+                        rotationDegrees = device.rotationDegrees.floatValue,
+                        inputPortId = inputPortId,
+                        inputPortName = inputPortName,
+                        outputPortId = outputPortId,
+                        outputPortName = outputPortName
                     )
                     is ViewportLaunchpadMk2 -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadMk2(
                         id = device.launchpadId,
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
-                        rotationDegrees = device.rotationDegrees.floatValue
+                        rotationDegrees = device.rotationDegrees.floatValue,
+                        inputPortId = inputPortId,
+                        inputPortName = inputPortName,
+                        outputPortId = outputPortId,
+                        outputPortName = outputPortName
                     )
                     is ViewportMystrix -> SavableWorkspaceData.SavableViewportLaunchpad.Mystrix(
                         id = device.launchpadId,
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
-                        rotationDegrees = device.rotationDegrees.floatValue
+                        rotationDegrees = device.rotationDegrees.floatValue,
+                        inputPortId = inputPortId,
+                        inputPortName = inputPortName,
+                        outputPortId = outputPortId,
+                        outputPortName = outputPortName
                     )
                     is ViewportMidiFighter64 -> SavableWorkspaceData.SavableViewportLaunchpad.MidiFighter64(
                         id = device.launchpadId,
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
-                        style = device.style
+                        style = device.style,
+                        inputPortId = inputPortId,
+                        inputPortName = inputPortName,
+                        outputPortId = outputPortId,
+                        outputPortName = outputPortName
                     )
                     else -> { TODO("Could not serialize virtual launchpad element for the workspace") }
                 }

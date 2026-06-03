@@ -115,6 +115,10 @@ abstract class LaunchpadViewportElement(
     val renderScope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     var deviceConfig: ProjectDeviceConfig = ProjectDeviceConfig()
+    var savedInputPortId: String? = null
+    var savedInputPortName: String? = null
+    var savedOutputPortId: String? = null
+    var savedOutputPortName: String? = null
     val previewState: LaunchpadPreviewState = LaunchpadPreviewState()
 
     val screen = Screen()

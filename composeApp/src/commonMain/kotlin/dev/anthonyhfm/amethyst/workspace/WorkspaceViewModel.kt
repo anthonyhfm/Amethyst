@@ -61,7 +61,7 @@ class WorkspaceViewModel(
                 .collect { viewportElements ->
                     Heaven.devices = viewportElements
 
-                    if (viewportElements.size == 1) {
+                    if (viewportElements.isNotEmpty()) {
                         amethystMidiManager.startAutoDetectLoop()
                     } else {
                         amethystMidiManager.stopAutoDetectLoop()

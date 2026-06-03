@@ -38,12 +38,59 @@ fun DeviceSettingsDialog(
 ) {
     val midiAccess = platformMidiAccess ?: EmptyMidiAccess()
     val device = Heaven.devices.find { it.selectionUUID == uuid }
-    val inputPorts = remember(midiAccess) { midiAccess.inputs.toList() }
-    val outputPorts = remember(midiAccess) { midiAccess.outputs.toList() }
+    val rawInputPorts = remember(midiAccess) { midiAccess.inputs.toList() }
+    val rawOutputPorts = remember(midiAccess) { midiAccess.outputs.toList() }
+
+    val inputPorts = remember(rawInputPorts, device) {
+        val list = rawInputPorts.toMutableList()
+        if (device != null && (device.savedInputPortId != null || device.savedInputPortName != null)) {
+            val exists = list.any { it.id == device.savedInputPortId || (device.savedInputPortId == null && it.name == device.savedInputPortName) }
+            if (!exists) {
+                list.add(0, object : MidiPortDetails {
+                    override val id: String = device.savedInputPortId ?: ""
+                    override val manufacturer: String? = null
+                    override val name: String? = device.savedInputPortName ?: "Disconnected Input"
+                    override val version: String? = null
+                    override val midiTransportProtocol: Int = 1
+                })
+            }
+        }
+        list
+    }
+
+    val outputPorts = remember(rawOutputPorts, device) {
+        val list = rawOutputPorts.toMutableList()
+        if (device != null && (device.savedOutputPortId != null || device.savedOutputPortName != null)) {
+            val exists = list.any { it.id == device.savedOutputPortId || (device.savedOutputPortId == null && it.name == device.savedOutputPortName) }
+            if (!exists) {
+                list.add(0, object : MidiPortDetails {
+                    override val id: String = device.savedOutputPortId ?: ""
+                    override val manufacturer: String? = null
+                    override val name: String? = device.savedOutputPortName ?: "Disconnected Output"
+                    override val version: String? = null
+                    override val midiTransportProtocol: Int = 1
+                })
+            }
+        }
+        list
+    }
+
     val dialogState = rememberDialogState(initiallyVisible = true)
 
-    var midiInputPort: MidiPortDetails? by remember(uuid) { mutableStateOf(device?.deviceConfig?.input?.details) }
-    var midiOutputPort: MidiPortDetails? by remember(uuid) { mutableStateOf(device?.deviceConfig?.launchpadDevice?.midiOutput?.details) }
+    var midiInputPort: MidiPortDetails? by remember(uuid, device) {
+        mutableStateOf(
+            device?.deviceConfig?.input?.details
+                ?: inputPorts.firstOrNull { it.id == device?.savedInputPortId }
+                ?: inputPorts.firstOrNull { it.name == device?.savedInputPortName }
+        )
+    }
+    var midiOutputPort: MidiPortDetails? by remember(uuid, device) {
+        mutableStateOf(
+            device?.deviceConfig?.launchpadDevice?.midiOutput?.details
+                ?: outputPorts.firstOrNull { it.id == device?.savedOutputPortId }
+                ?: outputPorts.firstOrNull { it.name == device?.savedOutputPortName }
+        )
+    }
 
     val selectedInput = inputPorts.firstOrNull { it.id == midiInputPort?.id } ?: midiInputPort
     val selectedOutput = outputPorts.firstOrNull { it.id == midiOutputPort?.id } ?: midiOutputPort
