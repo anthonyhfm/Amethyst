@@ -145,5 +145,5 @@ jobs:
             release-artifacts/release-assets-amethyst-macos-intel/*.dmg
             release-artifacts/release-assets-amethyst-linux-deb/*.deb
             release-artifacts/release-assets-amethyst-linux-appimage/*.AppImage
-            update-*.yml
+            release-artifacts/update-yml/*.yml
           fail_on_unmatched_files: false
