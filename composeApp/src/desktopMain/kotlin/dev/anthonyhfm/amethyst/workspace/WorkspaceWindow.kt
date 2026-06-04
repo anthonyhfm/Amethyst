@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +55,8 @@ fun WorkspaceWindow(
     var showSaveDialog by remember { mutableStateOf(false) }
     var pendingClose by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val projectName by WorkspaceRepository.projectName.collectAsState()
+    val windowTitle = "Amethyst - [${projectName ?: "Untitled Project"}]"
 
     Window(
         onCloseRequest = {
@@ -67,7 +70,7 @@ fun WorkspaceWindow(
                 onClose()
             }
         },
-        title = "Amethyst - [${WorkspaceRepository.workspaceMeta?.title ?: "Untitled Project"}]",
+        title = windowTitle,
         state = rememberWindowState(
             width = 1200.dp,
             height = 800.dp,

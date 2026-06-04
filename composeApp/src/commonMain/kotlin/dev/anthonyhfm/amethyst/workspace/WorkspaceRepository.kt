@@ -192,6 +192,7 @@ object WorkspaceRepository {
 
     fun setProjectName(name: String, fromRemote: Boolean = false) {
         isApplyingRemoteProjectNameUpdate = fromRemote
+        workspaceMeta = workspaceMeta?.copy(title = name)
         _projectName.update { name }
         if (!fromRemote) isApplyingRemoteProjectNameUpdate = false
     }
@@ -521,6 +522,10 @@ object WorkspaceRepository {
             _mode.update {
                 WorkspaceContract.WorkspaceMode.Performance()
             }
+        }
+
+        runBlocking {
+            deviceRefresh.emit(Unit)
         }
     }
 
