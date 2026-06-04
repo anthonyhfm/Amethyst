@@ -124,7 +124,7 @@ object KeyLED {
                     val rawX = inst[1].toIntOrNull() ?: return@forEach
                     val rawY = inst[2].toIntOrNull() ?: return@forEach
                     val x = rawY
-                    val y = 9 - rawX
+                    val y = rawX
                     currentFrame = currentFrame.copy(
                         entries = currentFrame.entries
                             .filter { it.x != x || it.y != y }
@@ -153,7 +153,7 @@ object KeyLED {
                     val rawX = inst[1].toIntOrNull() ?: return@forEach
                     val rawY = inst[2].toIntOrNull() ?: return@forEach
                     val x = rawY
-                    val y = 9 - rawX
+                    val y = rawX
                     currentFrame = currentFrame.copy(
                         entries = currentFrame.entries
                             .filter { it.x != x || it.y != y }
@@ -215,7 +215,7 @@ object KeyLED {
             val rawX = parts.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
             val rawY = parts.getOrNull(2)?.toIntOrNull() ?: return@mapNotNull null
             val x = rawY
-            val y = 9 - rawX
+            val y = rawX
             val loop = parts.getOrNull(3)?.toIntOrNull() ?: 1
             LedEntry(path = path, x = x, y = y, loop = loop)
         }
