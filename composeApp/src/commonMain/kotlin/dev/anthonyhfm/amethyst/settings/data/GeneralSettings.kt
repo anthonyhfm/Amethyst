@@ -24,6 +24,12 @@ object GeneralSettings : SettingsGroup("General") {
         label = { "${(it * 100).toInt()}%" },
     )
 
+    val simplifiedGraphics: Setting.Toggle = toggle(
+        key = "simplifiedGraphics",
+        title = "Simplified Graphics",
+        default = false,
+    )
+
     // Not in the settings list — accessed programmatically by HomeRepository
     val localAuthor: Setting.TextField = Setting.TextField(
         key = "localAuthor",

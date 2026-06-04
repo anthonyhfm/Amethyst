@@ -40,14 +40,14 @@ jobs:
             task: packageReleaseDmg
             artifact-dir: dmg
             artifact-ext: dmg
-            artifact-name: amethyst-macos-arm
+            artifact-name: amethyst-macos-arm64
 
           - os: macos-15-intel
             name: macOS Intel
             task: packageReleaseDmg
             artifact-dir: dmg
             artifact-ext: dmg
-            artifact-name: amethyst-macos-intel
+            artifact-name: amethyst-macos-amd64
 
           - os: ubuntu-latest
             name: Linux DEB
@@ -141,8 +141,8 @@ jobs:
             **Build #${{ github.run_number }}** · Commit: `${{ github.sha }}` · @${{ github.actor }}
           files: |
             release-artifacts/release-assets-amethyst-windows/*.msi
-            release-artifacts/release-assets-amethyst-macos-arm/*.dmg
-            release-artifacts/release-assets-amethyst-macos-intel/*.dmg
+            release-artifacts/release-assets-amethyst-macos-arm64/*.dmg
+            release-artifacts/release-assets-amethyst-macos-amd64/*.dmg
             release-artifacts/release-assets-amethyst-linux-deb/*.deb
             release-artifacts/release-assets-amethyst-linux-appimage/*.AppImage
             release-artifacts/update-yml/*.yml
