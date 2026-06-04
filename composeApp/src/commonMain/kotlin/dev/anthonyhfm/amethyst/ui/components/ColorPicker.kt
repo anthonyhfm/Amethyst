@@ -48,6 +48,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+private const val HUE_PICKER_MAX = 359.999f
+
 @Suppress("unused")
 class ColorPickerState internal constructor(initialColor: Color) {
     private var _hue by mutableStateOf(0f)
@@ -78,8 +80,11 @@ class ColorPickerState internal constructor(initialColor: Color) {
     val hueColor: Color get() = hsvToColor(_hue, 1f, 1f)
 
     fun setHue(newHue: Float) {
-        val h = (newHue % 360f + 360f) % 360f
-        _hue = h
+        _hue = when {
+            newHue < 0f -> 0f
+            newHue >= 360f -> HUE_PICKER_MAX
+            else -> newHue
+        }
         updateColorFromHsv()
     }
 
@@ -225,7 +230,7 @@ fun HuePickerBar(
     fun updateHueFrom(pos: Offset, width: Int, height: Int) {
         if (width <= 0f || height <= 0f) return
         val ratio = if (vertical) (pos.y / height).coerceIn(0f, 1f) else (pos.x / width).coerceIn(0f, 1f)
-        currentState.setHue((ratio * 360f))
+        currentState.setHue((ratio * 360f).coerceIn(0f, HUE_PICKER_MAX))
     }
 
     BoxWithConstraints(
