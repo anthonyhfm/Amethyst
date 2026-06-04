@@ -126,7 +126,9 @@ actual fun WorkspaceTopAppBar(
             PianoRollOptions(mode)
         }
 
-        if (mode is WorkspaceContract.WorkspaceMode.Timeline) {
+        WorkspaceToolbarSlideFromTopControls(
+            visible = mode is WorkspaceContract.WorkspaceMode.Timeline,
+        ) {
             TimelinePlaybackControls()
             TimelineGridPicker()
         }
