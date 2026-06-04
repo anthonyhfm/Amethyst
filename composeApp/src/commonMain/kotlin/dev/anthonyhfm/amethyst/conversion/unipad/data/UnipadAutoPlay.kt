@@ -10,6 +10,7 @@ object UnipadAutoPlay {
         val actions = mutableMapOf<Double, List<AutoPlayData.Action>>()
 
         var currentTime: Double = 0.0
+        val touchedKeys = mutableListOf<Pair<Int, Int>>()
 
         instructions.forEach { rawLine ->
             val line = rawLine.trim()
@@ -29,6 +30,11 @@ object UnipadAutoPlay {
                 // delay / d — advance timeline
                 cmd == "delay" || cmd == "d" -> {
                     val ms = data.getOrNull(1)?.toDoubleOrNull() ?: return@forEach
+                    touchedKeys.forEach { (x, y) ->
+                        val current = actions.getOrPut(currentTime + ms) { emptyList() }
+                        actions[currentTime + ms] = current + AutoPlayData.Action(x = x, y = y, down = false)
+                    }
+                    touchedKeys.clear()
                     currentTime += ms
                 }
 
@@ -61,10 +67,16 @@ object UnipadAutoPlay {
                     val y = rawX
                     val current = actions.getOrPut(currentTime) { emptyList() }
                     actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = true)
+                    touchedKeys.add(x to y)
                 }
 
                 else -> println("UnipadAutoPlay: unrecognised command '${data[0]}' in line: $line")
             }
+        }
+
+        touchedKeys.forEach { (x, y) ->
+            val current = actions.getOrPut(currentTime) { emptyList() }
+            actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = false)
         }
 
         return AutoPlayData(actions = actions)
