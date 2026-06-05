@@ -63,6 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
+import dev.anthonyhfm.amethyst.core.util.primaryModifierShortcutLabel
+import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
+import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
@@ -177,6 +180,8 @@ fun TrackInfo(
     val trackName = track.displayName(trackIndex, allTracks)
 
     val selections by SelectionManager.selections.collectAsState()
+    val clipboardData by ClipboardManager.clipboardData.collectAsState()
+    val canPasteTracks = clipboardData is ClipboardData.TimelineTracks
     val isSelected = selections.any { it is Selectable.TimelineTrack && it.trackIndex == trackIndex }
     val selectedAutomationLane = selections
         .filterIsInstance<Selectable.TimelineAutomationLane>()
@@ -440,6 +445,20 @@ fun TrackInfo(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TrackToggleChip(
+                                    label = "M",
+                                    active = track.isMuted,
+                                    activeContainer = activeChipContainer,
+                                    activeBorder = activeChipBorder,
+                                    activeContent = activeChipContent,
+                                    inactiveContainer = inactiveChipContainer,
+                                    inactiveBorder = inactiveChipBorder,
+                                    inactiveContent = inactiveChipContent,
+                                    onClick = {
+                                        SelectionManager.select(Selectable.TimelineTrack(trackIndex = trackIndex))
+                                        onTrackMuteToggle(trackIndex)
+                                    }
+                                )
+                                TrackToggleChip(
                                     label = "S",
                                     active = track.isSoloed,
                                     activeContainer = activeChipContainer,
@@ -470,20 +489,6 @@ fun TrackInfo(
                                         )
                                     }
                                 )
-                                TrackToggleChip(
-                                    label = "M",
-                                    active = track.isMuted,
-                                    activeContainer = activeChipContainer,
-                                    activeBorder = activeChipBorder,
-                                    activeContent = activeChipContent,
-                                    inactiveContainer = inactiveChipContainer,
-                                    inactiveBorder = inactiveChipBorder,
-                                    inactiveContent = inactiveChipContent,
-                                    onClick = {
-                                        SelectionManager.select(Selectable.TimelineTrack(trackIndex = trackIndex))
-                                        onTrackMuteToggle(trackIndex)
-                                    }
-                                )
                             }
 
                             Spacer(modifier = Modifier.weight(1f))
@@ -511,11 +516,25 @@ fun TrackInfo(
             }
         ) {
             TimelineContextMenuAction(
-                label = "Rename Track",
-                shortcut = "⌘/Ctrl+R",
-                enabled = renameTarget != null,
+                label = when {
+                    contextTrackIndices.size > 1 -> "Toggle Mute"
+                    track.isMuted -> "Unmute Track"
+                    else -> "Mute Track"
+                },
+                shortcut = "M",
                 onClick = {
-                    renameTarget?.let(TimelineCommandSurface::requestTrackRename)
+                    TimelineCommandSurface.toggleTrackMute(contextTrackIndices, allTracks)
+                }
+            )
+            TimelineContextMenuAction(
+                label = when {
+                    contextTrackIndices.size > 1 -> "Toggle Solo"
+                    track.isSoloed -> "Unsolo Track"
+                    else -> "Solo Track"
+                },
+                shortcut = "S",
+                onClick = {
+                    TimelineCommandSurface.toggleTrackSolo(contextTrackIndices, allTracks)
                 }
             )
             TimelineContextMenuAction(
@@ -529,26 +548,50 @@ fun TrackInfo(
                     )
                 }
             )
+            ContextMenuSeparator()
+            TimelineContextMenuAction(
+                label = "Rename Track",
+                shortcut = primaryModifierShortcutLabel("R"),
+                enabled = renameTarget != null,
+                onClick = {
+                    renameTarget?.let(TimelineCommandSurface::requestTrackRename)
+                }
+            )
             if (routedSourceTrackIndices.isNotEmpty()) {
                 TimelineContextMenuAction(
                     label = if (routedSourceTrackIndices.size == 1) "Select Routed Source" else "Select Routed Sources",
                     onClick = {
                         TimelineCommandSurface.selectRoutedSources(
                             trackIndex = trackIndex,
-                            tracks = allTracks
+                            tracks = allTracks,
                         )
-                    }
+                    },
                 )
             }
 
             TimelineContextMenuAction(
+                label = if (contextTrackIndices.size > 1) "Copy Tracks" else "Copy Track",
+                shortcut = primaryModifierShortcutLabel("C"),
+                onClick = {
+                    ClipboardManager.copy(
+                        contextTrackIndices.map { Selectable.TimelineTrack(trackIndex = it) }
+                    )
+                },
+            )
+            TimelineContextMenuAction(
+                label = if (contextTrackIndices.size > 1) "Paste Tracks" else "Paste Track",
+                shortcut = primaryModifierShortcutLabel("V"),
+                enabled = canPasteTracks,
+                onClick = { ClipboardManager.paste() },
+            )
+            TimelineContextMenuAction(
                 label = if (contextTrackIndices.size > 1) "Duplicate Tracks" else "Duplicate Track",
-                shortcut = "⌘/Ctrl+D",
+                shortcut = primaryModifierShortcutLabel("D"),
                 onClick = {
                     TimelineCommandExecutor.execute(
                         TimelineEditCommand.DuplicateTracks(contextTrackIndices)
                     )
-                }
+                },
             )
             ContextMenuSeparator()
             TimelineContextMenuAction(

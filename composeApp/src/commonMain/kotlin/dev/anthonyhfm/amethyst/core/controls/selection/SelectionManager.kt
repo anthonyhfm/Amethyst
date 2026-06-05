@@ -57,8 +57,22 @@ object SelectionManager {
             selections.value.filterIsInstance<Selectable.TimelineAutomationLane>().lastOrNull()
         lastSelectedChainDevice =
             selections.value.filterIsInstance<Selectable.ChainDevice>().lastOrNull()
-        _lastSelectedTimelineTrackIndex =
-            selections.value.filterIsInstance<Selectable.TimelineTrack>().lastOrNull()?.trackIndex
+        val trackIndexFromSelection = selections.value
+            .filterIsInstance<Selectable.TimelineTrack>()
+            .lastOrNull()
+            ?.trackIndex
+            ?: selections.value
+                .filterIsInstance<Selectable.TimelineEntryItem>()
+                .lastOrNull()
+                ?.trackIndex
+            ?: selections.value
+                .filterIsInstance<Selectable.TimelineAutomationLane>()
+                .lastOrNull()
+                ?.trackIndex
+
+        if (trackIndexFromSelection != null) {
+            _lastSelectedTimelineTrackIndex = trackIndexFromSelection
+        }
     }
 
     fun replaceSelections(updatedSelections: List<Selectable>) {

@@ -460,11 +460,21 @@ object TimelineCommandSurface {
         }
 
         if (visible) {
-            SelectionManager.selectTimelineAutomationLane(
+            val laneKey = laneKeys.first()
+            val laneSelection = Selectable.TimelineAutomationLane(
                 trackIndex = trackIndex,
-                target = laneKeys.first().target,
-                bindingId = laneKeys.first().bindingId
+                target = laneKey.target,
+                bindingId = laneKey.bindingId,
             )
+            val preservedSelections = SelectionManager.selections.value.filterNot {
+                it is Selectable.TimelineAutomationLane || it is Selectable.TimelineAutomationPoint
+            }
+            val updatedSelections = if (preservedSelections.isEmpty()) {
+                listOf(Selectable.TimelineTrack(trackIndex = trackIndex), laneSelection)
+            } else {
+                preservedSelections + laneSelection
+            }
+            SelectionManager.replaceSelections(updatedSelections)
         } else {
             removeAutomationSelections { selection ->
                 selection.trackIndex == trackIndex
@@ -490,7 +500,7 @@ object TimelineCommandSurface {
         tracks: List<TimelineTrack<*>> = TimelineRepository.tracks.value,
         selections: List<Selectable> = SelectionManager.selections.value
     ): Boolean {
-        val trackIndex = automationTrackIndexForSelection(
+        val trackIndex = primaryTrackIndexForSelection(
             tracks = tracks,
             selections = selections
         ) ?: return false
@@ -499,6 +509,46 @@ object TimelineCommandSurface {
             trackIndex = trackIndex,
             tracks = tracks
         ).didChange
+    }
+
+    fun toggleTrackMute(
+        trackIndices: Collection<Int>,
+        tracks: List<TimelineTrack<*>> = TimelineRepository.tracks.value
+    ): Boolean {
+        val indices = trackIndices.filter { it in tracks.indices }.distinct()
+        if (indices.isEmpty()) return false
+        return updateTrackStates(indices) {
+            isMuted = !isMuted
+            true
+        }.didChange
+    }
+
+    fun toggleTrackSolo(
+        trackIndices: Collection<Int>,
+        tracks: List<TimelineTrack<*>> = TimelineRepository.tracks.value
+    ): Boolean {
+        val indices = trackIndices.filter { it in tracks.indices }.distinct()
+        if (indices.isEmpty()) return false
+        return updateTrackStates(indices) {
+            isSoloed = !isSoloed
+            true
+        }.didChange
+    }
+
+    fun toggleMuteForSelection(
+        tracks: List<TimelineTrack<*>> = TimelineRepository.tracks.value,
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        val indices = trackIndicesForShortcutTarget(tracks = tracks, selections = selections)
+        return toggleTrackMute(indices, tracks)
+    }
+
+    fun toggleSoloForSelection(
+        tracks: List<TimelineTrack<*>> = TimelineRepository.tracks.value,
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        val indices = trackIndicesForShortcutTarget(tracks = tracks, selections = selections)
+        return toggleTrackSolo(indices, tracks)
     }
 
     private fun selectCreatedEntries(createdEntries: List<TimelineCreatedEntry>) {
@@ -516,34 +566,44 @@ object TimelineCommandSurface {
         }
     }
 
-    private fun automationTrackIndexForSelection(
+    private fun trackIndicesForShortcutTarget(
         tracks: List<TimelineTrack<*>>,
         selections: List<Selectable>
-    ): Int? {
-        val automationLaneSelection = selections
+    ): List<Int> {
+        val selectedTracks = selectedTrackIndices(selections).filter { it in tracks.indices }
+        if (selectedTracks.isNotEmpty()) return selectedTracks
+
+        val entryTrackIndices = selections
+            .filterIsInstance<Selectable.TimelineEntryItem>()
+            .map(Selectable.TimelineEntryItem::trackIndex)
+            .distinct()
+            .filter { it in tracks.indices }
+        if (entryTrackIndices.isNotEmpty()) return entryTrackIndices
+
+        selections
             .filterIsInstance<Selectable.TimelineAutomationLane>()
             .lastOrNull()
             ?.trackIndex
-        if (automationLaneSelection != null) {
-            return automationLaneSelection
-        }
+            ?.takeIf { it in tracks.indices }
+            ?.let { return listOf(it) }
 
-        return when {
-            selectedTrackIndices(selections).size == 1 -> {
-                selectedTrackIndices(selections).single()
-                    .takeIf { it in tracks.indices }
-            }
+        return SelectionManager.lastSelectedTimelineTrackIndex
+            ?.takeIf { it in tracks.indices }
+            ?.let { listOf(it) }
+            .orEmpty()
+    }
 
-            selections.filterIsInstance<Selectable.TimelineEntryItem>().size == 1 -> {
-                selections
-                    .filterIsInstance<Selectable.TimelineEntryItem>()
-                    .single()
-                    .trackIndex
-                    .takeIf { it in tracks.indices }
-            }
+    private fun primaryTrackIndexForSelection(
+        tracks: List<TimelineTrack<*>>,
+        selections: List<Selectable>
+    ): Int? {
+        val indices = trackIndicesForShortcutTarget(tracks = tracks, selections = selections)
+        if (indices.isEmpty()) return null
+        if (indices.size == 1) return indices.single()
 
-            else -> null
-        }
+        return SelectionManager.lastSelectedTimelineTrackIndex
+            ?.takeIf { it in indices }
+            ?: indices.last()
     }
 
     private fun trackAutomationLaneKeys(track: TimelineTrack<*>): List<TimelineAutomationLaneKey> {

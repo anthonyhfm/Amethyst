@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
+import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 
 sealed interface ClipboardData {
     data class ChainDevice(
@@ -48,5 +49,9 @@ sealed interface ClipboardData {
 
     data class PianoRollNotes(
         val notes: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>
+    ) : ClipboardData
+
+    data class TimelineTracks(
+        val tracks: List<TimelineTrack<*>>,
     ) : ClipboardData
 }

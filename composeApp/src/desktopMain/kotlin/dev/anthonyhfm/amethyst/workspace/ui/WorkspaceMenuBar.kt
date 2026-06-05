@@ -8,15 +8,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.MenuBar
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
-import dev.anthonyhfm.amethyst.core.util.Platform
-import dev.anthonyhfm.amethyst.core.util.platform
+import dev.anthonyhfm.amethyst.core.util.primaryKeyShortcut
+import dev.anthonyhfm.amethyst.core.util.redoKeyShortcut
 import dev.anthonyhfm.amethyst.desktop.about.showAboutDialog
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
@@ -77,7 +76,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
         Menu(text = "File") {
             Item(
                 text = "Open Project...",
-                shortcut = primaryShortcut(Key.O),
+                shortcut = primaryKeyShortcut(Key.O),
                 onClick = {
                     requestProjectChange {
                         viewModel.openProject()
@@ -110,7 +109,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
 
             Item(
                 text = "Save",
-                shortcut = primaryShortcut(Key.S),
+                shortcut = primaryKeyShortcut(Key.S),
                 onClick = {
                     viewModel.saveProject()
                 }
@@ -118,7 +117,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
 
             Item(
                 text = "Save As...",
-                shortcut = primaryShortcut(Key.S, shift = true),
+                shortcut = primaryKeyShortcut(Key.S, shift = true),
                 onClick = {
                     viewModel.saveProjectAs()
                 }
@@ -128,7 +127,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
 
             Item(
                 text = "Close Project",
-                shortcut = primaryShortcut(Key.W, shift = true),
+                shortcut = primaryKeyShortcut(Key.W, shift = true),
                 onClick = {
                     window.dispatchEvent(WindowEvent(window, WindowEvent.WINDOW_CLOSING))
                 }
@@ -139,7 +138,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Undo",
                 enabled = editState.canUndo,
-                shortcut = undoShortcut(),
+                shortcut = primaryKeyShortcut(Key.Z),
                 onClick = {
                     WorkspaceMenuCommandSurface.undo()
                 }
@@ -148,7 +147,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Redo",
                 enabled = editState.canRedo,
-                shortcut = redoShortcut(),
+                shortcut = redoKeyShortcut(),
                 onClick = {
                     WorkspaceMenuCommandSurface.redo()
                 }
@@ -159,7 +158,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Cut",
                 enabled = editState.canCut,
-                shortcut = primaryShortcut(Key.X),
+                shortcut = primaryKeyShortcut(Key.X),
                 onClick = {
                     WorkspaceMenuCommandSurface.cut()
                 }
@@ -168,7 +167,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Copy",
                 enabled = editState.canCopy,
-                shortcut = primaryShortcut(Key.C),
+                shortcut = primaryKeyShortcut(Key.C),
                 onClick = {
                     WorkspaceMenuCommandSurface.copy()
                 }
@@ -177,7 +176,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Paste",
                 enabled = editState.canPaste,
-                shortcut = primaryShortcut(Key.V),
+                shortcut = primaryKeyShortcut(Key.V),
                 onClick = {
                     WorkspaceMenuCommandSurface.paste()
                 }
@@ -196,7 +195,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Duplicate",
                 enabled = editState.canDuplicate,
-                shortcut = primaryShortcut(Key.D),
+                shortcut = primaryKeyShortcut(Key.D),
                 onClick = {
                     WorkspaceMenuCommandSurface.duplicate()
                 }
@@ -205,7 +204,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Rename",
                 enabled = editState.canRename,
-                shortcut = primaryShortcut(Key.R),
+                shortcut = primaryKeyShortcut(Key.R),
                 onClick = {
                     WorkspaceMenuCommandSurface.rename()
                 }
@@ -216,7 +215,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Item(
                 text = "Select All",
                 enabled = editState.canSelectAll,
-                shortcut = primaryShortcut(Key.A),
+                shortcut = primaryKeyShortcut(Key.A),
                 onClick = {
                     WorkspaceMenuCommandSurface.selectAll()
                 }
@@ -227,7 +226,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             if (editState.canCloseCurrentTool) {
                 Item(
                     text = "Close ${mode.displayName}",
-                    shortcut = primaryShortcut(Key.W),
+                    shortcut = primaryKeyShortcut(Key.W),
                     onClick = {
                         WorkspaceMenuCommandSurface.closeCurrentTool()
                     }
@@ -389,7 +388,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
         Menu(text = "Window") {
             Item(
                 text = "Minimize",
-                shortcut = primaryShortcut(Key.M),
+                shortcut = primaryKeyShortcut(Key.M),
                 onClick = {
                     window.extendedState = window.extendedState or Frame.ICONIFIED
                 }
@@ -407,7 +406,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
         Menu(text = "Help") {
             Item(
                 text = "Settings...",
-                shortcut = primaryShortcut(Key.Comma),
+                shortcut = primaryKeyShortcut(Key.Comma),
                 onClick = {
                     showSettingsWindow()
                 }
@@ -451,28 +450,6 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                 }
             )
         }
-    }
-}
-
-private fun primaryShortcut(
-    key: Key,
-    shift: Boolean = false,
-    alt: Boolean = false
-): KeyShortcut {
-    return if (platform == Platform.Desktop.MacOS) {
-        KeyShortcut(key = key, meta = true, shift = shift, alt = alt)
-    } else {
-        KeyShortcut(key = key, ctrl = true, shift = shift, alt = alt)
-    }
-}
-
-private fun undoShortcut(): KeyShortcut = primaryShortcut(Key.Z)
-
-private fun redoShortcut(): KeyShortcut {
-    return if (platform == Platform.Desktop.MacOS) {
-        KeyShortcut(key = Key.Z, meta = true, shift = true)
-    } else {
-        KeyShortcut(key = Key.Y, ctrl = true)
     }
 }
 

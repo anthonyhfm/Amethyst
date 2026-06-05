@@ -67,8 +67,24 @@ object ClipboardManager {
                             return
                         }
                     }
-                } else {
+                }
+            }
 
+            data.any { it is Selectable.TimelineTrack } &&
+                data.none { it is Selectable.TimelineEntryItem } -> {
+                val trackIndices = data
+                    .filterIsInstance<Selectable.TimelineTrack>()
+                    .map(Selectable.TimelineTrack::trackIndex)
+                    .distinct()
+                    .sorted()
+                val tracks = trackIndices.mapNotNull { trackIndex ->
+                    TimelineRepository.tracks.value
+                        .getOrNull(trackIndex)
+                        ?.deepCopy(preserveTrackIdentity = false)
+                }
+                if (tracks.isNotEmpty()) {
+                    setClipboardData(ClipboardData.TimelineTracks(tracks = tracks))
+                    return
                 }
             }
 
@@ -345,10 +361,55 @@ object ClipboardManager {
                 pianoRollMode.pasteNotes(clip.notes)
             }
 
-            else -> {
-                println("You cannot copy this right now")
+            is ClipboardData.TimelineTracks -> {
+                if (clip.tracks.isEmpty()) return
+
+                val anchorIndex = resolveTimelineTrackPasteAnchor()
+                val current = TimelineRepository.tracks.value.toMutableList()
+                val insertAt = (anchorIndex + 1).coerceIn(0, current.size)
+                val pastedIndices = mutableListOf<Int>()
+
+                clip.tracks.forEachIndexed { offset, track ->
+                    val targetIndex = insertAt + offset
+                    current.add(targetIndex, track)
+                    pastedIndices += targetIndex
+                    UndoManager.addAction(
+                        UndoableAction.TrackAddition(
+                            trackIndex = targetIndex,
+                            track = track,
+                        )
+                    )
+                }
+
+                TimelineRepository.updateTracksSnapshot(current.toList())
+                SelectionManager.selectTimelineTracks(
+                    trackIndices = pastedIndices,
+                    anchorTrackIndex = pastedIndices.lastOrNull(),
+                )
             }
+
+            else -> Unit
         }
+    }
+
+    private fun resolveTimelineTrackPasteAnchor(): Int {
+        val selections = SelectionManager.selections.value
+        val selectedTrackIndices = selections
+            .filterIsInstance<Selectable.TimelineTrack>()
+            .map(Selectable.TimelineTrack::trackIndex)
+        if (selectedTrackIndices.isNotEmpty()) {
+            return selectedTrackIndices.max()
+        }
+
+        selections
+            .filterIsInstance<Selectable.TimelineEntryItem>()
+            .lastOrNull()
+            ?.trackIndex
+            ?.let { return it }
+
+        SelectionManager.lastSelectedTimelineTrackIndex?.let { return it }
+
+        return TimelineRepository.tracks.value.lastIndex.coerceAtLeast(0)
     }
 
     private fun resolveTimelinePasteAnchor(): Pair<Int, Long> {

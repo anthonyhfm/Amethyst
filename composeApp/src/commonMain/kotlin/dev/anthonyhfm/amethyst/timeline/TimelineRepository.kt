@@ -391,7 +391,6 @@ object TimelineRepository {
             else -> return null
         }
 
-        SelectionManager.clear()
         val current = tracks.value.toMutableList()
         current.add(trackIndex + 1, duplicate)
         updateTracksSnapshot(current.toList())
