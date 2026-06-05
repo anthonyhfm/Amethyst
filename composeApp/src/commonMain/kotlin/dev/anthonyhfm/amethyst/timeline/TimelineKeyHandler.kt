@@ -18,6 +18,7 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.utils.TimelineClipUtils
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 object TimelineKeyHandler {
     fun canCopySelection(
@@ -75,6 +76,7 @@ object TimelineKeyHandler {
 
     fun handleKeyInput(keyEvent: KeyEvent): Boolean {
         if (keyEvent.type != KeyEventType.KeyDown) return false
+        if (WorkspaceRepository.isInputFocused) return false
 
         return when {
             keyEvent.key == Key.Spacebar && keyEvent.hasNoShortcutModifier() -> handleTogglePlayPause()
