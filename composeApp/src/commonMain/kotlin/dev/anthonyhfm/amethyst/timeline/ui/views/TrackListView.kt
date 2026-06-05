@@ -50,8 +50,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
@@ -291,14 +289,11 @@ fun TrackInfo(
                         .border(1.dp, trackHeaderColors.border, trackShape)
                         .background(trackHeaderColors.container)
                         .pointerInput(trackIndex, visibleTrackIndices) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.type != PointerEventType.Press || !event.buttons.isPrimaryPressed) {
-                                        continue
-                                    }
-
-                                    val change = event.changes.firstOrNull() ?: continue
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    TimelineCommandSurface.requestTrackRename(trackIndex)
+                                },
+                                onTap = {
                                     when {
                                         ModifierKeysState.isShiftPressed -> {
                                             TimelineCommandSurface.selectTrackRange(
@@ -316,10 +311,8 @@ fun TrackInfo(
                                             SelectionManager.select(Selectable.TimelineTrack(trackIndex = trackIndex))
                                         }
                                     }
-
-                                    change.consume()
-                                }
-                            }
+                                },
+                            )
                         }
                         .padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(0.dp),
