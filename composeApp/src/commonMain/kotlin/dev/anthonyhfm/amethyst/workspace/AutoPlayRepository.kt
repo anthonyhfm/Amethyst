@@ -67,6 +67,11 @@ object AutoPlayRepository {
         _state.value = AutoPlayState.PLAYING
         startProgressTracking()
 
+        // Automatically stop when the last action has played
+        Heaven.schedule(totalDuration - playbackOffset, this) {
+            stopAutoPlay()
+        }
+
         autoplay.actions.entries.forEach { entry ->
             val adjustedDelay = entry.key - playbackOffset
             if (adjustedDelay >= 0) {
