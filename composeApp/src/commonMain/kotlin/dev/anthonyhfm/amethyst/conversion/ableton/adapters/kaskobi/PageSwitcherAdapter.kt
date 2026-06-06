@@ -58,7 +58,7 @@ class PageSwitcherAdapter(
                                         for (i in 0..7) { // Page 8-16
                                             add(
                                                 Group(
-                                                    name = "Page ${8 + 1}",
+                                                    name = "Page ${8 + i}",
                                                     stateChain = StateChain(
                                                         devices = listOf(
                                                             CoordinateFilterChainDeviceState(
