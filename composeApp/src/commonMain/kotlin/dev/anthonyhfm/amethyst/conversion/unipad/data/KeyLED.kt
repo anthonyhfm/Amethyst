@@ -75,22 +75,23 @@ object KeyLED {
 
             // on / o  — turn LED on
             if (cmd == "on" || cmd == "o") {
-                if (inst.size < 4) {
+                val isLogo = inst.getOrNull(1)?.lowercase().let { it == "l" || it == "logo" }
+                if (!isLogo && inst.size < 4) {
                     println("KeyLED: skipping malformed 'on' line: $event")
                     return@forEach
                 }
 
-                val isMc = inst[1].lowercase() == "mc" || inst[1] == "*"
-                val colorToken = inst[3].trim().lowercase()
+                val colorToken = if (isLogo) inst.getOrNull(2)?.trim()?.lowercase() else inst.getOrNull(3)?.trim()?.lowercase()
 
                 val color: Color = when {
-                    // auto + velocity  (5 tokens: on x y auto velocity)
+                    // auto + velocity  (5 tokens: on x y auto velocity / o l a velocity)
                     colorToken == "auto" || colorToken == "a" -> {
-                        if (inst.size < 5) {
+                        val velocityIdx = if (isLogo) 3 else 4
+                        if (inst.size < velocityIdx + 1) {
                             println("KeyLED: 'auto' color requires velocity token: $event")
                             return@forEach
                         }
-                        val velocity = inst[4].trim().toIntOrNull() ?: run {
+                        val velocity = inst[velocityIdx].trim().toIntOrNull() ?: run {
                             println("KeyLED: invalid velocity in: $event")
                             return@forEach
                         }
@@ -98,7 +99,7 @@ object KeyLED {
                         Color(r / 63f, g / 63f, b / 63f)
                     }
                     // 6-digit HEX  (4 tokens: on x y RRGGBB)
-                    colorToken.length == 6 && colorToken.all { it.isDigit() || it in 'a'..'f' } -> {
+                    !isLogo && colorToken != null && colorToken.length == 6 && colorToken.all { it.isDigit() || it in 'a'..'f' } -> {
                         val r = colorToken.substring(0, 2).toInt(16) / 255f
                         val g = colorToken.substring(2, 4).toInt(16) / 255f
                         val b = colorToken.substring(4, 6).toInt(16) / 255f
@@ -110,55 +111,75 @@ object KeyLED {
                     }
                 }
 
-                if (isMc) {
-                    val idx = inst[2].toIntOrNull() ?: return@forEach
-                    if (idx < 0 || idx >= mcCoordinates.size) return@forEach
-                    val (cx, cy) = mcCoordinates[idx]
+                if (isLogo) {
+                    val (cx, cy) = mcCoordinates[0]
                     currentFrame = currentFrame.copy(
                         entries = currentFrame.entries
                             .filter { it.x != cx || it.y != cy }
                             .plus(KeyframesChainDeviceContract.KeyframesEntry(x = cx, y = cy, r = color.red, g = color.green, b = color.blue))
                     )
                 } else {
-                    // Docs: on x y color  → inst[1]=x, inst[2]=y
-                    val rawX = inst[1].toIntOrNull() ?: return@forEach
-                    val rawY = inst[2].toIntOrNull() ?: return@forEach
-                    val x = rawY
-                    val y = rawX
-                    currentFrame = currentFrame.copy(
-                        entries = currentFrame.entries
-                            .filter { it.x != x || it.y != y }
-                            .plus(KeyframesChainDeviceContract.KeyframesEntry(x = x, y = y, r = color.red, g = color.green, b = color.blue))
-                    )
+                    val isMc = inst.getOrNull(1)?.lowercase().let { it == "mc" || it == "*" }
+                    if (isMc) {
+                        val idx = inst[2].toIntOrNull() ?: return@forEach
+                        if (idx < 0 || idx >= mcCoordinates.size) return@forEach
+                        val (cx, cy) = mcCoordinates[idx]
+                        currentFrame = currentFrame.copy(
+                            entries = currentFrame.entries
+                                .filter { it.x != cx || it.y != cy }
+                                .plus(KeyframesChainDeviceContract.KeyframesEntry(x = cx, y = cy, r = color.red, g = color.green, b = color.blue))
+                        )
+                    } else {
+                        // Docs: on x y color  → inst[1]=x, inst[2]=y
+                        val rawX = inst[1].toIntOrNull() ?: return@forEach
+                        val rawY = inst[2].toIntOrNull() ?: return@forEach
+                        val x = rawY
+                        val y = rawX
+                        currentFrame = currentFrame.copy(
+                            entries = currentFrame.entries
+                                .filter { it.x != x || it.y != y }
+                                .plus(KeyframesChainDeviceContract.KeyframesEntry(x = x, y = y, r = color.red, g = color.green, b = color.blue))
+                        )
+                    }
                 }
             }
 
             // off / f  — turn LED off
             else if (cmd == "off" || cmd == "f") {
-                if (inst.size < 3) {
+                val isLogo = inst.getOrNull(1)?.lowercase().let { it == "l" || it == "logo" }
+                if (!isLogo && inst.size < 3) {
                     println("KeyLED: skipping malformed 'off' line: $event")
                     return@forEach
                 }
-                val isMc = inst[1].lowercase() == "mc" || inst[1] == "*"
-                if (isMc) {
-                    val idx = inst[2].toIntOrNull() ?: return@forEach
-                    if (idx < 0 || idx >= mcCoordinates.size) return@forEach
-                    val (cx, cy) = mcCoordinates[idx]
+                if (isLogo) {
+                    val (cx, cy) = mcCoordinates[0]
                     currentFrame = currentFrame.copy(
                         entries = currentFrame.entries
                             .filter { it.x != cx || it.y != cy }
                             .plus(KeyframesChainDeviceContract.KeyframesEntry(x = cx, y = cy, r = 0f, g = 0f, b = 0f))
                     )
                 } else {
-                    val rawX = inst[1].toIntOrNull() ?: return@forEach
-                    val rawY = inst[2].toIntOrNull() ?: return@forEach
-                    val x = rawY
-                    val y = rawX
-                    currentFrame = currentFrame.copy(
-                        entries = currentFrame.entries
-                            .filter { it.x != x || it.y != y }
-                            .plus(KeyframesChainDeviceContract.KeyframesEntry(x = x, y = y, r = 0f, g = 0f, b = 0f))
-                    )
+                    val isMc = inst.getOrNull(1)?.lowercase().let { it == "mc" || it == "*" }
+                    if (isMc) {
+                        val idx = inst[2].toIntOrNull() ?: return@forEach
+                        if (idx < 0 || idx >= mcCoordinates.size) return@forEach
+                        val (cx, cy) = mcCoordinates[idx]
+                        currentFrame = currentFrame.copy(
+                            entries = currentFrame.entries
+                                .filter { it.x != cx || it.y != cy }
+                                .plus(KeyframesChainDeviceContract.KeyframesEntry(x = cx, y = cy, r = 0f, g = 0f, b = 0f))
+                        )
+                    } else {
+                        val rawX = inst[1].toIntOrNull() ?: return@forEach
+                        val rawY = inst[2].toIntOrNull() ?: return@forEach
+                        val x = rawY
+                        val y = rawX
+                        currentFrame = currentFrame.copy(
+                            entries = currentFrame.entries
+                                .filter { it.x != x || it.y != y }
+                                .plus(KeyframesChainDeviceContract.KeyframesEntry(x = x, y = y, r = 0f, g = 0f, b = 0f))
+                        )
+                    }
                 }
             }
 
@@ -211,8 +232,14 @@ object KeyLED {
 
         val parsed = entries.mapNotNull { path ->
             val parts = path.split(" ")
+            val sub = parts.getOrNull(1)?.lowercase()
 
-            val rawX = parts.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
+            if (sub == "l" || sub == "logo") {
+                val coords = mcCoordinates[0]
+                return@mapNotNull LedEntry(path, coords.first, coords.second, parts.getOrNull(2)?.toIntOrNull() ?: 1)
+            }
+
+            val rawX = sub?.toIntOrNull() ?: return@mapNotNull null
             val rawY = parts.getOrNull(2)?.toIntOrNull() ?: return@mapNotNull null
             val x = rawY
             val y = rawX
