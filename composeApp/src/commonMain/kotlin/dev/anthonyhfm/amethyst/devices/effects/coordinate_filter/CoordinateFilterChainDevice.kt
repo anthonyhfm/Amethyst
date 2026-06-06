@@ -151,10 +151,10 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
                         )
                     }
             } else {
-                // Legacy fallback: global coordinate pairs (from old saves / Ableton imports)
+                // Legacy fallback: global coordinate pairs (from old saves / Ableton imports).
                 currentState.filters.map { (gx, gy) ->
                     RawLEDUpdate(
-                        index = gx + gy * 10,
+                        index = gx + (9 - gy) * 10,
                         color = Color.Green
                     )
                 }
