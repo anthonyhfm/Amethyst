@@ -131,6 +131,7 @@ object AutoPlayRepository {
 
     fun stopAutoPlay() {
         Heaven.cancelJobsForOwner(this)
+        Heaven.clear()
         progressJob?.cancel()
         progressJob = null
         _progress.value = 0f
