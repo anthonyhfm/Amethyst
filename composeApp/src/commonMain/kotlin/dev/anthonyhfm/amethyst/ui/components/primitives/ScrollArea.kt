@@ -6,8 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.ScrollableState
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,7 +26,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,8 +38,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -232,13 +235,15 @@ fun ScrollBar(
         (scrollRange.toFloat() * (scrollValue.toFloat() / maxScrollValue.toFloat())).roundToInt()
     } else 0
 
-    val draggableState = rememberDraggableState { delta ->
-        if (scrollRange > 0 && maxScrollValue > 0) {
-            val scrollDelta = (delta / scrollRange.toFloat()) * maxScrollValue.toFloat()
-            val newScroll = (scrollValue + scrollDelta).roundToInt().coerceIn(0, maxScrollValue)
-            onScrollTo(newScroll)
-        }
-    }
+    val layoutDirection = LocalLayoutDirection.current
+    val reverseThumbDrag = orientation == ScrollBarOrientation.Horizontal &&
+        layoutDirection == LayoutDirection.Rtl
+    val scrollValueState by rememberUpdatedState(scrollValue)
+    val scrollRangeState by rememberUpdatedState(scrollRange)
+    val maxScrollValueState by rememberUpdatedState(maxScrollValue)
+    val onScrollToState by rememberUpdatedState(onScrollTo)
+    var dragStartScroll by remember { mutableFloatStateOf(0f) }
+    var dragAccumulatedPx by remember { mutableFloatStateOf(0f) }
 
     if (maxScrollValue <= 0) return
 
@@ -281,13 +286,30 @@ fun ScrollBar(
                     )
                     .clip(FullShape)
                     .background(Theme[colors][border])
-                    .draggable(
-                        state = draggableState,
-                        orientation = when (orientation) {
-                            ScrollBarOrientation.Vertical -> Orientation.Vertical
-                            ScrollBarOrientation.Horizontal -> Orientation.Horizontal
-                        },
-                    )
+                    .pointerInput(orientation, reverseThumbDrag, scrollRange, maxScrollValue) {
+                        detectDragGestures(
+                            onDragStart = {
+                                dragStartScroll = scrollValueState.toFloat()
+                                dragAccumulatedPx = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                val range = scrollRangeState
+                                val maxScroll = maxScrollValueState
+                                if (range <= 0 || maxScroll <= 0) return@detectDragGestures
+                                val delta = when (orientation) {
+                                    ScrollBarOrientation.Vertical -> dragAmount.y
+                                    ScrollBarOrientation.Horizontal -> {
+                                        if (reverseThumbDrag) -dragAmount.x else dragAmount.x
+                                    }
+                                }
+                                dragAccumulatedPx += delta
+                                val newScroll = dragStartScroll +
+                                    (dragAccumulatedPx / range.toFloat()) * maxScroll.toFloat()
+                                onScrollToState(newScroll.roundToInt().coerceIn(0, maxScroll))
+                            },
+                        )
+                    }
             )
         }
     }

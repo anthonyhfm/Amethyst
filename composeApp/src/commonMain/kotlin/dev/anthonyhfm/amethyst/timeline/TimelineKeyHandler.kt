@@ -18,6 +18,7 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.utils.TimelineClipUtils
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 object TimelineKeyHandler {
     fun canCopySelection(
@@ -25,7 +26,8 @@ object TimelineKeyHandler {
     ): Boolean {
         return activeAutomationRangeSelection(selections) != null ||
             selections.any { it is Selectable.TimelineRange } ||
-            selections.any { it is Selectable.TimelineEntryItem }
+            selections.any { it is Selectable.TimelineEntryItem } ||
+            selections.any { it is Selectable.TimelineTrack }
     }
 
     fun canCutSelection(
@@ -75,12 +77,15 @@ object TimelineKeyHandler {
 
     fun handleKeyInput(keyEvent: KeyEvent): Boolean {
         if (keyEvent.type != KeyEventType.KeyDown) return false
+        if (WorkspaceRepository.isInputFocused) return false
 
         return when {
             keyEvent.key == Key.Spacebar && keyEvent.hasNoShortcutModifier() -> handleTogglePlayPause()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.R -> renameSelection()
             keyEvent.key == Key.A && keyEvent.isAltPressed -> handleAutomappingTrigger()
             keyEvent.key == Key.A && keyEvent.hasNoShortcutModifier() -> handleToggleAutomation()
+            keyEvent.key == Key.M && keyEvent.hasNoShortcutModifier() -> handleToggleMute()
+            keyEvent.key == Key.S && keyEvent.hasNoShortcutModifier() -> handleToggleSolo()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.E -> handleCutAtSelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.C -> copySelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.X -> cutSelection()
@@ -139,6 +144,14 @@ object TimelineKeyHandler {
         return TimelineCommandSurface.toggleAutomationForSelection()
     }
 
+    private fun handleToggleMute(): Boolean {
+        return TimelineCommandSurface.toggleMuteForSelection()
+    }
+
+    private fun handleToggleSolo(): Boolean {
+        return TimelineCommandSurface.toggleSoloForSelection()
+    }
+
     private fun handleCutAtSelection(): Boolean {
         val selection = SelectionManager.selections.value
             .filterIsInstance<Selectable.TimelineTime>()
@@ -160,6 +173,12 @@ object TimelineKeyHandler {
         val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
         if (entrySelections.isNotEmpty()) {
             ClipboardManager.copy(entrySelections)
+            return true
+        }
+
+        val trackSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTrack>()
+        if (trackSelections.isNotEmpty()) {
+            ClipboardManager.copy(trackSelections)
             return true
         }
 
@@ -264,7 +283,6 @@ object TimelineKeyHandler {
             TimelineCommandExecutor.execute(
                 TimelineEditCommand.DeleteTracks(trackSelections.map { it.trackIndex })
             )
-            SelectionManager.clear()
             return true
         }
 

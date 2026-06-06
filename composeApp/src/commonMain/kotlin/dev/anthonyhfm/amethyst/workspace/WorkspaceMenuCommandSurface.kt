@@ -214,7 +214,8 @@ object WorkspaceMenuCommandSurface {
             is WorkspaceContract.WorkspaceMode.Timeline -> {
                 clipboard is ClipboardData.TimelineAudioEntries ||
                     clipboard is ClipboardData.TimelineAudioRange ||
-                    clipboard is ClipboardData.TimelineMidiEntries
+                    clipboard is ClipboardData.TimelineMidiEntries ||
+                    clipboard is ClipboardData.TimelineTracks
             }
 
             is WorkspaceContract.WorkspaceMode.LightsChain -> canPasteIntoChainMode(

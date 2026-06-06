@@ -34,6 +34,7 @@ import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.viewport.wheelZoomScaleFactor
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -177,6 +178,11 @@ fun TimelineLaneView(
                             }
                         }
                     }
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    SelectionManager.clear()
                 }
             }
             .pointerInput(Unit) {

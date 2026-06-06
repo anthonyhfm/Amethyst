@@ -355,10 +355,25 @@ object TimelineRepository {
 
     fun removeTrack(trackIndex: Int) {
         if (trackIndex !in tracks.value.indices) return
-        SelectionManager.clear()
         val current = tracks.value.toMutableList()
         current.removeAt(trackIndex)
         updateTracksSnapshot(current.toList())
+
+        val selectionIndex = when {
+            current.isEmpty() -> null
+            trackIndex <= current.lastIndex -> trackIndex
+            trackIndex > 0 -> trackIndex - 1
+            else -> null
+        }
+
+        if (selectionIndex == null) {
+            SelectionManager.clear()
+        } else {
+            SelectionManager.selectTimelineTracks(
+                trackIndices = listOf(selectionIndex),
+                anchorTrackIndex = selectionIndex,
+            )
+        }
     }
 
     fun insertTrack(trackIndex: Int, track: TimelineTrack<*>) {
@@ -391,7 +406,6 @@ object TimelineRepository {
             else -> return null
         }
 
-        SelectionManager.clear()
         val current = tracks.value.toMutableList()
         current.add(trackIndex + 1, duplicate)
         updateTracksSnapshot(current.toList())

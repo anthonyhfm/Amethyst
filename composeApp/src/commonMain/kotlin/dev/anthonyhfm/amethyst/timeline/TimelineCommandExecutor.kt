@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline
 
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
@@ -101,9 +102,11 @@ object TimelineCommandExecutor {
 
     private fun duplicateTracks(trackIndices: List<Int>): TimelineCommandResult {
         var didChange = false
+        val duplicatedIndices = mutableListOf<Int>()
 
         trackIndices.distinct().sortedDescending().forEach { trackIndex ->
             val duplicated = TimelineRepository.duplicateTrack(trackIndex) ?: return@forEach
+            duplicatedIndices += trackIndex + 1
             UndoManager.addAction(
                 UndoableAction.TrackDuplication(
                     originalIndex = trackIndex,
@@ -112,6 +115,14 @@ object TimelineCommandExecutor {
                 )
             )
             didChange = true
+        }
+
+        if (duplicatedIndices.isNotEmpty()) {
+            val sortedIndices = duplicatedIndices.sorted()
+            SelectionManager.selectTimelineTracks(
+                trackIndices = sortedIndices,
+                anchorTrackIndex = sortedIndices.last(),
+            )
         }
 
         return TimelineCommandResult(didChange = didChange)

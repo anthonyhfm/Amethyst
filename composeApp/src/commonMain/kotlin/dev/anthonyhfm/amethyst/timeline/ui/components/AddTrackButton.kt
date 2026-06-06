@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.ui.components.AmethystContextMenu
 import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
@@ -45,7 +46,10 @@ fun AddTrackButton(
         contentAlignment = Alignment.Center,
     ) {
         Button(
-            onClick = { showDropdown = true },
+            onClick = {
+                SelectionManager.clear()
+                showDropdown = true
+            },
             modifier = Modifier.fillMaxWidth(),
             variant = ButtonVariant.Outline,
             size = ButtonSize.Default,

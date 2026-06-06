@@ -158,8 +158,17 @@ fun MacroList() {
                         WorkspaceRepository.removeMacro(index)
                     }
                 ) {
-                    Icon(Lucide.Trash2, null, modifier = Modifier.size(16.dp))
-                    Text("Delete Macro", modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Lucide.Trash2,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Theme[colors][destructive],
+                    )
+                    Text(
+                        text = "Delete Macro",
+                        modifier = Modifier.weight(1f),
+                        color = Theme[colors][destructive],
+                    )
                 }
             }
         }

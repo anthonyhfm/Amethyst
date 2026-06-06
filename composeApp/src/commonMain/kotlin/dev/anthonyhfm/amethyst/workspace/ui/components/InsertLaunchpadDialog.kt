@@ -104,18 +104,18 @@ fun InsertLaunchpadDialog(
             ),
             VirtualLaunchpadOption(
                 category = LaunchpadCategory.Novation,
-                title = "Idealised",
-                device = ViewportLaunchpadIdealised(interactive = false),
-            ),
-            VirtualLaunchpadOption(
-                category = LaunchpadCategory.Novation,
-                title = "Launchpad Pro Mk3",
+                title = "Launchpad Pro MK3",
                 device = ViewportLaunchpadProMk3(interactive = false),
             ),
             VirtualLaunchpadOption(
                 category = LaunchpadCategory.Novation,
-                title = "Launchpad Mk2",
+                title = "Launchpad MK2",
                 device = ViewportLaunchpadMk2(interactive = false),
+            ),
+            VirtualLaunchpadOption(
+                category = LaunchpadCategory.Novation,
+                title = "Idealised",
+                device = ViewportLaunchpadIdealised(interactive = false),
             ),
             VirtualLaunchpadOption(
                 category = LaunchpadCategory.Other,

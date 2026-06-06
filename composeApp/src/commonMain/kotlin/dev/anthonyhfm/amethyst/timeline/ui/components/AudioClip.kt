@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import dev.anthonyhfm.amethyst.core.util.primaryModifierShortcutLabel
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
@@ -502,7 +503,7 @@ fun AudioClip(
         ) {
             TimelineContextMenuAction(
                 label = "Rename Clip",
-                shortcut = "⌘/Ctrl+R",
+                shortcut = primaryModifierShortcutLabel("R"),
                 enabled = renameTarget != null,
                 onClick = {
                     renameTarget?.let {
@@ -515,7 +516,7 @@ fun AudioClip(
             )
             TimelineContextMenuAction(
                 label = if (contextEntryTargets.size > 1) "Duplicate Clips" else "Duplicate Clip",
-                shortcut = "⌘/Ctrl+D",
+                shortcut = primaryModifierShortcutLabel("D"),
                 onClick = { TimelineCommandSurface.duplicateEntries(contextEntryTargets) }
             )
             ContextMenuSeparator()

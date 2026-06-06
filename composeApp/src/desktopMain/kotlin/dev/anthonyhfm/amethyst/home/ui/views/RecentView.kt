@@ -481,7 +481,7 @@ private fun EmptyRecentProjectsCard(
     ) {
         CardHeader {
             CardTitle("No recent projects yet")
-            CardDescription("Open an existing `.ame` workspace or create a new project to start building your next performance.")
+            CardDescription("Create a new project or open an existing `.ame` workspace. Alternatively, convert an Ableton, Apollo or UniPad project into an Amethyst workspace!")
         }
 
         // CardContent {
