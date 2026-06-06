@@ -67,8 +67,8 @@ object AutoPlayRepository {
         _state.value = AutoPlayState.PLAYING
         startProgressTracking()
 
-        // Automatically stop when the last action has played
-        Heaven.schedule(totalDuration - playbackOffset, this) {
+        // Automatically stop when the last action has played (+ a small buffer to ensure last keys are turned off)
+        Heaven.schedule(totalDuration - playbackOffset + 50.0, this) {
             stopAutoPlay()
         }
 

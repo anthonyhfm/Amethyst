@@ -23,8 +23,11 @@ object UnipadAutoPlay {
                 // chain / c — switch to a different chain (emitted as a side-button press)
                 cmd == "chain" || cmd == "c" -> {
                     val chain = data.getOrNull(1)?.toIntOrNull() ?: return@forEach
+                    val x = 9
+                    val y = chain
                     val current = actions.getOrPut(currentTime) { emptyList() }
-                    actions[currentTime] = current + AutoPlayData.Action(x = 9, y = chain, down = true)
+                    actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = true)
+                    touchedKeys.add(x to y)
                 }
 
                 // delay / d — advance timeline
@@ -46,6 +49,7 @@ object UnipadAutoPlay {
                     val y = rawX
                     val current = actions.getOrPut(currentTime) { emptyList() }
                     actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = true)
+                    touchedKeys.add(x to y)
                 }
 
                 // off / f — button release (up)
@@ -56,6 +60,7 @@ object UnipadAutoPlay {
                     val y = rawX
                     val current = actions.getOrPut(currentTime) { emptyList() }
                     actions[currentTime] = current + AutoPlayData.Action(x = x, y = y, down = false)
+                    touchedKeys.remove(x to y)
                 }
 
                 // touch / t — press + immediate release
