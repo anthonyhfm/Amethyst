@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
+import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadSurfaceDetectionOverlay
 import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadButton
 import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadLayout
@@ -61,14 +63,24 @@ class ViewportLaunchpadPro(
         val previewGrid by previewState.grid
         val density = LocalDensity.current
 
+        val useSimplified: Boolean by GeneralSettings.simplifiedGraphics.flow.collectAsState()
+
         var buttonsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
         var deviceBitmap: ImageBitmap? by remember { mutableStateOf(null) }
         var ledspotsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
 
-        LaunchedEffect(Unit) {
-            buttonsBitmap = Res.readBytes("files/launchpad/LPP/LPP_Buttons_Layer_ml.png").decodeToImageBitmap()
-            deviceBitmap = Res.readBytes("files/launchpad/LPP/LPP_Device_Layer_ml.png").decodeToImageBitmap()
-            ledspotsBitmap = Res.readBytes("files/launchpad/LPP/LPP_LED_Spots_ml.png").decodeToImageBitmap()
+        LaunchedEffect(useSimplified) {
+            val suffix = if (useSimplified) "anth" else "ml"
+
+            try {
+                buttonsBitmap = Res.readBytes("files/launchpad/LPP/LPP_Buttons_Layer_$suffix.png").decodeToImageBitmap()
+                deviceBitmap = Res.readBytes("files/launchpad/LPP/LPP_Device_Layer_$suffix.png").decodeToImageBitmap()
+                ledspotsBitmap = Res.readBytes("files/launchpad/LPP/LPP_LED_Spots_$suffix.png").decodeToImageBitmap()
+            } catch (ex: Exception) { // open source fallback
+                buttonsBitmap = Res.readBytes("files/launchpad/LPP/LPP_Buttons_Layer_anth.png").decodeToImageBitmap()
+                deviceBitmap = Res.readBytes("files/launchpad/LPP/LPP_Device_Layer_anth.png").decodeToImageBitmap()
+                ledspotsBitmap = Res.readBytes("files/launchpad/LPP/LPP_LED_Spots_anth.png").decodeToImageBitmap()
+            }
         }
 
         if (buttonsBitmap != null && deviceBitmap != null && ledspotsBitmap != null) {
@@ -91,8 +103,8 @@ class ViewportLaunchpadPro(
                                 y = padding
                             ),
                             size = size.copy(
-                                width = size.width + padding * 2,
-                                height = size.height + padding * 2
+                                width = size.width - (padding * 2),
+                                height = size.height - (padding * 2)
                             ),
                         )
 
