@@ -5,10 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +16,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -117,7 +112,11 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.modifier.hoverRevealEnterTransition
+import dev.anthonyhfm.amethyst.ui.modifier.hoverRevealExitTransition
+import dev.anthonyhfm.amethyst.ui.modifier.hoverTweenSpec
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
+import dev.anthonyhfm.amethyst.ui.modifier.rememberDelayedHoverAsState
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.chainBorder
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
@@ -721,7 +720,7 @@ private fun GroupEditorInsertButton(
     onPasteDevicesAsGroup: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val hovering by interaction.collectIsHoveredAsState()
+    val hovering by rememberDelayedHoverAsState(interaction)
     val clipboard by ClipboardManager.clipboardData.collectAsState()
     val hasDevicesInClipboard = clipboard is ClipboardData.ChainDevice
 
@@ -735,7 +734,8 @@ private fun GroupEditorInsertButton(
                             56.dp
                         } else {
                             8.dp
-                        }
+                        },
+                        animationSpec = hoverTweenSpec(durationMillis = 100),
                     ).value
                 )
                 .hoverable(interaction),
@@ -744,8 +744,8 @@ private fun GroupEditorInsertButton(
         ) {
             AnimatedVisibility(
                 visible = expanded || hovering,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut(),
+                enter = hoverRevealEnterTransition(),
+                exit = hoverRevealExitTransition(),
             ) {
                 IconButton(
                     onClick = onAddGroup,

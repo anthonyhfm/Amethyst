@@ -30,6 +30,21 @@ object GeneralSettings : SettingsGroup("General") {
         default = false,
     )
 
+    val reducedMotion: Setting.Toggle = toggle(
+        key = "reducedMotion",
+        title = "Reduced Motion",
+        default = false,
+    )
+
+    val hoverTime: Setting.Select<Int> = select(
+        key = "hoverTime",
+        title = "Hover Time",
+        default = 100,
+        options = listOf(0, 100, 250, 500),
+        codec = SettingCodec.Int,
+        label = { "${it.toInt()} ms" },
+    )
+
     // Not in the settings list — accessed programmatically by HomeRepository
     val localAuthor: Setting.TextField = Setting.TextField(
         key = "localAuthor",

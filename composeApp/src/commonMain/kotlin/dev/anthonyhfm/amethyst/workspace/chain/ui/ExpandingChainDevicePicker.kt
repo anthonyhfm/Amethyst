@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +59,10 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.modifier.hoverTweenSpec
+import dev.anthonyhfm.amethyst.ui.modifier.hoverTweenSpecFloat
+import dev.anthonyhfm.amethyst.ui.modifier.rememberDelayedHoverAsState
+import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
@@ -86,7 +89,7 @@ fun ExpandingChainDevicePicker(
 ) {
     val density = LocalDensity.current.density
     val interaction = remember { MutableInteractionSource() }
-    val hovering: Boolean by interaction.collectIsHoveredAsState()
+    val hovering by rememberDelayedHoverAsState(interaction)
     var pickerVisible: Boolean by remember { mutableStateOf(false) }
     val dropKey = remember { UUID.randomUUID() }
     var isDropHover by remember { mutableStateOf(false) }
@@ -96,6 +99,7 @@ fun ExpandingChainDevicePicker(
     var rightClickMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
     val hasGlobalDrag = dragAndDropState.draggedItem != null
+    val reducedMotion = rememberReducedMotion()
 
     val targetWidth by animateDpAsState(
         targetValue = when {
@@ -106,18 +110,20 @@ fun ExpandingChainDevicePicker(
             else -> collapsedWidth
         },
         label = "ExpandingPickerWidth",
-        animationSpec = tween(durationMillis = 100)
+        animationSpec = hoverTweenSpec(durationMillis = 100),
     )
 
     val showButton = !forceOff && !isDropHover && (hovering || pickerVisible || expanded)
 
     val indicatorAlpha by animateFloatAsState(
         targetValue = if (isDropHover) 1f else 0f,
-        animationSpec = tween(120), label = "IndicatorAlpha"
+        animationSpec = hoverTweenSpecFloat(durationMillis = 120),
+        label = "IndicatorAlpha",
     )
     val buttonAlpha by animateFloatAsState(
         targetValue = if (showButton) 1f else 0f,
-        animationSpec = tween(150), label = "ButtonAlpha"
+        animationSpec = hoverTweenSpecFloat(durationMillis = 150),
+        label = "ButtonAlpha",
     )
 
     val pulseAlpha = remember { Animatable(0f) }
@@ -125,8 +131,9 @@ fun ExpandingChainDevicePicker(
         SignalIndicatorManager.events(destinationChain, slotIndex)
     }
 
-    LaunchedEffect(pulseEvents) {
+    LaunchedEffect(pulseEvents, reducedMotion) {
         pulseEvents.collectLatest {
+            if (reducedMotion) return@collectLatest
             pulseAlpha.stop()
             pulseAlpha.snapTo(1f)
             pulseAlpha.animateTo(
