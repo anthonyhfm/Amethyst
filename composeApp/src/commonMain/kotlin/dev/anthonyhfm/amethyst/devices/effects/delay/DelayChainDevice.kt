@@ -18,7 +18,9 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
+import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -116,8 +118,10 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
     }
 
     override fun signalEnter(n: List<Signal>) {
+        val bpm = WorkspaceRepository.bpm.value
+        val delay = state.value.timing.toMsValue(bpm).toDouble()
         Heaven.schedule(
-            delayInMs = state.value.delayMs.toDouble() * (state.value.gate * 2),
+            delayInMs = delay * (state.value.gate * 2),
             owner = this
         ) {
             signalExit?.invoke(n)

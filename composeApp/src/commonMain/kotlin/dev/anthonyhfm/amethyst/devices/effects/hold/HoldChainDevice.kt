@@ -265,11 +265,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                 Pair(this, signal.hashCode()) // fallback for signals without coordinates
             }
 
-            val baseDelayMs = (if (state.value.delayMs > 0) {
-                state.value.delayMs.toDouble()
-            } else {
-                state.value.timing.toMsValue(bpm).toDouble()
-            }) * (state.value.gate * 2)
+            val baseDelayMs = state.value.timing.toMsValue(bpm).toDouble() * (state.value.gate * 2)
 
             val updateSchedule: () -> Unit = {
                 Heaven.cancelJobs { job ->

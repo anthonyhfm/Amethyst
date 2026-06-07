@@ -34,7 +34,10 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -129,17 +132,21 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 renderAnimation()
             }
         }
+
+        // Render again whenever bpm changes
+        stateObserverScope.launch {
+            combine(
+                state.map { it.frames }.distinctUntilChanged(),
+                WorkspaceRepository.bpm
+            ) { _, _ -> }.collect {
+                renderAnimation()
+            }
+        }
     }
 
     @Composable
     override fun Content() {
-        val bpm = WorkspaceRepository.bpm.collectAsState()
-        val state by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
-
-        LaunchedEffect(bpm, state.frames) {
-            renderAnimation()
-        }
 
         ChainDeviceShell(
             title = "Keyframes",
