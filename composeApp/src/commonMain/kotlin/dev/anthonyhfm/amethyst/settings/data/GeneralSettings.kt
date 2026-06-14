@@ -36,6 +36,12 @@ object GeneralSettings : SettingsGroup("General") {
         default = false,
     )
 
+    val alwaysShowGrid: Setting.Toggle = toggle(
+        key = "alwaysShowGrid",
+        title = "Always show grid",
+        default = false,
+    )
+
     val hoverTime: Setting.Select<Int> = select(
         key = "hoverTime",
         title = "Hover Time",

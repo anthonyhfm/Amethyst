@@ -70,6 +70,7 @@ import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -96,6 +97,7 @@ fun WorkspaceViewport(
     val remoteFocuses by CollaborationPresence.remoteFocuses.collectAsState()
     val remoteCursors by CollaborationPresence.remoteCursors.collectAsState()
     val workspaceMode by WorkspaceRepository.mode.collectAsState()
+    val alwaysShowGrid by GeneralSettings.alwaysShowGrid.flow.collectAsState()
 
     LaunchedEffect(elements.size, viewportSize.value) {
         if (viewportSize.value.width <= 0f || viewportSize.value.height <= 0f) return@LaunchedEffect
@@ -194,22 +196,24 @@ fun WorkspaceViewport(
                     }
                 }
         ) {
-            val scaledGridSize = gridSize * viewportState.zoom
-            val startX = (viewportState.offset.x % scaledGridSize) - scaledGridSize
-            val startY = (viewportState.offset.y % scaledGridSize) - scaledGridSize
+            if (workspaceMode is WorkspaceContract.WorkspaceMode.Layout || alwaysShowGrid) {
+                val scaledGridSize = gridSize * viewportState.zoom
+                val startX = (viewportState.offset.x % scaledGridSize) - scaledGridSize
+                val startY = (viewportState.offset.y % scaledGridSize) - scaledGridSize
 
-            var x = startX
-            while (x < size.width) {
-                var y = startY
-                while (y < size.height) {
-                    drawCircle(
-                        color = gridColor,
-                        radius = 2f * density * viewportState.zoom,
-                        center = Offset(x, y)
-                    )
-                    y += scaledGridSize
+                var x = startX
+                while (x < size.width) {
+                    var y = startY
+                    while (y < size.height) {
+                        drawCircle(
+                            color = gridColor,
+                            radius = 2f * density * viewportState.zoom,
+                            center = Offset(x, y)
+                        )
+                        y += scaledGridSize
+                    }
+                    x += scaledGridSize
                 }
-                x += scaledGridSize
             }
         }
 
