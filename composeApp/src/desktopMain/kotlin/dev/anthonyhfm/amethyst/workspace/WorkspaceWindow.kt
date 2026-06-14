@@ -49,29 +49,53 @@ import kotlin.system.exitProcess
 
 @Composable
 fun WorkspaceWindow(
-    onClose: () -> Unit = { }
+    onClose: () -> Unit = { },
+    externalCloseRequest: Int = 0,
+    onExternalCloseConfirmed: () -> Unit = onClose,
+    onExternalCloseCancelled: () -> Unit = { }
 ) {
     if (DesktopPlatform.get() == DesktopPlatform.Windows) {
         UIManager.setLookAndFeel(FlatAmethystLaf())
     }
 
     var showSaveDialog by remember { mutableStateOf(false) }
-    var pendingClose by remember { mutableStateOf(false) }
+    var pendingCloseAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingCancelAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val projectName by WorkspaceRepository.projectName.collectAsState()
     val windowTitle = "Amethyst - [${projectName ?: "Untitled Project"}]"
 
+    fun closeWorkspace(afterClose: () -> Unit) {
+        AudioOutput.stopAll()
+        WorkspaceRepository.clean()
+        afterClose()
+    }
+
+    fun requestWorkspaceClose(
+        afterClose: () -> Unit,
+        afterCancel: () -> Unit = { }
+    ) {
+        if (WorkspaceRepository.hasUnsavedChanges()) {
+            pendingCloseAction = afterClose
+            pendingCancelAction = afterCancel
+            showSaveDialog = true
+        } else {
+            closeWorkspace(afterClose)
+        }
+    }
+
+    LaunchedEffect(externalCloseRequest) {
+        if (externalCloseRequest > 0) {
+            requestWorkspaceClose(
+                afterClose = onExternalCloseConfirmed,
+                afterCancel = onExternalCloseCancelled
+            )
+        }
+    }
+
     Window(
         onCloseRequest = {
-            // Check if there are unsaved changes
-            if (WorkspaceRepository.hasUnsavedChanges()) {
-                showSaveDialog = true
-                pendingClose = true
-            } else {
-                AudioOutput.stopAll()
-                WorkspaceRepository.clean()
-                onClose()
-            }
+            requestWorkspaceClose(afterClose = onClose)
         },
         title = windowTitle,
         state = rememberWindowState(
@@ -154,27 +178,28 @@ fun WorkspaceWindow(
                     onSave = {
                         coroutineScope.launch {
                             val saved = WorkspaceSaveHelper.saveWorkspace()
-                            if (saved && pendingClose) {
-                                AudioOutput.stopAll()
-                                WorkspaceRepository.clean()
-                                onClose()
+                            if (saved) {
+                                val closeAction = pendingCloseAction
+                                showSaveDialog = false
+                                pendingCloseAction = null
+                                pendingCancelAction = null
+                                closeAction?.let(::closeWorkspace)
                             }
-                            showSaveDialog = false
-                            pendingClose = false
                         }
                     },
                     onDontSave = {
+                        val closeAction = pendingCloseAction
                         showSaveDialog = false
-                        if (pendingClose) {
-                            AudioOutput.stopAll()
-                            WorkspaceRepository.clean()
-                            onClose()
-                        }
-                        pendingClose = false
+                        pendingCloseAction = null
+                        pendingCancelAction = null
+                        closeAction?.let(::closeWorkspace)
                     },
                     onCancel = {
+                        val cancelAction = pendingCancelAction
                         showSaveDialog = false
-                        pendingClose = false
+                        pendingCloseAction = null
+                        pendingCancelAction = null
+                        cancelAction?.invoke()
                     }
                 )
             }

@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -19,7 +20,9 @@ import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenHelper
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenResult
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
+import java.awt.Desktop
 import java.io.File
+import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -44,10 +47,31 @@ fun main(args: Array<String>) {
         FileKit.init(appId = "Amethyst")
 
         var showEditor: Boolean by remember { mutableStateOf(false) }
+        var macQuitRequest by remember { mutableIntStateOf(0) }
+        var pendingMacQuitResponse by remember { mutableStateOf<java.awt.desktop.QuitResponse?>(null) }
         var hasAcceptedEarlyAccess by remember {
             mutableStateOf(
                 SettingsRepository.platformSettings.getBoolean("early_access_accepted", false)
             )
+        }
+
+        LaunchedEffect(Unit) {
+            if (
+                platform == DesktopPlatform.MacOS &&
+                Desktop.isDesktopSupported() &&
+                Desktop.getDesktop().isSupported(Desktop.Action.APP_QUIT_HANDLER)
+            ) {
+                Desktop.getDesktop().setQuitHandler { _, response ->
+                    SwingUtilities.invokeLater {
+                        if (showEditor) {
+                            pendingMacQuitResponse = response
+                            macQuitRequest += 1
+                        } else {
+                            response.performQuit()
+                        }
+                    }
+                }
+            }
         }
 
         LaunchedEffect(hasAcceptedEarlyAccess) {
@@ -86,8 +110,17 @@ fun main(args: Array<String>) {
         } else {
             println("[main ${System.currentTimeMillis()}] rendering WorkspaceWindow")
             WorkspaceWindow(
+                externalCloseRequest = macQuitRequest,
+                onExternalCloseConfirmed = {
+                    showEditor = false
+                    pendingMacQuitResponse?.performQuit()
+                    pendingMacQuitResponse = null
+                },
+                onExternalCloseCancelled = {
+                    pendingMacQuitResponse?.cancelQuit()
+                    pendingMacQuitResponse = null
+                },
                 onClose = {
-                    println("[main ${System.currentTimeMillis()}] WorkspaceWindow onClose -> showEditor=false")
                     showEditor = false
                 }
             )
