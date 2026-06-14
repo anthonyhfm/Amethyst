@@ -1,6 +1,6 @@
-import java.util.regex.Pattern
+package dev.anthonyhfm.amethyst.workspace.help
 
-fun main() {
+fun mainRegex() {
     val text = "![Keyframes device](res://keyframes.png)"
     val regex = Regex("""!\[.*?\]\((.*?)\)""")
     val match = regex.find(text)

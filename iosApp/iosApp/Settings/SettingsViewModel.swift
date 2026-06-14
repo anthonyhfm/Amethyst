@@ -30,8 +30,12 @@ final class SettingsViewModel {
 
     // MARK: - Experimental
 
-    var gemsEnabled: Bool {
-        didSet { ExperimentalSettings.shared.extensions.update(value: KotlinBoolean(bool: gemsEnabled)) }
+    var liveCollaborationEnabled: Bool {
+        didSet { ExperimentalSettings.shared.liveCollaboration.update(value: KotlinBoolean(bool: liveCollaborationEnabled)) }
+    }
+
+    var abletonTutorialEnabled: Bool {
+        didSet { ExperimentalSettings.shared.abletonTutorial.update(value: KotlinBoolean(bool: abletonTutorialEnabled)) }
     }
 
     // MARK: - Static option lists
@@ -49,9 +53,10 @@ final class SettingsViewModel {
     // MARK: - Init
 
     init() {
-        performanceFPS     = (GeneralSettings.shared.performanceFPS.value as! KotlinInt).int32Value
-        gradientSmoothness = (GeneralSettings.shared.gradientSmoothness.value as! KotlinFloat).floatValue
-        masterVolume       = (AudioSettings.shared.masterVolume.value as! KotlinFloat).floatValue
-        gemsEnabled        = (ExperimentalSettings.shared.extensions.value as! KotlinBoolean).boolValue
+        performanceFPS           = (GeneralSettings.shared.performanceFPS.value as! KotlinInt).int32Value
+        gradientSmoothness       = (GeneralSettings.shared.gradientSmoothness.value as! KotlinFloat).floatValue
+        masterVolume             = (AudioSettings.shared.masterVolume.value as! KotlinFloat).floatValue
+        liveCollaborationEnabled = (ExperimentalSettings.shared.liveCollaboration.value as! KotlinBoolean).boolValue
+        abletonTutorialEnabled    = (ExperimentalSettings.shared.abletonTutorial.value as! KotlinBoolean).boolValue
     }
 }

@@ -31,6 +31,7 @@ struct ContentView: View {
 
     @State private var viewModel = HomeViewModel()
     @State private var settingsViewModel = SettingsViewModel()
+    @State private var showSettingsSheet = false
 
     private var theme: AmethystTheme {
         AmethystTheme(darkMode: colorScheme == .dark)
@@ -43,6 +44,44 @@ struct ContentView: View {
                     viewModel.workspaceClosed()
                 }
                 .ignoresSafeArea()
+                .onAppear {
+                    IosWorkspaceBridge.shared.onShowSettings = {
+                        showSettingsSheet = true
+                    }
+                    IosWorkspaceBridge.shared.createLiquidGlassEffect = {
+                        if #available(iOS 26.0, *) {
+                            let effect = UIGlassEffect(style: .regular)
+                            effect.isInteractive = true
+                            return effect
+                        } else {
+                            return UIBlurEffect(style: .systemThinMaterial)
+                        }
+                    }
+                    if #available(iOS 26.0, *) {
+                        IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = {
+                            let effect = UIGlassContainerEffect()
+                            effect.spacing = 10
+                            return effect
+                        }
+                    } else {
+                        IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = nil
+                    }
+                    IosWorkspaceBridge.shared.createLiquidGlassButtonConfiguration = {
+                        if #available(iOS 26.0, *) {
+                            var configuration = UIButton.Configuration.glass()
+                            configuration.cornerStyle = .capsule
+                            configuration.indicator = .none
+                            return configuration._bridgeToObjectiveC()
+                        } else {
+                            var configuration = UIButton.Configuration.bordered()
+                            configuration.cornerStyle = .capsule
+                            return configuration._bridgeToObjectiveC()
+                        }
+                    }
+                }
+                .sheet(isPresented: $showSettingsSheet) {
+                    SettingsTabView(viewModel: settingsViewModel, showsCloseButton: true)
+                }
             } else {
                 homeTabView
             }
@@ -99,4 +138,3 @@ struct ContentView: View {
         .amethystThemed()
     }
 }
-

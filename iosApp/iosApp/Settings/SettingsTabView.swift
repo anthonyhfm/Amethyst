@@ -9,7 +9,9 @@ import SwiftUI
 
 struct SettingsTabView: View {
     @Bindable var viewModel: SettingsViewModel
+    var showsCloseButton = false
 
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.amethystTheme) private var theme
 
     var body: some View {
@@ -22,6 +24,18 @@ struct SettingsTabView: View {
             .scrollContentBackground(.hidden)
             .background(theme.background.ignoresSafeArea())
             .navigationTitle("Settings")
+            .toolbar {
+                if showsCloseButton {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                        .accessibilityLabel("Close settings")
+                    }
+                }
+            }
         }
     }
 
@@ -72,7 +86,10 @@ struct SettingsTabView: View {
 
     private var experimentalSection: some View {
         Section {
-            Toggle("Amethyst Gems", isOn: $viewModel.gemsEnabled)
+            Toggle("Live Collaboration", isOn: $viewModel.liveCollaborationEnabled)
+                .tint(theme.primary)
+                .listRowBackground(theme.muted)
+            Toggle("Ableton Tutorial", isOn: $viewModel.abletonTutorialEnabled)
                 .tint(theme.primary)
                 .listRowBackground(theme.muted)
         } header: {
