@@ -107,6 +107,14 @@ internal fun floorClipTimeToGrid(clipTimeMs: Double, resolution: GridResolution)
     return (floored * MS_PER_BEAT).toLong()
 }
 
+internal fun cellDurationAt(cellStartMs: Long, resolution: GridResolution): Long {
+    val n = resolution.snapDivisionsPerBeat
+    val currentBeatFraction = cellStartMs / MS_PER_BEAT.toDouble()
+    val k = kotlin.math.round(currentBeatFraction * n)
+    val nextCellStartMs = (((k + 1) * MS_PER_BEAT) / n.toDouble()).toLong()
+    return nextCellStartMs - cellStartMs
+}
+
 /**
  * Builds [PianoRollNoteRect] instances in **screen-space** (viewport coordinates).
  *

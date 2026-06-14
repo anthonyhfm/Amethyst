@@ -11,14 +11,14 @@ internal const val MS_PER_BEAT: Long = 500L
 internal class PianoRollMetrics(
     val totalPitches: Int,
     val noteHeightDp: Dp,
-    val pixelsPerBeatDp: Dp,
+    val zoomX: Float,
     private val density: Density,
     private val gridResolution: GridResolution,
     /** How many ms before t=0 the canvas starts. Shifts all x positions right by this amount. */
     val oobOffsetMs: Long = 0L
 ) {
     val noteHeightPx: Float = with(density) { noteHeightDp.toPx() }
-    val pixelsPerBeatPx: Float = with(density) { pixelsPerBeatDp.toPx() }
+    val pixelsPerBeatPx: Float = zoomX * MS_PER_BEAT
     val noteRenderHeightPx: Float = noteHeightPx - 4f
 
     fun pitchToYPx(pitch: Int): Float = (totalPitches - 1 - pitch) * noteHeightPx

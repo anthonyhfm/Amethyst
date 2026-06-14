@@ -472,6 +472,7 @@ internal fun PianoKeysColumn(
     val palette = TimelineTheme.palette
     val blackKeyColor = Theme[colors][muted]
     val whiteKeyColor = Theme[colors][foreground]
+    val density = LocalDensity.current
 
     Box(
         modifier = Modifier
@@ -480,12 +481,15 @@ internal fun PianoKeysColumn(
             .background(palette.rulerSurface)
             .let { if (verticalScroll != null) it.verticalScroll(verticalScroll, enabled = false) else it }
     ) {
-        Column(
+        val noteHeightPx = with(density) { noteHeight.toPx() }
+        Canvas(
             modifier = Modifier
                 .width(120.dp)
                 .height(noteHeight * totalPitches)
         ) {
-            for (pitch in (totalPitches - 1) downTo 0) {
+            val widthPx = size.width
+            for (pitch in 0 until totalPitches) {
+                val y = (totalPitches - 1 - pitch) * noteHeightPx
                 val noteInOctave = pitch % 12
                 val isBlackKey = noteInOctave in listOf(1, 3, 6, 8, 10)
                 val isPressed = pressedPitches.contains(pitch)
@@ -496,21 +500,20 @@ internal fun PianoKeysColumn(
                     else -> whiteKeyColor
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(noteHeight)
-                        .background(keyColor)
-                        .drawBehind {
-                            drawLine(
-                                color = palette.canvas,
-                                start = Offset(0f, size.height),
-                                end = Offset(size.width, size.height),
-                                strokeWidth = 1f
-                            )
-                        },
-                    contentAlignment = Alignment.CenterEnd
-                ) {}
+                // Draw the key background
+                drawRect(
+                    color = keyColor,
+                    topLeft = Offset(0f, y),
+                    size = Size(widthPx, noteHeightPx)
+                )
+
+                // Draw the separator line at the bottom of the key
+                drawLine(
+                    color = palette.canvas,
+                    start = Offset(0f, y + noteHeightPx),
+                    end = Offset(widthPx, y + noteHeightPx),
+                    strokeWidth = 1f
+                )
             }
         }
     }

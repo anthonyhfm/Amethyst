@@ -1928,9 +1928,6 @@ private fun PianoRollEditor(
     val totalPitches = 100
 
     val noteHeightDp: Dp = 22.dp
-    // Derive effective pixels-per-beat from the viewport's horizontal zoom.
-    // zoomX is pixels-per-ms; one beat = MS_PER_BEAT ms.
-    val effectivePixelsPerBeatDp = with(density) { (viewport.zoomX * MS_PER_BEAT).toDp() }
     val beatsPerBar = 4
 
     val clipBeats = entry.durationMs.toFloat() / MS_PER_BEAT.toFloat()
@@ -1940,8 +1937,8 @@ private fun PianoRollEditor(
     val oobOverhangRightMs = (entry.durationMs * 0.25).toLong().coerceAtLeast(2000L)
     val totalBeatsWithOverhang = (entry.durationMs + oobOverhangRightMs).toFloat() / MS_PER_BEAT.toFloat()
 
-    val metrics = remember(totalPitches, density, gridResolution, effectivePixelsPerBeatDp, oobOverhangMs) {
-        PianoRollMetrics(totalPitches, noteHeightDp, effectivePixelsPerBeatDp, density, gridResolution, oobOffsetMs = oobOverhangMs)
+    val metrics = remember(totalPitches, density, gridResolution, viewport.zoomX, oobOverhangMs) {
+        PianoRollMetrics(totalPitches, noteHeightDp, viewport.zoomX, density, gridResolution, oobOffsetMs = oobOverhangMs)
     }
     val latestMetrics by rememberUpdatedState(metrics)
     // Keep oobOverhangMs and totalBeatsWithOverhang fresh inside long-lived pointerInput(Unit)
@@ -1950,13 +1947,12 @@ private fun PianoRollEditor(
     val latestTotalBeatsWithOverhang by rememberUpdatedState(totalBeatsWithOverhang)
 
     val canvasHeightDp = noteHeightDp * totalPitches
-    val canvasWidthDp = effectivePixelsPerBeatDp * totalBeatsWithOverhang
 
     // Position the viewport at t=0 on first open so the OOB lead-in region is off-screen.
     // Also record the initial content extent so pan/zoom clamping works from the first frame.
     LaunchedEffect(Unit) {
         val initialScrollX = metrics.timeMsToXPx(0L).coerceAtLeast(0f)
-        val contentWidthPx = with(density) { canvasWidthDp.toPx() }
+        val contentWidthPx = viewport.zoomX * MS_PER_BEAT.toFloat() * totalBeatsWithOverhang
         latestOnViewportChange(
             viewport.copy(scrollX = initialScrollX, contentWidth = contentWidthPx)
         )
@@ -1989,9 +1985,8 @@ private fun PianoRollEditor(
     var viewportWidthPx by remember { mutableStateOf(0) }
     var lastPointerX by remember { mutableStateOf<Float?>(null) }
 
-    fun snapSelectedTimeMs(timeMs: Long, currentResolution: GridResolution): Long {
-        val gridIntervalMs = currentCellDurationMs(currentResolution)
-        return ((timeMs + gridIntervalMs / 2) / gridIntervalMs) * gridIntervalMs
+    fun snapSelectedTimeMs(timeMs: Double, currentResolution: GridResolution): Long {
+        return snapClipTimeToGrid(timeMs, currentResolution)
     }
 
     fun buildDraftNote(
@@ -2028,7 +2023,7 @@ private fun PianoRollEditor(
                 // offset.x is screen-space since we tap the viewport directly
                 val contentX = viewport.screenToContentX(offset.x)
                 val timeMs = snapSelectedTimeMs(
-                    viewport.contentXToClipTimeMs(contentX, oobOverhangMs).toLong(),
+                    viewport.contentXToClipTimeMs(contentX, oobOverhangMs),
                     gridResolution
                 )
                 onSelectedTimeMsChange(timeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
@@ -2248,11 +2243,7 @@ private fun PianoRollEditor(
                                                                  latestViewport.screenXToClipTimeMs(offset.x, latestOobOverhangMs),
                                                                  latestGridResolution,
                                                              )
-                                                            val snappedTimeMs = snapSelectedTimeMs(
-                                                                timeMs,
-                                                                latestGridResolution
-                                                            )
-                                                            onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
+                                                            onSelectedTimeMsChange(timeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
                                                         }
                                                     }
                                                 )
@@ -2280,9 +2271,6 @@ private fun PianoRollEditor(
                                                         return@awaitEachGesture
                                                     }
 
-                                                    val cellDurationMs = currentCellDurationMs(
-                                                        currentResolution = latestGridResolution
-                                                    )
                                                     val anchorCellStartMs = floorClipTimeToGrid(
                                                          latestViewport.screenXToClipTimeMs(down.position.x, latestOobOverhangMs),
                                                          latestGridResolution,
@@ -2293,6 +2281,8 @@ private fun PianoRollEditor(
                                                              latestViewport.screenXToClipTimeMs(position.x, latestOobOverhangMs),
                                                              latestGridResolution,
                                                          )
+                                                        val maxCellStartMs = maxOf(anchorCellStartMs, currentCellStartMs)
+                                                        val exactCellDurationMs = cellDurationAt(maxCellStartMs, latestGridResolution)
                                                         draftNote = buildDraftNote(
                                                             device = index,
                                                             pitch = lockedPitch,
@@ -2300,7 +2290,7 @@ private fun PianoRollEditor(
                                                             gradient = latestWorkingGradient.takeIf { latestGradientMode },
                                                             anchorCellStartMs = anchorCellStartMs,
                                                             currentCellStartMs = currentCellStartMs,
-                                                            cellDurationMs = cellDurationMs,
+                                                            cellDurationMs = exactCellDurationMs,
                                                         )
                                                     }
 
