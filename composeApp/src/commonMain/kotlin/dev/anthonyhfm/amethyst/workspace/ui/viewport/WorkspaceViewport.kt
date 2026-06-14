@@ -58,7 +58,6 @@ import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.ui.components.CursorOverlay
-import dev.anthonyhfm.amethyst.ui.components.primitives.FullShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -90,9 +89,6 @@ fun WorkspaceViewport(
     val viewportBackground = Color(0xFF1C1C23)
     val viewportBorder = if (platform is Platform.Desktop) Color(0xFF3E4451) else Color.Transparent
     val selectionColor = Theme[colors][selectionBorder]
-    val shadowColor = Color.Black.copy(alpha = 0.24f)
-    val actionTrayBackground = Color(0xFF282C34)
-    val actionTrayBorder = Color(0xFF3E4451)
     val originBackground = Color(0xFF282C34)
     val originForeground = Color(0xFFABB2BF).copy(alpha = 0.82f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
@@ -407,11 +403,7 @@ fun WorkspaceViewport(
                     }
                     .onSizeChanged { size ->
                         traySize = Size(size.width.toFloat(), size.height.toFloat())
-                    }
-                    .background(actionTrayBackground, FullShape)
-                    .border(1.dp, actionTrayBorder, FullShape)
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    },
             ) {
                 element.Actions(this)
             }
