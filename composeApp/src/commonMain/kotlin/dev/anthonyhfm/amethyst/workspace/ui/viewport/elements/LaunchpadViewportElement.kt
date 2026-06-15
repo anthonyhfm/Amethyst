@@ -54,6 +54,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.DialogHeader
 import dev.anthonyhfm.amethyst.ui.components.primitives.DialogTitle
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.ui.launchpad.LaunchpadPreviewState
+import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
+import dev.anthonyhfm.amethyst.workspace.AutoPlayState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportElement
@@ -413,7 +415,7 @@ abstract class LaunchpadViewportElement(
             )
         )
 
-        WorkspaceRepository.samplingChain.signalEnter(
+        val midiSignals = listOf(
             Signal.Midi(
                 origin = this,
                 x = x,
@@ -421,6 +423,9 @@ abstract class LaunchpadViewportElement(
                 velocity = 127
             )
         )
+
+        WorkspaceRepository.samplingChain.signalEnter(midiSignals)
+        AutoPlayRepository.onMidiInput(midiSignals)
     }
 
     fun sendGenericPadUp(x: Int, y: Int) {
@@ -443,7 +448,7 @@ abstract class LaunchpadViewportElement(
             )
         )
 
-        WorkspaceRepository.samplingChain.signalEnter(
+        val midiSignals = listOf(
             Signal.Midi(
                 origin = this,
                 x = x,
@@ -451,5 +456,8 @@ abstract class LaunchpadViewportElement(
                 velocity = 0
             )
         )
+
+        WorkspaceRepository.samplingChain.signalEnter(midiSignals)
+        AutoPlayRepository.onMidiInput(midiSignals)
     }
 }

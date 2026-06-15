@@ -17,6 +17,8 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
 import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
+import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
+import dev.anthonyhfm.amethyst.workspace.AutoPlayState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -241,7 +243,7 @@ class AmethystMidiManager {
                         return@let
                     }
 
-                    WorkspaceRepository.samplingChain.signalEnter(
+                    val midiSignals = listOf(
                         Signal.Midi(
                             origin = null,
                             x = globalX,
@@ -249,6 +251,9 @@ class AmethystMidiManager {
                             velocity = it.velocity
                         )
                     )
+
+                    WorkspaceRepository.samplingChain.signalEnter(midiSignals)
+                    AutoPlayRepository.onMidiInput(midiSignals)
 
                     WorkspaceRepository.lightsChain.signalEnter(
                         Signal.LED(

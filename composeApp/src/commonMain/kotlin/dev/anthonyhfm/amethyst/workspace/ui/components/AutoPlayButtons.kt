@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.BookOpenText
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pause
 import com.composables.icons.lucide.Play
@@ -123,6 +124,9 @@ fun AutoPlayButtons() {
                         AutoPlayState.STOPPED -> AutoPlayRepository.startAutoPlay()
                         AutoPlayState.PLAYING -> AutoPlayRepository.pauseAutoPlay()
                         AutoPlayState.PAUSED -> AutoPlayRepository.resumeAutoPlay()
+                        AutoPlayState.LEARNING -> {
+                            AutoPlayRepository.startAutoPlay()
+                        }
                     }
                 },
                 imageVector = if (autoPlayState == AutoPlayState.PLAYING) Lucide.Pause else Lucide.Play,
@@ -130,8 +134,22 @@ fun AutoPlayButtons() {
                     AutoPlayState.STOPPED -> "Start AutoPlay"
                     AutoPlayState.PLAYING -> "Pause AutoPlay"
                     AutoPlayState.PAUSED -> "Resume AutoPlay"
+                    AutoPlayState.LEARNING -> "Switch to Normal Playback"
                 },
                 variant = if (autoPlayState == AutoPlayState.PLAYING) ButtonVariant.Default else ButtonVariant.Ghost,
+            )
+
+            WorkspaceToolbarIconButton(
+                onClick = {
+                    if (autoPlayState == AutoPlayState.LEARNING) {
+                        AutoPlayRepository.stopAutoPlay()
+                    } else {
+                        AutoPlayRepository.startLearningMode()
+                    }
+                },
+                imageVector = Lucide.BookOpenText,
+                contentDescription = if (autoPlayState == AutoPlayState.PLAYING) "Switch to Learning Mode" else "Learning Mode",
+                variant = if (autoPlayState == AutoPlayState.LEARNING) ButtonVariant.Default else ButtonVariant.Ghost,
             )
 
             WorkspaceToolbarIconButton(
