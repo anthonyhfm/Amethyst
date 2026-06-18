@@ -90,8 +90,6 @@ fun WorkspaceViewport(
     val viewportBackground = Color(0xFF1C1C23)
     val viewportBorder = if (platform is Platform.Desktop) Color(0xFF3E4451) else Color.Transparent
     val selectionColor = Theme[colors][selectionBorder]
-    val originBackground = Color(0xFF282C34)
-    val originForeground = Color(0xFFABB2BF).copy(alpha = 0.82f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
     val selections by SelectionManager.selections.collectAsState()
     val remoteFocuses by CollaborationPresence.remoteFocuses.collectAsState()
@@ -217,6 +215,7 @@ fun WorkspaceViewport(
                         }
                     }
                 }
+        ) {
             if (workspaceMode is WorkspaceContract.WorkspaceMode.Layout || alwaysShowGrid) {
                 val scaledGridSize = gridSize * viewportState.zoom
                 val startX = (effectiveOffset.x % scaledGridSize) - scaledGridSize
@@ -452,21 +451,10 @@ fun WorkspaceViewport(
             enter = fadeIn() + scaleIn(),
             exit = fadeOut() + scaleOut()
         ) {
-            Box(
+            OriginIndicator(
                 modifier = Modifier
-                    .clip(CircleShape)
-                    .background(originBackground)
-                    .border(1.dp, viewportBorder, CircleShape)
                     .size(originSizeDp)
-            ) {
-                Text(
-                    text = "0,0",
-                    modifier = Modifier
-                        .align(Alignment.Center),
-                    style = Theme[typography][small],
-                    color = originForeground,
-                )
-            }
+            )
         }
 
         CursorOverlay(

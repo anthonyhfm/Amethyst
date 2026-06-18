@@ -103,5 +103,7 @@ interface WorkspaceContract {
         
         // Note: PianoRollWorkspaceMode is defined in timeline package
         // as it needs special handling similar to KeyframesWorkspaceMode
+        // Note: CompositionWorkspaceMode is defined in composition package
+        // as it needs special handling similar to KeyframesWorkspaceMode
     }
 }

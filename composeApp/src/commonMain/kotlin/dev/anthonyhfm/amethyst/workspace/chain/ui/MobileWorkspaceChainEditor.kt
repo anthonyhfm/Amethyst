@@ -68,12 +68,10 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
 
 @Composable
-fun WorkspaceChainEditor(
+fun MobileWorkspaceChainEditor(
     devices: List<GenericChainDevice<*>>,
     scrollState: ScrollAreaState = rememberScrollAreaState(),
     modifier: Modifier = Modifier,
-    isFullScreen: Boolean = false,
-    showMacroControls: Boolean = true,
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
     val density = LocalDensity.current.density
@@ -91,7 +89,6 @@ fun WorkspaceChainEditor(
 
     Column(
         modifier = modifier
-            .padding(12.dp)
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -102,29 +99,18 @@ fun WorkspaceChainEditor(
 
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (showMacroControls) {
-            MacroControls()
-        }
-
         ScrollArea(
             modifier = Modifier
-                .clip(DefaultShape)
-                .then(
-                    if (isFullScreen) {
-                        Modifier.weight(1f)
-                    } else {
-                        Modifier.height(280.dp)
-                    }
-                )
+                .height(280.dp)
                 .fillMaxWidth()
-                .background(Theme[chainColorTokens][chainCanvas], DefaultShape)
-                .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape)
-                .padding(bottom = 10.dp),
+                .background(Theme[chainColorTokens][chainCanvas])
+                .padding(bottom = 16.dp),
             orientation = ScrollBarOrientation.Horizontal,
             state = scrollState,
+            scrollBarThickness = 16.dp,
         ) {
             Row(
-                modifier = Modifier.padding(top = 12.dp, end = 12.dp, bottom = 12.dp),
+                modifier = Modifier.padding(top = 12.dp, end = 12.dp, bottom = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 key(devices) {
@@ -171,6 +157,7 @@ fun WorkspaceChainEditor(
                                         key = device.selectionUUID,
                                         data = device,
                                         useDragAnchor = true,
+                                        dragAfterLongPress = true, // Force long press to drag on mobile
                                     ) {
                                         var showRightClickMenu: Boolean by remember { mutableStateOf(false) }
                                         var rightClickMenuOffset: DpOffset by remember { mutableStateOf(DpOffset.Zero) }
@@ -335,119 +322,5 @@ fun WorkspaceChainEditor(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun ChainDeviceContextMenu(
-    chain: Chain,
-    device: GenericChainDevice<*>,
-    visible: Boolean,
-    offset: DpOffset,
-    onDismiss: () -> Unit
-) {
-    val currentClipboard by ClipboardManager.clipboardData.collectAsState()
-
-    ChainContextMenu(
-        expanded = visible,
-        onDismissRequest = onDismiss,
-        offset = offset
-    ) {
-        ChainContextMenuItem(
-            label = "Copy",
-            icon = Lucide.Copy,
-            onClick = {
-                ClipboardManager.setClipboardData(
-                    ClipboardData.ChainDevice(
-                        states = listOf(device.state.value),
-                        type = when (WorkspaceRepository.mode.value) {
-                            is WorkspaceContract.WorkspaceMode.SamplingChain -> ClipboardData.ChainDevice.ChainType.Sampling
-                            else -> ClipboardData.ChainDevice.ChainType.Lights
-                        }
-                    )
-                )
-                onDismiss()
-            }
-        )
-
-        ChainContextMenuItem(
-            label = "Duplicate",
-            icon = Lucide.CopyPlus,
-            onClick = {
-                val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
-
-                chain.add(
-                    device = StateChain.unpackDevice(StateChain.packDevice(device)),
-                    atIndex = index + 1
-                )
-                onDismiss()
-            }
-        )
-
-        if (device.helpRef != null) {
-            ChainContextMenuItem(
-                label = "Get Help",
-                icon = Lucide.BookOpenText,
-                onClick = {
-                    WorkspaceRepository.switchMode(
-                        GetHelpWorkspaceMode(helpRef = device.helpRef!!),
-                        undoable = false
-                    )
-                    onDismiss()
-                }
-            )
-        }
-
-        if (currentClipboard is ClipboardData.ChainDevice) {
-            ChainContextMenuItem(
-                label = "Paste",
-                icon = Lucide.ClipboardPaste,
-                onClick = {
-                    val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
-
-                    (currentClipboard as ClipboardData.ChainDevice).states.map {
-                        StateChain.unpackDevice(it)
-                    }.fastForEachReversed {
-                        chain.add(
-                            device = it,
-                            atIndex = index + 1
-                        )
-                    }
-                    onDismiss()
-                }
-            )
-
-            ChainContextMenuItem(
-                label = "Paste Replace",
-                icon = Lucide.Replace,
-                onClick = {
-                    val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
-
-                    chain.remove(device.selectionUUID)
-
-                    (currentClipboard as ClipboardData.ChainDevice).states.map {
-                        StateChain.unpackDevice(it)
-                    }.fastForEachReversed {
-                        chain.add(
-                            device = it,
-                            atIndex = index
-                        )
-                    }
-                    onDismiss()
-                }
-            )
-        }
-
-        ContextMenuSeparator()
-
-        ChainContextMenuItem(
-            label = "Delete",
-            icon = Lucide.Trash2,
-            variant = ContextMenuItemVariant.Destructive,
-            onClick = {
-                chain.remove(device.selectionUUID)
-                onDismiss()
-            }
-        )
     }
 }

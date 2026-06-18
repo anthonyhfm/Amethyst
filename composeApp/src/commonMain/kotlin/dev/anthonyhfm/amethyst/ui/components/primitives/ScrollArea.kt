@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -103,6 +104,7 @@ fun ScrollArea(
     modifier: Modifier = Modifier,
     orientation: ScrollBarOrientation = ScrollBarOrientation.Vertical,
     state: ScrollAreaState = rememberScrollAreaState(),
+    scrollBarThickness: Dp = 8.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val areaInteractionSource = remember { MutableInteractionSource() }
@@ -198,6 +200,7 @@ fun ScrollArea(
             onScrollTo = { state.scrollValue = it.coerceIn(0, state.maxScrollValue) },
             orientation = orientation,
             visible = visible,
+            thickness = scrollBarThickness,
             modifier = Modifier.align(alignment),
         )
     }
@@ -211,6 +214,7 @@ fun ScrollBar(
     modifier: Modifier = Modifier,
     orientation: ScrollBarOrientation = ScrollBarOrientation.Vertical,
     visible: Boolean = true,
+    thickness: Dp = 8.dp,
 ) {
     val density = LocalDensity.current
     var trackSizePx by remember { mutableStateOf(0) }
@@ -253,8 +257,8 @@ fun ScrollBar(
             .alpha(animatedAlpha)
             .then(
                 when (orientation) {
-                    ScrollBarOrientation.Vertical -> Modifier.fillMaxHeight().width(8.dp)
-                    ScrollBarOrientation.Horizontal -> Modifier.fillMaxWidth().height(8.dp)
+                    ScrollBarOrientation.Vertical -> Modifier.fillMaxHeight().width(thickness)
+                    ScrollBarOrientation.Horizontal -> Modifier.fillMaxWidth().height(thickness)
                 }
             )
             .clip(FullShape)

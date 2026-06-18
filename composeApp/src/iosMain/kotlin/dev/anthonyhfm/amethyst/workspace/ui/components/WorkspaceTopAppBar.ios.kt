@@ -173,6 +173,7 @@ private fun modeMenuButton(mode: WorkspaceContract.WorkspaceMode): UIView {
         image = selectedEntry?.let { UIImage.systemImageNamed(it.iconName) }
         imagePadding = 7.0
         baseForegroundColor = UIColor.labelColor
+        contentInsets = NSDirectionalEdgeInsetsMake(8.0, 20.0, 8.0, 20.0)
     }
     menuButton.setAccessibilityLabel("Switch workspace mode")
 
@@ -208,6 +209,7 @@ private fun modeTitleButton(title: String): UIView {
     titleButton.configuration = liquidGlassButtonConfiguration().apply {
         this.title = title
         baseForegroundColor = UIColor.labelColor
+        contentInsets = NSDirectionalEdgeInsetsMake(8.0, 20.0, 8.0, 20.0)
     }
     titleButton.userInteractionEnabled = false
     titleButton.setAccessibilityLabel(title)
