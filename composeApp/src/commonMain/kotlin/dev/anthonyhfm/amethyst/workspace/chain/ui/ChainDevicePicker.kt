@@ -66,7 +66,6 @@ import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
@@ -115,7 +114,6 @@ fun ChainDevicePicker(
                     ChainContextMenuItem("Copy", icon = Icons.TwoTone.ContentCopy, onClick = { onPickComponent(CopyChainDevice()) })
                     ChainContextMenuItem("Keyframes", icon = Icons.TwoTone.Timeline, onClick = { onPickComponent(KeyframesChainDevice()) })
                     ChainContextMenuItem("Piano Roll", icon = Icons.TwoTone.Piano, onClick = { onPickComponent(PianoRollChainDevice()) })
-                    ChainContextMenuItem("Composition", icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
                 }
                 "timing" -> {
                     ChainContextMenuItem("Delay", icon = Icons.TwoTone.Timer, onClick = { onPickComponent(DelayChainDevice()) })

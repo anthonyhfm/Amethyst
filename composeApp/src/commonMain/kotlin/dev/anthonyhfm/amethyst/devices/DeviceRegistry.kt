@@ -7,7 +7,6 @@ import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color_filter.ColorFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
@@ -42,7 +41,6 @@ object DeviceRegistry {
         register(BlurChainDevice)
         register(ChokeChainDevice)
         register(ClearChainDevice)
-        register(CompositionChainDevice)
         register(ColorChainDevice)
         register(ColorFilterChainDevice)
         register(CoordinateFilterChainDevice)

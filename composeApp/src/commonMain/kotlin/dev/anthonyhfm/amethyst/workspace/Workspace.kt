@@ -28,7 +28,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
-import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.Timeline
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
@@ -335,10 +334,6 @@ fun Workspace(onBack: () -> Unit = {}) {
 
                 if (state.mode is KeyframesWorkspaceMode) {
                     (state.mode as KeyframesWorkspaceMode).ModeContent(paddingValues)
-                }
-
-                if (state.mode is CompositionWorkspaceMode) {
-                    (state.mode as CompositionWorkspaceMode).ModeContent(paddingValues)
                 }
 
                 if (state.mode is PianoRollWorkspaceMode) {
