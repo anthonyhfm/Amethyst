@@ -58,7 +58,6 @@ import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.ui.components.CursorOverlay
-import dev.anthonyhfm.amethyst.ui.components.primitives.FullShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -71,6 +70,7 @@ import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -90,30 +90,48 @@ fun WorkspaceViewport(
     val viewportBackground = Color(0xFF1C1C23)
     val viewportBorder = if (platform is Platform.Desktop) Color(0xFF3E4451) else Color.Transparent
     val selectionColor = Theme[colors][selectionBorder]
-    val shadowColor = Color.Black.copy(alpha = 0.24f)
-    val actionTrayBackground = Color(0xFF282C34)
-    val actionTrayBorder = Color(0xFF3E4451)
-    val originBackground = Color(0xFF282C34)
-    val originForeground = Color(0xFFABB2BF).copy(alpha = 0.82f)
     val viewportSize = remember { mutableStateOf(Size.Zero) }
     val selections by SelectionManager.selections.collectAsState()
     val remoteFocuses by CollaborationPresence.remoteFocuses.collectAsState()
     val remoteCursors by CollaborationPresence.remoteCursors.collectAsState()
     val workspaceMode by WorkspaceRepository.mode.collectAsState()
+    val alwaysShowGrid by GeneralSettings.alwaysShowGrid.flow.collectAsState()
+
+    val virtualLaunchpads = elements.filterIsInstance<LaunchpadViewportElement>()
+    val isSingleVirtualDeviceMode = (platform is Platform.Android || platform is Platform.iOS) && virtualLaunchpads.size == 1
+
+    val effectiveOffset = if (isSingleVirtualDeviceMode && viewportSize.value.width > 0f) {
+        val launchpad = virtualLaunchpads.first()
+        val targetCenterX = launchpad.position.value.x * gridSize + (launchpad.size.width * gridSize) / 2f
+        val targetCenterY = launchpad.position.value.y * gridSize + (launchpad.size.height * gridSize) / 2f
+        Offset(
+            x = viewportSize.value.width / 2f - targetCenterX * viewportState.zoom,
+            y = viewportSize.value.height / 2f - targetCenterY * viewportState.zoom
+        )
+    } else {
+        viewportState.offset
+    }
 
     LaunchedEffect(elements.size, viewportSize.value) {
         if (viewportSize.value.width <= 0f || viewportSize.value.height <= 0f) return@LaunchedEffect
 
         val launchpads = elements.filterIsInstance<LaunchpadViewportElement>()
         if (launchpads.isNotEmpty()) {
-            ViewportController.centerLaunchpads(
-                viewportOffset = viewportState.offset,
-                viewportZoom = viewportState.zoom,
-                elements = launchpads,
-                viewportSize = viewportSize.value,
-                gridSize = gridSize,
-                onEvent = onEvent
-            )
+            if (isSingleVirtualDeviceMode) {
+                val launchpad = launchpads.first()
+                val targetZoom = (viewportSize.value.width - 2 * 16 * density) / (launchpad.size.width * gridSize)
+                val zoomDelta = targetZoom - viewportState.zoom
+                onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, Offset.Zero))
+            } else {
+                ViewportController.centerLaunchpads(
+                    viewportOffset = viewportState.offset,
+                    viewportZoom = viewportState.zoom,
+                    elements = launchpads,
+                    viewportSize = viewportSize.value,
+                    gridSize = gridSize,
+                    onEvent = onEvent
+                )
+            }
         }
     }
 
@@ -125,11 +143,11 @@ fun WorkspaceViewport(
             .onSizeChanged { size ->
                 viewportSize.value = Size(size.width.toFloat(), size.height.toFloat())
             }
-            .pointerInput(Unit) {
+            .pointerInput(isSingleVirtualDeviceMode) {
                 detectTransformGestures(
                     panZoomLock = false,
                     onGesture = { centroid, pan, gestureZoom, _ ->
-                        if (pan != Offset.Zero) {
+                        if (pan != Offset.Zero && !isSingleVirtualDeviceMode) {
                             onEvent(WorkspaceContract.Event.OnPanViewport(pan))
                         }
 
@@ -141,7 +159,7 @@ fun WorkspaceViewport(
                     }
                 )
             }
-            .pointerInput(viewportState.zoom) {
+            .pointerInput(viewportState.zoom, isSingleVirtualDeviceMode) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -155,7 +173,7 @@ fun WorkspaceViewport(
                                 val zoomDelta = viewportState.zoom * (factor - 1f)
                                 val mousePosition = change.position
                                 onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, mousePosition))
-                            } else if (!isZoomModifier) {
+                            } else if (!isZoomModifier && !isSingleVirtualDeviceMode) {
                                 // Panning: allow buttery smooth two-finger panning on trackpads and mouse-wheel scrolling
                                 val isHorizontalModifier = event.keyboardModifiers.isShiftPressed
                                 val panX = if (isHorizontalModifier && scrollDelta.x == 0f) scrollDelta.y else scrollDelta.x
@@ -168,7 +186,7 @@ fun WorkspaceViewport(
                     }
                 }
             }
-            .pointerInput("collaboration-cursor", viewportState.offset, viewportState.zoom) {
+            .pointerInput("collaboration-cursor", effectiveOffset, viewportState.zoom) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -176,8 +194,8 @@ fun WorkspaceViewport(
                         val isMove = event.type == PointerEventType.Move || event.buttons.isPrimaryPressed
                         if (isMove) {
                             CollaborationPresence.sendCursorMoved(
-                                x = (position.x - viewportState.offset.x) / viewportState.zoom,
-                                y = (position.y - viewportState.offset.y) / viewportState.zoom
+                                x = (position.x - effectiveOffset.x) / viewportState.zoom,
+                                y = (position.y - effectiveOffset.y) / viewportState.zoom
                             )
                         }
                     }
@@ -198,22 +216,24 @@ fun WorkspaceViewport(
                     }
                 }
         ) {
-            val scaledGridSize = gridSize * viewportState.zoom
-            val startX = (viewportState.offset.x % scaledGridSize) - scaledGridSize
-            val startY = (viewportState.offset.y % scaledGridSize) - scaledGridSize
+            if (workspaceMode is WorkspaceContract.WorkspaceMode.Layout || alwaysShowGrid) {
+                val scaledGridSize = gridSize * viewportState.zoom
+                val startX = (effectiveOffset.x % scaledGridSize) - scaledGridSize
+                val startY = (effectiveOffset.y % scaledGridSize) - scaledGridSize
 
-            var x = startX
-            while (x < size.width) {
-                var y = startY
-                while (y < size.height) {
-                    drawCircle(
-                        color = gridColor,
-                        radius = 2f * density * viewportState.zoom,
-                        center = Offset(x, y)
-                    )
-                    y += scaledGridSize
+                var x = startX
+                while (x < size.width) {
+                    var y = startY
+                    while (y < size.height) {
+                        drawCircle(
+                            color = gridColor,
+                            radius = 2f * density * viewportState.zoom,
+                            center = Offset(x, y)
+                        )
+                        y += scaledGridSize
+                    }
+                    x += scaledGridSize
                 }
-                x += scaledGridSize
             }
         }
 
@@ -236,8 +256,8 @@ fun WorkspaceViewport(
                     )
                     .offset {
                         val scaledGridSize = gridSize * viewportState.zoom
-                        val xOffset = (element.position.value.x * scaledGridSize + viewportState.offset.x).roundToInt()
-                        val yOffset = (element.position.value.y * scaledGridSize + viewportState.offset.y).roundToInt()
+                        val xOffset = (element.position.value.x * scaledGridSize + effectiveOffset.x).roundToInt()
+                        val yOffset = (element.position.value.y * scaledGridSize + effectiveOffset.y).roundToInt()
                         IntOffset(xOffset, yOffset)
                     }
                     .graphicsLayer {
@@ -288,8 +308,8 @@ fun WorkspaceViewport(
                 modifier = Modifier
                     .offset {
                         val scaledGridSize = gridSize * viewportState.zoom
-                        val xOffset = (element.position.value.x * scaledGridSize + viewportState.offset.x).roundToInt()
-                        val yOffset = (element.position.value.y * scaledGridSize + viewportState.offset.y).roundToInt()
+                        val xOffset = (element.position.value.x * scaledGridSize + effectiveOffset.x).roundToInt()
+                        val yOffset = (element.position.value.y * scaledGridSize + effectiveOffset.y).roundToInt()
                         IntOffset(xOffset, yOffset)
                     }
                     .graphicsLayer {
@@ -393,8 +413,8 @@ fun WorkspaceViewport(
             var traySize by remember { mutableStateOf(Size(164f * density, 44f * density)) }
 
             val scaledGridSize = gridSize * viewportState.zoom
-            val trayScreenCenterX = element.position.value.x * scaledGridSize + viewportState.offset.x + element.size.width * scaledGridSize / 2
-            val trayScreenTopY = element.position.value.y * scaledGridSize + viewportState.offset.y
+            val trayScreenCenterX = element.position.value.x * scaledGridSize + effectiveOffset.x + element.size.width * scaledGridSize / 2
+            val trayScreenTopY = element.position.value.y * scaledGridSize + effectiveOffset.y
 
             Row(
                 modifier = Modifier
@@ -407,19 +427,15 @@ fun WorkspaceViewport(
                     }
                     .onSizeChanged { size ->
                         traySize = Size(size.width.toFloat(), size.height.toFloat())
-                    }
-                    .background(actionTrayBackground, FullShape)
-                    .border(1.dp, actionTrayBorder, FullShape)
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    },
             ) {
                 element.Actions(this)
             }
         }
 
         val originSizeDp = 48.dp
-        val centerPxX = viewportState.offset.x
-        val centerPxY = viewportState.offset.y
+        val centerPxX = effectiveOffset.x
+        val centerPxY = effectiveOffset.y
 
         val originSizePx = (originSizeDp.value * density)
         val offsetX = (centerPxX - originSizePx / 2f).roundToInt()
@@ -435,28 +451,17 @@ fun WorkspaceViewport(
             enter = fadeIn() + scaleIn(),
             exit = fadeOut() + scaleOut()
         ) {
-            Box(
+            OriginIndicator(
                 modifier = Modifier
-                    .clip(CircleShape)
-                    .background(originBackground)
-                    .border(1.dp, viewportBorder, CircleShape)
                     .size(originSizeDp)
-            ) {
-                Text(
-                    text = "0,0",
-                    modifier = Modifier
-                        .align(Alignment.Center),
-                    style = Theme[typography][small],
-                    color = originForeground,
-                )
-            }
+            )
         }
 
         CursorOverlay(
             cursors = remoteCursors.mapValues { (_, cursor) ->
                 cursor.copy(
-                    x = cursor.x * viewportState.zoom + viewportState.offset.x,
-                    y = cursor.y * viewportState.zoom + viewportState.offset.y
+                    x = cursor.x * viewportState.zoom + effectiveOffset.x,
+                    y = cursor.y * viewportState.zoom + effectiveOffset.y
                 )
             },
             modifier = Modifier

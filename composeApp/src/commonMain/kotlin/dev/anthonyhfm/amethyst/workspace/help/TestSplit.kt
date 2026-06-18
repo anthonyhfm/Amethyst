@@ -1,6 +1,6 @@
-import java.util.regex.Pattern
+package dev.anthonyhfm.amethyst.workspace.help
 
-fun main() {
+fun mainSplit() {
     val text = """
 # Header
 Some text

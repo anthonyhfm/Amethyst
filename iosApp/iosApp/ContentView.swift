@@ -12,15 +12,74 @@ import ComposeApp
 
 // MARK: - Workspace host (KMP Compose)
 
+private class OrientationContainerViewController: UIViewController {
+    let childViewController: UIViewController
+    var forcedLandscape: Bool = false {
+        didSet {
+            if oldValue != forcedLandscape {
+                setNeedsUpdateOfSupportedInterfaceOrientations()
+                if #available(iOS 16.0, *) {
+                    if let windowScene = self.view.window?.windowScene {
+                        let orientations: UIInterfaceOrientationMask = forcedLandscape ? .landscape : .all
+                        let preferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: orientations)
+                        windowScene.requestGeometryUpdate(preferences) { error in
+                            print("Geometry update failed: \(error)")
+                        }
+                    }
+                } else {
+                    let value = forcedLandscape ? UIInterfaceOrientation.landscapeLeft.rawValue : UIInterfaceOrientation.unknown.rawValue
+                    UIDevice.current.setValue(value, forKey: "orientation")
+                    UIViewController.attemptRotationToDeviceOrientation()
+                }
+            }
+        }
+    }
+
+    init(child: UIViewController) {
+        self.childViewController = child
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        addChild(childViewController)
+        childViewController.view.frame = view.bounds
+        childViewController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(childViewController.view)
+        childViewController.didMove(toParent: self)
+    }
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        return forcedLandscape ? .landscape : .all
+    }
+
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        return forcedLandscape ? .landscapeLeft : .portrait
+    }
+}
+
 private struct WorkspaceView: UIViewControllerRepresentable {
     let darkMode: Bool
     let onBack: () -> Void
 
-    func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.WorkspaceViewController(darkMode: darkMode, onBack: onBack)
+    func makeUIViewController(context: Context) -> OrientationContainerViewController {
+        let child = MainViewControllerKt.WorkspaceViewController(darkMode: darkMode, onBack: onBack)
+        let container = OrientationContainerViewController(child: child)
+        
+        IosWorkspaceBridge.shared.onOrientationChanged = { [weak container] landscape in
+            DispatchQueue.main.async {
+                container?.forcedLandscape = landscape.boolValue
+            }
+        }
+        
+        return container
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: OrientationContainerViewController, context: Context) {}
 }
 
 // MARK: - Root content
@@ -31,6 +90,7 @@ struct ContentView: View {
 
     @State private var viewModel = HomeViewModel()
     @State private var settingsViewModel = SettingsViewModel()
+    @State private var showSettingsSheet = false
 
     private var theme: AmethystTheme {
         AmethystTheme(darkMode: colorScheme == .dark)
@@ -43,6 +103,48 @@ struct ContentView: View {
                     viewModel.workspaceClosed()
                 }
                 .ignoresSafeArea()
+                .onAppear {
+                    IosWorkspaceBridge.shared.onShowSettings = {
+                        showSettingsSheet = true
+                    }
+                    IosWorkspaceBridge.shared.createLiquidGlassEffect = {
+                        if #available(iOS 26.0, *) {
+                            let effect = UIGlassEffect(style: .regular)
+                            effect.isInteractive = true
+                            return effect
+                        } else {
+                            return UIBlurEffect(style: .systemThinMaterial)
+                        }
+                    }
+                    if #available(iOS 26.0, *) {
+                        IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = {
+                            let effect = UIGlassContainerEffect()
+                            effect.spacing = 10
+                            return effect
+                        }
+                    } else {
+                        IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = nil
+                    }
+                    IosWorkspaceBridge.shared.createLiquidGlassButtonConfiguration = {
+                        if #available(iOS 26.0, *) {
+                            var configuration = UIButton.Configuration.glass()
+                            configuration.cornerStyle = .capsule
+                            configuration.indicator = .none
+                            return configuration._bridgeToObjectiveC()
+                        } else {
+                            var configuration = UIButton.Configuration.bordered()
+                            configuration.cornerStyle = .capsule
+                            return configuration._bridgeToObjectiveC()
+                        }
+                    }
+                }
+                .onDisappear {
+                    IosWorkspaceBridge.shared.onOrientationChanged = nil
+                    IosWorkspaceBridge.shared.onShowSettings = nil
+                }
+                .sheet(isPresented: $showSettingsSheet) {
+                    SettingsTabView(viewModel: settingsViewModel, showsCloseButton: true)
+                }
             } else {
                 homeTabView
             }
@@ -99,4 +201,3 @@ struct ContentView: View {
         .amethystThemed()
     }
 }
-

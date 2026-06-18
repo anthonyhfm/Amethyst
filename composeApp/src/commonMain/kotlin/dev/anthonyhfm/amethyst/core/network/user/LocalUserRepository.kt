@@ -62,7 +62,7 @@ object LocalUserRepository {
 
     private fun colorForName(name: String): Int {
         if (name.isEmpty()) return COLLABORATION_COLORS.first()
-        val index = Math.abs(name.hashCode()) % COLLABORATION_COLORS.size
+        val index = kotlin.math.abs(name.hashCode()) % COLLABORATION_COLORS.size
         return COLLABORATION_COLORS[index]
     }
 

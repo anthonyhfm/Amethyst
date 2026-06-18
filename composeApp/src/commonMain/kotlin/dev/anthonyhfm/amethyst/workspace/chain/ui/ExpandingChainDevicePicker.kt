@@ -20,7 +20,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
+import dev.anthonyhfm.amethyst.workspace.isMobilePhone
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -87,10 +89,12 @@ fun ExpandingChainDevicePicker(
     onAddComponent: (GenericChainDevice<*>) -> Unit,
     onDropDevice: (device: GenericChainDevice<*>, Pair<Int, String>, originChain: Chain) -> Unit
 ) {
+    val isMobile = isMobilePhone()
     val density = LocalDensity.current.density
     val interaction = remember { MutableInteractionSource() }
     val hovering by rememberDelayedHoverAsState(interaction)
     var pickerVisible: Boolean by remember { mutableStateOf(false) }
+    var isExpandedByTap by remember { mutableStateOf(false) }
     val dropKey = remember { UUID.randomUUID() }
     var isDropHover by remember { mutableStateOf(false) }
     val clipboard by ClipboardManager.clipboardData.collectAsState()
@@ -101,19 +105,21 @@ fun ExpandingChainDevicePicker(
     val hasGlobalDrag = dragAndDropState.draggedItem != null
     val reducedMotion = rememberReducedMotion()
 
+    val actualCollapsedWidth = if (isMobile) 24.dp else collapsedWidth
+
     val targetWidth by animateDpAsState(
         targetValue = when {
-            forceOff -> collapsedWidth
+            forceOff -> actualCollapsedWidth
             isDropHover -> expandedWidth                          // FULL size only on real drop hover
-            hovering || pickerVisible || showRightClickMenu || expanded -> hoverWidth   // pointer / explicit hover
+            hovering || pickerVisible || showRightClickMenu || expanded || isExpandedByTap -> hoverWidth   // pointer / explicit hover
             hasGlobalDrag -> dragPresenceWidth                    // global drag but not over this zone
-            else -> collapsedWidth
+            else -> actualCollapsedWidth
         },
         label = "ExpandingPickerWidth",
         animationSpec = hoverTweenSpec(durationMillis = 100),
     )
 
-    val showButton = !forceOff && !isDropHover && (hovering || pickerVisible || expanded)
+    val showButton = !forceOff && !isDropHover && (hovering || pickerVisible || expanded || isExpandedByTap)
 
     val indicatorAlpha by animateFloatAsState(
         targetValue = if (isDropHover) 1f else 0f,
@@ -210,6 +216,14 @@ fun ExpandingChainDevicePicker(
                 }
 
                 rightClickMenuOffset = DpOffset((it.x / density).dp, (it.y / density).dp)
+            }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                if (isMobile) {
+                    isExpandedByTap = !isExpandedByTap
+                }
             },
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -337,9 +351,13 @@ fun ExpandingChainDevicePicker(
                     ChainDevicePicker(
                         visible = pickerVisible,
                         sampling = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain,
-                        onDismiss = { pickerVisible = false },
+                        onDismiss = {
+                            pickerVisible = false
+                            isExpandedByTap = false
+                        },
                         onPickComponent = {
                             pickerVisible = false
+                            isExpandedByTap = false
 
                             onAddComponent(it)
                         }
