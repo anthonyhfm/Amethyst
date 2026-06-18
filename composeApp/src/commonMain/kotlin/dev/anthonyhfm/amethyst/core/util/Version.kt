@@ -9,7 +9,7 @@ data class Version(
     val hotfix: Int
 )
 
-val amethystVersion = Version(0, 5, 3)
+val amethystVersion = Version(0, 6, 0)
 
 val Version.displayString: String
     get() = "$major.$minor.$hotfix"
