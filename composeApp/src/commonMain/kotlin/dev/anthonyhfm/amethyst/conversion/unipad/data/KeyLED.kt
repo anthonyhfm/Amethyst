@@ -8,6 +8,8 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
@@ -221,7 +223,9 @@ object KeyLED {
 
         return KeyframesChainDeviceContract.KeyframesChainDeviceState(
             frames = frames,
-            renderedAnimation = renderedAnimation
+            renderedAnimation = renderedAnimation,
+            useOwnershipTracking = true,
+            ownershipId = UUID.randomUUID()
         )
     }
 
