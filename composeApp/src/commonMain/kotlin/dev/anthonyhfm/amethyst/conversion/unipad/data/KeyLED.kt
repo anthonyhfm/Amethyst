@@ -207,12 +207,21 @@ object KeyLED {
             }
         }
 
+        val addedFinalFrame = currentFrame.entries.isNotEmpty() && currentFrame.entries != frames.lastOrNull()?.entries
+        if (addedFinalFrame) {
+            frames.add(currentFrame)
+        }
+
+        val keepLastFrameOn = frames.lastOrNull()?.entries
+            ?.any { it.r != 0f || it.g != 0f || it.b != 0f } == true
+
         val renderedAnimation: List<Pair<Int, List<Signal>>>
 
         KeyframesChainDevice().apply {
             state.update {
                 it.copy(
-                    frames = frames
+                    frames = frames,
+                    infinity = keepLastFrameOn
                 )
             }
 
@@ -224,6 +233,7 @@ object KeyLED {
         return KeyframesChainDeviceContract.KeyframesChainDeviceState(
             frames = frames,
             renderedAnimation = renderedAnimation,
+            infinity = keepLastFrameOn,
             useOwnershipTracking = true,
             ownershipId = UUID.randomUUID()
         )
