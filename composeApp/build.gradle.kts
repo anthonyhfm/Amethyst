@@ -97,6 +97,7 @@ kotlin {
                 exclude(compose.material)
             }
 
+            implementation(projects.nativeEngine)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)

@@ -4,6 +4,7 @@
 .junie
 .gradle
 **/build/
+**/target/
 xcuserdata
 !src/**/build/
 local.properties

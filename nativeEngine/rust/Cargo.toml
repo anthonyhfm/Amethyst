@@ -1,0 +1,12 @@
+[package]
+name = "amethyst-native-engine"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[dependencies]
+uniffi = "0.29.4"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"

@@ -29,6 +29,7 @@ reorderable = "2.4.3"
 sentry-kmp = "0.26.0"
 nucleus = "1.15.6"
 ktor = "3.1.3"
+gobley = "0.3.7"
 
 [libraries]
 coremidi4j = { module = "uk.co.xfactory-librarians:coremidi4j", version.ref = "coremidi4j" }
@@ -68,3 +69,5 @@ composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "k
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 sentryKmp = { id = "io.sentry.kotlin.multiplatform.gradle", version.ref = "sentry-kmp" }
 nucleus = { id = "io.github.kdroidfilter.nucleus", version.ref = "nucleus" }
+gobleyCargo = { id = "dev.gobley.cargo", version.ref = "gobley" }
+gobleyUniffi = { id = "dev.gobley.uniffi", version.ref = "gobley" }
