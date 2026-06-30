@@ -8,8 +8,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntSize
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import kotlin.math.floor
 
 @Composable
@@ -33,7 +33,7 @@ fun LaunchpadSurfaceDetectionOverlay(
                 layoutSize = coordinates.size
             }
             .then(
-                if (workspaceMode is WorkspaceContract.WorkspaceMode.Layout) {
+                if (workspaceMode is LayoutWorkspaceMode) {
                     Modifier
                 } else {
                     Modifier

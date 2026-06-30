@@ -64,6 +64,7 @@ import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
 
@@ -73,7 +74,6 @@ fun WorkspaceChainEditor(
     scrollState: ScrollAreaState = rememberScrollAreaState(),
     modifier: Modifier = Modifier,
     isFullScreen: Boolean = false,
-    showMacroControls: Boolean = true,
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
     val density = LocalDensity.current.density
@@ -84,14 +84,13 @@ fun WorkspaceChainEditor(
 
     LaunchedEffect(WorkspaceRepository.mode.collectAsState().value) {
         chain = when (WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+            is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
             else -> WorkspaceRepository.lightsChain
         }
     }
 
     Column(
         modifier = modifier
-            .padding(12.dp)
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -99,13 +98,7 @@ fun WorkspaceChainEditor(
                     SelectionManager.clear()
                 }
             ),
-
-        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (showMacroControls) {
-            MacroControls()
-        }
-
         ScrollArea(
             modifier = Modifier
                 .clip(DefaultShape)
@@ -117,8 +110,6 @@ fun WorkspaceChainEditor(
                     }
                 )
                 .fillMaxWidth()
-                .background(Theme[chainColorTokens][chainCanvas], DefaultShape)
-                .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape)
                 .padding(bottom = 10.dp),
             orientation = ScrollBarOrientation.Horizontal,
             state = scrollState,
@@ -135,7 +126,7 @@ fun WorkspaceChainEditor(
                             Row {
                                 ExpandingChainDevicePicker(
                                     destinationChain = when (WorkspaceRepository.mode.value) {
-                                        is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                        is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                         else -> WorkspaceRepository.lightsChain
                                     },
                                     slotIndex = 0,
@@ -180,7 +171,7 @@ fun WorkspaceChainEditor(
                                                 .clickable {
                                                     val chainDeviceSelectable = Selectable.ChainDevice(
                                                         parent = when (WorkspaceRepository.mode.value) {
-                                                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                                            is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                                             else -> WorkspaceRepository.lightsChain
                                                         },
                                                         device = device
@@ -218,7 +209,7 @@ fun WorkspaceChainEditor(
 
                                             ChainDeviceContextMenu(
                                                 chain = when (WorkspaceRepository.mode.value) {
-                                                    is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                                    is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                                     else -> WorkspaceRepository.lightsChain
                                                 },
                                                 device = device,
@@ -268,7 +259,7 @@ fun WorkspaceChainEditor(
                                     val insertionIndex = index + 1
                                     ExpandingChainDevicePicker(
                                         destinationChain = when (WorkspaceRepository.mode.value) {
-                                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                            is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                             else -> WorkspaceRepository.lightsChain
                                         },
                                         slotIndex = insertionIndex,
@@ -302,7 +293,7 @@ fun WorkspaceChainEditor(
                     } else {
                         ExpandingChainDevicePicker(
                             destinationChain = when (WorkspaceRepository.mode.value) {
-                                is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                 else -> WorkspaceRepository.lightsChain
                             },
                             slotIndex = 0,
@@ -361,7 +352,7 @@ fun ChainDeviceContextMenu(
                     ClipboardData.ChainDevice(
                         states = listOf(device.state.value),
                         type = when (WorkspaceRepository.mode.value) {
-                            is WorkspaceContract.WorkspaceMode.SamplingChain -> ClipboardData.ChainDevice.ChainType.Sampling
+                            is SamplingChainWorkspaceMode -> ClipboardData.ChainDevice.ChainType.Sampling
                             else -> ClipboardData.ChainDevice.ChainType.Lights
                         }
                     )

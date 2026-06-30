@@ -19,22 +19,11 @@ import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 
 @Composable
 fun Timeline() {
-    val timelinePalette = TimelineTheme.palette
     val viewModel: TimelineViewModel = viewModel { TimelineViewModel() }
 
     Scaffold(
         modifier = Modifier
             .fillMaxSize(),
-        topBar = {
-            Spacer(
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .height(64.dp)
-                    .background(timelinePalette.rulerHighlight)
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            )
-        }
     ) { paddingValues ->
         Box(
             modifier = Modifier

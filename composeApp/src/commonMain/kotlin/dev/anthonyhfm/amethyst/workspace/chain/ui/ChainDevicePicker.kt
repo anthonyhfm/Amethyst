@@ -66,7 +66,7 @@ import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable

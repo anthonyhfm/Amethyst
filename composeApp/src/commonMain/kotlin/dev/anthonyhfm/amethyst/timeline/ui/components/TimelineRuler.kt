@@ -60,14 +60,7 @@ fun TimelineRuler(
         if (zoomLevel <= 0f) return@Canvas
 
         val dividerStrokePx = 1.dp.toPx()
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    timelinePalette.rulerHighlight,
-                    timelinePalette.rulerSurface
-                )
-            )
-        )
+
         drawLine(
             color = timelinePalette.rulerHighlight.copy(alpha = 0.9f),
             start = Offset(0f, dividerStrokePx / 2f),

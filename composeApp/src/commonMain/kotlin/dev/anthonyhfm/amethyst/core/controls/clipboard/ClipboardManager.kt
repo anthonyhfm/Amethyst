@@ -7,6 +7,8 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
@@ -105,7 +107,7 @@ object ClipboardManager {
                 setClipboardData(
                     data = ClipboardData.ChainDevice(
                         states = sortedDevices.map { it.device.state.value },
-                        type = if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
+                        type = if (WorkspaceRepository.mode.value is LightsChainWorkspaceMode) {
                             ClipboardData.ChainDevice.ChainType.Lights
                         } else {
                             ClipboardData.ChainDevice.ChainType.Sampling
@@ -178,7 +180,7 @@ object ClipboardManager {
 
         when (val clip = clipboardData.value) {
             is ClipboardData.TimelineAudioRange -> {
-                if (mode is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                if (mode is SamplingChainWorkspaceMode) {
                     pasteSamplingDevices(
                         buildChainDevicesFromTimelineAudioRange(
                             entries = clip.entries,
@@ -226,7 +228,7 @@ object ClipboardManager {
             }
 
             is ClipboardData.TimelineAudioEntries -> {
-                if (mode is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                if (mode is SamplingChainWorkspaceMode) {
                     pasteSamplingDevices(
                         clip.entries.mapNotNull(::buildChainDeviceFromTimelineAudioEntry)
                     )
@@ -290,8 +292,8 @@ object ClipboardManager {
                     }.filter { it >= 0 }
                     val baseIndex = (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
 
-                    val modeIsLights = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain
-                    val modeIsSampling = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain
+                    val modeIsLights = WorkspaceRepository.mode.value is LightsChainWorkspaceMode
+                    val modeIsSampling = WorkspaceRepository.mode.value is SamplingChainWorkspaceMode
                     if ((modeIsLights && clipData.type != ClipboardData.ChainDevice.ChainType.Lights) ||
                         (modeIsSampling && clipData.type != ClipboardData.ChainDevice.ChainType.Sampling)) {
                         return
@@ -304,7 +306,7 @@ object ClipboardManager {
                         )
                     }
                 } else {
-                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
+                    if (WorkspaceRepository.mode.value is LightsChainWorkspaceMode) {
                         if (clipData.type != ClipboardData.ChainDevice.ChainType.Lights) return
                         val baseIndex = WorkspaceRepository.lightsChain.devices.value.size
                         clipData.states.forEachIndexed { offset, state ->
@@ -313,7 +315,7 @@ object ClipboardManager {
                                 atIndex = baseIndex + offset
                             )
                         }
-                    } else if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                    } else if (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
                         if (clipData.type != ClipboardData.ChainDevice.ChainType.Sampling) return
                         val baseIndex = WorkspaceRepository.samplingChain.devices.value.size
                         clipData.states.forEachIndexed { offset, state ->

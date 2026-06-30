@@ -31,7 +31,7 @@ import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
-fun BoxScope.FrameDrawingPanel(
+fun FrameDrawingPanel(
     state: KeyframesChainDeviceContract.KeyframesChainDeviceState,
     onEvent: (KeyframesChainDeviceContract.Event) -> Unit
 ) {
@@ -41,14 +41,9 @@ fun BoxScope.FrameDrawingPanel(
 
     Column(
         modifier = Modifier
-            .align(Alignment.TopEnd)
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp)
             .clip(DefaultShape)
             .fillMaxHeight()
             .width(220.dp)
-            .background(Theme[colors][card])
-            .border(1.dp, Theme[colors][border], DefaultShape)
             .padding(12.dp),
     ) {
         ColorControls(

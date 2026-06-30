@@ -45,10 +45,6 @@ fun ColumnScope.FrameListPanel(
                 .clip(DefaultShape)
                 .fillMaxHeight()
                 .width(220.dp)
-                .background(Theme[colors][card])
-                .border(1.dp, Theme[colors][border], DefaultShape)
-                .padding(horizontal = 12.dp)
-                .padding(top = 4.dp)
         ) {
             itemsIndexed(state.frames, key = { _, frame -> frame._internalUuid }) { index, frame ->
                 FrameCreationButton(

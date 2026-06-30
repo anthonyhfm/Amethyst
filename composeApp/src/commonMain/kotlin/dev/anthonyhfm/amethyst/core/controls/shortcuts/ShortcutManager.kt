@@ -20,6 +20,12 @@ import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.openFileSaver
@@ -130,7 +136,7 @@ object ShortcutManager {
     fun renameSelection(): Boolean = handleRenameShortcut()
 
     fun canSelectAll(
-        mode: WorkspaceContract.WorkspaceMode = WorkspaceRepository.mode.value,
+        mode: WorkspaceMode = WorkspaceRepository.mode.value,
         selections: List<Selectable> = SelectionManager.selections.value
     ): Boolean {
         val groupItem = selections.filterIsInstance<Selectable.GroupChainItem>().firstOrNull()
@@ -140,9 +146,9 @@ object ShortcutManager {
         }
 
         return when (mode) {
-            is WorkspaceContract.WorkspaceMode.LightsChain -> WorkspaceRepository.lightsChain.devices.value.isNotEmpty()
-            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain.devices.value.isNotEmpty()
-            is WorkspaceContract.WorkspaceMode.Timeline -> TimelineRepository.tracks.value.isNotEmpty()
+            is LightsChainWorkspaceMode -> WorkspaceRepository.lightsChain.devices.value.isNotEmpty()
+            is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain.devices.value.isNotEmpty()
+            is TimelineWorkspaceMode -> TimelineRepository.tracks.value.isNotEmpty()
             is dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode -> mode.currentEntry?.notes?.isNotEmpty() == true
             else -> false
         }
@@ -228,7 +234,7 @@ object ShortcutManager {
 
         // Escape — clear selection (fallback, only if something is selected)
         if (keyEvent.key == Key.Escape) {
-            if (WorkspaceRepository.mode.value.selectable && SelectionManager.selections.value.isNotEmpty()) {
+            if (WorkspaceRepository.mode.value.selectableMode && SelectionManager.selections.value.isNotEmpty()) {
                 SelectionManager.clear()
                 return true
             }
@@ -241,13 +247,13 @@ object ShortcutManager {
         }
 
         // Numeric mode switching (1–5): only when no modifier pressed, main mode is selectable
-        if (!isCtrl && !keyEvent.isShiftPressed && WorkspaceRepository.mode.value.selectable) {
+        if (!isCtrl && !keyEvent.isShiftPressed && WorkspaceRepository.mode.value.selectableMode) {
             val targetMode = when (keyEvent.key) {
-                Key.One -> WorkspaceContract.WorkspaceMode.Performance()
-                Key.Two -> WorkspaceContract.WorkspaceMode.Timeline()
-                Key.Three -> WorkspaceContract.WorkspaceMode.LightsChain()
-                Key.Four -> WorkspaceContract.WorkspaceMode.SamplingChain()
-                Key.Five -> WorkspaceContract.WorkspaceMode.Layout()
+                Key.One -> PerformanceWorkspaceMode()
+                Key.Two -> TimelineWorkspaceMode()
+                Key.Three -> LightsChainWorkspaceMode()
+                Key.Four -> SamplingChainWorkspaceMode()
+                Key.Five -> LayoutWorkspaceMode()
                 else -> null
             }
             if (targetMode != null) {
@@ -273,7 +279,7 @@ object ShortcutManager {
         }
 
         return when (val mode = WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.LightsChain -> {
+            is LightsChainWorkspaceMode -> {
                 val chain = WorkspaceRepository.lightsChain
                 val devices = chain.devices.value
                 if (devices.isNotEmpty()) {
@@ -284,7 +290,7 @@ object ShortcutManager {
                     true
                 } else false
             }
-            is WorkspaceContract.WorkspaceMode.SamplingChain -> {
+            is SamplingChainWorkspaceMode -> {
                 val chain = WorkspaceRepository.samplingChain
                 val devices = chain.devices.value
                 if (devices.isNotEmpty()) {
@@ -295,7 +301,7 @@ object ShortcutManager {
                     true
                 } else false
             }
-            is WorkspaceContract.WorkspaceMode.Timeline -> {
+            is TimelineWorkspaceMode -> {
                 val tracks = TimelineRepository.tracks.value
                 if (tracks.isNotEmpty()) {
                     SelectionManager.clear()

@@ -59,39 +59,45 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 
 @Composable
 fun WorkspaceMode(
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: WorkspaceMode,
 ) {
     val selectableModes = listOf(
         WorkspaceModePickerItem(
             key = "performance",
-            mode = WorkspaceContract.WorkspaceMode.Performance(),
+            mode = PerformanceWorkspaceMode(),
             text = "Performance",
             icon = Lucide.Play,
         ),
         WorkspaceModePickerItem(
             key = "timeline",
-            mode = WorkspaceContract.WorkspaceMode.Timeline(),
+            mode = TimelineWorkspaceMode(),
             text = "Timeline",
             icon = Lucide.ChartNoAxesGantt,
         ),
         WorkspaceModePickerItem(
             key = "lights-chain",
-            mode = WorkspaceContract.WorkspaceMode.LightsChain(),
+            mode = LightsChainWorkspaceMode(),
             text = "Lights",
             icon = Lucide.Lightbulb,
         ),
         WorkspaceModePickerItem(
             key = "sampling-chain",
-            mode = WorkspaceContract.WorkspaceMode.SamplingChain(),
+            mode = SamplingChainWorkspaceMode(),
             text = "Sampling",
             icon = Lucide.AudioLines,
         ),
         WorkspaceModePickerItem(
             key = "layout",
-            mode = WorkspaceContract.WorkspaceMode.Layout(),
+            mode = LayoutWorkspaceMode(),
             text = "Layout",
             icon = Lucide.LayoutGrid,
         ),
@@ -99,7 +105,7 @@ fun WorkspaceMode(
 
     val selectedMode = selectableModes.firstOrNull { modeMatches(mode, it.mode) }
 
-    if (!mode.selectable) {
+    if (!mode.selectableMode) {
         val variant = ButtonVariant.Destructive
         Button(
             onClick = { WorkspaceRepository.switchToPreviousMode() },
@@ -224,22 +230,22 @@ private fun WorkspaceModeTabButton(
 }
 
 private fun modeMatches(
-    currentMode: WorkspaceContract.WorkspaceMode,
-    candidate: WorkspaceContract.WorkspaceMode,
+    currentMode: WorkspaceMode,
+    candidate: WorkspaceMode,
 ): Boolean {
     return when {
-        currentMode is WorkspaceContract.WorkspaceMode.Layout && candidate is WorkspaceContract.WorkspaceMode.Layout -> true
-        currentMode is WorkspaceContract.WorkspaceMode.Performance && candidate is WorkspaceContract.WorkspaceMode.Performance -> true
-        currentMode is WorkspaceContract.WorkspaceMode.LightsChain && candidate is WorkspaceContract.WorkspaceMode.LightsChain -> true
-        currentMode is WorkspaceContract.WorkspaceMode.SamplingChain && candidate is WorkspaceContract.WorkspaceMode.SamplingChain -> true
-        currentMode is WorkspaceContract.WorkspaceMode.Timeline && candidate is WorkspaceContract.WorkspaceMode.Timeline -> true
+        currentMode is LayoutWorkspaceMode && candidate is LayoutWorkspaceMode -> true
+        currentMode is PerformanceWorkspaceMode && candidate is PerformanceWorkspaceMode -> true
+        currentMode is LightsChainWorkspaceMode && candidate is LightsChainWorkspaceMode -> true
+        currentMode is SamplingChainWorkspaceMode && candidate is SamplingChainWorkspaceMode -> true
+        currentMode is TimelineWorkspaceMode && candidate is TimelineWorkspaceMode -> true
         else -> false
     }
 }
 
 data class WorkspaceModePickerItem(
     val key: String,
-    val mode: WorkspaceContract.WorkspaceMode,
+    val mode: WorkspaceMode,
     val text: String,
     val icon: ImageVector,
 )

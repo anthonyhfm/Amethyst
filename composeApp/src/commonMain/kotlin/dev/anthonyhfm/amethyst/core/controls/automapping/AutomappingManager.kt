@@ -18,6 +18,7 @@ import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
@@ -56,7 +57,7 @@ object AutomappingManager {
                 val target = resolveActiveTarget() ?: return@combine clearShotgunLayer()
                 
                 val effectiveDomain: AutomappingChainDomain = when (mode) {
-                    is WorkspaceContract.WorkspaceMode.Timeline -> target.domain
+                    is TimelineWorkspaceMode -> target.domain
 
                     else -> return@combine clearShotgunLayer()
                 }
@@ -259,7 +260,7 @@ object AutomappingManager {
         val target = resolveActiveTarget() ?: return false
         val mode = WorkspaceRepository.mode.value
         val effectiveDomain = when (mode) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> target.domain
+            is TimelineWorkspaceMode -> target.domain
             else -> return false
         }
         val selectedClip = resolveAutomappingSelectedClip(
@@ -281,7 +282,7 @@ object AutomappingManager {
         val target = resolveActiveTarget() ?: return false
 
         val effectiveDomain: AutomappingChainDomain = when (mode) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> target.domain
+            is TimelineWorkspaceMode -> target.domain
             else -> return false
         }
 

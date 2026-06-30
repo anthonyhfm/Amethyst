@@ -24,6 +24,7 @@ import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
 import dev.anthonyhfm.amethyst.workspace.AutoPlayState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +97,7 @@ abstract class LaunchpadViewportElement(
         val (translatedX, translatedY) = translateToDeviceCoordinates(x, y)
         val mode = WorkspaceRepository.mode.value
 
-        if (mode is WorkspaceContract.WorkspaceMode.Layout) return
+        if (mode is LayoutWorkspaceMode) return
 
         lastDragPad = Pair(translatedX, translatedY)
 
@@ -112,7 +113,7 @@ abstract class LaunchpadViewportElement(
                 localY = translatedY - position.value.y.toInt()
             )
             else -> {
-                if (mode.claimInputs) {
+                if (mode.claimMidiInputs) {
                     val localX = translatedX - position.value.x.toInt()
                     val localY = translatedY - position.value.y.toInt()
                     val pitch = (9 - localY) * 10 + localX
@@ -126,7 +127,7 @@ abstract class LaunchpadViewportElement(
                         pitch = pitch,
                         velocity = 127
                     )
-                    mode.onMidiInput(data, offset).invoke()
+                    mode.onMidiInput(data, offset)
                 } else {
                     sendGenericPadDown(translatedX, translatedY)
                 }
@@ -141,7 +142,7 @@ abstract class LaunchpadViewportElement(
         val (translatedX, translatedY) = translateToDeviceCoordinates(x, y)
         val mode = WorkspaceRepository.mode.value
 
-        if (mode is WorkspaceContract.WorkspaceMode.Layout) return
+        if (mode is LayoutWorkspaceMode) return
 
         when (mode) {
             is KeyframesWorkspaceMode -> mode.virtualDeviceDrag(
@@ -155,7 +156,7 @@ abstract class LaunchpadViewportElement(
                 localY = translatedY - position.value.y.toInt()
             )
             else -> {
-                if (mode.claimInputs) {
+                if (mode.claimMidiInputs) {
                     val localX = translatedX - position.value.x.toInt()
                     val localY = translatedY - position.value.y.toInt()
                     val pitch = (9 - localY) * 10 + localX
@@ -175,14 +176,14 @@ abstract class LaunchpadViewportElement(
                                 pitch = oldPitch,
                                 velocity = 0
                             )
-                            mode.onMidiInput(oldData, offset).invoke()
+                            mode.onMidiInput(oldData, offset)
                         }
                         
                         val data = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
                             pitch = pitch,
                             velocity = 127
                         )
-                        mode.onMidiInput(data, offset).invoke()
+                        mode.onMidiInput(data, offset)
                         lastDragPad = Pair(translatedX, translatedY)
                     }
                 } else {
@@ -203,13 +204,13 @@ abstract class LaunchpadViewportElement(
     open fun handlePadDragEnd() {
         val mode = WorkspaceRepository.mode.value
 
-        if (mode is WorkspaceContract.WorkspaceMode.Layout) return
+        if (mode is LayoutWorkspaceMode) return
 
         when (mode) {
             is KeyframesWorkspaceMode -> mode.virtualDeviceDragEnd()
             is CoordinateFilterWorkspaceMode -> mode.virtualDeviceDragEnd()
             else -> {
-                if (mode.claimInputs) {
+                if (mode.claimMidiInputs) {
                     lastDragPad?.let { (x, y) ->
                         val localX = x - position.value.x.toInt()
                         val localY = y - position.value.y.toInt()
@@ -224,7 +225,7 @@ abstract class LaunchpadViewportElement(
                             pitch = pitch,
                             velocity = 0
                         )
-                        mode.onMidiInput(data, offset).invoke()
+                        mode.onMidiInput(data, offset)
                     }
                 } else {
                     lastDragPad?.let { (x, y) ->

@@ -6,6 +6,6 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 @Composable
 expect fun WorkspaceTopAppBar(
     onBack: () -> Unit,
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode,
     onEvent: (WorkspaceContract.Event) -> Unit,
 )

@@ -29,6 +29,11 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceMenuCommandSurface
 import dev.anthonyhfm.amethyst.workspace.WorkspacePrimaryMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
 import kotlinx.coroutines.launch
 import java.awt.Frame
@@ -234,13 +239,12 @@ fun FrameWindowScope.WorkspaceMenuBar() {
 
                 Separator()
             }
-
             Menu(text = "Workspace Mode") {
                 RadioButtonItem(
                     text = "Layout",
                     selected = primaryMode == WorkspacePrimaryMode.Layout,
                     onClick = {
-                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.Layout())
+                        viewModel.switchMode(LayoutWorkspaceMode())
                     }
                 )
 
@@ -248,7 +252,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                     text = "Performance",
                     selected = primaryMode == WorkspacePrimaryMode.Performance,
                     onClick = {
-                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.Performance())
+                        viewModel.switchMode(PerformanceWorkspaceMode())
                     }
                 )
 
@@ -256,7 +260,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                     text = "Timeline",
                     selected = primaryMode == WorkspacePrimaryMode.Timeline,
                     onClick = {
-                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.Timeline())
+                        viewModel.switchMode(TimelineWorkspaceMode())
                     }
                 )
 
@@ -264,7 +268,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                     text = "Lights (Chain Editor)",
                     selected = primaryMode == WorkspacePrimaryMode.LightsChain,
                     onClick = {
-                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.LightsChain())
+                        viewModel.switchMode(LightsChainWorkspaceMode())
                     }
                 )
 
@@ -272,13 +276,13 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                     text = "Sampling (Chain Editor)",
                     selected = primaryMode == WorkspacePrimaryMode.SamplingChain,
                     onClick = {
-                        viewModel.switchMode(WorkspaceContract.WorkspaceMode.SamplingChain())
+                        viewModel.switchMode(SamplingChainWorkspaceMode())
                     }
                 )
             }
         }
 
-        if (mode is WorkspaceContract.WorkspaceMode.Timeline) {
+        if (mode is TimelineWorkspaceMode) {
             Menu(text = "Transport") {
                 Item(
                     text = if (isTimelinePlaying) "Pause" else "Play",

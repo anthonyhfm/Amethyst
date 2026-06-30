@@ -20,6 +20,9 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -37,38 +40,17 @@ class WorkspaceViewModel(
 
     init {
         viewModelScope.launch {
-            WorkspaceRepository.deviceRefresh.collect {
-                val devices = Heaven.devices.map { device ->
+            ViewportRepository.devices.collect { devices ->
+                devices.forEach { device ->
                     device.onEvent = { onEvent(it) }
-
-                    return@map device
                 }
 
-                state.update {
-                    it.copy(
-                        viewportElements = devices
-                    )
+                if (devices.isNotEmpty()) {
+                    amethystMidiManager.startAutoDetectLoop()
+                } else {
+                    amethystMidiManager.stopAutoDetectLoop()
                 }
             }
-        }
-
-        viewModelScope.launch {
-            WorkspaceRepository.deviceRefresh.emit(Unit)
-        }
-
-        viewModelScope.launch {
-            state
-                .map { it.viewportElements }
-                .distinctUntilChanged()
-                .collect { viewportElements ->
-                    Heaven.devices = viewportElements
-
-                    if (viewportElements.isNotEmpty()) {
-                        amethystMidiManager.startAutoDetectLoop()
-                    } else {
-                        amethystMidiManager.stopAutoDetectLoop()
-                    }
-                }
         }
 
         viewModelScope.launch {
@@ -99,7 +81,7 @@ class WorkspaceViewModel(
                             (state.value.mode as KeyframesWorkspaceMode).close()
                         }
 
-                        if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
+                        if (state.value.mode is LayoutWorkspaceMode) {
                             WorkspaceRepository.updateWorkspaceBounds()
 
                             if (SelectionManager.selections.value.any { it is Selectable.VirtualViewportDevice }) {
@@ -111,8 +93,7 @@ class WorkspaceViewModel(
 
                 state.update {
                     it.copy(
-                        mode = newMode,
-                        viewportElements = Heaven.devices
+                        mode = newMode
                     )
                 }
             }
@@ -158,72 +139,32 @@ class WorkspaceViewModel(
                 device.onEvent = { onEvent(it) }
 
                 state.update {
-                    it.copy(
-                        showDevicePicker = false,
-                        viewportElements = it.viewportElements.plus(device)
-                    )
+                    it.copy(showDevicePicker = false)
                 }
 
-                DeviceSyncCoordinator.onDevicePlaced(device)
+                viewModelScope.launch {
+                    WorkspaceRepository.addVirtualDevice(device)
+                }
             }
 
             is WorkspaceContract.Event.ChangeViewportElementPosition -> {
-                if (state.value.mode !is WorkspaceContract.WorkspaceMode.Layout) return
+                if (state.value.mode !is LayoutWorkspaceMode) return
 
-                var movedElement: dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement? = null
-                state.update {
-                    it.copy(
-                        viewportElements = it.viewportElements.toMutableList().apply {
-                            this[event.index].position.value = event.offset
-                            movedElement = this[event.index]
-                        }
-                    )
+                val elements = ViewportRepository.devices.value
+                if (event.index in elements.indices) {
+                    val element = elements[event.index]
+                    viewModelScope.launch {
+                        WorkspaceRepository.moveVirtualDevice(element.launchpadId, event.offset)
+                    }
                 }
-
-                movedElement?.let { DeviceSyncCoordinator.onDeviceMoved(it) }
-                WorkspaceRepository.updateWorkspaceBounds()
             }
 
             is WorkspaceContract.Event.OnViewportElementMoveFinished -> {
                 WorkspaceRepository.updateWorkspaceBounds()
             }
 
-            is WorkspaceContract.Event.OnPanViewport -> {
-                state.update {
-                    it.copy(
-                        viewportState = it.viewportState.copy(
-                            offset = it.viewportState.offset + event.offset
-                        )
-                    )
-                }
-            }
-
-            is WorkspaceContract.Event.OnZoomViewport -> {
-                state.update {
-                    val currentZoom = it.viewportState.zoom
-                    val isMobile = platform is Platform.Android || platform is Platform.iOS
-                    val isSingleVirtualDeviceMode = isMobile && it.viewportElements.size == 1
-                    val minZoom = if (isSingleVirtualDeviceMode) 0.1f else 0.5f
-                    val maxZoom = if (isSingleVirtualDeviceMode) 4.0f else 2.0f
-                    val newZoom = (currentZoom + event.zoomDelta).coerceIn(minZoom, maxZoom)
-
-                    val zoomChange = newZoom / currentZoom
-                    val newOffset = Offset(
-                        x = event.zoomCenter.x + (it.viewportState.offset.x - event.zoomCenter.x) * zoomChange,
-                        y = event.zoomCenter.y + (it.viewportState.offset.y - event.zoomCenter.y) * zoomChange
-                    )
-
-                    it.copy(
-                        viewportState = it.viewportState.copy(
-                            offset = newOffset,
-                            zoom = newZoom
-                        )
-                    )
-                }
-            }
-
             is WorkspaceContract.Event.OnClickDeviceConfigure -> {
-                if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
+                if (state.value.mode is LayoutWorkspaceMode) {
                     state.update {
                         it.copy(
                             showDeviceConfigurator = event.uuid
@@ -241,36 +182,22 @@ class WorkspaceViewModel(
             }
 
             is WorkspaceContract.Event.OnChangeDeviceConfig -> {
-                if (state.value.mode is WorkspaceContract.WorkspaceMode.Layout) {
+                if (state.value.mode is LayoutWorkspaceMode) {
                     amethystMidiManager.changeDeviceConfig(event)
                 }
             }
 
             is WorkspaceContract.Event.OnDeleteDevice -> {
-                val element = state.value.viewportElements.find { it.selectionUUID == event.uuid }
-
-                element?.deviceConfig?.launchpadDevice?.midiOutput?.close()
-                element?.deviceConfig?.input?.close()
-
-                element?.let {
-                    DeviceSyncCoordinator.onDeviceRemoved(it.launchpadId)
-                }
-
                 SelectionManager.clear()
-
-                state.update {
-                    it.copy(
-                        viewportElements = it.viewportElements.filter { e -> e.selectionUUID != event.uuid }
-                    )
+                viewModelScope.launch {
+                    WorkspaceRepository.removeVirtualDeviceById(event.uuid)
                 }
-
-                WorkspaceRepository.updateWorkspaceBounds()
             }
 
             is WorkspaceContract.Event.AddChainDevice -> {
-                if (state.value.mode is WorkspaceContract.WorkspaceMode.LightsChain) {
+                if (state.value.mode is LightsChainWorkspaceMode) {
                     WorkspaceRepository.lightsChain.add(event.device, event.atIndex)
-                } else if (state.value.mode is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                } else if (state.value.mode is SamplingChainWorkspaceMode) {
                     WorkspaceRepository.samplingChain.add(event.device, event.atIndex)
                 }
             }

@@ -64,6 +64,7 @@ import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
 
@@ -82,7 +83,7 @@ fun MobileWorkspaceChainEditor(
 
     LaunchedEffect(WorkspaceRepository.mode.collectAsState().value) {
         chain = when (WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+            is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
             else -> WorkspaceRepository.lightsChain
         }
     }
@@ -121,7 +122,7 @@ fun MobileWorkspaceChainEditor(
                             Row {
                                 ExpandingChainDevicePicker(
                                     destinationChain = when (WorkspaceRepository.mode.value) {
-                                        is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                        is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                         else -> WorkspaceRepository.lightsChain
                                     },
                                     slotIndex = 0,
@@ -167,7 +168,7 @@ fun MobileWorkspaceChainEditor(
                                                 .clickable {
                                                     val chainDeviceSelectable = Selectable.ChainDevice(
                                                         parent = when (WorkspaceRepository.mode.value) {
-                                                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                                            is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                                             else -> WorkspaceRepository.lightsChain
                                                         },
                                                         device = device
@@ -205,7 +206,7 @@ fun MobileWorkspaceChainEditor(
 
                                             ChainDeviceContextMenu(
                                                 chain = when (WorkspaceRepository.mode.value) {
-                                                    is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                                    is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                                     else -> WorkspaceRepository.lightsChain
                                                 },
                                                 device = device,
@@ -255,7 +256,7 @@ fun MobileWorkspaceChainEditor(
                                     val insertionIndex = index + 1
                                     ExpandingChainDevicePicker(
                                         destinationChain = when (WorkspaceRepository.mode.value) {
-                                            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                            is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                             else -> WorkspaceRepository.lightsChain
                                         },
                                         slotIndex = insertionIndex,
@@ -289,7 +290,7 @@ fun MobileWorkspaceChainEditor(
                     } else {
                         ExpandingChainDevicePicker(
                             destinationChain = when (WorkspaceRepository.mode.value) {
-                                is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspaceRepository.samplingChain
+                                is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain
                                 else -> WorkspaceRepository.lightsChain
                             },
                             slotIndex = 0,

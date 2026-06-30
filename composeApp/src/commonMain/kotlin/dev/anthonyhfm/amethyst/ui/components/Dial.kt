@@ -59,6 +59,7 @@ import dev.anthonyhfm.amethyst.ui.modifier.VerticalDrag
 import dev.anthonyhfm.amethyst.ui.modifier.gesturesDisabled
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.destructive
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.input
@@ -489,7 +490,7 @@ internal fun resolveContainerColor(containerColor: Color): Color {
 @Composable
 internal fun resolveDialColor(dialColor: Color): Color {
     return if (dialColor == Color.Unspecified) {
-        Theme[colors][primary]
+        Theme[colors][destructive]
     } else {
         dialColor
     }

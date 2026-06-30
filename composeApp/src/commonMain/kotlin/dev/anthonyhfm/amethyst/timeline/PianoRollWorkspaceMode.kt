@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -132,10 +133,10 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PinchGrap
 private fun currentCellDurationMs(currentResolution: GridResolution): Long =
     (MS_PER_BEAT / currentResolution.snapDivisionsPerBeat).coerceAtLeast(1L)
 
-class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
+class PianoRollWorkspaceMode : WorkspaceMode() {
     override val displayName: String = "Piano Roll"
-    override val selectable: Boolean = false
-    override val claimInputs: Boolean = true
+    override val selectableMode: Boolean = false
+    override val claimMidiInputs: Boolean = true
 
     var activeTool by mutableStateOf(TimelineEditorTool.SELECT)
     var clipContext by mutableStateOf<TimelineClipContext?>(null)
@@ -432,7 +433,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
     }
 
     @Composable
-    fun ModeContent(paddingValues: PaddingValues) {
+    override fun Content(modifier: Modifier) {
         val entry = currentEntry ?: return
         val launchpads = Heaven.devices
         val selections by SelectionManager.selections.collectAsState()
@@ -861,9 +862,8 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
         }
 
         Row(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
-                .padding(paddingValues)
         ) {
             Column(
                 modifier = Modifier
@@ -1843,7 +1843,7 @@ class PianoRollWorkspaceMode : WorkspaceContract.WorkspaceMode {
 
     private val midiFeedbackScope = CoroutineScope(Dispatchers.Default)
 
-    override fun onMidiInput(data: MidiInputData, offset: Offset): () -> Unit = {
+    override fun onMidiInput(data: MidiInputData, offset: Offset) {
         val deviceIndex = Heaven.devices.indexOfFirst { 
             val expectedOffset = it.position.value.copy(
                 x = it.position.value.x - it.layout.offsetX,

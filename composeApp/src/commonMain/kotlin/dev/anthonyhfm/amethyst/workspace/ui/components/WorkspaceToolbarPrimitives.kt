@@ -74,7 +74,7 @@ fun WorkspaceToolbarSlideFromTopControls(
 fun WorkspaceToolbarSurface(
     modifier: Modifier = Modifier,
     spacing: Dp = 4.dp,
-    contentPadding: PaddingValues = PaddingValues(4.dp),
+    contentPadding: PaddingValues = PaddingValues(2.dp),
     content: @Composable RowScope.() -> Unit,
 ) {
     Row(

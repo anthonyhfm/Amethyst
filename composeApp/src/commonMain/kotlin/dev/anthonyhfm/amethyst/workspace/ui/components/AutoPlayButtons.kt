@@ -70,7 +70,7 @@ fun AutoPlayButtons() {
 
     Column(
         modifier = Modifier
-            .padding(bottom = 24.dp)
+            .padding(bottom = 12.dp)
             .widthIn(min = 280.dp, max = 320.dp)
             .background(Theme[colors][card], DefaultShape)
             .border(1.dp, Theme[colors][border], DefaultShape),

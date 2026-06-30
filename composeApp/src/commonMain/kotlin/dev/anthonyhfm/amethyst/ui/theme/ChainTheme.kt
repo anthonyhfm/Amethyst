@@ -20,7 +20,7 @@ internal val lightChainColorMap = mapOf(
 
 internal val darkChainColorMap = mapOf(
     chainCanvas to Color(0xFF1C1F23),
-    chainSurface to Color(0xFF16181D),
-    chainSurfaceRaised to Color(0xFF20242A),
-    chainBorder to Color(0xFF454D58),
+    chainSurface to Color(0xFF13141F),
+    chainSurfaceRaised to Color(0xFF292E3D),
+    chainBorder to Color(0xFF282936),
 )

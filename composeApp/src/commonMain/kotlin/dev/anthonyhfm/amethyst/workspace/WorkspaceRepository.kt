@@ -46,6 +46,9 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadIdealised
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
 import kotlin.concurrent.Volatile
 
 object WorkspaceRepository {
@@ -99,8 +102,8 @@ object WorkspaceRepository {
     private val _macros: MutableStateFlow<List<Macro>> = MutableStateFlow(listOf(Macro(1)))
     val macros: StateFlow<List<Macro>> = _macros.asStateFlow()
 
-    private val _mode: MutableStateFlow<WorkspaceContract.WorkspaceMode> = MutableStateFlow(WorkspaceContract.WorkspaceMode.Layout())
-    val mode: StateFlow<WorkspaceContract.WorkspaceMode> = _mode.asStateFlow()
+    private val _mode: MutableStateFlow<WorkspaceMode> = MutableStateFlow(LayoutWorkspaceMode())
+    val mode: StateFlow<WorkspaceMode> = _mode.asStateFlow()
 
     private val _bpm = MutableStateFlow(120.00)
     val bpm: StateFlow<Double> = _bpm.asStateFlow()
@@ -116,7 +119,7 @@ object WorkspaceRepository {
     val recentColors: StateFlow<List<Triple<Float, Float, Float>>> = _recentColors.asStateFlow()
 
     // Keep track of the previous mode
-    private var previousMode: WorkspaceContract.WorkspaceMode = WorkspaceContract.WorkspaceMode.Layout()
+    private var previousMode: WorkspaceMode = LayoutWorkspaceMode()
 
     private val _gridType = MutableStateFlow<GridUtils.GridType>(GridUtils.GridType.Flexible.Medium)
     val gridType: StateFlow<GridUtils.GridType> = _gridType.asStateFlow()
@@ -135,7 +138,7 @@ object WorkspaceRepository {
         }
     }
 
-    fun switchMode(mode: WorkspaceContract.WorkspaceMode, undoable: Boolean = true) {
+    fun switchMode(mode: WorkspaceMode, undoable: Boolean = true) {
         val current = _mode.value
         if (current == mode) return
 
@@ -148,7 +151,7 @@ object WorkspaceRepository {
             )
         }
 
-        if (undoable && current.selectable) {
+        if (undoable && current.selectableMode) {
             previousMode = current
         }
 
@@ -291,9 +294,9 @@ object WorkspaceRepository {
         element: LaunchpadViewportElement,
         fromRemote: Boolean = false
     ): Boolean {
-        if (Heaven.devices.any { it.launchpadId == element.launchpadId }) return false
+        if (ViewportRepository.devices.value.any { it.launchpadId == element.launchpadId }) return false
 
-        Heaven.devices = Heaven.devices + element
+        ViewportRepository.addDevice(element)
         if (!fromRemote) {
             DeviceSyncCoordinator.onDevicePlaced(element)
         }
@@ -306,7 +309,7 @@ object WorkspaceRepository {
         uuid: String,
         fromRemote: Boolean = false
     ): Boolean {
-        val element = Heaven.devices.firstOrNull { it.selectionUUID == uuid || it.launchpadId == uuid }
+        val element = ViewportRepository.devices.value.firstOrNull { it.selectionUUID == uuid || it.launchpadId == uuid }
             ?: return false
 
         element.deviceConfig.input?.close()
@@ -315,7 +318,7 @@ object WorkspaceRepository {
             DeviceSyncCoordinator.onDeviceRemoved(element.launchpadId)
         }
 
-        Heaven.devices = Heaven.devices.filterNot { it.selectionUUID == uuid || it.launchpadId == uuid }
+        ViewportRepository.removeDevice(uuid)
         deviceRefresh.emit(Unit)
         updateWorkspaceBounds()
         return true
@@ -326,7 +329,7 @@ object WorkspaceRepository {
         position: Offset,
         fromRemote: Boolean = false
     ): Boolean {
-        val element = Heaven.devices.firstOrNull { it.launchpadId == deviceId || it.selectionUUID == deviceId }
+        val element = ViewportRepository.devices.value.firstOrNull { it.launchpadId == deviceId || it.selectionUUID == deviceId }
             ?: return false
 
         element.position.value = position
@@ -343,7 +346,7 @@ object WorkspaceRepository {
         rotationDegrees: Float,
         fromRemote: Boolean = false
     ): Boolean {
-        val element = Heaven.devices.firstOrNull { it.launchpadId == deviceId || it.selectionUUID == deviceId }
+        val element = ViewportRepository.devices.value.firstOrNull { it.launchpadId == deviceId || it.selectionUUID == deviceId }
             ?: return false
 
         element.rotationDegrees.floatValue = rotationDegrees
@@ -355,15 +358,16 @@ object WorkspaceRepository {
     }
 
     fun updateWorkspaceBounds() {
-        if (Heaven.devices.isNotEmpty()) {
+        val currentDevices = ViewportRepository.devices.value
+        if (currentDevices.isNotEmpty()) {
             bounds = Pair(
                 first = IntOffset(
-                    x = Heaven.devices.minOf { it.position.value.x.toInt() },
-                    y = Heaven.devices.minOf { it.position.value.y.toInt() }
+                    x = currentDevices.minOf { it.position.value.x.toInt() },
+                    y = currentDevices.minOf { it.position.value.y.toInt() }
                 ),
                 second = IntSize(
-                    width = Heaven.devices.maxOf { it.position.value.x.toInt() + it.size.width.toInt() } - Heaven.devices.minOf { it.position.value.x.toInt() },
-                    height = Heaven.devices.maxOf { it.position.value.y.toInt() + it.size.height.toInt() } - Heaven.devices.minOf { it.position.value.y.toInt() }
+                    width = currentDevices.maxOf { it.position.value.x.toInt() + it.size.width.toInt() } - currentDevices.minOf { it.position.value.x.toInt() },
+                    height = currentDevices.maxOf { it.position.value.y.toInt() + it.size.height.toInt() } - currentDevices.minOf { it.position.value.y.toInt() }
                 )
             )
         }
@@ -482,11 +486,11 @@ object WorkspaceRepository {
         AudioSourceLibrary.load(workspaceData.audioSources)
         migrateAudioEntries()
 
-        Heaven.devices.forEach { device ->
+        ViewportRepository.devices.value.forEach { device ->
             device.deviceConfig.input?.close()
             device.deviceConfig.launchpadDevice?.midiOutput?.close()
         }
-        Heaven.devices = workspaceData.launchpadDevices.map { savedDevice ->
+        val loadedDevices = workspaceData.launchpadDevices.map { savedDevice ->
             val device = when (savedDevice) {
                 is SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro -> ViewportLaunchpadPro()
                 is SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadIdealised -> ViewportLaunchpadIdealised()
@@ -507,8 +511,9 @@ object WorkspaceRepository {
                 savedOutputPortName = savedDevice.outputPortName
             }
         }
+        ViewportRepository.setDevices(loadedDevices)
 
-        if (Heaven.devices.isNotEmpty()) {
+        if (ViewportRepository.devices.value.isNotEmpty()) {
             updateWorkspaceBounds()
         }
 
@@ -522,7 +527,7 @@ object WorkspaceRepository {
 
         if (!fromRemote) {
             _mode.update {
-                WorkspaceContract.WorkspaceMode.Performance()
+                PerformanceWorkspaceMode()
             }
         }
 
@@ -591,7 +596,7 @@ object WorkspaceRepository {
                 autoPlayShowButtonPresses = workspaceMeta?.settings?.autoPlayShowButtonPresses ?: true,
                 autoPlayShowLights = workspaceMeta?.settings?.autoPlayShowLights ?: true
             ),
-            launchpadDevices = Heaven.devices.map { device ->
+            launchpadDevices = ViewportRepository.devices.value.map { device ->
                 val inputPortId = device.deviceConfig.input?.details?.id ?: device.savedInputPortId
                 val inputPortName = device.deviceConfig.input?.details?.name ?: device.savedInputPortName
                 val outputPortId = device.deviceConfig.launchpadDevice?.midiOutput?.details?.id ?: device.savedOutputPortId
@@ -714,20 +719,20 @@ object WorkspaceRepository {
         setupChains()
         
         // Clear devices
-        Heaven.devices.forEach { device ->
+        ViewportRepository.devices.value.forEach { device ->
             device.deviceConfig.input?.close()
             device.deviceConfig.launchpadDevice?.midiOutput?.close()
         }
-        Heaven.devices = emptyList()
+        ViewportRepository.clear()
         
         // Reset state
         bounds = Pair(IntOffset(0, 0), IntSize(0, 0))
         workspaceMeta = null
         _macros.update { listOf(Macro(1)) }
-        _mode.update { WorkspaceContract.WorkspaceMode.Layout() }
+        _mode.update { LayoutWorkspaceMode() }
         _bpm.update { 120.00 }
         _projectName.update { null }
-        previousMode = WorkspaceContract.WorkspaceMode.Layout()
+        previousMode = LayoutWorkspaceMode()
         _gridType.update { GridUtils.GridType.Flexible.Medium }
     }
 

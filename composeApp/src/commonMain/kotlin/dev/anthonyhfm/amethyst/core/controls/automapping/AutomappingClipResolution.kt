@@ -6,7 +6,9 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 
 data class AutomappingTarget(
     val parentDeviceSelectionUUID: String,
@@ -42,17 +44,17 @@ sealed interface AutomappingSelectedClip {
 }
 
 fun resolveAutomappingChainDomain(
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: WorkspaceMode,
 ): AutomappingChainDomain? {
     return when (mode) {
-        is WorkspaceContract.WorkspaceMode.LightsChain -> AutomappingChainDomain.Lights
-        is WorkspaceContract.WorkspaceMode.SamplingChain -> AutomappingChainDomain.Sampling
+        is LightsChainWorkspaceMode -> AutomappingChainDomain.Lights
+        is SamplingChainWorkspaceMode -> AutomappingChainDomain.Sampling
         else -> null
     }
 }
 
 fun resolveAutomappingSelectedClip(
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: WorkspaceMode,
     tracks: List<TimelineTrack<*>>,
     selections: List<Selectable>,
 ): AutomappingSelectedClip? {

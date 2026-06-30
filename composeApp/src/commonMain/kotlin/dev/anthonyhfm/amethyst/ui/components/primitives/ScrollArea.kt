@@ -127,7 +127,7 @@ fun ScrollArea(
         }
     }
 
-    val visible = true
+    val visible = state.maxScrollValue > 0 && (areaHovered || isScrolling)
     val flingBehavior = ScrollableDefaults.flingBehavior()
     val scrollOrientation = when (orientation) {
         ScrollBarOrientation.Vertical -> Orientation.Vertical
@@ -221,7 +221,7 @@ fun ScrollBar(
 
     val animatedAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 300),
+        animationSpec = tween(durationMillis = 150),
     )
 
     val minThumbSizePx = with(density) { 20.dp.toPx() }
@@ -249,7 +249,7 @@ fun ScrollBar(
     var dragStartScroll by remember { mutableFloatStateOf(0f) }
     var dragAccumulatedPx by remember { mutableFloatStateOf(0f) }
 
-    if (maxScrollValue <= 0) return
+    if (animatedAlpha == 0f && maxScrollValue <= 0) return
 
     // Track
     Box(
@@ -257,8 +257,15 @@ fun ScrollBar(
             .alpha(animatedAlpha)
             .then(
                 when (orientation) {
-                    ScrollBarOrientation.Vertical -> Modifier.fillMaxHeight().width(thickness)
-                    ScrollBarOrientation.Horizontal -> Modifier.fillMaxWidth().height(thickness)
+                    ScrollBarOrientation.Vertical -> Modifier
+                        .fillMaxHeight()
+                        .width(thickness)
+                        .padding(vertical = 12.dp)
+
+                    ScrollBarOrientation.Horizontal -> Modifier
+                        .fillMaxWidth()
+                        .height(thickness)
+                        .padding(horizontal = 12.dp)
                 }
             )
             .clip(FullShape)

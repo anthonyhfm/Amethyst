@@ -49,14 +49,6 @@ fun TimelineView(
                 modifier = Modifier
                     .width(timelineDimensions.trackHeaderWidth)
                     .fillMaxHeight()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                timelinePalette.rulerHighlight,
-                                timelinePalette.trackHeaderSurface
-                            )
-                        )
-                    )
                     .drawBehind {
                         val stroke = 1.dp.toPx()
                         drawLine(

@@ -86,12 +86,13 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import kotlinx.coroutines.launch
 
 @Composable
 actual fun WorkspaceTopAppBar(
     onBack: () -> Unit,
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode,
     onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val automappingState by AutomappingManager.state.collectAsState()
@@ -110,7 +111,7 @@ actual fun WorkspaceTopAppBar(
     Row(
         modifier = Modifier
             .statusBarsPadding()
-            .padding(16.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -129,7 +130,7 @@ actual fun WorkspaceTopAppBar(
         }
 
         WorkspaceToolbarSlideFromTopControls(
-            visible = mode is WorkspaceContract.WorkspaceMode.Timeline,
+            visible = mode is TimelineWorkspaceMode,
         ) {
             TimelinePlaybackControls()
             TimelineGridPicker()
@@ -142,12 +143,13 @@ actual fun WorkspaceTopAppBar(
         BPMChanger()
         CleanupButtons()
 
-        WorkspaceToolbarSurface(contentPadding = PaddingValues(4.dp)) {
+        WorkspaceToolbarSurface(contentPadding = PaddingValues(2.dp)) {
             if (liveCollaborationEnabled && collaborationState is ConnectionState.Connected) {
                 UserRoster(
                     (session?.participants.orEmpty() + listOfNotNull(connectLocalUser))
                         .distinctBy { it.id }
                 )
+
                 Separator(
                     modifier = Modifier.height(20.dp),
                     orientation = SeparatorOrientation.Vertical,

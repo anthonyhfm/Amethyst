@@ -4,8 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,6 +23,8 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -30,19 +35,28 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceCon
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Frame
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.InfinityCheckbox
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPinchControl
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPreviewControls
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PlaybackModePicker
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.RepeatsControl
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
+import dev.anthonyhfm.amethyst.ui.theme.cardForeground
+import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
-class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportPanBoundsPolicy
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
+
+class KeyframesWorkspaceMode : WorkspaceMode() {
     override val displayName: String = "Keyframes"
-    override val selectable: Boolean = false
-    override val claimInputs: Boolean = true
+    override val selectableMode: Boolean = false
+    override val claimMidiInputs: Boolean = true
 
     lateinit var state: StateFlow<KeyframesChainDeviceContract.KeyframesChainDeviceState>
 
@@ -56,21 +70,25 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
     var parentDevice: KeyframesChainDevice? = null
 
     @Composable
-    fun ModeContent(paddingValues: PaddingValues) {
+    override fun Content(modifier: Modifier) {
+        ModeContent(modifier)
+    }
+
+    @Composable
+    fun ModeContent(modifier: Modifier) {
+        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
         val state by state.collectAsState()
 
-        Box(
-            modifier = Modifier
-                .padding(paddingValues)
+        Row(
+            modifier = modifier
                 .fillMaxSize()
         ) {
             Column(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = 12.dp)
-                    .padding(bottom = 12.dp),
+                    .width(220.dp)
+                    .padding(12.dp),
 
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FrameListPanel(
                     state = state,
@@ -80,6 +98,12 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     parent = parentDevice
                 )
 
+                HorizontalDivider(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp),
+                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
+                )
+
                 KeyframesPinchControl(
                     pinch = state.pinch,
                     onPinchChange = { onEvent?.invoke(Event.OnChangePinch(it)) },
@@ -87,9 +111,21 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     onToggleBilateral = { onEvent?.invoke(Event.OnTogglePinchBilateral) }
                 )
 
+                HorizontalDivider(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp),
+                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
+                )
+
                 PlaybackModePicker(
                     selectedMode = state.playbackMode,
                     onModeSelected = { onEvent?.invoke(Event.OnChangePlaybackMode(it)) }
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp),
+                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
                 )
 
                 RepeatsControl(
@@ -97,12 +133,47 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
                     onRepeatsChange = { onEvent?.invoke(Event.OnChangeRepeats(it)) }
                 )
 
+                HorizontalDivider(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp),
+                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
+                )
+
                 InfinityCheckbox(
                     checked = state.infinity,
                     onCheckedChange = {
-                        onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeInfinity(it))
+                        onEvent?.invoke(Event.OnChangeInfinity(it))
                     }
                 )
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+            ) {
+                WorkspaceViewport(
+                    modifier = Modifier
+                        .weight(1f),
+                    viewportKey = "workspace-keyframes",
+                    config = ViewportConfig(
+                        minZoom = 0.5f,
+                        maxZoom = 2f,
+                        enablePanning = true,
+                        enableZoom = true,
+                        draggableObjects = false,
+                        panBoundsPolicy = ViewportPanBoundsPolicy.ClampToContent(
+                            allowedOutOfBoundsFraction = 0.5f,
+                        ),
+                        showGrid = false,
+                        showOrigin = false,
+                        showActions = false,
+                        showRemoteCursors = true,
+                        contentPadding = 24.dp
+                    ),
+                    onEvent = { viewModel.onEvent(it) }
+                )
+
+                KeyframesPreviewControls()
             }
 
             FrameDrawingPanel(
@@ -280,7 +351,7 @@ class KeyframesWorkspaceMode : WorkspaceContract.WorkspaceMode {
         return false
     }
 
-    override fun onMidiInput(data: MidiInputData, offset: Offset) = {
+    override fun onMidiInput(data: MidiInputData, offset: Offset) {
         val x: Int = data.pitch % 10
         val y: Int = 9 - (data.pitch / 10)
 

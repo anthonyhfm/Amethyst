@@ -69,7 +69,8 @@ import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.primary
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.coroutines.flow.collectLatest
@@ -174,7 +175,7 @@ fun ExpandingChainDevicePicker(
 
                     val device = dragged // reuse original instance to keep state
 
-                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                    if (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
                         val oc = WorkspaceRepository.samplingChain.findDeviceChain(dragged.selectionUUID) ?: run {
                             isDropHover = false
                             return@dropTarget
@@ -208,8 +209,8 @@ fun ExpandingChainDevicePicker(
                 val isDevice = clipboard is ClipboardData.ChainDevice
                 val isTimelineAudio =
                     (clipboard is ClipboardData.TimelineAudioEntries || clipboard is ClipboardData.TimelineAudioRange) &&
-                        WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain
-                val isMidiEntries = clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain
+                        WorkspaceRepository.mode.value is SamplingChainWorkspaceMode
+                val isMidiEntries = clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is LightsChainWorkspaceMode
 
                 if (isDevice || isTimelineAudio || isMidiEntries) {
                     showRightClickMenu = true
@@ -256,7 +257,7 @@ fun ExpandingChainDevicePicker(
                             showRightClickMenu = false
                         }
                     )
-                } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
                     ChainContextMenuItem(
                         label = "Paste Audio from Timeline",
                         icon = Icons.Default.ContentPaste,
@@ -269,7 +270,7 @@ fun ExpandingChainDevicePicker(
                             showRightClickMenu = false
                         }
                     )
-                } else if (clipboard is ClipboardData.TimelineAudioRange && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain) {
+                } else if (clipboard is ClipboardData.TimelineAudioRange && WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
                     ChainContextMenuItem(
                         label = "Paste Audio + Automation from Timeline",
                         icon = Icons.Default.ContentPaste,
@@ -284,7 +285,7 @@ fun ExpandingChainDevicePicker(
                             showRightClickMenu = false
                         }
                     )
-                } else if (clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.LightsChain) {
+                } else if (clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is LightsChainWorkspaceMode) {
                     ChainContextMenuItem(
                         label = "Paste Midi from Timeline",
                         icon = Icons.Default.ContentPaste,
@@ -350,7 +351,7 @@ fun ExpandingChainDevicePicker(
 
                     ChainDevicePicker(
                         visible = pickerVisible,
-                        sampling = WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.SamplingChain,
+                        sampling = WorkspaceRepository.mode.value is SamplingChainWorkspaceMode,
                         onDismiss = {
                             pickerVisible = false
                             isExpandedByTap = false

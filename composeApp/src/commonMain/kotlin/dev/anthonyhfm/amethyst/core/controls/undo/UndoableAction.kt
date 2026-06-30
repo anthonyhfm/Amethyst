@@ -234,8 +234,8 @@ sealed interface UndoableAction {
     ) : UndoableAction
 
     data class WorkspaceModeChange(
-        val beforeMode: WorkspaceContract.WorkspaceMode,
-        val afterMode: WorkspaceContract.WorkspaceMode
+        val beforeMode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode,
+        val afterMode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
     ) : UndoableAction
 
     data class WorkspaceBpmChange(

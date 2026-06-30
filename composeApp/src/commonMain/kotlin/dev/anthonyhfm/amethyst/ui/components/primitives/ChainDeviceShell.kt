@@ -48,7 +48,11 @@ fun ChainDeviceShell(
         Theme[colors][cardForeground]
     }
 
-    val borderColor = Theme[chainColorTokens][chainBorder]
+    val borderColor = if (isSelected) {
+        Theme[colors][selectionSurface]
+    } else {
+        Theme[chainColorTokens][chainBorder]
+    }
 
     Column(
         modifier = modifier

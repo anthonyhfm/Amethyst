@@ -34,10 +34,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -50,7 +53,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -59,36 +61,33 @@ import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.ui.components.CursorOverlay
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
-import dev.anthonyhfm.amethyst.ui.theme.background
-import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.ui.theme.foreground
-import dev.anthonyhfm.amethyst.ui.theme.muted
-import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
-import dev.anthonyhfm.amethyst.ui.theme.primary
-import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
-import dev.anthonyhfm.amethyst.ui.theme.small
-import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
+import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.sin
 import kotlin.math.roundToInt
 
 @Composable
 fun WorkspaceViewport(
     modifier: Modifier = Modifier,
-    viewportState: WorkspaceContract.ViewportState,
-    elements: List<ViewportElement>,
+    viewportKey: String = "default",
+    viewportState: ViewportState = rememberViewportState(viewportKey),
+    elements: List<ViewportElement> = ViewportRepository.devices.collectAsState().value,
+    config: ViewportConfig = ViewportConfig(),
     onEvent: (WorkspaceContract.Event) -> Unit
 ) {
     val density = LocalDensity.current.density
     val gridSize = (40 * density).toInt()
     val gridColor = Color(0xFF5C6370).copy(alpha = 0.38f)
     val viewportBackground = Color(0xFF1C1C23)
-    val viewportBorder = if (platform is Platform.Desktop) Color(0xFF3E4451) else Color.Transparent
     val selectionColor = Theme[colors][selectionBorder]
     val viewportSize = remember { mutableStateOf(Size.Zero) }
     val selections by SelectionManager.selections.collectAsState()
@@ -99,6 +98,27 @@ fun WorkspaceViewport(
 
     val virtualLaunchpads = elements.filterIsInstance<LaunchpadViewportElement>()
     val isSingleVirtualDeviceMode = (platform is Platform.Android || platform is Platform.iOS) && virtualLaunchpads.size == 1
+    val effectiveConfig = if (isSingleVirtualDeviceMode) {
+        config.copy(
+            minZoom = minOf(config.minZoom, 0.1f),
+            maxZoom = maxOf(config.maxZoom, 4f),
+            enablePanning = false,
+        )
+    } else {
+        config
+    }
+    val showGridDots = effectiveConfig.showGrid && (workspaceMode is LayoutWorkspaceMode || alwaysShowGrid)
+    val contentBounds = elements.contentBounds(gridSize)
+    val contentPadding = effectiveConfig.contentPadding
+    val contentPaddingPx = contentPadding.value * density
+    val viewportConstraints = ViewportConstraints(
+        viewportSize = viewportSize.value,
+        contentBounds = contentBounds,
+        viewportPaddingPx = contentPaddingPx,
+        minZoom = effectiveConfig.minZoom,
+        maxZoom = effectiveConfig.maxZoom,
+        panBoundsPolicy = effectiveConfig.panBoundsPolicy,
+    )
 
     val effectiveOffset = if (isSingleVirtualDeviceMode && viewportSize.value.width > 0f) {
         val launchpad = virtualLaunchpads.first()
@@ -112,79 +132,43 @@ fun WorkspaceViewport(
         viewportState.offset
     }
 
-    LaunchedEffect(elements.size, viewportSize.value) {
-        if (viewportSize.value.width <= 0f || viewportSize.value.height <= 0f) return@LaunchedEffect
-
-        val launchpads = elements.filterIsInstance<LaunchpadViewportElement>()
-        if (launchpads.isNotEmpty()) {
-            if (isSingleVirtualDeviceMode) {
-                val launchpad = launchpads.first()
-                val targetZoom = (viewportSize.value.width - 2 * 16 * density) / (launchpad.size.width * gridSize)
-                val zoomDelta = targetZoom - viewportState.zoom
-                onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, Offset.Zero))
-            } else {
-                ViewportController.centerLaunchpads(
-                    viewportOffset = viewportState.offset,
-                    viewportZoom = viewportState.zoom,
-                    elements = launchpads,
-                    viewportSize = viewportSize.value,
-                    gridSize = gridSize,
-                    onEvent = onEvent
-                )
-            }
+    val autoFitSignature = buildString {
+        append(elements.size)
+        append('@')
+        append(viewportSize.value.width.roundToInt())
+        append('x')
+        append(viewportSize.value.height.roundToInt())
+        elements.forEach { element ->
+            append('|')
+            append(element.selectionUUID)
+            append(':')
+            append(element.size.width)
+            append('x')
+            append(element.size.height)
         }
+    }
+
+    LaunchedEffect(autoFitSignature, viewportSize.value, contentPadding, effectiveConfig.minZoom, effectiveConfig.maxZoom) {
+        if (viewportState.hasCompletedAutoFit(autoFitSignature)) return@LaunchedEffect
+        if (viewportSize.value.width <= 0f || viewportSize.value.height <= 0f) return@LaunchedEffect
+        val bounds = contentBounds ?: return@LaunchedEffect
+
+        ViewportController.centerAndZoom(
+            viewportState = viewportState,
+            contentBounds = bounds,
+            viewportSize = viewportSize.value,
+            paddingPx = contentPaddingPx,
+            constraints = viewportConstraints,
+        )
+        viewportState.markAutoFitComplete(autoFitSignature)
     }
 
     Box(
         modifier = modifier
-            .fillMaxSize()
+            .clipToBounds()
             .background(viewportBackground, DefaultShape)
-            .border(1.dp, viewportBorder, DefaultShape)
             .onSizeChanged { size ->
                 viewportSize.value = Size(size.width.toFloat(), size.height.toFloat())
-            }
-            .pointerInput(isSingleVirtualDeviceMode) {
-                detectTransformGestures(
-                    panZoomLock = false,
-                    onGesture = { centroid, pan, gestureZoom, _ ->
-                        if (pan != Offset.Zero && !isSingleVirtualDeviceMode) {
-                            onEvent(WorkspaceContract.Event.OnPanViewport(pan))
-                        }
-
-                        if (gestureZoom != 1f) {
-                            val zoomDelta = (gestureZoom - 1f)
-
-                            onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, centroid))
-                        }
-                    }
-                )
-            }
-            .pointerInput(viewportState.zoom, isSingleVirtualDeviceMode) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull()
-                        val scrollDelta = change?.scrollDelta
-                        if (scrollDelta != null && (scrollDelta.x != 0f || scrollDelta.y != 0f)) {
-                            val isZoomModifier = event.keyboardModifiers.isMetaPressed || event.keyboardModifiers.isCtrlPressed
-                            if (isZoomModifier && scrollDelta.y != 0f) {
-                                // Zooming: smooth exponential zoom for trackpad and scroll-wheel
-                                val factor = kotlin.math.exp(-scrollDelta.y * 0.05f)
-                                val zoomDelta = viewportState.zoom * (factor - 1f)
-                                val mousePosition = change.position
-                                onEvent(WorkspaceContract.Event.OnZoomViewport(zoomDelta, mousePosition))
-                            } else if (!isZoomModifier && !isSingleVirtualDeviceMode) {
-                                // Panning: allow buttery smooth two-finger panning on trackpads and mouse-wheel scrolling
-                                val isHorizontalModifier = event.keyboardModifiers.isShiftPressed
-                                val panX = if (isHorizontalModifier && scrollDelta.x == 0f) scrollDelta.y else scrollDelta.x
-                                val panY = if (isHorizontalModifier) 0f else scrollDelta.y
-                                val panOffset = Offset(-panX * 15f, -panY * 15f)
-                                onEvent(WorkspaceContract.Event.OnPanViewport(panOffset))
-                            }
-                            change.consume()
-                        }
-                    }
-                }
             }
             .pointerInput("collaboration-cursor", effectiveOffset, viewportState.zoom) {
                 awaitPointerEventScope {
@@ -205,34 +189,78 @@ fun WorkspaceViewport(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .pointerInput(isSingleVirtualDeviceMode) {
+                    detectTransformGestures(
+                        panZoomLock = false,
+                        onGesture = { centroid, pan, gestureZoom, _ ->
+                            if (pan != Offset.Zero && effectiveConfig.enablePanning) {
+                                viewportState.pan(pan, viewportConstraints)
+                            }
+
+                            if (gestureZoom != 1f && effectiveConfig.enableZoom) {
+                                val zoomDelta = (gestureZoom - 1f)
+                                viewportState.zoom(zoomDelta, centroid, viewportConstraints)
+                            }
+                        }
+                    )
+                }
+                .pointerInput(viewportState.zoom, effectiveConfig.enableZoom, effectiveConfig.enablePanning, viewportConstraints) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull()
+                            val scrollDelta = change?.scrollDelta
+                            if (scrollDelta != null && (scrollDelta.x != 0f || scrollDelta.y != 0f)) {
+                                val isZoomModifier = event.keyboardModifiers.isMetaPressed || event.keyboardModifiers.isCtrlPressed
+                                if (isZoomModifier && scrollDelta.y != 0f && effectiveConfig.enableZoom) {
+                                    // Zooming: smooth exponential zoom for trackpad and scroll-wheel
+                                    val factor = kotlin.math.exp(-scrollDelta.y * 0.05f)
+                                    val zoomDelta = viewportState.zoom * (factor - 1f)
+                                    val mousePosition = change.position
+                                    viewportState.zoom(zoomDelta, mousePosition, viewportConstraints)
+                                } else if (!isZoomModifier && effectiveConfig.enablePanning) {
+                                    // Panning: allow buttery smooth two-finger panning on trackpads and mouse-wheel scrolling
+                                    val isHorizontalModifier = event.keyboardModifiers.isShiftPressed
+                                    val panX = if (isHorizontalModifier && scrollDelta.x == 0f) scrollDelta.y else scrollDelta.x
+                                    val panY = if (isHorizontalModifier) 0f else scrollDelta.y
+                                    val panOffset = Offset(-panX * 15f, -panY * 15f)
+                                    viewportState.pan(panOffset, viewportConstraints)
+                                }
+                                change.consume()
+                            }
+                        }
+                    }
+                }
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
                 ) {
-                    if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Layout) {
+                    if (WorkspaceRepository.mode.value is LayoutWorkspaceMode) {
                         if (SelectionManager.selections.value.any { it is Selectable.VirtualViewportDevice }) {
                             SelectionManager.clear()
                         }
                     }
                 }
         ) {
-            if (workspaceMode is WorkspaceContract.WorkspaceMode.Layout || alwaysShowGrid) {
+            if (showGridDots) {
                 val scaledGridSize = gridSize * viewportState.zoom
                 val startX = (effectiveOffset.x % scaledGridSize) - scaledGridSize
                 val startY = (effectiveOffset.y % scaledGridSize) - scaledGridSize
 
-                var x = startX
-                while (x < size.width) {
-                    var y = startY
-                    while (y < size.height) {
-                        drawCircle(
-                            color = gridColor,
-                            radius = 2f * density * viewportState.zoom,
-                            center = Offset(x, y)
-                        )
-                        y += scaledGridSize
+                if (scaledGridSize >= 8f * density) {
+                    var x = startX
+                    while (x < size.width + scaledGridSize) {
+                        var y = startY
+                        while (y < size.height + scaledGridSize) {
+                            drawCircle(
+                                color = gridColor,
+                                radius = 2f * density,
+                                center = Offset(x, y)
+                            )
+                            y += scaledGridSize
+                        }
+                        x += scaledGridSize
                     }
-                    x += scaledGridSize
                 }
             }
         }
@@ -325,61 +353,67 @@ fun WorkspaceViewport(
                             Modifier.border((2 / viewportState.zoom).dp, focusColor, element.shape)
                         } else Modifier
                     )
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = {
-                                if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Layout) {
-                                    SelectionManager.select(
-                                        Selectable.VirtualViewportDevice(
-                                            element = element as LaunchpadViewportElement
-                                        )
-                                    )
-                                }
-                            },
-                            onDrag = { input, offset ->
-                                input.consume()
-
-                                draggingOffset += offset
-
-                                val accumulatedGridX = draggingOffset.x / gridSize
-                                val accumulatedGridY = draggingOffset.y / gridSize
-
-                                if (abs(accumulatedGridX) >= 1f || abs(accumulatedGridY) >= 1f) {
-                                    val gridMoveX = accumulatedGridX.toInt()
-                                    val gridMoveY = accumulatedGridY.toInt()
-
-                                    if (gridMoveX != 0 || gridMoveY != 0) {
-                                        val newX = element.position.value.x.roundToInt() + gridMoveX
-                                        val newY = element.position.value.y.roundToInt() + gridMoveY
-
-                                        draggingOffset = Offset(
-                                            draggingOffset.x - (gridMoveX * gridSize),
-                                            draggingOffset.y - (gridMoveY * gridSize)
-                                        )
-
-                                        onEvent(
-                                            WorkspaceContract.Event.ChangeViewportElementPosition(
-                                                index = index,
-                                                offset = Offset(newX.toFloat(), newY.toFloat())
+                    .then(
+                        if (effectiveConfig.draggableObjects) {
+                            Modifier.pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        if (WorkspaceRepository.mode.value is LayoutWorkspaceMode) {
+                                            SelectionManager.select(
+                                                Selectable.VirtualViewportDevice(
+                                                    element = element as LaunchpadViewportElement
+                                                )
                                             )
-                                        )
+                                        }
+                                    },
+                                    onDrag = { input, offset ->
+                                        input.consume()
+
+                                        draggingOffset += offset
+
+                                        val accumulatedGridX = draggingOffset.x / gridSize
+                                        val accumulatedGridY = draggingOffset.y / gridSize
+
+                                        if (abs(accumulatedGridX) >= 1f || abs(accumulatedGridY) >= 1f) {
+                                            val gridMoveX = accumulatedGridX.toInt()
+                                            val gridMoveY = accumulatedGridY.toInt()
+
+                                            if (gridMoveX != 0 || gridMoveY != 0) {
+                                                val newX = element.position.value.x.roundToInt() + gridMoveX
+                                                val newY = element.position.value.y.roundToInt() + gridMoveY
+
+                                                draggingOffset = Offset(
+                                                    draggingOffset.x - (gridMoveX * gridSize),
+                                                    draggingOffset.y - (gridMoveY * gridSize)
+                                                )
+
+                                                onEvent(
+                                                    WorkspaceContract.Event.ChangeViewportElementPosition(
+                                                        index = index,
+                                                        offset = Offset(newX.toFloat(), newY.toFloat())
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingOffset = Offset.Zero
+                                        onEvent(WorkspaceContract.Event.OnViewportElementMoveFinished(element.selectionUUID))
+                                    },
+                                    onDragCancel = {
+                                        draggingOffset = Offset.Zero
                                     }
-                                }
-                            },
-                            onDragEnd = {
-                                draggingOffset = Offset.Zero
-                                onEvent(WorkspaceContract.Event.OnViewportElementMoveFinished(element.selectionUUID))
-                            },
-                            onDragCancel = {
-                                draggingOffset = Offset.Zero
+                                )
                             }
-                        )
-                    }
+                        } else {
+                            Modifier
+                        }
+                    )
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
                     ) {
-                        if (WorkspaceRepository.mode.value is WorkspaceContract.WorkspaceMode.Layout) {
+                        if (WorkspaceRepository.mode.value is LayoutWorkspaceMode && effectiveConfig.draggableObjects) {
                             SelectionManager.select(
                                 Selectable.VirtualViewportDevice(
                                     element = element as LaunchpadViewportElement
@@ -406,30 +440,32 @@ fun WorkspaceViewport(
 
         // Action tray overlay — rendered outside the zoomed element layer so it
         // stays at a fixed screen-space size regardless of viewport zoom.
-        elements.forEach { element ->
-            val selected = selections.any { it.selectionUUID == element.selectionUUID }
-            if (!selected) return@forEach
+        if (effectiveConfig.showActions) {
+            elements.forEach { element ->
+                val selected = selections.any { it.selectionUUID == element.selectionUUID }
+                if (!selected) return@forEach
 
-            var traySize by remember { mutableStateOf(Size(164f * density, 44f * density)) }
+                var traySize by remember { mutableStateOf(Size(164f * density, 44f * density)) }
 
-            val scaledGridSize = gridSize * viewportState.zoom
-            val trayScreenCenterX = element.position.value.x * scaledGridSize + effectiveOffset.x + element.size.width * scaledGridSize / 2
-            val trayScreenTopY = element.position.value.y * scaledGridSize + effectiveOffset.y
+                val scaledGridSize = gridSize * viewportState.zoom
+                val trayScreenCenterX = element.position.value.x * scaledGridSize + effectiveOffset.x + element.size.width * scaledGridSize / 2
+                val trayScreenTopY = element.position.value.y * scaledGridSize + effectiveOffset.y
 
-            Row(
-                modifier = Modifier
-                    .zIndex(2000f)
-                    .offset {
-                        IntOffset(
-                            x = (trayScreenCenterX - traySize.width / 2).roundToInt(),
-                            y = (trayScreenTopY - traySize.height - 8.dp.toPx()).roundToInt(),
-                        )
-                    }
-                    .onSizeChanged { size ->
-                        traySize = Size(size.width.toFloat(), size.height.toFloat())
-                    },
-            ) {
-                element.Actions(this)
+                Row(
+                    modifier = Modifier
+                        .zIndex(2000f)
+                        .offset {
+                            IntOffset(
+                                x = (trayScreenCenterX - traySize.width / 2).roundToInt(),
+                                y = (trayScreenTopY - traySize.height - 8.dp.toPx()).roundToInt(),
+                                            )
+                        }
+                        .onSizeChanged { size ->
+                            traySize = Size(size.width.toFloat(), size.height.toFloat())
+                        },
+                ) {
+                    element.Actions(this)
+                }
             }
         }
 
@@ -442,7 +478,7 @@ fun WorkspaceViewport(
         val offsetY = (centerPxY - originSizePx / 2f).roundToInt()
 
         AnimatedVisibility(
-            visible = workspaceMode is WorkspaceContract.WorkspaceMode.Layout,
+            visible = effectiveConfig.showOrigin,
             modifier = Modifier
                 .offset { IntOffset(offsetX, offsetY) }
                 .size(originSizeDp)
@@ -457,16 +493,34 @@ fun WorkspaceViewport(
             )
         }
 
-        CursorOverlay(
-            cursors = remoteCursors.mapValues { (_, cursor) ->
-                cursor.copy(
-                    x = cursor.x * viewportState.zoom + effectiveOffset.x,
-                    y = cursor.y * viewportState.zoom + effectiveOffset.y
-                )
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(20_000f),
-        )
+        if (effectiveConfig.showRemoteCursors) {
+            CursorOverlay(
+                cursors = remoteCursors.mapValues { (_, cursor) ->
+                    cursor.copy(
+                        x = cursor.x * viewportState.zoom + effectiveOffset.x,
+                        y = cursor.y * viewportState.zoom + effectiveOffset.y
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(20_000f),
+            )
+        }
     }
+}
+
+private fun List<ViewportElement>.contentBounds(gridSize: Int): Rect? {
+    if (isEmpty()) return null
+
+    val minX = minOf { it.position.value.x * gridSize }
+    val minY = minOf { it.position.value.y * gridSize }
+    val maxX = maxOf { (it.position.value.x + it.size.width) * gridSize }
+    val maxY = maxOf { (it.position.value.y + it.size.height) * gridSize }
+
+    return Rect(
+        left = minX,
+        top = minY,
+        right = maxX,
+        bottom = maxY,
+    )
 }

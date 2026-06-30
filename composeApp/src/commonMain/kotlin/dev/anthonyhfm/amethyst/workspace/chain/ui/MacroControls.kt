@@ -1,21 +1,38 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
@@ -32,6 +50,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollBarOrientation
 import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
 import dev.anthonyhfm.amethyst.ui.theme.chainBorder
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
@@ -50,62 +70,130 @@ import com.composables.icons.lucide.Trash2
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
+import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.card
+import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
+
+private val MacroControlsButtonWidth = 136.dp
+private val MacroControlsButtonHeight = 32.dp
+private val MacroControlsListHeight = 132.dp
+private val MacroControlsAddButtonWidth = 56.dp
+private val MacroControlsHorizontalPadding = 24.dp
+private val MacroControlsItemWidth = 56.dp
+private val MacroControlsDividerWidth = 1.dp
+private val MacroControlsItemGap = 16.dp
+private val MacroControlsShape = RoundedCornerShape(4.dp)
 
 @Composable
-fun MacroControls() {
-    var macrosVisible by remember { mutableStateOf(false) }
+fun BoxScope.MacroControls(
+    macrosVisible: Boolean,
+    onMacrosVisibleChange: (Boolean) -> Unit,
+) {
+    val macros by WorkspaceRepository.macros.collectAsState()
+    val numDividers = (macros.size - 1).coerceAtLeast(0)
+    val numItems = macros.size
+    val numAddButton = 1
+    val totalElements = numItems + numDividers + numAddButton
+    val totalGaps = (totalElements - 1).coerceAtLeast(0)
 
-    Row(
+    val expandedWidth = maxOf(
+        MacroControlsButtonWidth,
+        MacroControlsHorizontalPadding +
+            (MacroControlsItemWidth * numItems) +
+            (MacroControlsDividerWidth * numDividers) +
+            MacroControlsAddButtonWidth +
+            (MacroControlsItemGap * totalGaps)
+    )
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (macrosVisible) 90f else 0f,
+        animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
+    )
+
+    BoxWithConstraints(
         modifier = Modifier
-            .clip(DefaultShape)
-            .background(Theme[chainColorTokens][chainSurface], DefaultShape)
-            .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .align(Alignment.BottomStart),
     ) {
-        if (macrosVisible) {
+        val availableWidth = maxWidth
+        val targetWidth = if (macrosVisible) {
+            minOf(expandedWidth, availableWidth)
+        } else {
+            MacroControlsButtonWidth
+        }
+        val animatedWidth by animateDpAsState(
+            targetValue = targetWidth,
+            animationSpec = spring(
+                dampingRatio = 0.86f,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        )
+        val animatedHeight by animateDpAsState(
+            targetValue = if (macrosVisible) {
+                MacroControlsButtonHeight + MacroControlsListHeight
+            } else {
+                MacroControlsButtonHeight
+            },
+            animationSpec = spring(
+                dampingRatio = 0.86f,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .width(animatedWidth)
+                .height(animatedHeight)
+                .clip(MacroControlsShape)
+                .background(Theme[colors][selectionForeground])
+                .border(1.dp, Theme[colors][border], MacroControlsShape)
+                .clipToBounds(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .width(animatedWidth)
+                    .height(MacroControlsListHeight)
+                    .clipToBounds(),
+            ) {
+                if (macrosVisible || animatedHeight > MacroControlsButtonHeight) {
+                    ScrollArea(
+                        modifier = Modifier
+                            .width(animatedWidth)
+                            .height(MacroControlsListHeight),
+                        orientation = ScrollBarOrientation.Horizontal,
+                    ) {
+                        MacroList(macros = macros)
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier
-                    .height(116.dp),
+                    .align(Alignment.BottomStart)
+                    .width(MacroControlsButtonWidth)
+                    .height(MacroControlsButtonHeight)
+                    .clip(MacroControlsShape)
+                    .background(Theme[colors][selectionForeground])
+                    .clickable {
+                        onMacrosVisibleChange(!macrosVisible)
+                    }
+                    .padding(4.dp),
 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 8.dp, end = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Button(
-                        onClick = { macrosVisible = !macrosVisible },
-                        variant = ButtonVariant.Ghost,
-                        size = ButtonSize.Icon,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "Toggle Macros",
-                            modifier = Modifier.rotate(-90f),
-                        )
-                    }
-                }
-
-                MacroList()
-            }
-        } else {
-            Button(
-                onClick = { macrosVisible = !macrosVisible },
-                variant = ButtonVariant.Ghost,
-                size = ButtonSize.Small,
-                modifier = Modifier.padding(4.dp),
-            ) {
                 Icon(
-                    imageVector = Icons.Default.ChevronLeft,
+                    imageVector = Icons.Default.ChevronRight,
                     contentDescription = "Toggle Macros",
-                    modifier = Modifier.rotate(0f),
+                    modifier = Modifier.rotate(chevronRotation),
                 )
 
                 Text(
                     text = "Global Macros",
                     style = Theme[typography][small],
                     color = Theme[colors][cardForeground],
+                    modifier = Modifier
+                        .padding(end = 6.dp)
                 )
             }
         }
@@ -113,11 +201,16 @@ fun MacroControls() {
 }
 
 @Composable
-fun MacroList() {
-    val macros by WorkspaceRepository.macros.collectAsState()
-
+fun MacroList(
+    macros: List<Macro>,
+) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .padding(top = 12.dp, bottom = 4.dp),
+
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         macros.forEachIndexed { index, macro ->
             ContextMenu(
@@ -171,24 +264,32 @@ fun MacroList() {
                     )
                 }
             }
-        }
-    }
 
-    Box(
-        modifier = Modifier
-            .width(64.dp)
-            .height(116.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Button(
-            onClick = { WorkspaceRepository.addMacro(Macro(value = 0)) },
-            variant = ButtonVariant.Ghost,
-            size = ButtonSize.Icon,
+            if (index < macros.lastIndex) {
+                VerticalDivider(
+                    modifier = Modifier
+                        .height(64.dp),
+                    color = Theme[colors][cardForeground].copy(0.1f),
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .width(56.dp)
+                .height(116.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Add Macro",
-            )
+            Button(
+                onClick = { WorkspaceRepository.addMacro(Macro(value = 0)) },
+                variant = ButtonVariant.Ghost,
+                size = ButtonSize.Icon,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Macro",
+                )
+            }
         }
     }
 }

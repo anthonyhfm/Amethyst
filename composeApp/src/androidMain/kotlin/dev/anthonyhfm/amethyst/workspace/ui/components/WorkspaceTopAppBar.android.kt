@@ -40,25 +40,32 @@ import dev.anthonyhfm.amethyst.settings.SettingsDialog
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+
 private data class WorkspaceModeEntry(
-    val mode: WorkspaceContract.WorkspaceMode,
+    val mode: WorkspaceMode,
     val label: String,
     val icon: ImageVector,
 )
 
 private val selectableModes = listOf(
-    WorkspaceModeEntry(WorkspaceContract.WorkspaceMode.Performance(), "Performance", Lucide.Play),
-    WorkspaceModeEntry(WorkspaceContract.WorkspaceMode.Timeline(), "Timeline", Lucide.ChartNoAxesGantt),
-    WorkspaceModeEntry(WorkspaceContract.WorkspaceMode.LightsChain(), "Lights", Lucide.Lightbulb),
-    WorkspaceModeEntry(WorkspaceContract.WorkspaceMode.SamplingChain(), "Sampling", Lucide.AudioLines),
-    WorkspaceModeEntry(WorkspaceContract.WorkspaceMode.Layout(), "Layout", Lucide.LayoutGrid),
+    WorkspaceModeEntry(PerformanceWorkspaceMode(), "Performance", Lucide.Play),
+    WorkspaceModeEntry(TimelineWorkspaceMode(), "Timeline", Lucide.ChartNoAxesGantt),
+    WorkspaceModeEntry(LightsChainWorkspaceMode(), "Lights", Lucide.Lightbulb),
+    WorkspaceModeEntry(SamplingChainWorkspaceMode(), "Sampling", Lucide.AudioLines),
+    WorkspaceModeEntry(LayoutWorkspaceMode(), "Layout", Lucide.LayoutGrid),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 actual fun WorkspaceTopAppBar(
     onBack: () -> Unit,
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: WorkspaceMode,
     onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val automappingState by AutomappingManager.state.collectAsState()
@@ -69,7 +76,7 @@ actual fun WorkspaceTopAppBar(
 
     CenterAlignedTopAppBar(
         navigationIcon = {
-            if (mode.selectable) {
+            if (mode.selectableMode) {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Lucide.ChevronLeft,
@@ -86,7 +93,7 @@ actual fun WorkspaceTopAppBar(
             }
         },
         title = {
-            if (mode.selectable) {
+            if (mode.selectableMode) {
                 Box {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -162,13 +169,13 @@ actual fun WorkspaceTopAppBar(
 }
 
 private fun modeMatches(
-    current: WorkspaceContract.WorkspaceMode,
-    candidate: WorkspaceContract.WorkspaceMode,
+    current: WorkspaceMode,
+    candidate: WorkspaceMode,
 ): Boolean = when {
-    current is WorkspaceContract.WorkspaceMode.Performance && candidate is WorkspaceContract.WorkspaceMode.Performance -> true
-    current is WorkspaceContract.WorkspaceMode.Timeline && candidate is WorkspaceContract.WorkspaceMode.Timeline -> true
-    current is WorkspaceContract.WorkspaceMode.LightsChain && candidate is WorkspaceContract.WorkspaceMode.LightsChain -> true
-    current is WorkspaceContract.WorkspaceMode.SamplingChain && candidate is WorkspaceContract.WorkspaceMode.SamplingChain -> true
-    current is WorkspaceContract.WorkspaceMode.Layout && candidate is WorkspaceContract.WorkspaceMode.Layout -> true
+    current is PerformanceWorkspaceMode && candidate is PerformanceWorkspaceMode -> true
+    current is TimelineWorkspaceMode && candidate is TimelineWorkspaceMode -> true
+    current is LightsChainWorkspaceMode && candidate is LightsChainWorkspaceMode -> true
+    current is SamplingChainWorkspaceMode && candidate is SamplingChainWorkspaceMode -> true
+    current is LayoutWorkspaceMode && candidate is LayoutWorkspaceMode -> true
     else -> false
 }

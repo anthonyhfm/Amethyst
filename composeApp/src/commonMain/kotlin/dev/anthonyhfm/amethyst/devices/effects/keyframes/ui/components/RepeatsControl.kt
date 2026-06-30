@@ -37,10 +37,7 @@ fun RepeatsControl(
     Column(
         modifier = Modifier
             .clip(DefaultShape)
-            .width(220.dp)
-            .background(Theme[colors][card])
-            .border(1.dp, Theme[colors][border], DefaultShape)
-            .padding(8.dp),
+            .width(220.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {

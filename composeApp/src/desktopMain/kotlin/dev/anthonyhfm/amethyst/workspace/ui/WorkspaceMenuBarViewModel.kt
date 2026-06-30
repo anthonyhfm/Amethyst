@@ -45,7 +45,7 @@ class WorkspaceMenuBarViewModel : ViewModel() {
         }
     }
 
-    fun switchMode(mode: WorkspaceContract.WorkspaceMode) {
+    fun switchMode(mode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode) {
         dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.switchMode(mode)
     }
 

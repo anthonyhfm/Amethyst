@@ -48,10 +48,6 @@ fun KeyframesPinchControl(
         modifier = Modifier
             .clip(DefaultShape)
             .width(220.dp)
-            .background(Theme[colors][card])
-            .border(1.dp, Theme[colors][border], DefaultShape)
-            .padding(horizontal = 12.dp)
-            .padding(vertical = 8.dp)
             .clickable(
                 indication = null,
                 interactionSource = null,

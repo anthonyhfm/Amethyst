@@ -19,7 +19,7 @@ import dev.anthonyhfm.amethyst.gem.GemHostIoContract
 import dev.anthonyhfm.amethyst.gem.GemHostPort
 import dev.anthonyhfm.amethyst.gem.GemPinRef
 import dev.anthonyhfm.amethyst.gem.GemSignalDomain
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
@@ -102,7 +102,7 @@ class GemHostWorkflowIntegrationTest {
                 gemAssets = listOf(SavableWorkspaceGemAsset.from(asset))
             )
         )
-        WorkspaceRepository.switchMode(WorkspaceContract.WorkspaceMode.LightsChain(), undoable = false)
+        WorkspaceRepository.switchMode(LightsChainWorkspaceMode(), undoable = false)
 
         val original = GemChainDevice(
             initialState = GemDeviceState.fromAsset(
@@ -142,7 +142,7 @@ class GemHostWorkflowIntegrationTest {
                 gemAssets = listOf(SavableWorkspaceGemAsset.from(asset))
             )
         )
-        WorkspaceRepository.switchMode(WorkspaceContract.WorkspaceMode.LightsChain(), undoable = false)
+        WorkspaceRepository.switchMode(LightsChainWorkspaceMode(), undoable = false)
 
         val original = GemChainDevice(
             initialState = GemDeviceState.fromAsset(

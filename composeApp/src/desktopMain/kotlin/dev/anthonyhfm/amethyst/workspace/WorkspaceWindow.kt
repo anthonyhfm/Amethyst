@@ -38,6 +38,7 @@ import dev.anthonyhfm.amethyst.desktop.utility.CenterWindowOnFirstShow
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
@@ -128,7 +129,7 @@ fun WorkspaceWindow(
 
             val mode = WorkspaceRepository.mode.value
             when {
-                mode is WorkspaceContract.WorkspaceMode.Timeline || mode is PianoRollWorkspaceMode -> {
+                mode is TimelineWorkspaceMode || mode is PianoRollWorkspaceMode -> {
                     mode.onKeyEvent(it)
                 }
 

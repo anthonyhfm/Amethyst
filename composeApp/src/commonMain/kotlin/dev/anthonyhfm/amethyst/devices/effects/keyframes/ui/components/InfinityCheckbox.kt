@@ -32,10 +32,7 @@ fun InfinityCheckbox(
         modifier = Modifier
             .clip(DefaultShape)
             .height(42.dp)
-            .width(220.dp)
-            .background(Theme[colors][card])
-            .border(1.dp, Theme[colors][border], DefaultShape)
-            .padding(horizontal = 12.dp),
+            .width(220.dp),
 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)

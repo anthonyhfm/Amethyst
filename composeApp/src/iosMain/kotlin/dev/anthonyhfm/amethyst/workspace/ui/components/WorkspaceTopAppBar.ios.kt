@@ -15,31 +15,37 @@ import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitView
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import platform.UIKit.*
 
 private data class IosModeEntry(
-    val mode: WorkspaceContract.WorkspaceMode,
+    val mode: WorkspaceMode,
     val label: String,
     val iconName: String,
 )
 
 private val selectableModes = listOf(
-    IosModeEntry(WorkspaceContract.WorkspaceMode.Performance(), "Performance", "play.fill"),
-    IosModeEntry(WorkspaceContract.WorkspaceMode.Timeline(), "Timeline", "chart.bar.doc.horizontal"),
-    IosModeEntry(WorkspaceContract.WorkspaceMode.LightsChain(), "Lights", "lightbulb.fill"),
-    IosModeEntry(WorkspaceContract.WorkspaceMode.SamplingChain(), "Sampling", "waveform.path"),
-    IosModeEntry(WorkspaceContract.WorkspaceMode.Layout(), "Layout", "square.grid.3x3.fill"),
+    IosModeEntry(PerformanceWorkspaceMode(), "Performance", "play.fill"),
+    IosModeEntry(TimelineWorkspaceMode(), "Timeline", "chart.bar.doc.horizontal"),
+    IosModeEntry(LightsChainWorkspaceMode(), "Lights", "lightbulb.fill"),
+    IosModeEntry(SamplingChainWorkspaceMode(), "Sampling", "waveform.path"),
+    IosModeEntry(LayoutWorkspaceMode(), "Layout", "square.grid.3x3.fill"),
 )
 
 private fun modeMatches(
-    current: WorkspaceContract.WorkspaceMode,
-    candidate: WorkspaceContract.WorkspaceMode,
+    current: WorkspaceMode,
+    candidate: WorkspaceMode,
 ): Boolean = when {
-    current is WorkspaceContract.WorkspaceMode.Performance && candidate is WorkspaceContract.WorkspaceMode.Performance -> true
-    current is WorkspaceContract.WorkspaceMode.Timeline && candidate is WorkspaceContract.WorkspaceMode.Timeline -> true
-    current is WorkspaceContract.WorkspaceMode.LightsChain && candidate is WorkspaceContract.WorkspaceMode.LightsChain -> true
-    current is WorkspaceContract.WorkspaceMode.SamplingChain && candidate is WorkspaceContract.WorkspaceMode.SamplingChain -> true
-    current is WorkspaceContract.WorkspaceMode.Layout && candidate is WorkspaceContract.WorkspaceMode.Layout -> true
+    current is PerformanceWorkspaceMode && candidate is PerformanceWorkspaceMode -> true
+    current is TimelineWorkspaceMode && candidate is TimelineWorkspaceMode -> true
+    current is LightsChainWorkspaceMode && candidate is LightsChainWorkspaceMode -> true
+    current is SamplingChainWorkspaceMode && candidate is SamplingChainWorkspaceMode -> true
+    current is LayoutWorkspaceMode && candidate is LayoutWorkspaceMode -> true
     else -> false
 }
 
@@ -47,7 +53,7 @@ private fun modeMatches(
 @Composable
 actual fun WorkspaceTopAppBar(
     onBack: () -> Unit,
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: WorkspaceMode,
     onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -79,7 +85,7 @@ actual fun WorkspaceTopAppBar(
 
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 private fun UIView.rebuildWorkspaceTopAppBar(
-    mode: WorkspaceContract.WorkspaceMode,
+    mode: WorkspaceMode,
     onBack: () -> Unit,
 ) {
     subviews.forEach { (it as UIView).removeFromSuperview() }
@@ -120,13 +126,13 @@ private fun UIView.rebuildWorkspaceTopAppBar(
 
     val leftButton = UIButton.buttonWithType(UIButtonTypeSystem)
     leftButton.configuration = liquidGlassButtonConfiguration().apply {
-        image = UIImage.systemImageNamed(if (mode.selectable) "chevron.left" else "xmark")
+        image = UIImage.systemImageNamed(if (mode.selectableMode) "chevron.left" else "xmark")
         baseForegroundColor = UIColor.labelColor
     }
-    leftButton.setAccessibilityLabel(if (mode.selectable) "Back to home" else "Close ${mode.displayName}")
+    leftButton.setAccessibilityLabel(if (mode.selectableMode) "Back to home" else "Close ${mode.displayName}")
     leftButton.addAction(
         UIAction.actionWithHandler {
-            if (mode.selectable) {
+            if (mode.selectableMode) {
                 onBack()
             } else {
                 WorkspaceRepository.switchToPreviousMode()
@@ -138,7 +144,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
     leftButton.constrainSize(width = 50.0, height = 50.0)
 
     stackView.addArrangedSubview(
-        if (mode.selectable) {
+        if (mode.selectableMode) {
             modeMenuButton(mode)
         } else {
             modeTitleButton(mode.displayName)
@@ -165,7 +171,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
 }
 
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-private fun modeMenuButton(mode: WorkspaceContract.WorkspaceMode): UIView {
+private fun modeMenuButton(mode: WorkspaceMode): UIView {
     val selectedEntry = selectableModes.firstOrNull { modeMatches(mode, it.mode) }
     val menuButton = UIButton.buttonWithType(UIButtonTypeSystem)
     menuButton.configuration = liquidGlassButtonConfiguration().apply {

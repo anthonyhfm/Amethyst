@@ -5,6 +5,12 @@ import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilte
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import io.github.vyfor.kpresence.RichClient
 import io.github.vyfor.kpresence.rpc.ActivityType
 import kotlinx.coroutines.CoroutineScope
@@ -98,7 +104,7 @@ actual object DiscordRPCManager {
 
     private fun updatePresence(
         projectName: String?,
-        workspaceState: WorkspaceContract.WorkspaceMode,
+        workspaceState: WorkspaceMode,
         showProject: Boolean,
         showState: Boolean
     ) {
@@ -131,13 +137,13 @@ actual object DiscordRPCManager {
     /**
      * Format workspace mode for display.
      */
-    private fun formatWorkspaceMode(mode: WorkspaceContract.WorkspaceMode): String {
+    private fun formatWorkspaceMode(mode: WorkspaceMode): String {
         return when (mode) {
-            is WorkspaceContract.WorkspaceMode.Layout -> "Layout Mode"
-            is WorkspaceContract.WorkspaceMode.Timeline -> "In the Timeline"
-            is WorkspaceContract.WorkspaceMode.Performance -> "Preview Mode"
-            is WorkspaceContract.WorkspaceMode.LightsChain -> "Lights Chain Mode"
-            is WorkspaceContract.WorkspaceMode.SamplingChain -> "Sampling Chain Mode"
+            is LayoutWorkspaceMode -> "Layout Mode"
+            is TimelineWorkspaceMode -> "In the Timeline"
+            is PerformanceWorkspaceMode -> "Preview Mode"
+            is LightsChainWorkspaceMode -> "Lights Chain Mode"
+            is SamplingChainWorkspaceMode -> "Sampling Chain Mode"
             is KeyframesWorkspaceMode -> "Editing Keyframes"
             is CoordinateFilterWorkspaceMode -> "Editing Coordinate Filters"
 

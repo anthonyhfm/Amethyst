@@ -10,18 +10,22 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 
 fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
     // Alt+← / Alt+→ — switch workspace mode
-    if (keyEvent.isAltPressed && WorkspaceRepository.mode.value.selectable) {
+    if (keyEvent.isAltPressed && WorkspaceRepository.mode.value.selectableMode) {
         val selectableModes = listOf(
-            WorkspaceContract.WorkspaceMode.Performance(),
-            WorkspaceContract.WorkspaceMode.Timeline(),
-            WorkspaceContract.WorkspaceMode.LightsChain(),
-            WorkspaceContract.WorkspaceMode.SamplingChain(),
-            WorkspaceContract.WorkspaceMode.Layout(),
+            PerformanceWorkspaceMode(),
+            TimelineWorkspaceMode(),
+            LightsChainWorkspaceMode(),
+            SamplingChainWorkspaceMode(),
+            LayoutWorkspaceMode(),
         )
 
         if (keyEvent.key == Key.DirectionLeft || keyEvent.key == Key.DirectionRight) {

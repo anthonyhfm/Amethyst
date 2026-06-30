@@ -208,13 +208,13 @@ class AmethystMidiManager {
             val data = getMidiInputData(msg)
 
             data?.let {
-                if (WorkspaceRepository.mode.value.claimInputs) {
+                if (WorkspaceRepository.mode.value.claimMidiInputs) {
                     val offset = position.value.copy(
                         x = position.value.x - layout.offsetX,
                         y = position.value.y
                     )
 
-                    WorkspaceRepository.mode.value.onMidiInput(it, offset).invoke()
+                    WorkspaceRepository.mode.value.onMidiInput(it, offset)
                 } else {
                     val offset = position.value.copy(
                         x = position.value.x - layout.offsetX,

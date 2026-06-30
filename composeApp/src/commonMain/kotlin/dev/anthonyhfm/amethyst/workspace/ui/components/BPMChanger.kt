@@ -48,7 +48,6 @@ fun BPMChanger() {
 
     WorkspaceToolbarSurface(
         modifier = Modifier.width(120.dp),
-        contentPadding = PaddingValues(4.dp),
     ) {
         Row(
             modifier = Modifier

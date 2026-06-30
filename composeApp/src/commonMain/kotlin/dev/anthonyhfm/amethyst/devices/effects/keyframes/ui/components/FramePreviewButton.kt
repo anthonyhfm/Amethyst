@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -87,6 +90,15 @@ fun ReorderableItemScope.FramePreviewButton(
                             else -> Theme[colors][card]
                         }
                     )
+                    .border(
+                        width = 1.dp,
+                        color = when {
+                            !(selected && isSelectedInManager) -> Theme[colors][selectionSurface].copy(alpha = 0.1f)
+
+                            else -> Color.Transparent
+                        },
+                        shape = DefaultShape,
+                    )
                     .clickable {
                         onEvent(
                             KeyframesChainDeviceContract.Event.OnSelectFrame(
@@ -96,7 +108,7 @@ fun ReorderableItemScope.FramePreviewButton(
                             )
                         )
                     }
-                    .padding(4.dp),
+                    .padding(3.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -104,7 +116,8 @@ fun ReorderableItemScope.FramePreviewButton(
                     imageVector = Lucide.GripVertical,
                     contentDescription = null,
                     modifier = Modifier
-                        .size(16.dp)
+                        .padding(start = 2.dp)
+                        .size(12.dp)
                         .dragAnchor(),
                     tint = if (isHighlighted) Theme[colors][selectionForeground].copy(alpha = 0.6f)
                            else Theme[colors][mutedForeground],
@@ -122,7 +135,7 @@ fun ReorderableItemScope.FramePreviewButton(
                             if (isHighlighted) Theme[colors][selectionForeground].copy(alpha = 0.15f)
                             else Theme[colors][card]
                         )
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 2.dp),
                     style = Theme[typography][small],
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,

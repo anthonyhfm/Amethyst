@@ -12,6 +12,12 @@ import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
 import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 
 data class WorkspaceMenuEditState(
     val canUndo: Boolean,
@@ -36,20 +42,20 @@ enum class WorkspacePrimaryMode {
 
 object WorkspaceMenuCommandSurface {
     fun currentPrimaryMode(
-        mode: WorkspaceContract.WorkspaceMode = WorkspaceRepository.mode.value
+        mode: WorkspaceMode = WorkspaceRepository.mode.value
     ): WorkspacePrimaryMode? {
         return when (mode) {
-            is WorkspaceContract.WorkspaceMode.Layout -> WorkspacePrimaryMode.Layout
-            is WorkspaceContract.WorkspaceMode.Performance -> WorkspacePrimaryMode.Performance
-            is WorkspaceContract.WorkspaceMode.Timeline -> WorkspacePrimaryMode.Timeline
-            is WorkspaceContract.WorkspaceMode.LightsChain -> WorkspacePrimaryMode.LightsChain
-            is WorkspaceContract.WorkspaceMode.SamplingChain -> WorkspacePrimaryMode.SamplingChain
+            is LayoutWorkspaceMode -> WorkspacePrimaryMode.Layout
+            is PerformanceWorkspaceMode -> WorkspacePrimaryMode.Performance
+            is TimelineWorkspaceMode -> WorkspacePrimaryMode.Timeline
+            is LightsChainWorkspaceMode -> WorkspacePrimaryMode.LightsChain
+            is SamplingChainWorkspaceMode -> WorkspacePrimaryMode.SamplingChain
             else -> null
         }
     }
 
     fun editState(
-        mode: WorkspaceContract.WorkspaceMode = WorkspaceRepository.mode.value,
+        mode: WorkspaceMode = WorkspaceRepository.mode.value,
         selections: List<Selectable> = SelectionManager.selections.value,
         clipboard: ClipboardData? = ClipboardManager.clipboardData.value
     ): WorkspaceMenuEditState {
@@ -61,30 +67,30 @@ object WorkspaceMenuCommandSurface {
                 else -> UndoManager.canRedo()
             },
             canCut = when (mode) {
-                is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.canCutSelection(selections)
+                is TimelineWorkspaceMode -> TimelineKeyHandler.canCutSelection(selections)
                 is KeyframesWorkspaceMode -> selections.any { it is Selectable.KeyframeItem }
                 else -> ShortcutManager.canCutSelection(selections)
             },
             canCopy = when (mode) {
-                is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.canCopySelection(selections)
+                is TimelineWorkspaceMode -> TimelineKeyHandler.canCopySelection(selections)
                 is KeyframesWorkspaceMode -> selections.any { it is Selectable.KeyframeItem }
                 else -> ShortcutManager.canCopySelection(selections)
             },
             canPaste = canPasteForMode(mode, clipboard, selections),
             canDelete = when (mode) {
-                is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.canDeleteSelection(selections)
+                is TimelineWorkspaceMode -> TimelineKeyHandler.canDeleteSelection(selections)
                 is KeyframesWorkspaceMode -> mode.state.value.frames.isNotEmpty()
                 is PianoRollWorkspaceMode -> selections.any { it is Selectable.PianoRollNote }
                 else -> ShortcutManager.canDeleteSelection(selections)
             },
             canDuplicate = when (mode) {
-                is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.canDuplicateSelection(selections)
+                is TimelineWorkspaceMode -> TimelineKeyHandler.canDeleteSelection(selections)
                 is KeyframesWorkspaceMode -> mode.state.value.frames.isNotEmpty()
                 is PianoRollWorkspaceMode -> selections.any { it is Selectable.PianoRollNote }
                 else -> ShortcutManager.canDuplicateSelection(selections)
             },
             canRename = when (mode) {
-                is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.canRenameSelection(selections)
+                is TimelineWorkspaceMode -> TimelineKeyHandler.canRenameSelection(selections)
                 else -> ShortcutManager.canRenameSelection(selections)
             },
             canSelectAll = when (mode) {
@@ -92,7 +98,7 @@ object WorkspaceMenuCommandSurface {
                 is PianoRollWorkspaceMode -> mode.currentEntry?.notes?.isNotEmpty() == true
                 else -> ShortcutManager.canSelectAll(mode, selections)
             },
-            canCloseCurrentTool = !mode.selectable
+            canCloseCurrentTool = !mode.selectableMode
         )
     }
 
@@ -110,7 +116,7 @@ object WorkspaceMenuCommandSurface {
 
     fun copy(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.copySelection()
+            is TimelineWorkspaceMode -> TimelineKeyHandler.copySelection()
             is KeyframesWorkspaceMode -> mode.copySelection()
             else -> ShortcutManager.copySelection()
         }
@@ -118,7 +124,7 @@ object WorkspaceMenuCommandSurface {
 
     fun cut(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.cutSelection()
+            is TimelineWorkspaceMode -> TimelineKeyHandler.cutSelection()
             is KeyframesWorkspaceMode -> mode.cutSelection()
             else -> ShortcutManager.cutSelection()
         }
@@ -134,7 +140,7 @@ object WorkspaceMenuCommandSurface {
 
     fun delete(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.deleteSelection()
+            is TimelineWorkspaceMode -> TimelineKeyHandler.deleteSelection()
             is KeyframesWorkspaceMode -> mode.deleteSelection()
             is PianoRollWorkspaceMode -> mode.deleteSelectedNotes()
             else -> ShortcutManager.deleteSelection()
@@ -143,7 +149,7 @@ object WorkspaceMenuCommandSurface {
 
     fun duplicate(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.duplicateSelection()
+            is TimelineWorkspaceMode -> TimelineKeyHandler.duplicateSelection()
             is KeyframesWorkspaceMode -> mode.duplicateSelection()
             is PianoRollWorkspaceMode -> mode.duplicateSelectedNotes()
             else -> ShortcutManager.duplicateSelection()
@@ -152,7 +158,7 @@ object WorkspaceMenuCommandSurface {
 
     fun rename(): Boolean {
         return when (WorkspaceRepository.mode.value) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> TimelineKeyHandler.renameSelection()
+            is TimelineWorkspaceMode -> TimelineKeyHandler.renameSelection()
             else -> ShortcutManager.renameSelection()
         }
     }
@@ -193,7 +199,7 @@ object WorkspaceMenuCommandSurface {
             }
 
             else -> {
-                if (mode.selectable) {
+                if (mode.selectableMode) {
                     false
                 } else {
                     WorkspaceRepository.switchToPreviousMode()
@@ -204,28 +210,28 @@ object WorkspaceMenuCommandSurface {
     }
 
     private fun canPasteForMode(
-        mode: WorkspaceContract.WorkspaceMode,
+        mode: WorkspaceMode,
         clipboard: ClipboardData?,
         selections: List<Selectable>
     ): Boolean {
         clipboard ?: return false
 
         return when (mode) {
-            is WorkspaceContract.WorkspaceMode.Timeline -> {
+            is TimelineWorkspaceMode -> {
                 clipboard is ClipboardData.TimelineAudioEntries ||
                     clipboard is ClipboardData.TimelineAudioRange ||
                     clipboard is ClipboardData.TimelineMidiEntries ||
                     clipboard is ClipboardData.TimelineTracks
             }
 
-            is WorkspaceContract.WorkspaceMode.LightsChain -> canPasteIntoChainMode(
+            is LightsChainWorkspaceMode -> canPasteIntoChainMode(
                 clipboard = clipboard,
                 selections = selections,
                 allowsSamplingDrops = false,
                 chainType = ClipboardData.ChainDevice.ChainType.Lights
             )
 
-            is WorkspaceContract.WorkspaceMode.SamplingChain -> canPasteIntoChainMode(
+            is SamplingChainWorkspaceMode -> canPasteIntoChainMode(
                 clipboard = clipboard,
                 selections = selections,
                 allowsSamplingDrops = true,
