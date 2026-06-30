@@ -70,6 +70,22 @@ fun <T> StepDial(
             dialProgress = progressForSelection(index = index, size = steps.size)
             onValueChange(resolvedDefaultValue)
             onFinishValueChange(resolvedDefaultValue)
+        },
+        onIncrement = {
+            if (selectedIndex < steps.size - 1) {
+                onStartValueChange(steps[selectedIndex])
+                selectedIndex++
+                dialProgress = progressForSelection(index = selectedIndex, size = steps.size)
+                onFinishValueChange(steps[selectedIndex])
+            }
+        },
+        onDecrement = {
+            if (selectedIndex > 0) {
+                onStartValueChange(steps[selectedIndex])
+                selectedIndex--
+                dialProgress = progressForSelection(index = selectedIndex, size = steps.size)
+                onFinishValueChange(steps[selectedIndex])
+            }
         }
     )
 }

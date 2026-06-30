@@ -3,6 +3,9 @@ package dev.anthonyhfm.amethyst.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -42,11 +46,15 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,6 +75,9 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.ring
 import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
+import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
+import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 
@@ -119,6 +130,22 @@ fun Dial(
             dialValue = defaultValue
             onValueChange(defaultValue)
             onFinishValueChange(defaultValue)
+        },
+        onIncrement = {
+            val nextValue = (dialValue + 0.01f).coerceIn(0f, 1f)
+            if (nextValue != dialValue) {
+                onStartValueChange(dialValue)
+                dialValue = nextValue
+                onFinishValueChange(nextValue)
+            }
+        },
+        onDecrement = {
+            val nextValue = (dialValue - 0.01f).coerceIn(0f, 1f)
+            if (nextValue != dialValue) {
+                onStartValueChange(dialValue)
+                dialValue = nextValue
+                onFinishValueChange(nextValue)
+            }
         }
     )
 }
@@ -170,27 +197,56 @@ internal fun DialSurface(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onDoubleClick: () -> Unit = { },
+    onIncrement: (() -> Unit)? = null,
+    onDecrement: (() -> Unit)? = null,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val focusManager = LocalFocusManager.current
+
     val resolvedProgress = progress.coerceIn(0f, 1f)
     val currentProgress by rememberUpdatedState(resolvedProgress)
     val currentOnDragStart by rememberUpdatedState(onDragStart)
     val currentOnDragProgressChange by rememberUpdatedState(onDragProgressChange)
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+    val currentOnIncrement by rememberUpdatedState(onIncrement)
+    val currentOnDecrement by rememberUpdatedState(onDecrement)
     val resolvedContainerColor = resolveContainerColor(containerColor)
-    val resolvedDialColor = resolveDialColor(dialColor)
+    val focusedBorderColor = Theme[colors][selectionBorder]
+    val focusedDialColor = Theme[colors][selectionSurface]
+    val resolvedDialColor = if (isFocused) focusedDialColor else resolveDialColor(dialColor)
     val trackColor = Theme[colors][foreground].copy(alpha = 0.12f)
     val centerColor = Theme[colors][background]
     val outlineColor = Theme[colors][input]
     val indicatorColor = Theme[colors][foreground].copy(alpha = 0.9f)
     val innerOutlineColor = Theme[colors][foreground].copy(alpha = 0.06f)
 
+    val borderColor = if (isFocused) Color.Transparent else outlineColor
+    val borderWidth = 1.dp
+
     Box(
         modifier = modifier
             .gesturesDisabled(!enabled)
             .alpha(if (enabled) 1f else 0.45f)
+            .size(DialSurfaceSize)
+            .then(
+                if (isFocused) {
+                    Modifier.drawBehind {
+                        val strokeWidth = 2.dp.toPx()
+                        val outlineRadius = (size.minDimension / 2f) + (strokeWidth / 2f)
+                        drawCircle(
+                            color = focusedBorderColor,
+                            radius = outlineRadius,
+                            style = Stroke(width = strokeWidth)
+                        )
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .shadow(1.dp, CircleShape)
             .clip(CircleShape)
-            .size(DialSurfaceSize)
             .then(
                 if (enabled) {
                     Modifier.pointerHoverIcon(PointerIcon.VerticalDrag)
@@ -198,6 +254,36 @@ internal fun DialSurface(
                     Modifier
                 }
             )
+            .focusRequester(focusRequester)
+            .focusable(enabled = enabled, interactionSource = interactionSource)
+            .onKeyEvent { event ->
+                if (enabled && event.type == KeyEventType.KeyDown) {
+                    when (event.key) {
+                        Key.DirectionUp -> {
+                            currentOnIncrement?.invoke()
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            currentOnDecrement?.invoke()
+                            true
+                        }
+                        Key.Escape -> {
+                            focusManager.clearFocus()
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown(pass = PointerEventPass.Initial)
+                    focusRequester.requestFocus()
+                }
+            }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(
@@ -211,6 +297,7 @@ internal fun DialSurface(
 
                 detectDragGestures(
                     onDragStart = {
+                        focusRequester.requestFocus()
                         dragProgress = currentProgress
                         currentOnDragStart()
                     },
@@ -227,7 +314,7 @@ internal fun DialSurface(
                 )
             }
             .background(resolvedContainerColor)
-            .border(1.dp, outlineColor, CircleShape)
+            .border(borderWidth, borderColor, CircleShape)
             .padding(DialOuterPadding)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
