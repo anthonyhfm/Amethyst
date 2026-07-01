@@ -1,3 +1,11 @@
+pub mod midi;
+
+pub use midi::types::*;
+pub use midi::error::*;
+pub use midi::event::*;
+pub use midi::access::MidiAccess;
+pub use midi::connection::MidiConnection;
+
 #[derive(uniffi::Record)]
 pub struct NativeEngineInfo {
     pub name: String,
