@@ -61,7 +61,6 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.lifecycle.viewmodel.compose)
             implementation(libs.androidx.lifecycle.runtime.compose)
-            implementation(libs.ktmidi)
 
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.0")
 
@@ -99,8 +98,6 @@ kotlin {
 
             implementation(projects.nativeEngine)
             implementation(libs.kotlinx.coroutines.swing)
-            implementation(libs.ktmidi.jvm.desktop)
-            implementation(libs.coremidi4j)
             implementation(libs.flatlaf)
             implementation("io.github.vyfor:kpresence:0.6.5")
 

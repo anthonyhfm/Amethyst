@@ -2,32 +2,17 @@ package dev.anthonyhfm.amethyst.core.midi
 
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
-import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
-import dev.anthonyhfm.amethyst.core.midi.data.ProjectDeviceConfig
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevice
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMK2
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMiniMk3
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceMystrix
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevicePro
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceProMk3
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceType
-import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDeviceX
+import dev.anthonyhfm.amethyst.core.midi.devices.*
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
-import dev.anthonyhfm.amethyst.workspace.AutoPlayState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.rotateMidiCoordinate
-import dev.atsushieno.ktmidi.EmptyMidiAccess
-import dev.atsushieno.ktmidi.MidiAccess
-import dev.atsushieno.ktmidi.MidiInput
-import dev.atsushieno.ktmidi.MidiOutput
-import dev.atsushieno.ktmidi.MidiPortDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -37,35 +22,51 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/**
- * # Amethyst Midi Manager
- *
- * The Amethyst Midi Manager should be able to recognize device types based on input and output device.
- */
+data class AmethystMidiDeviceDetails(
+    val id: String,
+    val friendlyName: String,
+    val type: LaunchpadDeviceType
+)
+
 class AmethystMidiManager {
-    private val midiAccess: MidiAccess = platformMidiAccess ?: EmptyMidiAccess()
+    private val midiAccess: AmethystMidiAccess? = platformMidiAccess
 
     val midiInScope = CoroutineScope(Dispatchers.IO.limitedParallelism(4))
-    private var autoDetectJob: Job? = null
-    private var autoConfigureJob: Job? = null
     private var monitorJob: Job? = null
-    private val deviceConfigMutex = Mutex()
+    private val rescanMutex = Mutex()
+    private val elementCollectorJobs = mutableMapOf<String, Job>()
+    private val activeConnections = mutableMapOf<String, ActiveDeviceConnection>()
+
+    private class ActiveDeviceConnection(
+        val device: AmethystMidiDevice,
+        val input: AmethystMidiInput?,
+        val output: AmethystMidiOutput?,
+        val detectedType: LaunchpadDeviceType?,
+        var friendlyName: String
+    )
+
+    companion object {
+        private val _detectedDevices = MutableStateFlow<List<AmethystMidiDeviceDetails>>(emptyList())
+        val detectedDevices: StateFlow<List<AmethystMidiDeviceDetails>> = _detectedDevices.asStateFlow()
+    }
 
     fun close() {
         stopAutoDetectLoop()
-        autoConfigureJob?.cancel()
-        autoDetectJob?.cancel()
         midiInScope.cancel()
+        activeConnections.values.forEach { conn ->
+            conn.input?.close()
+            conn.output?.close()
+        }
+        activeConnections.clear()
+        elementCollectorJobs.values.forEach { it.cancel() }
+        elementCollectorJobs.clear()
     }
-
-    private data class DetectedLaunchpad(
-        val inputPort: MidiPortDetails,
-        val outputPort: MidiPortDetails,
-        val deviceType: LaunchpadDeviceType
-    )
 
     @OptIn(ExperimentalUnsignedTypes::class)
     val inquiryTests: Map<LaunchpadDeviceType, (UByteArray) -> Boolean> = mapOf(
@@ -79,54 +80,16 @@ class AmethystMidiManager {
     )
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    private suspend fun detect(input: MidiInput, output: MidiOutput): LaunchpadDeviceType? {
-        val deviceInquiry = ubyteArrayOf(
-            240u,
-            126u,
-            127u,
-            6u,
-            1u,
-            247u
-        )
-
-        var deviceType: LaunchpadDeviceType? = null
-
-        input.setMessageReceivedListener { data, _, _, _ ->
-            val detectedType = getDeviceTypeByInquiry(data)
-            if (detectedType != null) {
-                deviceType = detectedType
-            }
-        }
-
-        output.send(
-            mevent = deviceInquiry.toByteArray(),
-            offset = 0,
-            length = deviceInquiry.size,
-            timestampInNanoseconds = 0,
-        )
-
-        withTimeoutOrNull(2000) {
-            while (deviceType == null) {
-                delay(5)
-            }
-        }
-
-        return deviceType
-    }
-
-    @OptIn(ExperimentalUnsignedTypes::class)
     fun getDeviceTypeByInquiry(data: ByteArray): LaunchpadDeviceType? {
-        println(data.toUByteArray().contentToString())
-
         val convertedData = data.toUByteArray()
-        val messageStart = data.toUByteArray().indexOf(240u)
-        val messageEnd = data.toUByteArray().indexOf(247u)
+        val messageStart = convertedData.indexOf(240u)
+        val messageEnd = convertedData.indexOf(247u)
 
         if (messageStart == -1 || messageEnd == -1) return null
 
         val sysex = convertedData.copyOfRange(messageStart, messageEnd + 1)
 
-        if (sysex[1] == 126.toUByte()) {
+        if (sysex.size > 1 && sysex[1] == 126.toUByte()) {
             return inquiryTests.entries.find {
                 it.value(sysex)
             }?.key
@@ -135,65 +98,185 @@ class AmethystMidiManager {
         return null
     }
 
-    fun changeDeviceConfig(event: WorkspaceContract.Event.OnChangeDeviceConfig) {
-        Heaven.devices.find { it.selectionUUID == event.uuid }?.apply {
-            deviceConfig.input?.close()
-            deviceConfig.launchpadDevice?.midiOutput?.close()
+    private data class DetectedTypeAndPorts(
+        val type: LaunchpadDeviceType,
+        val inputConnection: AmethystMidiInput,
+        val outputConnection: AmethystMidiOutput
+    )
 
-            savedInputPortId = event.inputPort?.id
-            savedInputPortName = event.inputPort?.name
-            savedOutputPortId = event.outputPort?.id
-            savedOutputPortName = event.outputPort?.name
+    private suspend fun detectDeviceType(device: AmethystMidiDevice): DetectedTypeAndPorts? {
+        val inputs = device.inputPorts
+        val outputs = device.outputPorts
+        if (inputs.isEmpty() || outputs.isEmpty()) return null
 
-            midiInScope.launch {
-                var inputDevice: MidiInput? = null
-                var outputDevice: MidiOutput? = null
+        var detected: DetectedTypeAndPorts? = null
 
-                event.inputPort?.let { input ->
-                    inputDevice = runCatching { midiAccess.openInput(input.id) }.getOrNull()
+        for (outputPort in outputs) {
+            val openedInputs = mutableListOf<AmethystMidiInput>()
+            val outputConnection = runCatching { midiAccess?.openOutput(outputPort.id) }.getOrNull() ?: continue
+
+            try {
+                for (inputPort in inputs) {
+                    val inputConnection = runCatching { midiAccess?.openInput(inputPort.id) }.getOrNull() ?: continue
+                    openedInputs.add(inputConnection)
                 }
 
-                event.outputPort?.let { output ->
-                    outputDevice = runCatching { midiAccess.openOutput(output.id) }.getOrNull()
-                }
-
-                var deviceType: LaunchpadDeviceType? = null
-
-                if (inputDevice != null && outputDevice != null) {
-                    deviceType = detect(inputDevice, outputDevice)
-                }
-
-                inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
-                    val msgCopy = bytes.copyOf()
-
-                    if (platform is Platform.iOS) {
-                        msgCopy.toList().chunked(3).forEach {
-                            onMidiMessage(it.toByteArray())
+                val jobs = openedInputs.map { conn ->
+                    CoroutineScope(Dispatchers.IO).launch {
+                        conn.messages.collect { msg ->
+                            val type = getDeviceTypeByInquiry(msg)
+                            if (type != null && detected == null) {
+                                detected = DetectedTypeAndPorts(type, conn, outputConnection)
+                            }
                         }
-                    } else {
-                        onMidiMessage(msgCopy)
                     }
                 }
 
-                deviceConfigMutex.withLock {
-                    deviceConfig = deviceConfig.copy(
-                        input = inputDevice,
-                        launchpadDevice = outputDevice?.let { output ->
-                            deviceType?.mapLaunchpadDevice(output)
-                        },
-                    )
+                outputConnection.sendDeviceInquiry()
+
+                withTimeoutOrNull(1000) {
+                    while (detected == null && isActive) {
+                        delay(10)
+                    }
+                }
+
+                jobs.forEach { it.cancel() }
+            } catch (e: Exception) {
+                println("Error during shotgun detection on output ${outputPort.name}: ${e.message}")
+            } finally {
+                for (conn in openedInputs) {
+                    if (detected == null || detected.inputConnection.portId != conn.portId) {
+                        conn.close()
+                    }
+                }
+                if (detected == null || detected.outputConnection.portId != outputConnection.portId) {
+                    outputConnection.close()
                 }
             }
+
+            if (detected != null) {
+                return detected
+            }
+        }
+
+        return null
+    }
+
+    private fun updateDetectedDevicesList() {
+        val list = mutableListOf<AmethystMidiDeviceDetails>()
+        val groups = activeConnections.values.groupBy { it.detectedType }
+        for ((type, conns) in groups) {
+            if (type == null) continue
+            val sortedConns = conns.sortedBy { it.device.id }
+            if (sortedConns.size > 1) {
+                sortedConns.forEachIndexed { index, conn ->
+                    val name = "${type.label} #${index + 1}"
+                    conn.friendlyName = name
+                    list.add(AmethystMidiDeviceDetails(conn.device.id, name, type))
+                }
+            } else if (sortedConns.size == 1) {
+                val conn = sortedConns.first()
+                val name = type.label
+                conn.friendlyName = name
+                list.add(AmethystMidiDeviceDetails(conn.device.id, name, type))
+            }
+        }
+        _detectedDevices.value = list
+    }
+
+    private fun autoConnectDevice(active: ActiveDeviceConnection) {
+        val element = Heaven.devices.find {
+            it.savedInputPortId == active.device.id ||
+            (it.savedInputPortId == null && it.savedInputPortName == active.friendlyName)
+        } ?: if (Heaven.devices.size == 1 && activeConnections.size == 1) {
+            val single = Heaven.devices.first()
+            if (single.savedInputPortId == null && single.savedInputPortName == null) {
+                single
+            } else null
+        } else null
+
+        if (element == null) return
+        if (element.launchpadDevice?.connection?.input?.portId == active.input?.portId) return
+
+        connectElement(element, active)
+    }
+
+    private fun connectElement(element: LaunchpadViewportElement, active: ActiveDeviceConnection) {
+        elementCollectorJobs[element.selectionUUID]?.cancel()
+
+        val input = active.input
+        val output = active.output
+        val type = active.detectedType
+
+        if (input != null && output != null && type != null) {
+            val conn = AmethystMidiDeviceConnection(active.device, input, output)
+            val launchpadDevice = type.mapLaunchpadDevice(conn)
+
+            val job = midiInScope.launch {
+                input.messages.collect { msg ->
+                    val msgCopy = msg.copyOf()
+                    if (platform is Platform.iOS) {
+                        msgCopy.toList().chunked(3).forEach {
+                            element.onMidiMessage(it.toByteArray())
+                        }
+                    } else {
+                        element.onMidiMessage(msgCopy)
+                    }
+                }
+            }
+
+            elementCollectorJobs[element.selectionUUID] = job
+            element.launchpadDevice = launchpadDevice
+            element.savedInputPortId = active.device.id
+            element.savedInputPortName = active.friendlyName
+        }
+    }
+
+    fun changeDeviceConfig(event: WorkspaceContract.Event.OnChangeDeviceConfig) {
+        val element = Heaven.devices.find { it.selectionUUID == event.uuid } ?: return
+
+        elementCollectorJobs[element.selectionUUID]?.cancel()
+        elementCollectorJobs.remove(element.selectionUUID)
+        element.launchpadDevice = null
+
+        val deviceId = event.deviceId
+        if (deviceId == null) {
+            element.savedInputPortId = null
+            element.savedInputPortName = null
+            element.savedOutputPortId = null
+            element.savedOutputPortName = null
+            return
+        }
+
+        val active = activeConnections[deviceId]
+        if (active != null) {
+            connectElement(element, active)
+        } else {
+            element.savedInputPortId = deviceId
+            element.savedInputPortName = null
         }
     }
 
     fun startAutoDetectLoop() {
         if (monitorJob?.isActive == true) return
 
+        val access = midiAccess ?: return
         monitorJob = midiInScope.launch {
-            while (isActive) {
-                autoConfigureDevices()
-                delay(2000)
+            val nativeChangeJob = launch {
+                access.deviceChanges.collect {
+                    runCatching { rescanDevicesSerially() }
+                }
+            }
+
+            try {
+                runCatching { rescanDevicesSerially() }
+
+                while (isActive) {
+                    delay(2000)
+                    runCatching { rescanDevicesSerially() }
+                }
+            } finally {
+                nativeChangeJob.cancel()
             }
         }
     }
@@ -201,6 +284,56 @@ class AmethystMidiManager {
     fun stopAutoDetectLoop() {
         monitorJob?.cancel()
         monitorJob = null
+    }
+
+    private suspend fun rescanDevicesSerially() {
+        rescanMutex.withLock {
+            rescanDevices()
+        }
+    }
+
+    private suspend fun rescanDevices() {
+        val access = midiAccess ?: return
+        val discovered = access.discoverDevices()
+        val discoveredIds = discovered.map { it.id }.toSet()
+
+        val deadDeviceIds = activeConnections.filter { it.value.input?.isOpen == false || it.value.output?.isOpen == false }.keys
+        val disconnectedIds = activeConnections.keys.filter { it !in discoveredIds } + deadDeviceIds
+        for (id in disconnectedIds.distinct()) {
+            val conn = activeConnections.remove(id)
+            if (conn != null) {
+                conn.input?.close()
+                conn.output?.close()
+                Heaven.devices.forEach { element ->
+                    if (element.launchpadDevice?.connection?.input?.portId == conn.input?.portId) {
+                        elementCollectorJobs[element.selectionUUID]?.cancel()
+                        elementCollectorJobs.remove(element.selectionUUID)
+                        element.launchpadDevice = null
+                    }
+                }
+            }
+        }
+
+        val newDevices = discovered.filter { it.id !in activeConnections }
+        for (device in newDevices) {
+            val detection = detectDeviceType(device)
+            if (detection != null) {
+                val conn = ActiveDeviceConnection(
+                    device = device,
+                    input = detection.inputConnection,
+                    output = detection.outputConnection,
+                    detectedType = detection.type,
+                    friendlyName = detection.type.label
+                )
+                activeConnections[device.id] = conn
+            }
+        }
+
+        updateDetectedDevicesList()
+
+        for (conn in activeConnections.values) {
+            autoConnectDevice(conn)
+        }
     }
 
     fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray) {
@@ -269,201 +402,15 @@ class AmethystMidiManager {
         }
     }
 
-    private fun LaunchpadDeviceType.mapLaunchpadDevice(output: MidiOutput): LaunchpadDevice? {
+    private fun LaunchpadDeviceType.mapLaunchpadDevice(connection: AmethystMidiDeviceConnection): LaunchpadDevice? {
         return when (this) {
-            LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 -> LaunchpadDeviceProMk3(output)
-            LaunchpadDeviceType.LAUNCHPAD_X -> LaunchpadDeviceX(output)
-            LaunchpadDeviceType.LAUNCHPAD_MINI_MK3 -> LaunchpadDeviceMiniMk3(output)
-            LaunchpadDeviceType.LAUNCHPAD_PRO -> LaunchpadDevicePro(output)
-            LaunchpadDeviceType.LAUNCHPAD_PRO_CFW -> LaunchpadDevicePro(output, true)
-            LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(output)
-            LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(output)
+            LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 -> LaunchpadDeviceProMk3(connection)
+            LaunchpadDeviceType.LAUNCHPAD_X -> LaunchpadDeviceX(connection)
+            LaunchpadDeviceType.LAUNCHPAD_MINI_MK3 -> LaunchpadDeviceMiniMk3(connection)
+            LaunchpadDeviceType.LAUNCHPAD_PRO -> LaunchpadDevicePro(connection)
+            LaunchpadDeviceType.LAUNCHPAD_PRO_CFW -> LaunchpadDevicePro(connection, true)
+            LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(connection)
+            LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(connection)
         }
-    }
-
-    fun autoConfigureDevices() {
-        if (autoConfigureJob?.isActive == true) return
-
-        val allDevices = Heaven.devices
-        if (allDevices.isEmpty()) return
-
-        val inputs = midiAccess.inputs.toList()
-        val outputs = midiAccess.outputs.toList()
-
-        for (device in allDevices) {
-            val inputValid = device.deviceConfig.input?.details?.let { details ->
-                inputs.any { it.id == details.id || (details.name != null && it.name == details.name) }
-            } ?: false
-            val outputValid = device.deviceConfig.launchpadDevice?.midiOutput?.details?.let { details ->
-                outputs.any { it.id == details.id || (details.name != null && it.name == details.name) }
-            } ?: false
-
-            val incomplete = (device.deviceConfig.input != null && device.deviceConfig.launchpadDevice == null) ||
-                             (device.deviceConfig.input == null && device.deviceConfig.launchpadDevice != null)
-
-            if ((device.deviceConfig.input != null && !inputValid) ||
-                (device.deviceConfig.launchpadDevice != null && !outputValid) ||
-                incomplete) {
-                device.deviceConfig.input?.close()
-                device.deviceConfig.launchpadDevice?.midiOutput?.close()
-                device.deviceConfig = ProjectDeviceConfig()
-            }
-        }
-
-        val claimedInputs = allDevices.mapNotNull { it.deviceConfig.input?.details?.id }.toSet()
-        val claimedOutputs = allDevices.mapNotNull { it.deviceConfig.launchpadDevice?.midiOutput?.details?.id }.toSet()
-
-        val disconnectedDevices = allDevices.filter { device ->
-            device.deviceConfig.input == null || device.deviceConfig.launchpadDevice == null
-        }
-        if (disconnectedDevices.isEmpty()) return
-
-        autoConfigureJob = midiInScope.launch {
-            val availableInputs = inputs.filterNot { it.id in claimedInputs }.toMutableList()
-            val availableOutputs = outputs.filterNot { it.id in claimedOutputs }.toMutableList()
-
-            for (device in disconnectedDevices) {
-                val targetInputId = device.savedInputPortId
-                val targetInputName = device.savedInputPortName
-                val targetOutputId = device.savedOutputPortId
-                val targetOutputName = device.savedOutputPortName
-
-                if (targetInputId == null && targetInputName == null &&
-                    targetOutputId == null && targetOutputName == null) {
-                    continue
-                }
-
-                val matchedInput = if (targetInputId != null) {
-                    availableInputs.firstOrNull { it.id == targetInputId }
-                } else null
-                val matchedInputFinal = matchedInput ?: if (targetInputName != null) {
-                    availableInputs.firstOrNull { it.name == targetInputName }
-                } else null
-
-                val matchedOutput = if (targetOutputId != null) {
-                    availableOutputs.firstOrNull { it.id == targetOutputId }
-                } else null
-                val matchedOutputFinal = matchedOutput ?: if (targetOutputName != null) {
-                    availableOutputs.firstOrNull { it.name == targetOutputName }
-                } else null
-
-                if (matchedInputFinal != null || matchedOutputFinal != null) {
-                    val inputDevice = matchedInputFinal?.let { runCatching { midiAccess.openInput(it.id) }.getOrNull() }
-                    val outputDevice = matchedOutputFinal?.let { runCatching { midiAccess.openOutput(it.id) }.getOrNull() }
-
-                    var deviceType: LaunchpadDeviceType? = null
-                    if (inputDevice != null && outputDevice != null) {
-                        deviceType = detect(inputDevice, outputDevice)
-                    }
-
-                    inputDevice?.setMessageReceivedListener { bytes, _, _, _ ->
-                        val msgCopy = bytes.copyOf()
-                        if (platform is Platform.iOS) {
-                            msgCopy.toList().chunked(3).forEach {
-                                device.onMidiMessage(it.toByteArray())
-                            }
-                        } else {
-                            device.onMidiMessage(msgCopy)
-                        }
-                    }
-
-                    deviceConfigMutex.withLock {
-                        device.deviceConfig.input?.close()
-                        device.deviceConfig.launchpadDevice?.midiOutput?.close()
-
-                        device.deviceConfig = device.deviceConfig.copy(
-                            input = inputDevice,
-                            launchpadDevice = outputDevice?.let { output ->
-                                deviceType?.mapLaunchpadDevice(output)
-                            }
-                        )
-                    }
-
-                    matchedInputFinal?.let { availableInputs.remove(it) }
-                    matchedOutputFinal?.let { availableOutputs.remove(it) }
-                }
-            }
-
-            if (allDevices.size == 1 &&
-                allDevices[0].deviceConfig.input == null &&
-                allDevices[0].deviceConfig.launchpadDevice == null) {
-
-                val device = allDevices[0]
-                val targetInputId = device.savedInputPortId
-                val targetInputName = device.savedInputPortName
-                val targetOutputId = device.savedOutputPortId
-                val targetOutputName = device.savedOutputPortName
-
-                if (targetInputId == null && targetInputName == null &&
-                    targetOutputId == null && targetOutputName == null) {
-
-                    if (availableInputs.isNotEmpty() && availableOutputs.isNotEmpty()) {
-                        val detection = shotgunDetectLaunchpad()
-                        detection?.let {
-                            changeDeviceConfig(
-                                WorkspaceContract.Event.OnChangeDeviceConfig(
-                                    uuid = device.selectionUUID,
-                                    inputPort = it.inputPort,
-                                    outputPort = it.outputPort,
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }.apply {
-            invokeOnCompletion { autoConfigureJob = null }
-        }
-    }
-
-    @OptIn(ExperimentalUnsignedTypes::class)
-    private suspend fun shotgunDetectLaunchpad(): DetectedLaunchpad? {
-        val inputs = midiAccess.inputs.toList()
-        val outputs = midiAccess.outputs.toList()
-        if (inputs.isEmpty() || outputs.isEmpty()) return null
-
-        for (outputPort in outputs) {
-            val openedInputs = mutableListOf<Pair<MidiPortDetails, MidiInput>>()
-            val output = runCatching { midiAccess.openOutput(outputPort.id) }.getOrNull() ?: continue
-            var detected: DetectedLaunchpad? = null
-
-            try {
-                inputs.forEach { inputPort ->
-                    val input = runCatching { midiAccess.openInput(inputPort.id) }.getOrNull() ?: return@forEach
-
-                    input.setMessageReceivedListener { data, _, _, _ ->
-                        val type = getDeviceTypeByInquiry(data) ?: return@setMessageReceivedListener
-
-                        if (detected == null) {
-                            detected = DetectedLaunchpad(inputPort, outputPort, type)
-                        }
-                    }
-
-                    openedInputs.add(inputPort to input)
-                }
-
-                output.send(
-                    mevent = ubyteArrayOf(240u, 126u, 127u, 6u, 1u, 247u).toByteArray(),
-                    offset = 0,
-                    length = 6,
-                    timestampInNanoseconds = 0,
-                )
-
-                withTimeoutOrNull(2000) {
-                    while (isActive && detected == null) {
-                        delay(10)
-                    }
-                }
-            } catch (e: Exception) {
-                println("Shotgun auto-detection failed for output ${outputPort.name}: ${e.message}")
-            } finally {
-                openedInputs.forEach { it.second.close() }
-                output.close()
-            }
-
-            if (detected != null) return detected
-        }
-
-        return null
     }
 }

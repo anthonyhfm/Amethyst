@@ -2,12 +2,12 @@ package dev.anthonyhfm.amethyst.core.midi.devices
 
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
-import dev.atsushieno.ktmidi.MidiOutput
+import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 import kotlinx.coroutines.launch
 
 class LaunchpadDeviceProMk3(
-    override var midiOutput: MidiOutput,
-) : LaunchpadDevice() {
+    connection: AmethystMidiDeviceConnection,
+) : LaunchpadDevice(connection) {
     override fun clear() {
         val clearSysEx = byteArrayOf(0xF0.toByte(), 0x00.toByte(), 0x20.toByte(), 0x29.toByte(), 0x02.toByte(), 0x0E.toByte(), 0x03.toByte(), 0x00.toByte(), 0xF7.toByte())
 
@@ -48,7 +48,7 @@ class LaunchpadDeviceProMk3(
 
     private fun sendMidi(data: ByteArray) {
         outscope.launch {
-            midiOutput.send(data, 0, data.size, 0)
+            midiOutput.send(data)
         }
     }
 

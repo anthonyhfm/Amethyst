@@ -7,7 +7,6 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.ChainModeKeyHandler
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
-import dev.atsushieno.ktmidi.MidiPortDetails
 interface WorkspaceContract {
     sealed interface Event {
         data object OpenVirtualDevicePicker : Event
@@ -25,8 +24,7 @@ interface WorkspaceContract {
 
         data class OnChangeDeviceConfig(
             val uuid: String,
-            var inputPort: MidiPortDetails?,
-            var outputPort: MidiPortDetails?,
+            val deviceId: String?,
         ) : Event
 
         data class OnDeleteDevice(val uuid: String) : Event

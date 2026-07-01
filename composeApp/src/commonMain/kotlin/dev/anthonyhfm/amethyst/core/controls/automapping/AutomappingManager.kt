@@ -88,7 +88,7 @@ object AutomappingManager {
                 val signals = mutableListOf<Signal>()
 
                 Heaven.devices.forEach { device ->
-                    if (device.deviceConfig.launchpadDevice == null) return@forEach
+                    if (device.launchpadDevice == null) return@forEach
                     val launchpadId = device.launchpadId
                     val mappedForDevice = mappedPads.filter { it.key.launchpadId == launchpadId }.map { it.key.localX to it.key.localY }.toSet()
                     val posX = device.position.value.x.toInt()
@@ -276,7 +276,7 @@ object AutomappingManager {
         globalX: Int,
         globalY: Int,
     ): Boolean {
-        if (device.deviceConfig.launchpadDevice == null) return false
+        if (device.launchpadDevice == null) return false
 
         val mode = WorkspaceRepository.mode.value
         val target = resolveActiveTarget() ?: return false

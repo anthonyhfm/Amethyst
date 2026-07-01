@@ -103,12 +103,10 @@ fun main(args: Array<String>) {
         } else if (!showEditor) {
             StartWindow(
                 onOpenEditor = {
-                    println("[main ${System.currentTimeMillis()}] onOpenEditor -> showEditor=true")
                     showEditor = true
                 }
             )
         } else {
-            println("[main ${System.currentTimeMillis()}] rendering WorkspaceWindow")
             WorkspaceWindow(
                 externalCloseRequest = macQuitRequest,
                 onExternalCloseConfirmed = {

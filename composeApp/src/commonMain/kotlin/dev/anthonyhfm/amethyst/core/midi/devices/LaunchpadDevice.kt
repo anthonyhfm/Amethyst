@@ -4,11 +4,14 @@ import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.core.engine.heaven.Screen
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
-import dev.atsushieno.ktmidi.MidiOutput
+import dev.anthonyhfm.amethyst.core.midi.AmethystMidiOutput
+import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 
-abstract class LaunchpadDevice {
+abstract class LaunchpadDevice(
+    open val connection: AmethystMidiDeviceConnection
+) {
     val screen: Screen = Screen()
 
     protected val outscope = CoroutineScope(Dispatchers.Default)
@@ -19,7 +22,7 @@ abstract class LaunchpadDevice {
         }
     }
 
-    abstract var midiOutput: MidiOutput
+    val midiOutput: AmethystMidiOutput get() = connection.output
 
     abstract fun clear()
 
@@ -28,7 +31,7 @@ abstract class LaunchpadDevice {
     abstract fun getEffectSysEx(updates: List<RawLEDUpdate>): ByteArray
 
     open fun handleMidiInput(inputData: ByteArray): MidiInputData? {
-        return null
+        return dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData(inputData)
     }
 }
 

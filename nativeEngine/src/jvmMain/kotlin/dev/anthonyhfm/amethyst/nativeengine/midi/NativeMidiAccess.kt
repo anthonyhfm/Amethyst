@@ -2,12 +2,26 @@ package dev.anthonyhfm.amethyst.nativeengine.midi
 
 import dev.anthonyhfm.amethyst.nativeengine.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 
 class NativeMidiAccess : AutoCloseable {
     private val access = MidiAccess()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     val backendName: String get() = access.backendName()
+
+    val deviceChanges: Flow<Unit> = flow {
+        while (currentCoroutineContext().isActive) {
+            val changed = withContext(Dispatchers.IO) {
+                access.waitForDeviceChange(500uL)
+            }
+            if (changed) {
+                emit(Unit)
+            }
+        }
+    }.flowOn(Dispatchers.IO)
 
     suspend fun discoverDevices(): List<NativeMidiDevice> = withContext(Dispatchers.IO) {
         access.discoverDevices().map { it.toNativeMidiDevice() }

@@ -1,6 +1,7 @@
 use crate::midi::types::*;
 use crate::midi::error::MidiError;
 use std::sync::mpsc;
+use std::time::Duration;
 
 pub trait BackendPortHandle: Send + Sync {
     fn send(&self, data: &[u8]) -> Result<(), MidiError>;
@@ -10,6 +11,11 @@ pub trait BackendPortHandle: Send + Sync {
 
 pub trait MidiBackend: Send + Sync {
     fn discover_devices(&self) -> Result<Vec<MidiDeviceInfo>, MidiError>;
+
+    fn wait_for_device_change(&self, timeout_ms: u64) -> bool {
+        std::thread::sleep(Duration::from_millis(timeout_ms));
+        false
+    }
     
     fn open_input(
         &self,

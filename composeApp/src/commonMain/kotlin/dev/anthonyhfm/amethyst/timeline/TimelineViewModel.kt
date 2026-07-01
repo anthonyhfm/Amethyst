@@ -535,10 +535,6 @@ class TimelineViewModel : ViewModel() {
         }
     }
 
-
-
-
-
     fun moveAudioEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long) {
         val currentTracks = _tracks.value.toMutableList()
         val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
@@ -554,10 +550,8 @@ class TimelineViewModel : ViewModel() {
             val isAlreadySnapped = gridInterval > 0 && newStartMs % gridInterval == 0L
             if (isAlreadySnapped) newStartMs else snapToGrid(newStartMs, gridInterval)
         }
-        println("[TimelineViewModel] moveAudioEntry: old=$oldStartMs requested=$newStartMs snapped=$snappedStart gridType=$gridType")
         val movedEntry = entry.copyWithShiftedStartMs(snappedStart)
         val resolved = resolveOverlapAsymmetric(track, movedEntry, originStartMs = oldStartMs) ?: run {
-            println("[TimelineViewModel] moveAudioEntry: overlap resolution failed, restoring original")
             track.entries[oldStartMs] = entry
             return
         }

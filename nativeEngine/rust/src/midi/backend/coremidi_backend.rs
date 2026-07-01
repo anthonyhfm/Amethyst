@@ -1,10 +1,12 @@
 use crate::midi::types::*;
 use crate::midi::error::MidiError;
 use crate::midi::backend::{MidiBackend, BackendPortHandle};
-use std::sync::mpsc;
+use crate::midi::parser::split_midi_messages;
+use std::sync::{mpsc, Mutex};
 use std::sync::OnceLock;
 use core_foundation::base::TCFType;
 use core_foundation::string::{CFString, CFStringRef};
+use coremidi::Notification;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -49,13 +51,29 @@ unsafe fn get_integer_property(obj: coremidi_sys::MIDIObjectRef, prop_key: CFStr
 
 pub struct CoreMidiBackend {
     client: coremidi::Client,
+    device_changes: Mutex<mpsc::Receiver<()>>,
 }
 
 impl CoreMidiBackend {
     pub fn new() -> Result<Self, MidiError> {
-        let client = coremidi::Client::new("Amethyst")
+        let (device_change_sender, device_changes) = mpsc::channel();
+        let client = coremidi::Client::new_with_notifications("Amethyst", move |notification: &Notification| {
+            if matches!(
+                notification,
+                Notification::SetupChanged
+                    | Notification::ObjectAdded(_)
+                    | Notification::ObjectRemoved(_)
+                    | Notification::PropertyChanged(_)
+                    | Notification::IoError(_)
+            ) {
+                let _ = device_change_sender.send(());
+            }
+        })
             .map_err(|e| MidiError::BackendError { reason: format!("Failed to create CoreMIDI client: {:?}", e) })?;
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            device_changes: Mutex::new(device_changes),
+        })
     }
 }
 
@@ -90,7 +108,6 @@ impl BackendPortHandle for CoreMidiPortHandle {
         &self.port_id
     }
 }
-
 impl MidiBackend for CoreMidiBackend {
     fn discover_devices(&self) -> Result<Vec<MidiDeviceInfo>, MidiError> {
         let mut devices = Vec::new();
@@ -100,6 +117,9 @@ impl MidiBackend for CoreMidiBackend {
             for i in 0..device_count {
                 let dev = coremidi_sys::MIDIGetDevice(i);
                 if dev == 0 { continue; }
+                
+                let offline = get_integer_property(dev, coremidi_sys::kMIDIPropertyOffline).unwrap_or(0);
+                if offline != 0 { continue; }
                 
                 let name = get_string_property(dev, coremidi_sys::kMIDIPropertyName)
                     .unwrap_or_else(|| "Unknown Device".to_string());
@@ -118,6 +138,9 @@ impl MidiBackend for CoreMidiBackend {
                     for k in 0..src_count {
                         let endpoint = coremidi_sys::MIDIEntityGetSource(entity, k);
                         if endpoint == 0 { continue; }
+
+                        let offline = get_integer_property(endpoint, coremidi_sys::kMIDIPropertyOffline).unwrap_or(0);
+                        if offline != 0 { continue; }
                         
                         let port_id = get_integer_property(endpoint, coremidi_sys::kMIDIPropertyUniqueID)
                             .map(|id| id.to_string())
@@ -138,6 +161,9 @@ impl MidiBackend for CoreMidiBackend {
                     for k in 0..dest_count {
                         let endpoint = coremidi_sys::MIDIEntityGetDestination(entity, k);
                         if endpoint == 0 { continue; }
+
+                        let offline = get_integer_property(endpoint, coremidi_sys::kMIDIPropertyOffline).unwrap_or(0);
+                        if offline != 0 { continue; }
                         
                         let port_id = get_integer_property(endpoint, coremidi_sys::kMIDIPropertyUniqueID)
                             .map(|id| id.to_string())
@@ -177,6 +203,9 @@ impl MidiBackend for CoreMidiBackend {
                 let endpoint = coremidi_sys::MIDIGetSource(i);
                 if endpoint == 0 { continue; }
                 
+                let offline = get_integer_property(endpoint, coremidi_sys::kMIDIPropertyOffline).unwrap_or(0);
+                if offline != 0 { continue; }
+                
                 let mut entity = 0;
                 coremidi_sys::MIDIEndpointGetEntity(endpoint, &mut entity);
                 if entity == 0 {
@@ -212,6 +241,9 @@ impl MidiBackend for CoreMidiBackend {
                 let endpoint = coremidi_sys::MIDIGetDestination(i);
                 if endpoint == 0 { continue; }
                 
+                let offline = get_integer_property(endpoint, coremidi_sys::kMIDIPropertyOffline).unwrap_or(0);
+                if offline != 0 { continue; }
+                
                 let mut entity = 0;
                 coremidi_sys::MIDIEndpointGetEntity(endpoint, &mut entity);
                 if entity == 0 {
@@ -245,6 +277,16 @@ impl MidiBackend for CoreMidiBackend {
         Ok(devices)
     }
 
+    fn wait_for_device_change(&self, timeout_ms: u64) -> bool {
+        let receiver = self.device_changes.lock().unwrap();
+        if receiver.recv_timeout(std::time::Duration::from_millis(timeout_ms)).is_err() {
+            return false;
+        }
+
+        while receiver.try_recv().is_ok() {}
+        true
+    }
+
     fn open_input(
         &self,
         port_id: &str,
@@ -261,17 +303,19 @@ impl MidiBackend for CoreMidiBackend {
         let input_port = self.client.input_port("Amethyst Input Port", move |packet_list| {
             let timebase = get_timebase();
             for packet in packet_list.iter() {
-                let bytes = packet.data().to_vec();
+                let bytes = packet.data();
                 let raw_timestamp = packet.timestamp();
                 let nanos = (raw_timestamp * timebase.numer as u64) / timebase.denom as u64;
                 let timestamp_us = nanos / 1000;
                 
-                let msg = MidiMessage {
-                    data: bytes,
-                    timestamp_us,
-                    port_id: port_id_clone.clone(),
-                };
-                let _ = sender.send(msg);
+                for msg_bytes in split_midi_messages(bytes) {
+                    let msg = MidiMessage {
+                        data: msg_bytes,
+                        timestamp_us,
+                        port_id: port_id_clone.clone(),
+                    };
+                    let _ = sender.send(msg);
+                }
             }
         }).map_err(|e| MidiError::ConnectionFailed { reason: format!("Failed to create CoreMIDI input port: {}", e) })?;
         

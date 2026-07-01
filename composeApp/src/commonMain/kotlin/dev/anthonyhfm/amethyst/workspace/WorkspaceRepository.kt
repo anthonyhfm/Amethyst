@@ -312,8 +312,8 @@ object WorkspaceRepository {
         val element = ViewportRepository.devices.value.firstOrNull { it.selectionUUID == uuid || it.launchpadId == uuid }
             ?: return false
 
-        element.deviceConfig.input?.close()
-        element.deviceConfig.launchpadDevice?.midiOutput?.close()
+        element.launchpadDevice?.connection?.input?.close()
+        element.launchpadDevice?.midiOutput?.close()
         if (!fromRemote) {
             DeviceSyncCoordinator.onDeviceRemoved(element.launchpadId)
         }
@@ -487,8 +487,8 @@ object WorkspaceRepository {
         migrateAudioEntries()
 
         ViewportRepository.devices.value.forEach { device ->
-            device.deviceConfig.input?.close()
-            device.deviceConfig.launchpadDevice?.midiOutput?.close()
+            device.launchpadDevice?.connection?.input?.close()
+            device.launchpadDevice?.midiOutput?.close()
         }
         val loadedDevices = workspaceData.launchpadDevices.map { savedDevice ->
             val device = when (savedDevice) {
@@ -597,10 +597,10 @@ object WorkspaceRepository {
                 autoPlayShowLights = workspaceMeta?.settings?.autoPlayShowLights ?: true
             ),
             launchpadDevices = ViewportRepository.devices.value.map { device ->
-                val inputPortId = device.deviceConfig.input?.details?.id ?: device.savedInputPortId
-                val inputPortName = device.deviceConfig.input?.details?.name ?: device.savedInputPortName
-                val outputPortId = device.deviceConfig.launchpadDevice?.midiOutput?.details?.id ?: device.savedOutputPortId
-                val outputPortName = device.deviceConfig.launchpadDevice?.midiOutput?.details?.name ?: device.savedOutputPortName
+                val inputPortId = device.launchpadDevice?.connection?.input?.portId ?: device.savedInputPortId
+                val inputPortName = device.savedInputPortName
+                val outputPortId = device.launchpadDevice?.midiOutput?.portId ?: device.savedOutputPortId
+                val outputPortName = device.savedOutputPortName
 
                 when (device) {
                     is ViewportLaunchpadPro -> SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
@@ -720,8 +720,8 @@ object WorkspaceRepository {
         
         // Clear devices
         ViewportRepository.devices.value.forEach { device ->
-            device.deviceConfig.input?.close()
-            device.deviceConfig.launchpadDevice?.midiOutput?.close()
+            device.launchpadDevice?.connection?.input?.close()
+            device.launchpadDevice?.midiOutput?.close()
         }
         ViewportRepository.clear()
         

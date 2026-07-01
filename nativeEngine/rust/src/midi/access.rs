@@ -35,6 +35,10 @@ impl MidiAccess {
         self.devices_cache.read().unwrap().clone()
     }
 
+    pub fn wait_for_device_change(&self, timeout_ms: u64) -> bool {
+        self.backend.wait_for_device_change(timeout_ms)
+    }
+
     pub fn get_device(&self, device_id: String) -> Option<MidiDeviceInfo> {
         self.get_cached_devices()
             .into_iter()
@@ -56,9 +60,12 @@ impl MidiAccess {
 
     pub fn open_input(&self, port_id: String) -> Result<Arc<MidiConnection>, MidiError> {
         let mut conns = self.open_connections.lock().unwrap();
-        if conns.contains_key(&port_id) {
-            return Err(MidiError::PortAlreadyOpen { port_id });
+        if let Some(conn) = conns.get(&port_id) {
+            if conn.is_open() {
+                return Err(MidiError::PortAlreadyOpen { port_id });
+            }
         }
+        conns.remove(&port_id);
 
         let (sender, receiver) = std::sync::mpsc::channel();
         let handle = self.backend.open_input(&port_id, sender)?;
@@ -70,9 +77,12 @@ impl MidiAccess {
 
     pub fn open_output(&self, port_id: String) -> Result<Arc<MidiConnection>, MidiError> {
         let mut conns = self.open_connections.lock().unwrap();
-        if conns.contains_key(&port_id) {
-            return Err(MidiError::PortAlreadyOpen { port_id });
+        if let Some(conn) = conns.get(&port_id) {
+            if conn.is_open() {
+                return Err(MidiError::PortAlreadyOpen { port_id });
+            }
         }
+        conns.remove(&port_id);
 
         let handle = self.backend.open_output(&port_id)?;
         

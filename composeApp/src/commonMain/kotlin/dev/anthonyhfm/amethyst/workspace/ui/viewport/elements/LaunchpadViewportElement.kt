@@ -10,7 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
-import dev.anthonyhfm.amethyst.core.midi.data.ProjectDeviceConfig
+import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevice
 import dev.anthonyhfm.amethyst.core.engine.heaven.Screen
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -46,7 +46,7 @@ abstract class LaunchpadViewportElement(
 
     val renderScope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
-    var deviceConfig: ProjectDeviceConfig = ProjectDeviceConfig()
+    var launchpadDevice: LaunchpadDevice? = null
     var savedInputPortId: String? = null
     var savedInputPortName: String? = null
     var savedOutputPortId: String? = null
@@ -58,7 +58,7 @@ abstract class LaunchpadViewportElement(
     init {
         screen.screenExit = { u, c ->
             val rotatedUpdates = rotateMidiUpdates(u, layout, rotationDegrees.floatValue)
-            deviceConfig.launchpadDevice?.sendUpdate(rotatedUpdates, c)
+            launchpadDevice?.sendUpdate(rotatedUpdates, c)
 
             renderScope.launch {
                 previewState.sendToPreview(u)

@@ -2,12 +2,12 @@ package dev.anthonyhfm.amethyst.core.midi.devices
 
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
-import dev.atsushieno.ktmidi.MidiOutput
+import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 import kotlinx.coroutines.launch
 
 class LaunchpadDeviceMiniMk3(
-    override var midiOutput: MidiOutput,
-) : LaunchpadDevice() {
+    connection: AmethystMidiDeviceConnection,
+) : LaunchpadDevice(connection) {
     override fun clear() { }
 
     override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
@@ -38,7 +38,7 @@ class LaunchpadDeviceMiniMk3(
 
     private fun sendMidi(data: ByteArray) {
         outscope.launch {
-            midiOutput.send(data, 0, data.size, 0)
+            midiOutput.send(data)
         }
     }
 

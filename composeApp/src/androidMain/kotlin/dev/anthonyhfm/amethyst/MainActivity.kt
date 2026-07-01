@@ -12,7 +12,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import dev.anthonyhfm.amethyst.core.midi.platformMidiAccess
 import dev.anthonyhfm.amethyst.ui.theme.ComposeAmethystTheme
-import dev.atsushieno.ktmidi.AndroidMidiAccess
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.init
 
@@ -24,8 +23,6 @@ class MainActivity : ComponentActivity() {
         initializeSentry()
 
         FileKit.init(this)
-
-        platformMidiAccess = AndroidMidiAccess(this)
 
         setContent {
             val darkMode = true

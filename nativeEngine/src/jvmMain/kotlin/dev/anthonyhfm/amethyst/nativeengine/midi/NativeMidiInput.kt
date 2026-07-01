@@ -27,6 +27,7 @@ class NativeMidiInput internal constructor(
     }
 
     override fun close() {
+        connection.disconnect()
         connection.close()
     }
 }
