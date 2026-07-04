@@ -20,6 +20,7 @@ windows = { version = "0.58.0", features = [
     "Devices_Midi",
     "Devices_Enumeration",
     "Foundation",
+    "Foundation_Collections",
     "Storage_Streams",
 ] }
 

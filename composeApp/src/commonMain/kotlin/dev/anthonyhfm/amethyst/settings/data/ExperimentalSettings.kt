@@ -12,4 +12,10 @@ object ExperimentalSettings : SettingsGroup("Experimental Features") {
         title = "Ableton Tutorial Detection",
         default = false,
     )
+
+    val crystalCompositions: Setting.Toggle = toggle(
+        key = "crystalCompositions",
+        title = "Crystal Compositions",
+        default = false,
+    )
 }

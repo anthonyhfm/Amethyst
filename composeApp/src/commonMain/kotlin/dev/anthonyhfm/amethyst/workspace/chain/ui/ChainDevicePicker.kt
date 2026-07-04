@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.opacity.OpacityChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
@@ -76,6 +77,8 @@ fun ChainDevicePicker(
     onPickComponent: (GenericChainDevice<*>) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val crystalCompositions by ExperimentalSettings.crystalCompositions.flow.collectAsState()
+
     NavigableChainContextMenu(
         expanded = visible,
         onDismissRequest = onDismiss
@@ -129,6 +132,9 @@ fun ChainDevicePicker(
                 "effects" -> {
                     ChainContextMenuItem("Blur", icon = Icons.TwoTone.BlurOn, onClick = { onPickComponent(BlurChainDevice()) })
                     ChainContextMenuItem("Opacity", icon = Icons.TwoTone.Opacity, onClick = { onPickComponent(OpacityChainDevice()) })
+                    if (crystalCompositions) {
+                        ChainContextMenuItem("Composition", icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
+                    }
                 }
                 "misc" -> {
                     ChainContextMenuItem("Clear", icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
