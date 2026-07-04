@@ -37,6 +37,8 @@ import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
 import dev.anthonyhfm.amethyst.desktop.utility.CenterWindowOnFirstShow
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
+import dev.anthonyhfm.amethyst.settings.AppLocaleRefreshBoundary
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
@@ -164,45 +166,51 @@ fun WorkspaceWindow(
             }
         }
 
-        AmethystTheme {
-            Column {
-                if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
-                    OSXTitleBar()
+        AppLocaleProvider {
+            AmethystTheme {
+                AppLocaleRefreshBoundary {
+                    Column {
+                        if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
+                            OSXTitleBar()
+                        }
+
+                        Workspace()
+                    }
                 }
 
-                Workspace()
-            }
-
-            // Keep the dialog in the same theme tree as the workspace so it matches the catalog styling.
-            if (showSaveDialog) {
-                SaveChangesDialog(
-                    onSave = {
-                        coroutineScope.launch {
-                            val saved = WorkspaceSaveHelper.saveWorkspace()
-                            if (saved) {
+                // Keep the dialog in the same theme tree as the workspace so it matches the catalog styling.
+                if (showSaveDialog) {
+                    AppLocaleRefreshBoundary {
+                        SaveChangesDialog(
+                            onSave = {
+                                coroutineScope.launch {
+                                    val saved = WorkspaceSaveHelper.saveWorkspace()
+                                    if (saved) {
+                                        val closeAction = pendingCloseAction
+                                        showSaveDialog = false
+                                        pendingCloseAction = null
+                                        pendingCancelAction = null
+                                        closeAction?.let(::closeWorkspace)
+                                    }
+                                }
+                            },
+                            onDontSave = {
                                 val closeAction = pendingCloseAction
                                 showSaveDialog = false
                                 pendingCloseAction = null
                                 pendingCancelAction = null
                                 closeAction?.let(::closeWorkspace)
+                            },
+                            onCancel = {
+                                val cancelAction = pendingCancelAction
+                                showSaveDialog = false
+                                pendingCloseAction = null
+                                pendingCancelAction = null
+                                cancelAction?.invoke()
                             }
-                        }
-                    },
-                    onDontSave = {
-                        val closeAction = pendingCloseAction
-                        showSaveDialog = false
-                        pendingCloseAction = null
-                        pendingCancelAction = null
-                        closeAction?.let(::closeWorkspace)
-                    },
-                    onCancel = {
-                        val cancelAction = pendingCancelAction
-                        showSaveDialog = false
-                        pendingCloseAction = null
-                        pendingCancelAction = null
-                        cancelAction?.invoke()
+                        )
                     }
-                )
+                }
             }
         }
     }

@@ -5,6 +5,15 @@ import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 
 object GeneralSettings : SettingsGroup("General") {
+    val language: Setting.Select<LanguageOption> = select(
+        key = "language",
+        title = "Language",
+        default = LanguageOptions.English,
+        options = LanguageOptions.all,
+        codec = LanguageOptionCodec,
+        label = { it.displayName },
+    )
+
     val performanceFPS: Setting.Select<Int> = select(
         key = "framesPerSecond",
         title = "Refresh rate",

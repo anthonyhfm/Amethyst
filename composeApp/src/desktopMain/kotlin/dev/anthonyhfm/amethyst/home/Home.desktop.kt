@@ -43,6 +43,7 @@ import dev.anthonyhfm.amethyst.home.ui.views.UpdateView
 import io.github.kdroidfilter.nucleus.updater.UpdateResult
 import androidx.compose.runtime.LaunchedEffect
 import dev.anthonyhfm.amethyst.home.ui.components.WidescreenNavBar
+import dev.anthonyhfm.amethyst.settings.AppLocaleRefreshBoundary
 import dev.anthonyhfm.amethyst.ui.components.primitives.SidebarProvider
 import dev.anthonyhfm.amethyst.ui.components.primitives.rememberSidebarState
 
@@ -81,7 +82,9 @@ actual fun Home(
             state = sidebarState,
             modifier = Modifier.fillMaxSize(),
         ) {
-            WidescreenNavBar(navigator)
+            AppLocaleRefreshBoundary {
+                WidescreenNavBar(navigator)
+            }
 
             Box(
                 modifier = Modifier
@@ -95,28 +98,38 @@ actual fun Home(
                     exitTransition = { ExitTransition.None },
                 ) {
                     composable<HomeNavRoute.Recent> {
-                        RecentView(
-                            navigator = navigator,
-                            onOpenWorkspace = {
-                                onOpenWorkspace()
-                            },
-                        )
+                        AppLocaleRefreshBoundary {
+                            RecentView(
+                                navigator = navigator,
+                                onOpenWorkspace = {
+                                    onOpenWorkspace()
+                                },
+                            )
+                        }
                     }
 
                     composable<HomeNavRoute.Browser> {
-                        BrowserView()
+                        AppLocaleRefreshBoundary {
+                            BrowserView()
+                        }
                     }
 
                     composable<HomeNavRoute.Settings> {
-                        SettingsView()
+                        AppLocaleRefreshBoundary {
+                            SettingsView()
+                        }
                     }
 
                     composable<HomeNavRoute.Tutorials> {
-                        TutorialsView()
+                        AppLocaleRefreshBoundary {
+                            TutorialsView()
+                        }
                     }
 
                     composable<HomeNavRoute.About> {
-                        AboutView()
+                        AppLocaleRefreshBoundary {
+                            AboutView()
+                        }
                     }
 
                     dialog<HomeNavRoute.ProjectCreation>(

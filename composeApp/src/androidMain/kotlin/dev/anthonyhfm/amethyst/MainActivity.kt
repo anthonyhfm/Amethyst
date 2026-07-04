@@ -11,6 +11,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import dev.anthonyhfm.amethyst.core.midi.platformMidiAccess
+import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
 import dev.anthonyhfm.amethyst.ui.theme.ComposeAmethystTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.init
@@ -35,7 +36,9 @@ class MainActivity : ComponentActivity() {
             ComposeAmethystTheme(
                 darkMode = darkMode,
             ) {
-                App()
+                AppLocaleProvider {
+                    App()
+                }
             }
         }
     }

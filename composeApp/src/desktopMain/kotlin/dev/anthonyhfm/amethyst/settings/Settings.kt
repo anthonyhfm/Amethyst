@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.settings
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.home_settings_title
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyH2
 import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyLead
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun Settings(
@@ -103,7 +106,7 @@ private fun SettingsHeader(
         Column(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            TypographyH2("Settings")
+            TypographyH2(stringResource(Res.string.home_settings_title))
             TypographyLead("Tune performance, audio, integrations, and experimental features for your setup.")
         }
     }

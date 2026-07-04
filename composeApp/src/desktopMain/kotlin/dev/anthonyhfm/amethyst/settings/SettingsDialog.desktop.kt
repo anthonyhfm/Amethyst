@@ -43,8 +43,12 @@ fun showSettingsWindow() {
         }
     })
     dialog.setContent {
-        DesktopUtilityWindowScaffold {
-            Settings()
+        AppLocaleProvider {
+            DesktopUtilityWindowScaffold {
+                AppLocaleRefreshBoundary {
+                    Settings()
+                }
+            }
         }
     }
 
@@ -85,8 +89,12 @@ actual fun SettingsDialog(visible: Boolean, onDismiss: () -> Unit) {
 
         applyMacUtilityWindowChrome(window.rootPane)
 
-        DesktopUtilityWindowScaffold {
-            Settings()
+        AppLocaleProvider {
+            DesktopUtilityWindowScaffold {
+                AppLocaleRefreshBoundary {
+                    Settings()
+                }
+            }
         }
     }
 }

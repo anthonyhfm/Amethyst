@@ -27,6 +27,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import dev.anthonyhfm.amethyst.home.HomeCommandSurface
+import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
 import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import org.jetbrains.compose.resources.painterResource
 import javax.swing.UIManager
@@ -87,18 +88,20 @@ fun StartWindow(
             window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
         }
 
-        AmethystTheme {
-            Column {
-                if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
-                    OSXTitleBar()
-                }
-
-                Home(
-                    onOpenWorkspace = {
-                        println("[StartWindow ${System.currentTimeMillis()}] onOpenWorkspace -> onOpenEditor")
-                        onOpenEditor()
+        AppLocaleProvider {
+            AmethystTheme {
+                Column {
+                    if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
+                        OSXTitleBar()
                     }
-                )
+
+                    Home(
+                        onOpenWorkspace = {
+                            println("[StartWindow ${System.currentTimeMillis()}] onOpenWorkspace -> onOpenEditor")
+                            onOpenEditor()
+                        }
+                    )
+                }
             }
         }
     }
