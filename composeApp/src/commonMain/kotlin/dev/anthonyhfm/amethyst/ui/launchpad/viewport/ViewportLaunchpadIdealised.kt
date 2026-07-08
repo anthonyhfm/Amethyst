@@ -34,6 +34,8 @@ import kotlin.math.floor
 import org.jetbrains.compose.resources.InternalResourceApi
 import kotlin.math.pow
 
+import dev.anthonyhfm.amethyst.ui.launchpad.LaunchpadGraphicsRepository
+
 class ViewportLaunchpadIdealised(
     override var shape: Shape = RoundedCornerShape(1),
     override var size: Size = Size(10f, 10f),
@@ -48,27 +50,13 @@ class ViewportLaunchpadIdealised(
     override fun Content() {
         val previewGrid by previewState.grid
         val density = LocalDensity.current
-        val useSimplified: Boolean by GeneralSettings.simplifiedGraphics.flow.collectAsState()
+        val graphicsState by LaunchpadGraphicsRepository.graphicsState.collectAsState()
+        val idealisedGraphics = graphicsState.idealised
 
-        var buttonsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
-        var deviceBitmap: ImageBitmap? by remember { mutableStateOf(null) }
-        var ledspotsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
-
-        LaunchedEffect(useSimplified) {
-            val suffix = if (useSimplified) "anth" else "ml"
-
-            try {
-                buttonsBitmap = Res.readBytes("files/launchpad/Idealised/Idealised_Buttons_Layer_$suffix.png").decodeToImageBitmap()
-                deviceBitmap = Res.readBytes("files/launchpad/Idealised/Idealised_Device_Layer_$suffix.png").decodeToImageBitmap()
-                ledspotsBitmap = Res.readBytes("files/launchpad/Idealised/Idealised_Spots_Layer_$suffix.png").decodeToImageBitmap()
-            } catch (ex: Exception) { // open source fallback
-                buttonsBitmap = Res.readBytes("files/launchpad/Idealised/Idealised_Buttons_Layer_anth.png").decodeToImageBitmap()
-                deviceBitmap = Res.readBytes("files/launchpad/Idealised/Idealised_Device_Layer_anth.png").decodeToImageBitmap()
-                ledspotsBitmap = Res.readBytes("files/launchpad/Idealised/Idealised_Spots_Layer_anth.png").decodeToImageBitmap()
-            }
-        }
-
-        if (buttonsBitmap != null && deviceBitmap != null && ledspotsBitmap != null) {
+        if (idealisedGraphics != null) {
+            val buttonsBitmap = idealisedGraphics.buttons
+            val deviceBitmap = idealisedGraphics.device
+            val ledspotsBitmap = idealisedGraphics.ledspots
             Box(
                 modifier = Modifier
                     .requiredSize(width = size.width.dp * 40, height = size.height.dp * 40)

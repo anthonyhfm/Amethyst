@@ -65,6 +65,7 @@ import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData.SavableViewportLaunchpad.MidiFighter64.MidiFighter64Style
+import dev.anthonyhfm.amethyst.ui.launchpad.LaunchpadGraphicsRepository
 
 class ViewportMidiFighter64(
     override var shape: Shape = RoundedCornerShape(4),
@@ -160,22 +161,11 @@ class ViewportMidiFighter64(
     override fun Content() {
         val previewGrid by previewState.grid
         val density = LocalDensity.current
-        val useSimplified: Boolean by GeneralSettings.simplifiedGraphics.flow.collectAsState()
+        val graphicsState by LaunchpadGraphicsRepository.graphicsState.collectAsState()
+        val mfGraphics = graphicsState.midiFighter
 
-        var deviceBitmap: ImageBitmap? by remember { mutableStateOf(null) }
-
-        LaunchedEffect(style, useSimplified) {
-            val style: String = if (style == MidiFighter64Style.White) "White" else "Black"
-            val suffix = if (useSimplified) "anth" else "ml"
-
-            try {
-                deviceBitmap = Res.readBytes( "files/launchpad/MF64/MIDI_Fighter_64_${style}_$suffix.png").decodeToImageBitmap()
-            } catch (ex: Exception) {
-                deviceBitmap = Res.readBytes( "files/launchpad/MF64/MIDI_Fighter_64_${style}_anth.png").decodeToImageBitmap()
-            }
-        }
-
-        if (deviceBitmap != null) {
+        if (mfGraphics != null) {
+            val deviceBitmap = if (style == MidiFighter64Style.White) mfGraphics.whiteDevice else mfGraphics.blackDevice
             Box(
                 modifier = Modifier
                     .requiredSize(width = size.width.dp * 40, height = size.height.dp * 40)

@@ -48,6 +48,8 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.readResourceBytes
 import kotlin.math.pow
 
+import dev.anthonyhfm.amethyst.ui.launchpad.LaunchpadGraphicsRepository
+
 class ViewportLaunchpadPro(
     override var shape: Shape = RoundedCornerShape(1),
     override var size: Size = Size(10f, 10f),
@@ -63,27 +65,13 @@ class ViewportLaunchpadPro(
         val previewGrid by previewState.grid
         val density = LocalDensity.current
 
-        val useSimplified: Boolean by GeneralSettings.simplifiedGraphics.flow.collectAsState()
+        val graphicsState by LaunchpadGraphicsRepository.graphicsState.collectAsState()
+        val lppGraphics = graphicsState.lpp
 
-        var buttonsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
-        var deviceBitmap: ImageBitmap? by remember { mutableStateOf(null) }
-        var ledspotsBitmap: ImageBitmap? by remember { mutableStateOf(null) }
-
-        LaunchedEffect(useSimplified) {
-            val suffix = if (useSimplified) "anth" else "ml"
-
-            try {
-                buttonsBitmap = Res.readBytes("files/launchpad/LPP/LPP_Buttons_Layer_$suffix.png").decodeToImageBitmap()
-                deviceBitmap = Res.readBytes("files/launchpad/LPP/LPP_Device_Layer_$suffix.png").decodeToImageBitmap()
-                ledspotsBitmap = Res.readBytes("files/launchpad/LPP/LPP_LED_Spots_$suffix.png").decodeToImageBitmap()
-            } catch (ex: Exception) { // open source fallback
-                buttonsBitmap = Res.readBytes("files/launchpad/LPP/LPP_Buttons_Layer_anth.png").decodeToImageBitmap()
-                deviceBitmap = Res.readBytes("files/launchpad/LPP/LPP_Device_Layer_anth.png").decodeToImageBitmap()
-                ledspotsBitmap = Res.readBytes("files/launchpad/LPP/LPP_LED_Spots_anth.png").decodeToImageBitmap()
-            }
-        }
-
-        if (buttonsBitmap != null && deviceBitmap != null && ledspotsBitmap != null) {
+        if (lppGraphics != null) {
+            val buttonsBitmap = lppGraphics.buttons
+            val deviceBitmap = lppGraphics.device
+            val ledspotsBitmap = lppGraphics.ledspots
             Box(
                 modifier = Modifier
                     .requiredSize(width = size.width.dp * 40, height = size.height.dp * 40)
