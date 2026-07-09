@@ -27,7 +27,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
@@ -47,16 +46,13 @@ fun GradientEditorBar(
     selectedColor: String?,
     onSelectionChange: (String?) -> Unit,
     colors: List<GradientChainDeviceState.GradientColor>,
-    onGradientDataEmit: (List<GradientChainDeviceState.GradientColor>) -> Unit,
+    onGradientPointMoved: (selectionUUID: String, position: Float, rawPosition: Float) -> Unit,
     onAddGradientPoint: (position: Float) -> Unit,
     onGradientDragStart: () -> Unit,
     onGradientDragFinish: () -> Unit,
     onSmoothnessChange: (String, GradientSmoothness) -> Unit,
     gradientSteps: Int?,
 ) {
-    val density = LocalDensity.current
-
-    // Positions getrennt von Device-State für flüssiges Dragging
     val positionStates = remember(colors.map { it.selectionUUID }) {
         colors.associate { it.selectionUUID to mutableStateOf(it.position) }
     }
@@ -229,47 +225,12 @@ fun GradientEditorBar(
                                                 accumulatedDrag
                                             }
                                             pos = snappedPos
+                                            onGradientPointMoved(color.selectionUUID, snappedPos, accumulatedDrag)
                                         },
                                         onDragEnd = {
-                                            val committed = colors.map { c ->
-                                                val p = positionStates[c.selectionUUID]?.value ?: c.position
-                                                val rp = if (c.selectionUUID == color.selectionUUID) {
-                                                    accumulatedDrag
-                                                } else {
-                                                    c.rawPosition ?: c.position
-                                                }
-                                                GradientChainDeviceState.GradientColor(
-                                                    position = p,
-                                                    rawPosition = rp,
-                                                    r = c.r,
-                                                    g = c.g,
-                                                    b = c.b,
-                                                    smoothness = c.smoothness,
-                                                    selectionUUID = c.selectionUUID
-                                                )
-                                            }
-                                            onGradientDataEmit(committed)
                                             onGradientDragFinish()
                                         },
                                         onDragCancel = {
-                                            val committed = colors.map { c ->
-                                                val p = positionStates[c.selectionUUID]?.value ?: c.position
-                                                val rp = if (c.selectionUUID == color.selectionUUID) {
-                                                    accumulatedDrag
-                                                } else {
-                                                    c.rawPosition ?: c.position
-                                                }
-                                                GradientChainDeviceState.GradientColor(
-                                                    position = p,
-                                                    rawPosition = rp,
-                                                    r = c.r,
-                                                    g = c.g,
-                                                    b = c.b,
-                                                    smoothness = c.smoothness,
-                                                    selectionUUID = c.selectionUUID
-                                                )
-                                            }
-                                            onGradientDataEmit(committed)
                                             onGradientDragFinish()
                                         }
                                     )

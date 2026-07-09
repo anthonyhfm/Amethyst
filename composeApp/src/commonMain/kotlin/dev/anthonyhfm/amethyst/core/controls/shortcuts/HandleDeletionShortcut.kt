@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import kotlinx.coroutines.flow.update
@@ -108,14 +109,37 @@ fun handleDeletionShortcut(): Boolean {
         }
 
         selections.any { it is Selectable.GradientStep } -> {
-            selections.filterIsInstance<Selectable.GradientStep>().forEach { step ->
-                if (step.parent.state.value.gradientData.size - 1 < 1) return@forEach
+            val gradientSteps = selections.filterIsInstance<Selectable.GradientStep>()
 
-                step.parent.state.update {
-                    it.copy(
-                        gradientData = it.gradientData.toMutableList().apply {
-                            removeAll { it.selectionUUID == step.selectionUUID }
-                        }
+            gradientSteps.groupBy { it.parent.selectionUUID }.forEach { (_, steps) ->
+                val parent = steps.first().parent
+                val idsToRemove = steps.map { it.selectionUUID }.toSet()
+                val before = parent.state.value
+                val remaining = before.gradientData.filterNot { it.selectionUUID in idsToRemove }
+                if (remaining.size < 2 || remaining.size == before.gradientData.size) return@forEach
+
+                val after = before.copy(gradientData = remaining)
+                parent.state.value = after
+                UndoManager.addAction(
+                    UndoableAction.ChangeDeviceState(
+                        device = parent,
+                        beforeState = before,
+                        afterState = after
+                    )
+                )
+                ChainSyncCoordinator.onDeviceStateChanged(parent, after)
+
+                val firstRemovedIndex = before.gradientData.indexOfFirst { it.selectionUUID in idsToRemove }
+                val nextSelectionIndex = when {
+                    after.gradientData.isEmpty() -> -1
+                    firstRemovedIndex >= after.gradientData.size -> after.gradientData.lastIndex
+                    else -> firstRemovedIndex
+                }
+
+                if (nextSelectionIndex >= 0) {
+                    SelectionManager.select(
+                        Selectable.GradientStep(parent, nextSelectionIndex),
+                        single = true
                     )
                 }
             }
