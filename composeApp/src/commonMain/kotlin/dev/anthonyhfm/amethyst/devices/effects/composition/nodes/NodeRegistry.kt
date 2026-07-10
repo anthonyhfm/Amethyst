@@ -1,0 +1,30 @@
+package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
+
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
+
+object NodeRegistry {
+    private val definitionsByType = mutableMapOf<String, CompositionNodeDefinition>()
+    val definitions: List<CompositionNodeDefinition> get() = definitionsByType.values.toList()
+
+    init {
+        register(ScannerNode)
+        register(RotateNode)
+        register(MirrorNode)
+        register(SymmetryNode)
+        register(OutputNode)
+    }
+
+    fun register(definition: CompositionNodeDefinition) {
+        definitionsByType[definition.type] = definition
+    }
+
+    fun definitionFor(type: String): CompositionNodeDefinition? = definitionsByType[type]
+
+    fun definitionFor(node: CompositionNode): CompositionNodeDefinition? =
+        definitionFor(node.type)?.takeIf { it.acceptsState(node.state) }
+
+    fun labelFor(type: String): String = definitionFor(type)?.label ?: type
+
+    fun defaultStateFor(type: String): CompositionNodeState =
+        definitionFor(type)?.defaultState() ?: OutputNodeState
+}

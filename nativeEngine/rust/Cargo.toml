@@ -22,6 +22,7 @@ windows = { version = "0.58.0", features = [
     "Foundation",
     "Foundation_Collections",
     "Storage_Streams",
+    "Win32_System_Com",
 ] }
 
 [lib]
