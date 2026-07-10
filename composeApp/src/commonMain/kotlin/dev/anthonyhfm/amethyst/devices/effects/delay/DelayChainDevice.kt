@@ -16,7 +16,8 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
@@ -53,7 +54,7 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
                 }
 
                 TimeDial(
-                    headline = "Delay",
+                    title = "Delay",
                     timing = deviceState.timing,
                     onSelectTiming = { timing, msValue ->
                         state.update {
@@ -78,8 +79,9 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
                 )
 
                 var beforeGateDrag = deviceState.copy().gate
-                TextDial(
-                    headline = "Gate",
+                Dial(
+                    type = DialType.Continuous,
+                    title = "Gate",
                     text = "${(deviceState.gate * 200).roundToInt()}%",
                     value = deviceState.gate,
                     onStartValueChange = {

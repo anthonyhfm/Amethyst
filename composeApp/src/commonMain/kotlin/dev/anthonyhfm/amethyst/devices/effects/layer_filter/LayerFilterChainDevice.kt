@@ -21,7 +21,8 @@ import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -59,10 +60,10 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    StepTextDial(
-                        headline = "Target",
+                    Dial(
+                        title = "Target",
                         value = deviceState.layer,
-                        steps = IntArray(41) { -20 + it }.toList(),
+                        type = DialType.Steps(IntArray(41) { -20 + it }.toList()),
                         text = "${deviceState.layer}",
                         onResolveTextValue = {
                             val layerText = it.trim().toIntOrNull()
@@ -95,10 +96,10 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
                         Separator(orientation = SeparatorOrientation.Vertical)
                     }
 
-                    StepTextDial(
-                        headline = "Range",
+                    Dial(
+                        title = "Range",
                         value = deviceState.range,
-                        steps = IntArray(21) { it }.toList(),
+                        type = DialType.Steps(IntArray(21) { it }.toList()),
                         text = "${deviceState.range}",
                         onResolveTextValue = {
                             val rangeText = it.trim().toIntOrNull()

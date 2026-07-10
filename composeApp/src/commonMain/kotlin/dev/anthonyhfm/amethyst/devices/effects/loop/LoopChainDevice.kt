@@ -30,8 +30,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -70,20 +70,20 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxSize()
             ) {
-                Column (
+                Column(
                     modifier = Modifier
                         .fillMaxHeight().padding(start = 8.dp, top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp, alignment = Alignment.CenterVertically),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Column (
+                    Column(
                         Modifier.offset(x = 2.dp)
-                    ){
+                    ) {
                         var beforeRepeat = deviceState.repeat
-                        StepTextDial(
-                            headline = "Repeat",
+                        Dial(
+                            title = "Repeat",
                             text = if (deviceState.onHold) "Unused" else "${deviceState.repeat}",
-                            steps = IntArray(128) { it + 1 }.toList(),
+                            type = DialType.Steps(IntArray(128) { it + 1 }.toList()),
                             value = deviceState.repeat,
                             onStartValueChange = { v ->
                                 beforeRepeat = v
@@ -118,9 +118,9 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                         )
                     }
 
-                    Column (
+                    Column(
                         horizontalAlignment = Alignment.Start,
-                    ){
+                    ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -153,9 +153,10 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
-                    var beforeTiming: Pair<Timing, Long> = Pair(deviceState.timing, deviceState.timing.toMsValue(WorkspaceRepository.bpm.value))
+                    var beforeTiming: Pair<Timing, Long> =
+                        Pair(deviceState.timing, deviceState.timing.toMsValue(WorkspaceRepository.bpm.value))
                     TimeDial(
-                        headline = "Delay",
+                        title = "Delay",
                         timing = deviceState.timing,
                         onStartValueChange = { t, ms ->
                             beforeTiming = Pair(t, ms)
@@ -176,8 +177,9 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     )
 
                     var beforeGate = deviceState.gate
-                    TextDial(
-                        headline = "Gate",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Gate",
                         text = "${(deviceState.gate * 200).roundToInt()}%",
                         value = deviceState.gate,
                         onStartValueChange = { v ->
@@ -243,8 +245,8 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
 
                 Heaven.cancelJobs { job ->
                     job.owner is Pair<*, *> &&
-                    job.owner.first == this &&
-                    job.owner.second == ownerKey
+                            job.owner.first == this &&
+                            job.owner.second == ownerKey
                 }
 
                 if (!state.value.onHold) {
@@ -288,7 +290,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
             } else { // key up
                 val signalOwner = Pair(this, "${coords.first},${coords.second}")
                 val ownerKey = signalOwner.second as String
-                
+
                 if (!state.value.onHold) {
                     val intervalMs = loopIntervalMs(bpm)
                     for (i in 0..state.value.repeat - 1) {
@@ -317,8 +319,8 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                 // Cancel any ongoing loops for this key
                 Heaven.cancelJobs { job ->
                     job.owner is Pair<*, *> &&
-                    job.owner.first == this &&
-                    job.owner.second == ownerKey
+                            job.owner.first == this &&
+                            job.owner.second == ownerKey
                 }
             }
         }
@@ -345,7 +347,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
             }
 
             signalExit?.invoke(listOf(signal))
-            
+
             val offSignal = when (signal) {
                 is Signal.LED -> signal.copy(color = Color.Black)
                 is Signal.Midi -> signal.copy(velocity = 0)

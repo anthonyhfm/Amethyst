@@ -19,7 +19,7 @@ data class ScannerNodeState(
 @Serializable
 @SerialName("rotate")
 data class RotateNodeState(
-    val angleDegrees: Float = 90f,
+    val angleDegrees: Float = 0f,
 ) : CompositionNodeState
 
 @Serializable

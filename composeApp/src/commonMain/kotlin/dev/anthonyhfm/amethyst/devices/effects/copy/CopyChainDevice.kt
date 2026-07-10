@@ -54,7 +54,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -506,7 +507,8 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                         .padding(horizontal = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    TextDial(
+                    Dial(
+                        type = DialType.Continuous,
                         text = "${offset.angle}°",
                         value = offset.angle.toFloat() / 360f,
                         onValueChange = { value ->
@@ -558,7 +560,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         if (state.isolate != CopyChainDeviceState.IsolationType.NONE) {
             Heaven.cancelJobsForOwner(this)
         }
-        
+
         when (state.mode) {
             CopyChainDeviceState.CopyMode.STATIC -> {
                 state.offsets.forEach { offset ->
@@ -615,7 +617,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     private fun startPlayback(triggerSignals: List<Signal.LED>, animation: List<Pair<Int, List<Signal.LED>>>) {
         val state = state.value
         val identifier = if (triggerSignals.size == 1) triggerSignals[0].x * 10 + triggerSignals[0].y else null
-        
+
         animation.forEachIndexed { index, (time, signals) ->
             Heaven.schedule(time.toDouble(), owner = this, identifier = identifier) {
                 if (state.infinite && index == animation.lastIndex && triggerSignals.any { it.color == Color.Black }) {
@@ -655,7 +657,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                     if (frame.isNotEmpty()) {
                         signalExit?.invoke(frame)
                     }
-                    
+
                     playStep(loopOffset + stepDelayMs)
                 }
             }
@@ -674,7 +676,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         val state = state.value
         val stepDelayMs = (state.timing.toMsValue(WorkspaceRepository.bpm.value) * (state.gate * 2)).toInt()
         val offsets = if (state.reverse) state.offsets.reversed() else state.offsets
-        
+
         val raw = buildList {
             if (state.reverse) {
                 // Reverse: Offsets reversed, but we also need to include the "0,0" (origin) relative to the LAST offset?
@@ -714,7 +716,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         ).mapIndexed { index, signals ->
             index * stepDelayMs to signals
         }
-        
+
         return applyPinchToAnimation(raw)
     }
 
@@ -727,7 +729,12 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         if (totalDuration > 0 && (pinch != 0f || bilateral)) {
             val totalD = totalDuration.toDouble()
             return raw.map { (time, signals) ->
-                val mapped = dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher.applyPinch(time.toDouble(), totalD, pinch, bilateral).toInt()
+                val mapped = dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher.applyPinch(
+                    time.toDouble(),
+                    totalD,
+                    pinch,
+                    bilateral
+                ).toInt()
                 mapped to signals
             }.groupBy { it.first }
                 .map { (time, frames) -> time to frames.flatMap { it.second } }
@@ -740,7 +747,6 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         Heaven.cancelJobsForOwner(this)
         heldSignals.clear()
     }
-
 
 
     companion object : ChainDeviceFactory<CopyChainDeviceState> {

@@ -15,7 +15,8 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -42,8 +43,9 @@ class OpacityChainDevice : LEDChainDevice<OpacityChainDeviceState>() {
         ) {
             var beforeState = deviceState.copy()
 
-            TextDial(
-                headline = "Opacity",
+            Dial(
+                type = DialType.Continuous,
+                title = "Opacity",
                 text = "${(deviceState.opacity * 100).roundToInt()}%",
                 value = deviceState.opacity,
                 modifier = Modifier

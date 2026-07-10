@@ -49,13 +49,10 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
-import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollBarOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
-import dev.anthonyhfm.amethyst.ui.theme.chainBorder
-import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
-import dev.anthonyhfm.amethyst.ui.theme.chainSurface
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.cardForeground
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primary
@@ -215,10 +212,10 @@ fun MacroList(
         macros.forEachIndexed { index, macro ->
             ContextMenu(
                 trigger = {
-                    StepTextDial(
-                        headline = "Macro ${index + 1}",
+                    Dial(
+                        title = "Macro ${index + 1}",
                         text = macro.value.toString(),
-                        steps = IntArray(128) { it }.toList(),
+                        type = DialType.Steps(IntArray(128) { it }.toList()),
                         value = macro.value,
                         containerColor = Theme[colors][secondary],
                         dialColor = Theme[colors][primary],

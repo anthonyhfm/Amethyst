@@ -23,7 +23,8 @@ import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
@@ -64,10 +65,10 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                 if (macros.isNotEmpty()) {
                     if (macros.size > 1) {
                         var beforeMacro = deviceState.copy().macro
-                        StepTextDial(
-                            headline = "Macro",
+                        Dial(
+                            title = "Macro",
                             value = deviceState.macro,
-                            steps = IntArray(macros.size) { it }.toList(),
+                            type = DialType.Steps(IntArray(macros.size) { it }.toList()),
                             text = "${deviceState.macro + 1}",
                             onResolveTextValue = {
                                 val macroText = it.trim().toIntOrNull()
@@ -111,10 +112,10 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                     }
 
                     var beforeValue = deviceState.copy().value
-                    StepTextDial(
-                        headline = "Value",
+                    Dial(
+                        title = "Value",
                         value = deviceState.value,
-                        steps = IntArray(128) { it }.toList(),
+                        type = DialType.Steps(IntArray(128) { it }.toList()),
                         text = deviceState.value.toString(),
                         onResolveTextValue = {
                             val valueText = it.trim().toIntOrNull()

@@ -29,8 +29,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
@@ -80,10 +80,10 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 ) {
-                    StepTextDial(
-                        headline = "Radius",
+                    Dial(
+                        title = "Radius",
                         value = deviceState.radius,
-                        steps = IntArray(8) { it + 1 }.toList(),
+                        type = DialType.Steps(IntArray(8) { it + 1 }.toList()),
                         text = "${deviceState.radius}",
                         onResolveTextValue = {
                             it.trim().toIntOrNull()?.coerceIn(1, 8)?.let { v ->
@@ -99,8 +99,9 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
                         Separator(orientation = SeparatorOrientation.Vertical)
                     }
 
-                    TextDial(
-                        headline = "Amount",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Amount",
                         text = "${(deviceState.amount * 100).roundToInt()}%",
                         value = deviceState.amount,
                         onStartValueChange = { beforeState = state.value.copy() },

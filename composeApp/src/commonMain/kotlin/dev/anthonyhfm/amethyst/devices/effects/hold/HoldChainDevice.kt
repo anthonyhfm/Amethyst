@@ -22,7 +22,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
 import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
@@ -59,10 +60,10 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                 .width(160.dp),
             titleBarModifier = LocalTitleBarModifier.current
         ) {
-            Column (
+            Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
-            ){
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -79,7 +80,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                         }
 
                         TimeDial(
-                            headline = "Hold",
+                            title = "Hold",
                             text = if (deviceState.mode == HoldMode.Infinite) "Infinite" else null,
                             timing = deviceState.timing,
                             onStartValueChange = { t, ms ->
@@ -106,8 +107,9 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                         )
 
                         var beforeGate = deviceState.copy().gate
-                        TextDial(
-                            headline = "Gate",
+                        Dial(
+                            type = DialType.Continuous,
+                            title = "Gate",
                             text = if (deviceState.mode != HoldMode.Infinite) "${(deviceState.gate * 200).toInt()}%" else "Disabled",
                             value = deviceState.gate,
                             onStartValueChange = {
@@ -239,25 +241,25 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
     }
 
     override fun signalEnter(n: List<Signal>) {
-         val bpm = WorkspaceRepository.bpm.value
+        val bpm = WorkspaceRepository.bpm.value
 
-         n.forEach { signal ->
-             val down: Boolean = when (signal) {
-                 is Signal.LED -> signal.color != Color.Black
-                 is Signal.Midi -> signal.velocity != 0
-                 else -> false
-             }
+        n.forEach { signal ->
+            val down: Boolean = when (signal) {
+                is Signal.LED -> signal.color != Color.Black
+                is Signal.Midi -> signal.velocity != 0
+                else -> false
+            }
 
-             val signalX = when (signal) {
-                 is Signal.LED -> signal.x
-                 is Signal.Midi -> signal.x
-                 else -> null
-             }
-             val signalY = when (signal) {
-                 is Signal.LED -> signal.y
-                 is Signal.Midi -> signal.y
-                 else -> null
-             }
+            val signalX = when (signal) {
+                is Signal.LED -> signal.x
+                is Signal.Midi -> signal.x
+                else -> null
+            }
+            val signalY = when (signal) {
+                is Signal.LED -> signal.y
+                is Signal.Midi -> signal.y
+                else -> null
+            }
 
             val signalOwner: Any = if (signalX != null && signalY != null) {
                 Pair(this, "${signalX},${signalY}")
@@ -286,44 +288,44 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                         signalExit?.invoke(listOf(signal.copy(velocity = 0)))
                     }
                 }
-             }
+            }
 
-             if (down) {
-                 isDown.add(signalOwner)
-                 if (state.value.onRelease) {
-                     return@forEach
-                 }
+            if (down) {
+                isDown.add(signalOwner)
+                if (state.value.onRelease) {
+                    return@forEach
+                }
 
                 signalExit?.invoke(listOf(signal))
 
                 if (state.value.mode == HoldMode.Infinite) {
-                     return@forEach
-                 }
+                    return@forEach
+                }
 
                 updateSchedule()
-             } else {
-                 isDown.remove(signalOwner)
-                 if (!state.value.onRelease) {
-                     if (state.value.mode == HoldMode.Minimum) {
-                         // In minimum mode, if the key is released, we might need to release the signal
-                         // if the minimum duration has already passed.
-                         // But the current implementation uses Heaven.schedule which will handle the release.
-                         // If the key is released BEFORE baseDelayMs, the scheduled job will handle it.
-                         // If the key is released AFTER baseDelayMs, the job already fired and released it.
-                         // Wait, if it's Minimum mode and key is released after baseDelayMs, 
-                         // we should release it immediately.
-                         
-                         val isScheduled = activeJobOwners.contains(signalOwner)
-                         if (!isScheduled) {
-                             if (signal is Signal.LED) {
-                                 signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
-                             } else if (signal is Signal.Midi) {
-                                 signalExit?.invoke(listOf(signal.copy(velocity = 0)))
-                             }
-                         }
-                     }
-                     return@forEach
-                 }
+            } else {
+                isDown.remove(signalOwner)
+                if (!state.value.onRelease) {
+                    if (state.value.mode == HoldMode.Minimum) {
+                        // In minimum mode, if the key is released, we might need to release the signal
+                        // if the minimum duration has already passed.
+                        // But the current implementation uses Heaven.schedule which will handle the release.
+                        // If the key is released BEFORE baseDelayMs, the scheduled job will handle it.
+                        // If the key is released AFTER baseDelayMs, the job already fired and released it.
+                        // Wait, if it's Minimum mode and key is released after baseDelayMs,
+                        // we should release it immediately.
+
+                        val isScheduled = activeJobOwners.contains(signalOwner)
+                        if (!isScheduled) {
+                            if (signal is Signal.LED) {
+                                signalExit?.invoke(listOf(signal.copy(color = Color.Black)))
+                            } else if (signal is Signal.Midi) {
+                                signalExit?.invoke(listOf(signal.copy(velocity = 0)))
+                            }
+                        }
+                    }
+                    return@forEach
+                }
 
                 Heaven.schedule(0.0) {
                     if (signal is Signal.LED) {
@@ -334,13 +336,13 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                 }
 
                 if (state.value.mode == HoldMode.Infinite) {
-                     return@forEach
-                 }
+                    return@forEach
+                }
 
                 updateSchedule()
-             }
-         }
-     }
+            }
+        }
+    }
 
     override fun onChoke() {
         // Cancel all scheduled Heaven tasks owned by this device

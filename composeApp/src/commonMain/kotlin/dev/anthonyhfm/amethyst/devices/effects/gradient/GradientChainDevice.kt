@@ -49,8 +49,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
@@ -204,7 +204,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             val eps = 0.0005f
             if (kotlin.math.abs(current.red - grad.r) > eps ||
                 kotlin.math.abs(current.green - grad.g) > eps ||
-                kotlin.math.abs(current.blue - grad.b) > eps) {
+                kotlin.math.abs(current.blue - grad.b) > eps
+            ) {
                 cp.setColor(Color(grad.r, grad.g, grad.b))
             }
         }
@@ -216,7 +217,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             val eps = 0.0005f
             if (kotlin.math.abs(newColor.red - grad.r) < eps &&
                 kotlin.math.abs(newColor.green - grad.g) < eps &&
-                kotlin.math.abs(newColor.blue - grad.b) < eps) {
+                kotlin.math.abs(newColor.blue - grad.b) < eps
+            ) {
                 return@LaunchedEffect
             }
             // Nur State aktualisieren ohne Undo während der Interaktion
@@ -298,9 +300,10 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
 
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        var beforeTiming: Pair<Timing, Long> = Pair(deviceState.timing, deviceState.timing.toMsValue(WorkspaceRepository.bpm.value))
+                        var beforeTiming: Pair<Timing, Long> =
+                            Pair(deviceState.timing, deviceState.timing.toMsValue(WorkspaceRepository.bpm.value))
                         TimeDial(
-                            headline = "Duration",
+                            title = "Duration",
                             timing = deviceState.timing,
                             onStartValueChange = { t, ms ->
                                 beforeTiming = Pair(t, ms)
@@ -315,15 +318,20 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                             },
                             onFinishValueChange = { t, ms ->
                                 pushStateChange(
-                                    before = state.value.copy(timing = beforeTiming.first, durationMs = beforeTiming.first.toMsValue(WorkspaceRepository.bpm.value).toDouble()),
+                                    before = state.value.copy(
+                                        timing = beforeTiming.first,
+                                        durationMs = beforeTiming.first.toMsValue(WorkspaceRepository.bpm.value)
+                                            .toDouble()
+                                    ),
                                     after = state.value.copy(timing = t, durationMs = ms.toDouble())
                                 )
                             }
                         )
 
                         var beforeGate = deviceState.gate
-                        TextDial(
-                            headline = "Gate",
+                        Dial(
+                            type = DialType.Continuous,
+                            title = "Gate",
                             text = "${(deviceState.gate * 200).roundToInt()}%",
                             value = deviceState.gate,
                             onStartValueChange = { v ->
@@ -367,59 +375,60 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                             null -> "INF"
                             in 2..16 -> deviceState.gradientSteps.toString()
                             else -> "INF"
-                         }
+                        }
                         var beforeState = state.value
-                        StepTextDial(
-                            headline = "Steps",
+                        Dial(
+                            title = "Steps",
                             value = deviceState.gradientSteps,
-                            steps = gradientStepsList,
+                            type = DialType.Steps(gradientStepsList),
                             text = stepsDisplayText,
                             onResolveTextValue = { text ->
-                                 val parsed = text.trim().toIntOrNull()
-                                 val minSteps = deviceState.gradientData.size.coerceAtLeast(2)
-                                 if (parsed != null) {
-                                     val finalStepValue = parsed.coerceAtLeast(minSteps).coerceAtMost(16)
-                                     val before = state.value
-                                     state.update { old ->
-                                         val snappedColors = snapColorsNonOverlapping(old.gradientData, finalStepValue)
-                                         old.copy(gradientSteps = finalStepValue, gradientData = snappedColors)
-                                     }
-                                     pushStateChange(before, state.value)
-                                 } else if (text.trim().equals("inf", ignoreCase = true)) {
-                                     val before = state.value
-                                     state.update { old ->
-                                         val unsnappedColors = snapColorsNonOverlapping(old.gradientData, null)
-                                         old.copy(gradientSteps = null, gradientData = unsnappedColors)
-                                     }
-                                     pushStateChange(before, state.value)
-                                  }
-                              },
-                            onStartValueChange = {
-                                beforeState = state.value
-                             },
-                            onFinishValueChange = {
-                                pushStateChange(
-                                    before = beforeState,
-                                    after = state.value
-                                 )
-                             },
-                            onValueChange = { stepValue ->
-                               state.update { old ->
-                                    val minSteps = old.gradientData.size.coerceAtLeast(2)
-                                    val finalStepValue = if (stepValue != null) stepValue.coerceAtLeast(minSteps) else null
-                                    val snappedColors = snapColorsNonOverlapping(old.gradientData, finalStepValue)
-                                    old.copy(gradientSteps = finalStepValue, gradientData = snappedColors)
-                                }
-                             },
-                            modifier = Modifier
-                                 .rightClickable {
+                                val parsed = text.trim().toIntOrNull()
+                                val minSteps = deviceState.gradientData.size.coerceAtLeast(2)
+                                if (parsed != null) {
+                                    val finalStepValue = parsed.coerceAtLeast(minSteps).coerceAtMost(16)
+                                    val before = state.value
+                                    state.update { old ->
+                                        val snappedColors = snapColorsNonOverlapping(old.gradientData, finalStepValue)
+                                        old.copy(gradientSteps = finalStepValue, gradientData = snappedColors)
+                                    }
+                                    pushStateChange(before, state.value)
+                                } else if (text.trim().equals("inf", ignoreCase = true)) {
                                     val before = state.value
                                     state.update { old ->
                                         val unsnappedColors = snapColorsNonOverlapping(old.gradientData, null)
                                         old.copy(gradientSteps = null, gradientData = unsnappedColors)
                                     }
                                     pushStateChange(before, state.value)
-                                 },
+                                }
+                            },
+                            onStartValueChange = {
+                                beforeState = state.value
+                            },
+                            onFinishValueChange = {
+                                pushStateChange(
+                                    before = beforeState,
+                                    after = state.value
+                                )
+                            },
+                            onValueChange = { stepValue ->
+                                state.update { old ->
+                                    val minSteps = old.gradientData.size.coerceAtLeast(2)
+                                    val finalStepValue =
+                                        if (stepValue != null) stepValue.coerceAtLeast(minSteps) else null
+                                    val snappedColors = snapColorsNonOverlapping(old.gradientData, finalStepValue)
+                                    old.copy(gradientSteps = finalStepValue, gradientData = snappedColors)
+                                }
+                            },
+                            modifier = Modifier
+                                .rightClickable {
+                                    val before = state.value
+                                    state.update { old ->
+                                        val unsnappedColors = snapColorsNonOverlapping(old.gradientData, null)
+                                        old.copy(gradientSteps = null, gradientData = unsnappedColors)
+                                    }
+                                    pushStateChange(before, state.value)
+                                },
                         )
                     }
 
@@ -477,8 +486,11 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                     val beforeSnapshot = beforeColorGradientSnapshot.value
                                     if (grad != null && beforeSnapshot != null) {
                                         val before = state.value.copy(gradientData = beforeSnapshot)
-                                        val afterItem = state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
-                                        val changed = afterItem?.let { it.r != c.red || it.g != c.green || it.b != c.blue } ?: false
+                                        val afterItem =
+                                            state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
+                                        val changed =
+                                            afterItem?.let { it.r != c.red || it.g != c.green || it.b != c.blue }
+                                                ?: false
                                         if (changed) {
                                             pushStateChange(before, state.value)
                                         }
@@ -498,8 +510,11 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                     val beforeSnapshot = beforeColorGradientSnapshot.value
                                     if (grad != null && beforeSnapshot != null) {
                                         val before = state.value.copy(gradientData = beforeSnapshot)
-                                        val afterItem = state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
-                                        val changed = afterItem?.let { it.r != c.red || it.g != c.green || it.b != c.blue } ?: false
+                                        val afterItem =
+                                            state.value.gradientData.find { it.selectionUUID == grad.selectionUUID }
+                                        val changed =
+                                            afterItem?.let { it.r != c.red || it.g != c.green || it.b != c.blue }
+                                                ?: false
                                         if (changed) {
                                             pushStateChange(before, state.value)
                                         }
@@ -584,6 +599,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                     (proportion - 0.5).pow(2) * 2 + 0.5
                 }
             }
+
             GradientSmoothness.Smooth -> {
                 if (proportion < 0.5) {
                     proportion.pow(2) * 2
@@ -591,6 +607,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                     (proportion - 1).pow(2) * -2 + 1
                 }
             }
+
             else -> proportion
         }
 
@@ -683,15 +700,19 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             GradientSmoothness.Hold -> {
                 if (linearT < 0.95) 0.0 else 1.0
             }
+
             GradientSmoothness.Release -> {
                 if (linearT > 0.05) 1.0 else 0.0
             }
+
             GradientSmoothness.Fast -> {
                 kotlin.math.sqrt(linearT)
             }
+
             GradientSmoothness.Slow -> {
                 1.0 - kotlin.math.sqrt(1.0 - linearT)
             }
+
             GradientSmoothness.Sharp -> {
                 if (linearT < 0.5) {
                     0.5 - kotlin.math.sqrt(0.5 - linearT) / kotlin.math.sqrt(2.0)
@@ -699,6 +720,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                     0.5 + kotlin.math.sqrt(linearT - 0.5) / kotlin.math.sqrt(2.0)
                 }
             }
+
             GradientSmoothness.Smooth -> {
                 if (linearT < 0.5) {
                     kotlin.math.sqrt(linearT / 2.0)
@@ -731,8 +753,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                 (((((acc * 31 + color.position.toBits()) * 31 + color.r.toBits()) * 31 + color.g.toBits()) * 31 + color.b.toBits()) * 31 + color.smoothness.ordinal)
             },
             fps = samplingFps,
-           totalTimeBits = totalTime.toDouble().toBits(),
-           gradientSteps = state.value.gradientSteps
+            totalTimeBits = totalTime.toDouble().toBits(),
+            gradientSteps = state.value.gradientSteps
         )
         cachedFadeSignature?.let { cachedSig ->
             if (cachedSig == signature) return cachedFade
@@ -777,17 +799,19 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                 stepCountBuffer.add(1)
                 cutoffBuffer.add(1 + cutoffBuffer.last())
             } else {
-               for (k in 0 until segmentFrames) {
-                   val factor = k.toDouble() / segmentFrames
-                    colorStepBuffer.add(Color(
-                        red = current.r + (next.r - current.r) * factor.toFloat(),
-                        green = current.g + (next.g - current.g) * factor.toFloat(),
-                        blue = current.b + (next.b - current.b) * factor.toFloat()
-                    ))
+                for (k in 0 until segmentFrames) {
+                    val factor = k.toDouble() / segmentFrames
+                    colorStepBuffer.add(
+                        Color(
+                            red = current.r + (next.r - current.r) * factor.toFloat(),
+                            green = current.g + (next.g - current.g) * factor.toFloat(),
+                            blue = current.b + (next.b - current.b) * factor.toFloat()
+                        )
+                    )
                 }
 
-               stepCountBuffer.add(segmentFrames)
-               cutoffBuffer.add(segmentFrames + cutoffBuffer.last())
+                stepCountBuffer.add(segmentFrames)
+                cutoffBuffer.add(segmentFrames + cutoffBuffer.last())
             }
         }
 
@@ -805,7 +829,13 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
         }
 
         val fullFade = mutableListOf<FadeInfo>()
-        fullFade.add(FadeInfo(colorStepBuffer[0], 0.0, gradientData.getOrNull(0)?.smoothness == GradientSmoothness.Hold))
+        fullFade.add(
+            FadeInfo(
+                colorStepBuffer[0],
+                0.0,
+                gradientData.getOrNull(0)?.smoothness == GradientSmoothness.Hold
+            )
+        )
 
         var j = 0
         for (i in 1 until colorStepBuffer.size) {
@@ -814,8 +844,8 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             if (j < gradientData.size - 1) {
                 val prevTime = if (j != 0) gradientData[j].position.toDouble() * totalTime else 0.0
                 val currTime = (gradientData[j].position +
-                    (gradientData[j + 1].position - gradientData[j].position) *
-                    (i - cutoffBuffer[j]).toDouble() / stepCountBuffer[j].coerceAtLeast(1)) * totalTime
+                        (gradientData[j + 1].position - gradientData[j].position) *
+                        (i - cutoffBuffer[j]).toDouble() / stepCountBuffer[j].coerceAtLeast(1)) * totalTime
                 val nextTime = gradientData[j + 1].position.toDouble() * totalTime
 
                 val fadeType = gradientData[j].smoothness
@@ -834,10 +864,12 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             if (cutoff < fullFade[i].time) {
                 fade.add(fullFade[i])
             } else if (fade.last().time + 2 * frameTime <=
-                (if (i < fullFade.size - 1) fullFade[i + 1].time else totalTime.toDouble())) {
+                (if (i < fullFade.size - 1) fullFade[i + 1].time else totalTime.toDouble())
+            ) {
                 fade.add(fullFade[i].copy(time = cutoff))
             } else if (i == fullFade.size - 1 &&
-                (fullFade[i].color.red > 0.01f || fullFade[i].color.green > 0.01f || fullFade[i].color.blue > 0.01f)) {
+                (fullFade[i].color.red > 0.01f || fullFade[i].color.green > 0.01f || fullFade[i].color.blue > 0.01f)
+            ) {
                 fade.add(fullFade[i])
             }
         }

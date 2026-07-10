@@ -20,8 +20,8 @@ import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -56,10 +56,10 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    StepTextDial(
-                        headline = "Hue",
+                    Dial(
+                        title = "Hue",
                         text = "${deviceState.hue.toInt()}°",
-                        steps = List(361) { -180 + it },
+                        type = DialType.Steps(List(361) { -180 + it }),
                         value = deviceState.hue.toInt(),
                         onStartValueChange = { beforeState = state.value.copy() },
                         onValueChange = { value -> state.update { it.copy(hue = value.toFloat()) } },
@@ -84,8 +84,9 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    TextDial(
-                        headline = "Sat Low",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Sat Low",
                         text = "${(deviceState.saturationLow * 100).roundToInt()}%",
                         value = deviceState.saturationLow,
                         onStartValueChange = { beforeState = state.value.copy() },
@@ -98,8 +99,9 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                             pushStateChange(beforeState, state.value.copy(saturationLow = value.coerceIn(0f, 1f)))
                         }
                     )
-                    TextDial(
-                        headline = "Sat High",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Sat High",
                         text = "${(deviceState.saturationMax * 100).roundToInt()}%",
                         value = deviceState.saturationMax,
                         onStartValueChange = { beforeState = state.value.copy() },
@@ -124,8 +126,9 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    TextDial(
-                        headline = "Val Low",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Val Low",
                         text = "${(deviceState.valueLow * 100).roundToInt()}%",
                         value = deviceState.valueLow,
                         onStartValueChange = { beforeState = state.value.copy() },
@@ -138,8 +141,9 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                             pushStateChange(beforeState, state.value.copy(valueLow = value.coerceIn(0f, 1f)))
                         }
                     )
-                    TextDial(
-                        headline = "Val High",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Val High",
                         text = "${(deviceState.valueHigh * 100).roundToInt()}%",
                         value = deviceState.valueHigh,
                         onStartValueChange = { beforeState = state.value.copy() },
@@ -173,7 +177,9 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
     }
 
     private fun applyShift(color: Color, s: ShiftChainDeviceState): Color {
-        val r = color.red; val g = color.green; val b = color.blue
+        val r = color.red;
+        val g = color.green;
+        val b = color.blue
 
         val cMax = max(r, max(g, b))
         val cMin = min(r, min(g, b))
@@ -228,4 +234,3 @@ data class ShiftChainDeviceState(
     val valueHigh: Float = 1f,
     val valueLow: Float = 0f
 ) : DeviceState()
-

@@ -20,8 +20,8 @@ import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -58,10 +58,10 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    StepTextDial(
-                        headline = "Hue",
+                    Dial(
+                        title = "Hue",
                         text = "${deviceState.hue}°",
-                        steps = List(361) { -180 + it },
+                        type = DialType.Steps(List(361) { -180 + it }),
                         value = deviceState.hue,
                         onStartValueChange = {
                             beforeState = state.value.copy()
@@ -81,8 +81,9 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                         }
                     )
 
-                    TextDial(
-                        headline = "Tolerance",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Tolerance",
                         text = "${(deviceState.hueTolerance * 100).roundToInt()}%",
                         value = deviceState.hueTolerance,
                         onStartValueChange = {
@@ -113,8 +114,9 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    TextDial(
-                        headline = "Saturation",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Saturation",
                         text = "${(deviceState.saturation * 100).roundToInt()}%",
                         value = deviceState.saturation,
                         onStartValueChange = {
@@ -135,8 +137,9 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                         }
                     )
 
-                    TextDial(
-                        headline = "Tolerance",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Tolerance",
                         text = "${(deviceState.saturationTolerance * 100).roundToInt()}%",
                         value = deviceState.saturationTolerance,
                         onStartValueChange = {
@@ -167,8 +170,9 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    TextDial(
-                        headline = "Value",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Value",
                         text = "${(deviceState.value * 100).roundToInt()}%",
                         value = deviceState.value,
                         onStartValueChange = {
@@ -189,8 +193,9 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                         }
                     )
 
-                    TextDial(
-                        headline = "Tolerance",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Tolerance",
                         text = "${(deviceState.valueTolerance * 100).roundToInt()}%",
                         value = deviceState.valueTolerance,
                         onStartValueChange = {

@@ -62,7 +62,8 @@ import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
@@ -278,8 +279,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 var beforeFadeIn = deviceState.fadeInMs
-                TextDial(
-                    headline = "Fade In",
+                Dial(
+                    type = DialType.Continuous,
+                    title = "Fade In",
                     text = "${deviceState.fadeInMs.roundToInt()} ms",
                     value = deviceState.fadeInMs / MAX_FADE_MS,
                     onStartValueChange = { beforeFadeIn = deviceState.fadeInMs },
@@ -307,8 +309,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                 )
 
                 var beforeFadeOut = deviceState.fadeOutMs
-                TextDial(
-                    headline = "Fade Out",
+                Dial(
+                    type = DialType.Continuous,
+                    title = "Fade Out",
                     text = "${deviceState.fadeOutMs.roundToInt()} ms",
                     value = deviceState.fadeOutMs / MAX_FADE_MS,
                     onStartValueChange = { beforeFadeOut = deviceState.fadeOutMs },
@@ -336,14 +339,20 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                 )
 
                 var beforeVolume = deviceState.volumeDb
-                TextDial(
-                    headline = "Volume",
+                Dial(
+                    type = DialType.Continuous,
+                    title = "Volume",
                     text = "${if (deviceState.volumeDb >= 0) "+" else ""}${deviceState.volumeDb} dB",
                     value = (deviceState.volumeDb - VOLUME_MIN_DB) / VOLUME_RANGE_DB,
                     onStartValueChange = { beforeVolume = deviceState.volumeDb },
                     onValueChange = { value ->
                         state.update {
-                            it.copy(volumeDb = ((value * VOLUME_RANGE_DB) + VOLUME_MIN_DB).coerceIn(VOLUME_MIN_DB, VOLUME_MAX_DB))
+                            it.copy(
+                                volumeDb = ((value * VOLUME_RANGE_DB) + VOLUME_MIN_DB).coerceIn(
+                                    VOLUME_MIN_DB,
+                                    VOLUME_MAX_DB
+                                )
+                            )
                         }
                     },
                     onFinishValueChange = {
@@ -548,6 +557,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                         val amplified = (centered * gain).toInt().coerceIn(-128, 127)
                         outputData[destOffset] = (amplified + 128).toByte()
                     }
+
                     16 -> {
                         val lo = rawData[sourceOffset].toInt() and 0xFF
                         val hi = rawData[sourceOffset + 1].toInt() shl 8
@@ -556,6 +566,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                         outputData[destOffset] = (amplified and 0xFF).toByte()
                         outputData[destOffset + 1] = ((amplified shr 8) and 0xFF).toByte()
                     }
+
                     24 -> {
                         val b0 = rawData[sourceOffset].toInt() and 0xFF
                         val b1 = rawData[sourceOffset + 1].toInt() and 0xFF
@@ -567,13 +578,15 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                         outputData[destOffset + 1] = ((amplified shr 8) and 0xFF).toByte()
                         outputData[destOffset + 2] = ((amplified shr 16) and 0xFF).toByte()
                     }
+
                     32 -> {
                         val b0 = rawData[sourceOffset].toInt() and 0xFF
                         val b1 = rawData[sourceOffset + 1].toInt() and 0xFF
                         val b2 = rawData[sourceOffset + 2].toInt() and 0xFF
                         val b3 = rawData[sourceOffset + 3].toInt() and 0xFF
                         val sample = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
-                        val amplified = (sample * gain).toLong().coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+                        val amplified =
+                            (sample * gain).toLong().coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
                         outputData[destOffset] = (amplified and 0xFF).toByte()
                         outputData[destOffset + 1] = ((amplified shr 8) and 0xFF).toByte()
                         outputData[destOffset + 2] = ((amplified shr 16) and 0xFF).toByte()
@@ -669,7 +682,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
 
                         if (hitPoint != null) {
                             val isDoubleTap = lastTapState?.pointId == hitPoint.pointId &&
-                                upTimeMillis - (lastTapState?.timeMillis ?: 0L) <= SampleEnvelopeDoubleTapTimeoutMs
+                                    upTimeMillis - (lastTapState?.timeMillis ?: 0L) <= SampleEnvelopeDoubleTapTimeoutMs
                             if (isDoubleTap) {
                                 val updatedLane = normalizedLane.withoutPoints(listOf(hitPoint.pointId))
                                 onLaneCommitted(normalizedLane, updatedLane)
@@ -758,9 +771,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                                 )
 
                                 SampleEnvelopeDragMode.Curve -> currentDragState.afterPoint.copy(
-                                            curve = (currentDragState.afterPoint.curve - (dragAmount.y / SampleEnvelopeCurveDragSensitivityPx))
-                                                .coerceIn(-1f, 1f)
-                                        )
+                                    curve = (currentDragState.afterPoint.curve - (dragAmount.y / SampleEnvelopeCurveDragSensitivityPx))
+                                        .coerceIn(-1f, 1f)
+                                )
                             }
 
                             if (updatedPoint != currentDragState.afterPoint) {
@@ -981,7 +994,7 @@ private fun hitSampleEnvelopePoint(
             )
         )
         sampleEnvelopeDistanceSquared(pointOffset, tapOffset) <=
-            SampleEnvelopePointHitRadiusPx * SampleEnvelopePointHitRadiusPx
+                SampleEnvelopePointHitRadiusPx * SampleEnvelopePointHitRadiusPx
     }
 }
 
@@ -1099,7 +1112,7 @@ private fun sampleEnvelopeSegmentValueAtProgress(
 
 private fun isWithinSampleEnvelopeTapSlop(start: Offset, end: Offset): Boolean {
     return sampleEnvelopeDistanceSquared(start, end) <=
-        SampleEnvelopeTapSlopPx * SampleEnvelopeTapSlopPx
+            SampleEnvelopeTapSlopPx * SampleEnvelopeTapSlopPx
 }
 
 private fun sampleEnvelopeDistanceToSegment(

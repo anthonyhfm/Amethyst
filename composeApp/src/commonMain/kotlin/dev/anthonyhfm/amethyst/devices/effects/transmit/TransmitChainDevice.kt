@@ -26,7 +26,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
 import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
@@ -86,10 +87,10 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
 
                 Spacer(Modifier.weight(1f))
 
-                StepTextDial(
-                    headline = "Channel",
+                Dial(
+                    title = "Channel",
                     value = deviceState.channel,
-                    steps = channels,
+                    type = DialType.Steps(channels),
                     text = "${deviceState.channel}",
                     onResolveTextValue = { text ->
                         text.trim().toIntOrNull()?.let { channel ->

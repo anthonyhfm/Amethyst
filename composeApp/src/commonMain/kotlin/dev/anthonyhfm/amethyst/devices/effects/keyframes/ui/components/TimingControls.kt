@@ -6,7 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.anthonyhfm.amethyst.core.util.Timing
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 
@@ -25,15 +26,16 @@ fun TimingControls(
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         TimeDial(
-            headline = "Duration",
+            title = "Duration",
             timing = timing,
             onSelectTiming = { timing, _ ->
                 onTimingChanged(timing)
             }
         )
 
-        TextDial(
-            headline = "Gate",
+        Dial(
+            type = DialType.Continuous,
+            title = "Gate",
             text = "${(gate * 200).toInt()}%",
             value = gate,
             onValueChange = { value ->

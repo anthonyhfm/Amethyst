@@ -20,8 +20,8 @@ import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
-import dev.anthonyhfm.amethyst.ui.components.primitives.TextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -54,12 +54,22 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    TextDial(
-                        headline = "Brightness",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Brightness",
                         text = "${(deviceState.brightness * 100).roundToInt()}%",
                         value = deviceState.brightness / 2f,
                         onStartValueChange = { beforeState = state.value.copy() },
-                        onValueChange = { value -> state.update { it.copy(brightness = (value * 2f).coerceIn(0f, 2f)) } },
+                        onValueChange = { value ->
+                            state.update {
+                                it.copy(
+                                    brightness = (value * 2f).coerceIn(
+                                        0f,
+                                        2f
+                                    )
+                                )
+                            }
+                        },
                         onResolveTextValue = { text ->
                             text.removeSuffix("%").trim().toIntOrNull()?.takeIf { it in 0..200 }
                                 ?.let { v -> applyResolved { it.copy(brightness = v / 100f) } }
@@ -68,8 +78,9 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
                             pushStateChange(beforeState, state.value.copy(brightness = (value * 2f).coerceIn(0f, 2f)))
                         }
                     )
-                    TextDial(
-                        headline = "Contrast",
+                    Dial(
+                        type = DialType.Continuous,
+                        title = "Contrast",
                         text = "${(deviceState.contrast * 100).roundToInt()}%",
                         value = deviceState.contrast / 2f,
                         onStartValueChange = { beforeState = state.value.copy() },
@@ -94,10 +105,10 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
                 ) {
-                    StepTextDial(
-                        headline = "Temp",
+                    Dial(
+                        title = "Temp",
                         text = "${(deviceState.temperature * 100).toInt()}",
-                        steps = List(201) { -100 + it },
+                        type = DialType.Steps(List(201) { -100 + it }),
                         value = (deviceState.temperature * 100).toInt(),
                         onStartValueChange = { beforeState = state.value.copy() },
                         onValueChange = { value -> state.update { it.copy(temperature = value / 100f) } },
@@ -109,10 +120,10 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
                             pushStateChange(beforeState, state.value.copy(temperature = value / 100f))
                         }
                     )
-                    StepTextDial(
-                        headline = "Tint",
+                    Dial(
+                        title = "Tint",
                         text = "${(deviceState.tint * 100).toInt()}",
-                        steps = List(201) { -100 + it },
+                        type = DialType.Steps(List(201) { -100 + it }),
                         value = (deviceState.tint * 100).toInt(),
                         onStartValueChange = { beforeState = state.value.copy() },
                         onValueChange = { value -> state.update { it.copy(tint = value / 100f) } },
@@ -145,7 +156,9 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
     }
 
     private fun applyAdjust(color: Color, s: AdjustChainDeviceState): Color {
-        var r = color.red; var g = color.green; var b = color.blue
+        var r = color.red
+        var g = color.green
+        var b = color.blue
 
         // Brightness (multiplicative)
         r = (r * s.brightness).coerceIn(0f, 1f)

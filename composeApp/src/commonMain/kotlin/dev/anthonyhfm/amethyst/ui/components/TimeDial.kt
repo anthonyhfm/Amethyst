@@ -14,7 +14,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun TimeDial(
-    headline: String = "Duration",
+    title: String? = "Duration",
     timing: Timing,
     onSelectTiming: (timing: Timing, msValue: Long) -> Unit,
     onStartValueChange: (timing: Timing, msValue: Long) -> Unit = { _, _ -> },
@@ -26,7 +26,8 @@ fun TimeDial(
     val bpm by WorkspaceRepository.bpm.collectAsState()
 
     if (millisecondMode) {
-        TextDial(
+        Dial(
+            type = DialType.Continuous,
             value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / 1000,
             onStartValueChange = {
                 onStartValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
@@ -40,7 +41,7 @@ fun TimeDial(
             onFinishValueChange = {
                 onFinishValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
             },
-            headline = headline,
+            title = title,
             text = text ?: "${timing.duration.inWholeMilliseconds.toInt()} ms",
             onResolveTextValue = {
                 val timing = it.asTiming()
@@ -57,21 +58,25 @@ fun TimeDial(
             enabled = enabled
         )
     } else {
-        var lastRythmTiming by remember { mutableStateOf((timing as? Timing.Rythm)?.timing ?: Timing.Rythm.RythmTiming._1_4) }
+        var lastRythmTiming by remember {
+            mutableStateOf(
+                (timing as? Timing.Rythm)?.timing ?: Timing.Rythm.RythmTiming._1_4
+            )
+        }
         val currentRythmTiming = (timing as? Timing.Rythm)?.timing
         if (currentRythmTiming != null && currentRythmTiming != lastRythmTiming) {
             lastRythmTiming = currentRythmTiming
         }
 
-        StepTextDial(
+        Dial(
+            type = DialType.Steps(Timing.Rythm.RythmTiming.entries),
             text = if (timing is Timing.Rythm) {
                 text ?: timing.timing.text
             } else {
                 lastRythmTiming.text
             },
-            steps = Timing.Rythm.RythmTiming.entries,
             value = currentRythmTiming ?: lastRythmTiming,
-            headline = headline,
+            title = title,
             onStartValueChange = {
                 val startTiming = Timing.Rythm(it)
                 onStartValueChange(startTiming, startTiming.toMsValue(bpm))
@@ -119,6 +124,7 @@ fun String.asTiming(): Timing? {
             val value = trimmed.removeSuffix("ms").trim().toIntOrNull()
             value?.let { Timing.Duration(it.milliseconds) }
         }
+
         "/" in trimmed -> {
             val parts = trimmed.split("/").map { it.trim() }
             if (parts.size == 2) {
@@ -129,6 +135,7 @@ fun String.asTiming(): Timing? {
                 } else null
             } else null
         }
+
         else -> trimmed.toIntOrNull()?.let { Timing.Duration(it.milliseconds) }
     }
 }

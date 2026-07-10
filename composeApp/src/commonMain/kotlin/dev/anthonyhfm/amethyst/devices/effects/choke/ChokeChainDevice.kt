@@ -34,7 +34,8 @@ import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.chainBorder
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.chainSurface
@@ -62,7 +63,7 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
         state.value.chain.signalExit = {
             signalExit?.invoke(it)
         }
-        
+
         // Register this choke device with its channel
         chokeDevicesByChannel.getOrPut(state.value.target) { mutableListOf() }.add(this)
     }
@@ -73,6 +74,7 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
         override fun create() = ChokeChainDevice()
         override fun pack(device: GenericChainDevice<ChokeChainDeviceState>): ChokeChainDeviceState =
             device.state.value.copy(stateChain = StateChain.pack(device.state.value.chain))
+
         override fun unpack(state: ChokeChainDeviceState): ChokeChainDevice =
             ChokeChainDevice().apply {
                 this.state.update { state.copy(chain = state.stateChain.unpack()) }
@@ -135,10 +137,10 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
                     .width(100.dp),
                 titleBarModifier = LocalTitleBarModifier.current
             ) {
-                StepTextDial(
-                    headline = "Target",
+                Dial(
+                    title = "Target",
                     value = deviceState.target,
-                    steps = IntArray(16) { it + 1 }.toList(),
+                    type = DialType.Steps(IntArray(16) { it + 1 }.toList()),
                     text = "${deviceState.target}",
                     onResolveTextValue = {
                         val chokeChannel = it.trim().toIntOrNull()
@@ -152,7 +154,8 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
                                 // Update channel registration
                                 if (oldChannel != channel) {
                                     unregisterDevice(this@ChokeChainDevice, oldChannel)
-                                    chokeDevicesByChannel.getOrPut(channel) { mutableListOf() }.add(this@ChokeChainDevice)
+                                    chokeDevicesByChannel.getOrPut(channel) { mutableListOf() }
+                                        .add(this@ChokeChainDevice)
                                 }
                             }
                         }
@@ -295,7 +298,7 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
                                             parent = state.chain,
                                             device = device
                                         )
-                                        
+
                                         when {
                                             ModifierKeysState.isShiftPressed -> {
                                                 SelectionManager.selectRangeInChain(
@@ -303,12 +306,14 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
                                                     devicesInChain = devices
                                                 )
                                             }
+
                                             ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
                                                 SelectionManager.select(
                                                     chainDeviceSelectable,
                                                     single = false
                                                 )
                                             }
+
                                             else -> {
                                                 SelectionManager.select(chainDeviceSelectable)
                                             }
@@ -384,7 +389,7 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
     override fun signalEnter(n: List<Signal>) {
         // Trigger choking on all other choke devices with the same channel
         chokeChannel(state.value.target, this)
-        
+
         // Pass signals through to the chain
         state.value.chain.signalEnter(n)
     }

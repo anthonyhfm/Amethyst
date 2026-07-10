@@ -39,7 +39,8 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.Tooltip
 import dev.anthonyhfm.amethyst.ui.theme.accent
 import dev.anthonyhfm.amethyst.ui.theme.accentForeground
@@ -104,10 +105,10 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
                     contentAlignment = Alignment.Center
                 ) {
                     var beforeMacro = deviceState.macro
-                    StepTextDial(
-                        headline = "Macro",
+                    Dial(
+                        title = "Macro",
                         value = deviceState.macro,
-                        steps = IntArray(macros.size) { it }.toList(),
+                        type = DialType.Steps(IntArray(macros.size) { it }.toList()),
                         text = "${deviceState.macro + 1}",
                         onStartValueChange = { beforeMacro = it },
                         onResolveTextValue = { text ->
@@ -156,7 +157,8 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
                                 when (event.type) {
                                     PointerEventType.Press -> {
                                         event.changes.firstOrNull()?.let { change ->
-                                            val cellIndex = calculateCellFromOffset(change.position, gridSize) ?: return@let
+                                            val cellIndex =
+                                                calculateCellFromOffset(change.position, gridSize) ?: return@let
                                             stateBeforeDrag = state.value
                                             visitedCells = setOf(cellIndex)
                                             val activating = cellIndex !in state.value.allowedValues
@@ -170,11 +172,13 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
                                             change.consume()
                                         }
                                     }
+
                                     PointerEventType.Move -> {
                                         val mode = dragMode
                                         if (mode != null) {
                                             event.changes.firstOrNull()?.let { change ->
-                                                val cellIndex = calculateCellFromOffset(change.position, gridSize) ?: return@let
+                                                val cellIndex =
+                                                    calculateCellFromOffset(change.position, gridSize) ?: return@let
                                                 if (cellIndex !in visitedCells) {
                                                     visitedCells = visitedCells + cellIndex
                                                     val newAllowed = if (mode) {
@@ -188,6 +192,7 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
                                             }
                                         }
                                     }
+
                                     PointerEventType.Release -> {
                                         if (dragMode != null) {
                                             pushStateChange(stateBeforeDrag, state.value)
@@ -274,4 +279,3 @@ data class MacroFilterChainDeviceState(
     @ProtoNumber(3)
     val allowedValues: Set<Int> = emptySet(),
 ) : DeviceState()
-

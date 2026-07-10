@@ -76,10 +76,10 @@ import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.ring
 import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
-import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import kotlin.math.roundToInt
 
 internal val DialSurfaceSize = 52.dp
 internal val DialReadoutWidth = 56.dp
@@ -96,95 +96,178 @@ private const val DialArcStart = 122f
 private const val DialArcSweep = 296f
 
 @Composable
-fun Dial(
-    value: Float,
-    onStartValueChange: (Float) -> Unit = { },
-    onValueChange: (Float) -> Unit,
-    onFinishValueChange: (Float) -> Unit,
+fun <T> Dial(
+    type: DialType<T>,
+    value: T,
+    onValueChange: (T) -> Unit,
+    onStartValueChange: (T) -> Unit = { },
+    onFinishValueChange: (T) -> Unit = { },
+    title: String? = null,
+    text: String? = null,
+    onResolveTextValue: ((String) -> Unit)? = null,
     containerColor: Color = Color.Unspecified,
     dialColor: Color = Color.Unspecified,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    defaultValue: Float = 0.5f,
+    defaultValue: T? = null,
 ) {
-    var dialValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
+    when (type) {
+        DialType.Continuous -> ContinuousDial(
+            value = value as Float,
+            onStartValueChange = { onStartValueChange(it as T) },
+            onValueChange = { onValueChange(it as T) },
+            onFinishValueChange = { onFinishValueChange(it as T) },
+            defaultValue = (defaultValue as? Float) ?: 0.5f,
+            knob = false,
+            title = title,
+            text = text,
+            onResolveTextValue = onResolveTextValue,
+            containerColor = containerColor,
+            dialColor = dialColor,
+            modifier = modifier,
+            enabled = enabled,
+        )
 
-    LaunchedEffect(value) {
-        dialValue = value.coerceIn(0f, 1f)
-    }
+        DialType.Knob -> ContinuousDial(
+            value = value as Float,
+            onStartValueChange = { onStartValueChange(it as T) },
+            onValueChange = { onValueChange(it as T) },
+            onFinishValueChange = { onFinishValueChange(it as T) },
+            defaultValue = (defaultValue as? Float) ?: 0.5f,
+            knob = true,
+            title = title,
+            text = text,
+            onResolveTextValue = onResolveTextValue,
+            containerColor = containerColor,
+            dialColor = dialColor,
+            modifier = modifier,
+            enabled = enabled,
+        )
 
-    LaunchedEffect(dialValue) {
-        onValueChange(dialValue)
-    }
-
-    DialSurface(
-        progress = dialValue,
-        onDragStart = { onStartValueChange(dialValue) },
-        onDragProgressChange = { dialValue = it },
-        onDragEnd = { onFinishValueChange(dialValue) },
-        containerColor = containerColor,
-        dialColor = dialColor,
-        modifier = modifier,
-        enabled = enabled,
-        onDoubleClick = {
-            dialValue = defaultValue
-            onValueChange(defaultValue)
-            onFinishValueChange(defaultValue)
-        },
-        onIncrement = {
-            val nextValue = (dialValue + 0.01f).coerceIn(0f, 1f)
-            if (nextValue != dialValue) {
-                onStartValueChange(dialValue)
-                dialValue = nextValue
-                onFinishValueChange(nextValue)
-            }
-        },
-        onDecrement = {
-            val nextValue = (dialValue - 0.01f).coerceIn(0f, 1f)
-            if (nextValue != dialValue) {
-                onStartValueChange(dialValue)
-                dialValue = nextValue
-                onFinishValueChange(nextValue)
-            }
-        }
-    )
-}
-
-@Composable
-fun TextDial(
-    text: String,
-    headline: String? = null,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    onStartValueChange: (Float) -> Unit = { },
-    onFinishValueChange: (Float) -> Unit = { },
-    onResolveTextValue: (String) -> Unit,
-    containerColor: Color = Color.Unspecified,
-    dialColor: Color = Color.Unspecified,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    defaultValue: Float = 0.5f,
-) {
-    EditableDialControl(
-        text = text,
-        headline = headline,
-        enabled = enabled,
-        modifier = modifier,
-        onResolveTextValue = onResolveTextValue
-    ) { dialModifier ->
-        Dial(
+        is DialType.Steps<*> -> SteppedDial(
+            values = type.values as List<T>,
             value = value,
             onStartValueChange = onStartValueChange,
             onValueChange = onValueChange,
             onFinishValueChange = onFinishValueChange,
+            defaultValue = defaultValue,
+            title = title,
+            text = text,
+            onResolveTextValue = onResolveTextValue,
+            containerColor = containerColor,
+            dialColor = dialColor,
+            modifier = modifier,
+            enabled = enabled,
+        )
+    }
+}
+
+@Composable
+private fun ContinuousDial(
+    value: Float,
+    onStartValueChange: (Float) -> Unit,
+    onValueChange: (Float) -> Unit,
+    onFinishValueChange: (Float) -> Unit,
+    defaultValue: Float,
+    knob: Boolean,
+    title: String?,
+    text: String?,
+    onResolveTextValue: ((String) -> Unit)?,
+    containerColor: Color,
+    dialColor: Color,
+    modifier: Modifier,
+    enabled: Boolean,
+) {
+    var dialValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
+    LaunchedEffect(value) { dialValue = value.coerceIn(0f, 1f) }
+    LaunchedEffect(dialValue) { onValueChange(dialValue) }
+
+    DialContent(title, text, enabled, modifier, onResolveTextValue) { dialModifier ->
+        DialSurface(
+            progress = dialValue,
+            onDragStart = { onStartValueChange(dialValue) },
+            onDragProgressChange = { dialValue = it },
+            onDragEnd = { onFinishValueChange(dialValue) },
             containerColor = containerColor,
             dialColor = dialColor,
             modifier = dialModifier,
             enabled = enabled,
-            defaultValue = defaultValue
+            knob = knob,
+            onDoubleClick = {
+                dialValue = defaultValue
+                onValueChange(defaultValue)
+                onFinishValueChange(defaultValue)
+            },
+            onIncrement = {
+                changeContinuousValue(dialValue, 0.01f, onStartValueChange) {
+                    dialValue = it; onFinishValueChange(it)
+                }
+            },
+            onDecrement = {
+                changeContinuousValue(dialValue, -0.01f, onStartValueChange) {
+                    dialValue = it; onFinishValueChange(it)
+                }
+            },
         )
     }
 }
+
+private fun changeContinuousValue(value: Float, delta: Float, onStart: (Float) -> Unit, onChanged: (Float) -> Unit) {
+    val next = (value + delta).coerceIn(0f, 1f)
+    if (next != value) {
+        onStart(value); onChanged(next)
+    }
+}
+
+@Composable
+private fun <T> SteppedDial(
+    values: List<T>, value: T, onStartValueChange: (T) -> Unit, onValueChange: (T) -> Unit,
+    onFinishValueChange: (T) -> Unit, defaultValue: T?, title: String?, text: String?,
+    onResolveTextValue: ((String) -> Unit)?, containerColor: Color, dialColor: Color,
+    modifier: Modifier, enabled: Boolean,
+) {
+    var index by remember { mutableStateOf(values.indexOf(value).coerceAtLeast(0)) }
+    var progress by remember { mutableStateOf(progressForSelection(index, values.size)) }
+    LaunchedEffect(value, values) {
+        index = values.indexOf(value).coerceAtLeast(0); progress = progressForSelection(index, values.size)
+    }
+    LaunchedEffect(index) { onValueChange(values[index]) }
+    DialContent(title, text, enabled, modifier, onResolveTextValue) { dialModifier ->
+        DialSurface(
+            progress = displayProgressForSelection(index, values.size),
+            onDragStart = { onStartValueChange(values[index]) },
+            onDragProgressChange = { newProgress ->
+                progress = newProgress
+                val next = if (values.size <= 1) 0 else (progress * (values.size - 1)).roundToInt()
+                    .coerceIn(0, values.lastIndex)
+                index = next
+            },
+            onDragEnd = { onFinishValueChange(values[index]) },
+            containerColor = containerColor, dialColor = dialColor, modifier = dialModifier, enabled = enabled,
+            onDoubleClick = {
+                index = values.indexOf(defaultValue ?: values.first()).coerceAtLeast(0)
+                progress = progressForSelection(index, values.size)
+                onValueChange(values[index]); onFinishValueChange(values[index])
+            },
+            onIncrement = {
+                if (index < values.lastIndex) {
+                    onStartValueChange(values[index]); index++; progress =
+                        progressForSelection(index, values.size); onFinishValueChange(values[index])
+                }
+            },
+            onDecrement = {
+                if (index > 0) {
+                    onStartValueChange(values[index]); index--; progress =
+                        progressForSelection(index, values.size); onFinishValueChange(values[index])
+                }
+            },
+        )
+    }
+}
+
+private fun progressForSelection(index: Int, size: Int): Float = if (size <= 1) 0f else index.toFloat() / (size - 1)
+private fun displayProgressForSelection(index: Int, size: Int): Float =
+    if (size <= 1) 1f else index.toFloat() / (size - 1)
 
 @Composable
 internal fun DialSurface(
@@ -196,6 +279,7 @@ internal fun DialSurface(
     dialColor: Color,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    knob: Boolean = false,
     onDoubleClick: () -> Unit = { },
     onIncrement: (() -> Unit)? = null,
     onDecrement: (() -> Unit)? = null,
@@ -263,14 +347,17 @@ internal fun DialSurface(
                             currentOnIncrement?.invoke()
                             true
                         }
+
                         Key.DirectionDown -> {
                             currentOnDecrement?.invoke()
                             true
                         }
+
                         Key.Escape -> {
                             focusManager.clearFocus()
                             true
                         }
+
                         else -> false
                     }
                 } else {
@@ -324,16 +411,16 @@ internal fun DialSurface(
 
             drawArc(
                 color = trackColor,
-                startAngle = DialArcStart,
-                sweepAngle = DialArcSweep,
+                startAngle = if (knob) -90f else DialArcStart,
+                sweepAngle = if (knob) 360f else DialArcSweep,
                 useCenter = false,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
 
             drawArc(
                 color = resolvedDialColor,
-                startAngle = DialArcStart,
-                sweepAngle = DialArcSweep * resolvedProgress,
+                startAngle = if (knob) -90f else DialArcStart,
+                sweepAngle = (if (knob) 360f else DialArcSweep) * resolvedProgress,
                 useCenter = false,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
@@ -357,7 +444,7 @@ internal fun DialSurface(
                 .align(Alignment.Center)
                 .fillMaxSize()
                 .padding(DialIndicatorInset)
-                .rotate(DialRotationStart + (resolvedProgress * DialRotationSweep))
+                .rotate(if (knob) resolvedProgress * 360f else DialRotationStart + (resolvedProgress * DialRotationSweep))
         ) {
             Box(
                 modifier = Modifier
@@ -372,14 +459,19 @@ internal fun DialSurface(
 }
 
 @Composable
-internal fun EditableDialControl(
-    text: String,
-    headline: String?,
+internal fun DialContent(
+    title: String?,
+    text: String?,
     enabled: Boolean,
     modifier: Modifier = Modifier,
-    onResolveTextValue: (String) -> Unit,
+    onResolveTextValue: ((String) -> Unit)?,
     dial: @Composable (Modifier) -> Unit,
 ) {
+    if (text == null) {
+        DialControlFrame(title = title, dial = { dial(modifier) }, readout = {})
+        return
+    }
+
     var editing by remember { mutableStateOf(false) }
     var textValue by remember { mutableStateOf(text) }
 
@@ -411,12 +503,12 @@ internal fun EditableDialControl(
     }
 
     val submitTextValue = {
-        onResolveTextValue(textValue)
+        onResolveTextValue?.invoke(textValue)
         editing = false
     }
 
     DialControlFrame(
-        headline = headline,
+        title = title,
         dial = { dial(modifier) },
         readout = {
             if (editing) {
@@ -440,7 +532,7 @@ internal fun EditableDialControl(
 
 @Composable
 internal fun DialControlFrame(
-    headline: String?,
+    title: String?,
     dial: @Composable () -> Unit,
     readout: @Composable () -> Unit,
 ) {
@@ -448,7 +540,7 @@ internal fun DialControlFrame(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        headline?.let {
+        title?.let {
             Text(
                 text = it,
                 style = Theme[typography][small],
@@ -503,7 +595,7 @@ private fun DialReadoutEditor(
     val focused by interactionSource.collectIsFocusedAsState()
     val borderColor = if (focused) Theme[colors][ring] else Theme[colors][input]
     val borderWidth = if (focused) 2.dp else 1.dp
-    
+
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
@@ -536,6 +628,7 @@ private fun DialReadoutEditor(
                         onCancel()
                         true
                     }
+
                     else -> false
                 }
             },

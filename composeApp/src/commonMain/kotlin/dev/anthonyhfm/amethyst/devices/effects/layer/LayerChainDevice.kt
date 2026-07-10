@@ -28,7 +28,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.StepTextDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
@@ -70,10 +71,10 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    StepTextDial(
-                        headline = "Layer",
+                    Dial(
+                        title = "Layer",
                         value = deviceState.layer,
-                        steps = IntArray(41) { -20 + it }.toList(),
+                        type = DialType.Steps(IntArray(41) { -20 + it }.toList()),
                         text = "${deviceState.layer}",
                         onResolveTextValue = {
                             val layerText = it.trim().toIntOrNull()
@@ -106,10 +107,10 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                         Separator(orientation = SeparatorOrientation.Vertical)
                     }
 
-                    StepTextDial(
-                        headline = "Range",
+                    Dial(
+                        title = "Range",
                         value = deviceState.range,
-                        steps = IntArray(21) { it }.toList(),
+                        type = DialType.Steps(IntArray(21) { it }.toList()),
                         text = "${deviceState.range}",
                         enabled = deviceState.mode != Signal.LED.BlendingMode.Normal,
                         onResolveTextValue = {
