@@ -84,8 +84,7 @@ fun GraphNodeShell(
             .width(bodyWidth)
             .clip(DefaultShape)
             .background(Theme[chainColorTokens][chainSurface])
-            .border(1.dp, titleBarColor, DefaultShape)
-            .clickable(onClick = onSelect),
+            .border(1.dp, titleBarColor, DefaultShape),
     ) {
         Box(
             modifier = Modifier
