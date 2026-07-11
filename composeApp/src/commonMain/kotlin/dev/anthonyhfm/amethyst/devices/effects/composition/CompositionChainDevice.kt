@@ -154,12 +154,8 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
         }
     }
 
-    /**
-     * Pinch moves source frames to non-uniform output times. Include those times explicitly so
-     * the live scheduler cannot jump over a compressed run of source frames.
-     */
     private fun buildPlaybackProgressFrames(): List<Float> {
-        val frames = sortedSetOf(0f, 1f)
+        val frames = mutableSetOf(0f, 1f)
         repeat(PLAYBACK_SAMPLE_COUNT + 1) { index ->
             frames += index.toFloat() / PLAYBACK_SAMPLE_COUNT
         }
@@ -171,7 +167,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
                     frames += Pincher.mapFraction(sourceProgress, pinch.pinch, pinch.bilateral).toFloat()
                 }
             }
-        return frames.toList()
+        return frames.sorted()
     }
 
     private fun finishPlayback() {
@@ -304,5 +300,5 @@ data class CompositionChainDeviceState(
 data class CompositionPlaybackOptions(
     val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
     val repeat: Boolean = false,
-    val gate: Float = 1f,
+    val gate: Float = 0.5f,
 )

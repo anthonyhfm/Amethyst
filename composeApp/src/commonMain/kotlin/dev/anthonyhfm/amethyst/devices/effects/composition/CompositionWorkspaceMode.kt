@@ -11,6 +11,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.views.CompositionLayout
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -55,15 +56,15 @@ class CompositionWorkspaceMode(
     }
 
     fun undo(): Boolean {
-        if (!dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.canUndo()) return false
-        dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.undo()
+        if (!UndoManager.canUndo()) return false
+        UndoManager.undo()
         editor.reconcile()
         return true
     }
 
     fun redo(): Boolean {
-        if (!dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.canRedo()) return false
-        dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.redo()
+        if (!UndoManager.canRedo()) return false
+        UndoManager.redo()
         editor.reconcile()
         return true
     }
