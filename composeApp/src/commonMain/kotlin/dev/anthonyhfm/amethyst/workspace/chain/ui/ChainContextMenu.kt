@@ -45,6 +45,7 @@ import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.destructive
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
+import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 
 private class ChainContextMenuPositionProvider(
     private val offset: IntOffset,
@@ -106,6 +107,7 @@ internal fun NavigableChainContextMenu(
     ) -> Unit,
 ) {
     var navigationStack by remember(expanded) { mutableStateOf(listOf("main")) }
+    val reducedMotion = rememberReducedMotion()
 
     ChainContextMenu(
         expanded = expanded,
@@ -115,6 +117,9 @@ internal fun NavigableChainContextMenu(
         AnimatedContent(
             targetState = navigationStack,
             transitionSpec = {
+                if (reducedMotion) {
+                    fadeIn(animationSpec = tween(0)).togetherWith(fadeOut(animationSpec = tween(0)))
+                } else {
                 val isGoingBack = targetState.size < initialState.size
                 if (isGoingBack) {
                     (fadeIn(animationSpec = tween(220, delayMillis = 90)) +
@@ -131,6 +136,7 @@ internal fun NavigableChainContextMenu(
                                 scaleOut(targetScale = 1.08f, animationSpec = tween(90)),
                         )
                 }.using(SizeTransform(clip = false))
+                }
             },
         ) { stack ->
             val level = stack.last()

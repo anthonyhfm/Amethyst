@@ -27,6 +27,7 @@ object RotateNode : CompositionNodeDefinition {
     override val label = "Rotate"
     override val hasInput = true
     override val hasOutput = true
+    override val pickerCategory = CompositionNodePickerCategory.Transform
     override val bodyHeight: Dp = 128.dp
     override val bodyWidth: Dp = 128.dp
 

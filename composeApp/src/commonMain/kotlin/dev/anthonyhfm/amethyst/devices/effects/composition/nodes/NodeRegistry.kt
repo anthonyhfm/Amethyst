@@ -11,6 +11,7 @@ object NodeRegistry {
         register(RotateNode)
         register(MirrorNode)
         register(SymmetryNode)
+        register(PinchNode)
         register(OutputNode)
     }
 
@@ -27,4 +28,7 @@ object NodeRegistry {
 
     fun defaultStateFor(type: String): CompositionNodeState =
         definitionFor(type)?.defaultState() ?: OutputNodeState
+
+    fun pickerDefinitions(category: CompositionNodePickerCategory): List<CompositionNodeDefinition> =
+        definitions.filter { it.pickerCategory == category }
 }

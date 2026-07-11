@@ -31,6 +31,7 @@ object SymmetryNode : CompositionNodeDefinition {
     override val label = "Symmetry"
     override val hasInput = true
     override val hasOutput = true
+    override val pickerCategory = CompositionNodePickerCategory.Transform
     override val bodyHeight = 180.dp
 
     override fun defaultState(): CompositionNodeState = SymmetryNodeState()

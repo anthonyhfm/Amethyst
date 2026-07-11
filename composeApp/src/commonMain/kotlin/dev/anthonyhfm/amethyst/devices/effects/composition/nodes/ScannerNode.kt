@@ -25,6 +25,7 @@ object ScannerNode : CompositionNodeDefinition {
     override val label = "Scanner"
     override val hasInput = false
     override val hasOutput = true
+    override val pickerCategory = CompositionNodePickerCategory.Generators
 
     private const val SCAN_TRAVEL_PADDING = 0.5f
     private const val SCAN_POSITION_TIE_BREAK = 0.000001f

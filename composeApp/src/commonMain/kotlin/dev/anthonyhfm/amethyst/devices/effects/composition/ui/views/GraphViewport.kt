@@ -6,19 +6,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.twotone.Delete
-import androidx.compose.material.icons.twotone.Flip
-import androidx.compose.material.icons.twotone.GridView
-import androidx.compose.material.icons.twotone.RotateLeft
-import androidx.compose.material.icons.twotone.SettingsEthernet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -41,14 +32,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
-import com.composeunstyled.Icon
-import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
@@ -59,12 +42,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withViewport
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutConnection
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.MirrorNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.SymmetryNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.OutputNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableCurve
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableSimulator
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableTarget
@@ -73,17 +51,12 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GRAPH_N
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GRAPH_NODE_TITLE_HEIGHT
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.DEFAULT_GRAPH_NODE_BODY_WIDTH
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GraphNodeShell
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CompositionNodePicker
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.drawDataCable
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.ui.theme.destructive
-import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
 import kotlin.math.roundToInt
 
 private const val GRID_STEP_DP = 40f
@@ -118,7 +91,7 @@ fun GraphViewport(
     var selectedNodeId by remember(graph.outputNodeId) { mutableStateOf(graph.outputNodeId) }
     var cableDrag by remember { mutableStateOf<CableDrag?>(null) }
     var contextMenuVisible by remember { mutableStateOf(false) }
-    var contextMenuOffset by remember { mutableStateOf(IntOffset.Zero) }
+    var contextMenuOffset by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
     var contextMenuWorldPosition by remember { mutableStateOf(NodePosition(96f, 96f)) }
     val externalViewport = graph.viewport.normalized()
     var viewport by remember { mutableStateOf(externalViewport) }
@@ -277,57 +250,61 @@ fun GraphViewport(
             .background(Color(0xFF151820), DefaultShape)
             .border(1.dp, Theme[colors][border], DefaultShape)
             .onSizeChanged { viewportSize = Size(it.width.toFloat(), it.height.toFloat()) }
-            .rightClickable { position ->
-                val world = screenToWorld(position)
-                contextMenuWorldPosition = NodePosition(world.x, world.y)
-                contextMenuOffset = IntOffset(position.x.roundToInt(), position.y.roundToInt())
-                contextMenuVisible = true
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = {
-                        selectedNodeId = ""
-                        cableDrag = null
-                        contextMenuVisible = false
-                    }
-                )
-            }
-            .pointerInput(Unit) {
-                detectTransformGestures(panZoomLock = true) { _, pan, _, _ ->
-                    if (pan != Offset.Zero) {
-                        selectedNodeId = ""
-                        contextMenuVisible = false
-                        updateViewport(
-                            viewport.copy(
-                                offsetX = viewport.offsetX + pan.x,
-                                offsetY = viewport.offsetY + pan.y,
-                            )
-                        )
-                    }
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .rightClickable { position ->
+                    val world = screenToWorld(position)
+                    contextMenuWorldPosition = NodePosition(world.x, world.y)
+                    contextMenuOffset = androidx.compose.ui.unit.DpOffset(
+                        x = (position.x / densityScale).dp,
+                        y = (position.y / densityScale).dp,
+                    )
+                    contextMenuVisible = true
                 }
-            }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull()
-                        val scroll = change?.scrollDelta ?: Offset.Zero
-                        if (scroll != Offset.Zero) {
-                            val pointerChange = change ?: continue
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            selectedNodeId = ""
+                            cableDrag = null
+                            contextMenuVisible = false
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTransformGestures(panZoomLock = true) { _, pan, _, _ ->
+                        if (pan != Offset.Zero) {
+                            selectedNodeId = ""
+                            contextMenuVisible = false
                             updateViewport(
                                 viewport.copy(
-                                    offsetX = viewport.offsetX - scroll.x * 15f,
-                                    offsetY = viewport.offsetY - scroll.y * 15f,
+                                    offsetX = viewport.offsetX + pan.x,
+                                    offsetY = viewport.offsetY + pan.y,
                                 )
                             )
-                            pointerChange.consume()
                         }
                     }
                 }
-            }
-    ) {
-        Canvas(
-            modifier = Modifier.fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull()
+                            val scroll = change?.scrollDelta ?: Offset.Zero
+                            if (scroll != Offset.Zero) {
+                                val pointerChange = change ?: continue
+                                updateViewport(
+                                    viewport.copy(
+                                        offsetX = viewport.offsetX - scroll.x * 15f,
+                                        offsetY = viewport.offsetY - scroll.y * 15f,
+                                    )
+                                )
+                                pointerChange.consume()
+                            }
+                        }
+                    }
+                },
         ) {
             val gridColor = Color(0xFF5C6370).copy(alpha = 0.34f)
             val scaledStep = GRID_STEP_DP * densityScale * viewport.zoom
@@ -342,7 +319,6 @@ fun GraphViewport(
                     x += scaledStep
                 }
             }
-
         }
 
         graph.nodes.forEach { node ->
@@ -435,7 +411,13 @@ fun GraphViewport(
                 inputPortHighlighted = node.id == highlightedInputNodeId,
                 outputPortHighlighted = node.id == highlightedOutputNodeId,
                 onNodeChange = { updated ->
-                    device.updateGraph { current -> current.withNode(updated) }
+                    device.updateGraph { current ->
+                        val currentNode = current.nodes.firstOrNull { it.id == updated.id }
+                            ?: return@updateGraph current
+                        // Controls may change only their serialised node state. Position and
+                        // graph identity always belong to the viewport's graph mutation path.
+                        current.withNode(currentNode.copy(state = updated.state))
+                    }
                 },
             )
         }
@@ -516,29 +498,19 @@ fun GraphViewport(
             )
         }
 
-        if (contextMenuVisible) {
-            Popup(
-                popupPositionProvider = GraphContextMenuPositionProvider(contextMenuOffset),
-                onDismissRequest = { contextMenuVisible = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                ContextMenuContent {
-                    AddNodeMenuContent(
-                        selectedNode = graph.nodes.firstOrNull { it.id == selectedNodeId },
-                        onAddScanner = { addNode(ScannerNode.type) },
-                        onAddRotate = { addNode(RotateNode.type) },
-                        onAddMirror = { addNode(MirrorNode.type) },
-                        onAddSymmetry = { addNode(SymmetryNode.type) },
-                        onDeleteSelected = {
-                            val selected = graph.nodes.firstOrNull { it.id == selectedNodeId } ?: return@AddNodeMenuContent
-                            selectedNodeId = graph.outputNodeId
-                            device.updateGraph { current -> current.withoutNode(selected.id) }
-                            contextMenuVisible = false
-                        },
-                    )
-                }
-            }
-        }
+        CompositionNodePicker(
+            visible = contextMenuVisible,
+            offset = contextMenuOffset,
+            selectedNode = graph.nodes.firstOrNull { it.id == selectedNodeId },
+            onDismiss = { contextMenuVisible = false },
+            onPickNode = ::addNode,
+            onDeleteSelected = {
+                val selected = graph.nodes.firstOrNull { it.id == selectedNodeId } ?: return@CompositionNodePicker
+                selectedNodeId = graph.outputNodeId
+                device.updateGraph { current -> current.withoutNode(selected.id) }
+                contextMenuVisible = false
+            },
+        )
     }
 }
 
@@ -575,69 +547,6 @@ private fun CableEndHandle(
                 )
             },
     )
-}
-
-@Composable
-private fun ColumnScope.AddNodeMenuContent(
-    selectedNode: CompositionNode?,
-    onAddScanner: () -> Unit,
-    onAddRotate: () -> Unit,
-    onAddMirror: () -> Unit,
-    onAddSymmetry: () -> Unit,
-    onDeleteSelected: () -> Unit,
-) {
-    GraphContextMenuItem("Add Scanner", Icons.TwoTone.SettingsEthernet, onAddScanner)
-    GraphContextMenuItem("Add Rotate", Icons.TwoTone.RotateLeft, onAddRotate)
-    GraphContextMenuItem("Add Mirror", Icons.TwoTone.Flip, onAddMirror)
-    GraphContextMenuItem("Add Symmetry", Icons.TwoTone.GridView, onAddSymmetry)
-    if (selectedNode != null && selectedNode.type != OutputNode.type) {
-        ContextMenuSeparator()
-        GraphContextMenuItem(
-            label = "Delete ${selectedNode.label}",
-            icon = Icons.TwoTone.Delete,
-            onClick = onDeleteSelected,
-            variant = ContextMenuItemVariant.Destructive,
-        )
-    }
-}
-
-@Composable
-private fun GraphContextMenuItem(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    variant: ContextMenuItemVariant = ContextMenuItemVariant.Default,
-) {
-    val contentColor = if (variant == ContextMenuItemVariant.Destructive) {
-        Theme[colors][destructive]
-    } else {
-        Theme[colors][popoverForeground]
-    }
-
-    ContextMenuItem(onClick = onClick, variant = variant) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(imageVector = icon, contentDescription = null, tint = contentColor)
-            Text(text = label, color = contentColor)
-        }
-    }
-}
-
-private class GraphContextMenuPositionProvider(
-    private val offset: IntOffset,
-) : PopupPositionProvider {
-    override fun calculatePosition(
-        anchorBounds: IntRect,
-        windowSize: IntSize,
-        layoutDirection: LayoutDirection,
-        popupContentSize: IntSize,
-    ): IntOffset {
-        val x = anchorBounds.left + offset.x
-        val y = anchorBounds.top + offset.y
-        return IntOffset(
-            x = x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
-            y = y.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
-        )
-    }
 }
 
 private fun GraphViewportState.normalized(): GraphViewportState =

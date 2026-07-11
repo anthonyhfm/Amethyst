@@ -151,7 +151,16 @@ fun GraphNodeShell(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(bodyHeight),
+                .height(bodyHeight)
+                // Node controls own their pointer stream. Consume after child controls have seen
+                // it so the shell's selection click and graph gestures cannot react to a drag.
+                .pointerInput(node.id) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent().changes.forEach { it.consume() }
+                        }
+                    }
+                },
         ) {
             if (definition != null) {
                 definition.NodeBody(node, onNodeChange)

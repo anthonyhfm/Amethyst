@@ -29,6 +29,28 @@ object Pincher {
         }
     }
 
+    /**
+     * Returns the source-time fraction that lands at [fraction] after [mapFraction].
+     * Temporal graph nodes evaluate this inverse mapping so their output has the exact same
+     * timing semantics as keyframes, which warps scheduled frame times forward.
+     */
+    fun inverseMapFraction(fraction: Double, pinch: Float, bilateral: Boolean): Double {
+        val target = fraction.coerceIn(0.0, 1.0)
+        if (pinch.coerceIn(-2f, 2f) == 0f && !bilateral) return target
+
+        var low = 0.0
+        var high = 1.0
+        repeat(28) {
+            val middle = (low + high) / 2.0
+            if (mapFraction(middle, pinch, bilateral) < target) {
+                low = middle
+            } else {
+                high = middle
+            }
+        }
+        return (low + high) / 2.0
+    }
+
     fun applyPinch(time: Double, total: Double, pinch: Float, bilateral: Boolean): Double {
         if (total <= 0.0) return 0.0
         val fraction = (time / total).coerceIn(0.0, 1.0)

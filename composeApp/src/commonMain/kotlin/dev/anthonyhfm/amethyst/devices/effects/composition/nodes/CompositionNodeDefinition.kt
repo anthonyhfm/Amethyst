@@ -13,6 +13,7 @@ interface CompositionNodeDefinition {
     val hasInput: Boolean
     val hasOutput: Boolean
     val isOutput: Boolean get() = false
+    val pickerCategory: CompositionNodePickerCategory? get() = null
 
     /**
      * The dimensions reserved for the node body. The engine renders the title bar and ports;
@@ -34,6 +35,12 @@ interface CompositionNodeDefinition {
     ): List<GeometryFrame> = inputFrames
 
     /**
+     * Lets temporal nodes evaluate their upstream inputs at a different point in the playback.
+     * The node itself still receives the original context in [transformFrames].
+     */
+    fun inputContext(node: CompositionNode, context: EvaluationContext): EvaluationContext = context
+
+    /**
      * Fully custom body of the node. The engine only manages the title bar, ports and
      * drag/selection chrome — the node owns all rendering and interaction below the title,
      * including its own padding and layout.
@@ -43,4 +50,10 @@ interface CompositionNodeDefinition {
         node: CompositionNode,
         onNodeChange: (CompositionNode) -> Unit,
     )
+}
+
+enum class CompositionNodePickerCategory(val label: String) {
+    Generators("Generators"),
+    Transform("Transform"),
+    Time("Time"),
 }

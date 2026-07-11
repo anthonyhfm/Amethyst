@@ -23,6 +23,8 @@ import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphProcessor
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.defaultCompositionGraph
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.PinchNodeState
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
@@ -74,13 +76,13 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
 
     fun seekTo(progress: Float) {
         val clampedProgress = progress.coerceIn(0f, 1f)
-        val durationMs = state.value.playbackOptions.durationMs().coerceAtLeast(FRAME_INTERVAL_MS)
         playbackProgress.value = clampedProgress
         renderPlaybackFrame(progress = clampedProgress, origin = playbackRun?.origin ?: playbackOrigin)
 
         if (playing.value) {
             Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-            schedulePlaybackTick(elapsedMs = durationMs * clampedProgress)
+            val run = playbackRun ?: return
+            schedulePlaybackFrame(run.firstFrameAtOrAfter(clampedProgress))
         }
     }
 
@@ -102,31 +104,74 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
     private fun startPlayback(origin: Any?, progress: Float = 0f) {
         Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
         playbackOrigin = origin
-        playbackRun = PlaybackRun(origin = origin)
+        playbackRun = PlaybackRun(origin = origin, progressFrames = buildPlaybackProgressFrames())
         playing.value = true
-        val durationMs = state.value.playbackOptions.durationMs().coerceAtLeast(FRAME_INTERVAL_MS)
-        schedulePlaybackTick(elapsedMs = durationMs * progress.coerceIn(0f, 1f))
+        schedulePlaybackFrame(playbackRun!!.firstFrameAtOrAfter(progress.coerceIn(0f, 1f)))
     }
 
-    private fun schedulePlaybackTick(elapsedMs: Double) {
-        Heaven.schedule(delayInMs = if (elapsedMs == 0.0) 0.0 else FRAME_INTERVAL_MS, owner = this, identifier = PLAYBACK_IDENTIFIER) {
+    private fun schedulePlaybackFrame(frameIndex: Int, delayMs: Double = 0.0) {
+        Heaven.schedule(delayInMs = delayMs, owner = this, identifier = PLAYBACK_IDENTIFIER) {
             val run = playbackRun ?: return@schedule
             val options = state.value.playbackOptions
             val durationMs = options.durationMs().coerceAtLeast(FRAME_INTERVAL_MS)
-            val progress = (elapsedMs / durationMs).toFloat().coerceIn(0f, 1f)
+            val progress = run.progressFrames.getOrElse(frameIndex) { 1f }
             playbackProgress.value = progress
             renderPlaybackFrame(progress = progress, origin = run.origin)
 
-            val nextElapsed = elapsedMs + FRAME_INTERVAL_MS
             when {
-                nextElapsed <= durationMs -> schedulePlaybackTick(nextElapsed)
-                options.repeat -> {
-                    playbackProgress.value = 0f
-                    schedulePlaybackTick(0.0)
+                frameIndex < run.progressFrames.lastIndex -> {
+                    val nextProgress = run.progressFrames[frameIndex + 1]
+                    schedulePlaybackFrame(
+                        frameIndex = frameIndex + 1,
+                        delayMs = ((nextProgress - progress) * durationMs).coerceAtLeast(0.0),
+                    )
                 }
-                else -> finishPlayback()
+                options.repeat -> {
+                    // Keep the terminal frame visible for one presentation interval before
+                    // restarting; otherwise it is replaced by frame zero in the same tick.
+                    Heaven.schedule(
+                        delayInMs = FRAME_INTERVAL_MS,
+                        owner = this,
+                        identifier = PLAYBACK_IDENTIFIER,
+                    ) {
+                        if (playbackRun !== run) return@schedule
+                        playbackProgress.value = 0f
+                        playbackRun = PlaybackRun(origin = run.origin, progressFrames = buildPlaybackProgressFrames())
+                        schedulePlaybackFrame(0)
+                    }
+                }
+                else -> {
+                    // Do not clear the terminal frame in the same callback that emitted it.
+                    Heaven.schedule(
+                        delayInMs = FRAME_INTERVAL_MS,
+                        owner = this,
+                        identifier = PLAYBACK_IDENTIFIER,
+                    ) {
+                        if (playbackRun === run) finishPlayback()
+                    }
+                }
             }
         }
+    }
+
+    /**
+     * Pinch moves source frames to non-uniform output times. Include those times explicitly so
+     * the live scheduler cannot jump over a compressed run of source frames.
+     */
+    private fun buildPlaybackProgressFrames(): List<Float> {
+        val frames = sortedSetOf(0f, 1f)
+        repeat(PLAYBACK_SAMPLE_COUNT + 1) { index ->
+            frames += index.toFloat() / PLAYBACK_SAMPLE_COUNT
+        }
+        state.value.graph.nodes
+            .mapNotNull { it.state as? PinchNodeState }
+            .forEach { pinch ->
+                repeat(PLAYBACK_SAMPLE_COUNT + 1) { index ->
+                    val sourceProgress = index.toDouble() / PLAYBACK_SAMPLE_COUNT
+                    frames += Pincher.mapFraction(sourceProgress, pinch.pinch, pinch.bilateral).toFloat()
+                }
+            }
+        return frames.toList()
     }
 
     private fun finishPlayback() {
@@ -221,11 +266,16 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
 
     private data class PlaybackRun(
         val origin: Any?,
-    )
+        val progressFrames: List<Float>,
+    ) {
+        fun firstFrameAtOrAfter(progress: Float): Int =
+            progressFrames.indexOfFirst { it >= progress }.takeIf { it >= 0 } ?: progressFrames.lastIndex
+    }
 
     companion object : ChainDeviceFactory<CompositionChainDeviceState> {
         private const val PLAYBACK_IDENTIFIER = "composition-playback"
         private const val FRAME_INTERVAL_MS = 16.0
+        private const val PLAYBACK_SAMPLE_COUNT = 256
         const val MIN_SPLIT_RATIO = 0.25f
         const val MAX_SPLIT_RATIO = 0.75f
 

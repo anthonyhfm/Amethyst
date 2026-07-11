@@ -80,9 +80,10 @@ object GraphProcessor {
     ): List<GeometryFrame> {
         val node = graph.node(nodeId) ?: return emptyList()
         val definition = NodeRegistry.definitionFor(node) ?: return emptyList()
+        val inputContext = definition.inputContext(node, context)
         val inputFrames = graph.connections
             .filter { it.toNodeId == node.id }
-            .flatMap { evaluateNode(graph, it.fromNodeId, context) }
+            .flatMap { evaluateNode(graph, it.fromNodeId, inputContext) }
 
         return if (definition.hasInput) {
             definition.transformFrames(node, context, inputFrames)

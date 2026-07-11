@@ -37,5 +37,12 @@ data class SymmetryNodeState(
 ) : CompositionNodeState
 
 @Serializable
+@SerialName("pinch")
+data class PinchNodeState(
+    val pinch: Float = 0f,
+    val bilateral: Boolean = false,
+) : CompositionNodeState
+
+@Serializable
 @SerialName("output")
 data object OutputNodeState : CompositionNodeState

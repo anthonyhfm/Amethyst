@@ -19,6 +19,7 @@ object MirrorNode : CompositionNodeDefinition {
     override val label = "Mirror"
     override val hasInput = true
     override val hasOutput = true
+    override val pickerCategory = CompositionNodePickerCategory.Transform
 
     override fun defaultState(): CompositionNodeState = MirrorNodeState()
     override fun acceptsState(state: CompositionNodeState): Boolean = state is MirrorNodeState
