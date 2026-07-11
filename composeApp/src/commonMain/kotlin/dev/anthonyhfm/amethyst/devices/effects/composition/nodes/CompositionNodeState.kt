@@ -10,7 +10,6 @@ sealed interface CompositionNodeState
 @SerialName("scanner")
 data class ScannerNodeState(
     val angleDegrees: Float = 0f,
-    val thickness: Float = 0.5f,
     val red: Float = 1f,
     val green: Float = 1f,
     val blue: Float = 1f,

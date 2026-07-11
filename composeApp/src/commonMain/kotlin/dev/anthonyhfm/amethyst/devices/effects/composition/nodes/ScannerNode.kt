@@ -1,19 +1,40 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ArrowUp
+import com.composables.icons.lucide.Lucide
+import com.composeunstyled.Icon
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.dot
+import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.secondary
+import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
@@ -26,6 +47,8 @@ object ScannerNode : CompositionNodeDefinition {
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
+    override val bodyWidth = 128.dp
+    override val bodyHeight = 128.dp
 
     private const val SCAN_TRAVEL_PADDING = 0.5f
     private const val SCAN_POSITION_TIE_BREAK = 0.000001f
@@ -94,7 +117,7 @@ object ScannerNode : CompositionNodeDefinition {
                 green = state.green.coerceIn(0f, 1f),
                 blue = state.blue.coerceIn(0f, 1f),
             ),
-            thickness = state.thickness.coerceIn(0.1f, 2f),
+            thickness = 1f,
             origin = context.outputOrigin,
         )
     }
@@ -105,6 +128,62 @@ object ScannerNode : CompositionNodeDefinition {
         onNodeChange: (CompositionNode) -> Unit,
     ) {
         val state = node.state as? ScannerNodeState ?: return
+        val onAngleChange = rememberUpdatedState { position: Offset, size: androidx.compose.ui.unit.IntSize ->
+            if (size.width == 0 || size.height == 0) return@rememberUpdatedState
 
+            val centerX = size.width / 2f
+            val centerY = size.height / 2f
+            val angle = (atan2(position.y - centerY, position.x - centerX) * 180.0 / PI).toFloat()
+            onNodeChange(node.copy(state = state.copy(angleDegrees = angle)))
+        }
+
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(DefaultShape)
+                    .background(Theme[colors][secondary])
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .pointerInput(Unit) {
+                        detectTapGestures { position ->
+                            onAngleChange.value(position, size)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { position -> onAngleChange.value(position, size) },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                onAngleChange.value(change.position, size)
+                            },
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Lucide.ArrowUp,
+                    contentDescription = "Scanner direction",
+                    tint = Theme[colors][foreground],
+                    modifier = Modifier
+                        .size(32.dp)
+                        .rotate(state.angleDegrees + 90f),
+                )
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val angleRadians = state.angleDegrees * PI / 180.0
+                    val distance = min(size.width, size.height) / 2f - 8.dp.toPx()
+                    drawCircle(
+                        color = Color.White,
+                        radius = 4.dp.toPx(),
+                        center = center + Offset(
+                            x = cos(angleRadians).toFloat() * distance,
+                            y = sin(angleRadians).toFloat() * distance,
+                        ),
+                    )
+                }
+            }
+        }
     }
 }
