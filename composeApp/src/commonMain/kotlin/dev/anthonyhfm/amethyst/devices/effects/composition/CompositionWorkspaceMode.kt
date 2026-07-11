@@ -24,6 +24,10 @@ class CompositionWorkspaceMode(
     override val displayName: String = "Composition"
     override val selectableMode: Boolean = false
 
+    override fun onDeactivate() {
+        device.pause()
+    }
+
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown) return false
 

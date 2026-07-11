@@ -155,13 +155,18 @@ object WorkspaceRepository {
             previousMode = current
         }
 
-        _mode.update { mode }
+        replaceMode(mode)
     }
 
     fun switchToPreviousMode() {
-        _mode.update {
-            previousMode
-        }
+        replaceMode(previousMode)
+    }
+
+    private fun replaceMode(mode: WorkspaceMode) {
+        val current = _mode.value
+        if (current == mode) return
+        current.onDeactivate()
+        _mode.update { mode }
     }
 
     @Volatile var isApplyingRemoteBpmUpdate: Boolean = false
@@ -526,9 +531,7 @@ object WorkspaceRepository {
         }
 
         if (!fromRemote) {
-            _mode.update {
-                PerformanceWorkspaceMode()
-            }
+            replaceMode(PerformanceWorkspaceMode())
         }
 
         runBlocking {
@@ -729,7 +732,7 @@ object WorkspaceRepository {
         bounds = Pair(IntOffset(0, 0), IntSize(0, 0))
         workspaceMeta = null
         _macros.update { listOf(Macro(1)) }
-        _mode.update { LayoutWorkspaceMode() }
+        replaceMode(LayoutWorkspaceMode())
         _bpm.update { 120.00 }
         _projectName.update { null }
         previousMode = LayoutWorkspaceMode()
