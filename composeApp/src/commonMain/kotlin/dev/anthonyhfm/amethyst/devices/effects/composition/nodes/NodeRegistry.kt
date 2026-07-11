@@ -14,6 +14,7 @@ object NodeRegistry {
         register(MirrorNode)
         register(SymmetryNode)
         register(PinchNode)
+        register(ReverseNode)
         register(OutputNode)
     }
 

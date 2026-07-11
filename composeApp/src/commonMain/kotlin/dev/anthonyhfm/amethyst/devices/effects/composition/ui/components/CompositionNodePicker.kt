@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.devices.effects.composition.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.Delete
 import androidx.compose.material.icons.twotone.Cyclone
+import androidx.compose.material.icons.twotone.FastRewind
 import androidx.compose.material.icons.twotone.Flip
 import androidx.compose.material.icons.twotone.GridView
 import androidx.compose.material.icons.twotone.RotateLeft
@@ -18,6 +19,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.PinchNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ReverseNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.WaterdropNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.SpiralNode
@@ -91,5 +93,6 @@ private fun nodeIcon(definition: CompositionNodeDefinition): ImageVector = when 
     MirrorNode.type -> Icons.TwoTone.Flip
     SymmetryNode.type -> Icons.TwoTone.GridView
     PinchNode.type -> Icons.TwoTone.Timer
+    ReverseNode.type -> Icons.TwoTone.FastRewind
     else -> categoryIcon(requireNotNull(definition.pickerCategory))
 }

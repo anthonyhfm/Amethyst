@@ -59,5 +59,9 @@ data class PinchNodeState(
 ) : CompositionNodeState
 
 @Serializable
+@SerialName("reverse")
+data object ReverseNodeState : CompositionNodeState
+
+@Serializable
 @SerialName("output")
 data object OutputNodeState : CompositionNodeState
