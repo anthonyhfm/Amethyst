@@ -1,17 +1,25 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
+import dev.anthonyhfm.amethyst.ui.components.DialType
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 object RotateNode : CompositionNodeDefinition {
@@ -19,6 +27,8 @@ object RotateNode : CompositionNodeDefinition {
     override val label = "Rotate"
     override val hasInput = true
     override val hasOutput = true
+    override val bodyHeight: Dp = 128.dp
+    override val bodyWidth: Dp = 128.dp
 
     override fun defaultState(): CompositionNodeState = RotateNodeState()
     override fun acceptsState(state: CompositionNodeState): Boolean = state is RotateNodeState
@@ -66,6 +76,28 @@ object RotateNode : CompositionNodeDefinition {
     ) {
         val state = node.state as? RotateNodeState ?: return
 
-        
+        Box(
+            modifier = Modifier
+                .fillMaxSize(),
+
+            contentAlignment = Alignment.Center,
+        ) {
+            Dial(
+                type = DialType.Knob,
+                title = "Rotation",
+                text = "${state.angleDegrees.roundToInt()}°",
+                value = (state.angleDegrees / 360f).coerceIn(0f, 1f),
+                defaultValue = 0f,
+                onValueChange = { value ->
+                    val angle = (value * 360f).roundToInt().toFloat()
+                    onNodeChange(node.copy(state = state.copy(angleDegrees = angle)))
+                },
+                onResolveTextValue = { value ->
+                    value.removeSuffix("°").trim().toFloatOrNull()?.let { angle ->
+                        onNodeChange(node.copy(state = state.copy(angleDegrees = angle.coerceIn(0f, 360f))))
+                    }
+                },
+            )
+        }
     }
 }

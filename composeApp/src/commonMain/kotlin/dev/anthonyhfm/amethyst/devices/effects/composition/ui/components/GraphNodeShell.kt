@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -37,8 +36,8 @@ import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
-const val GRAPH_NODE_WIDTH = 188f
-const val GRAPH_NODE_HEIGHT = 178f
+const val DEFAULT_GRAPH_NODE_BODY_WIDTH = 188f
+const val DEFAULT_GRAPH_NODE_BODY_HEIGHT = 96f
 const val GRAPH_NODE_TITLE_HEIGHT = 28f
 const val GRAPH_NODE_PORT_RADIUS = DataCableGeometry.PORT_RADIUS_DP
 const val GRAPH_NODE_PORT_TOUCH_WIDTH = 36f
@@ -66,6 +65,8 @@ fun GraphNodeShell(
     val titleBarColor = if (selected) Theme[colors][selectionSurface] else Theme[chainColorTokens][chainSurfaceRaised]
     val titleColor = if (selected) Theme[colors][selectionForeground] else Theme[colors][cardForeground]
     val definition = NodeRegistry.definitionFor(node)
+    val bodyWidth = definition?.bodyWidth ?: DEFAULT_GRAPH_NODE_BODY_WIDTH.dp
+    val bodyHeight = definition?.bodyHeight ?: DEFAULT_GRAPH_NODE_BODY_HEIGHT.dp
 
     val currentOnInputPortClick by rememberUpdatedState(onInputPortClick)
     val currentOnInputPortDragStart by rememberUpdatedState(onInputPortDragStart)
@@ -78,7 +79,7 @@ fun GraphNodeShell(
 
     Column(
         modifier = modifier
-            .width(GRAPH_NODE_WIDTH.dp)
+            .width(bodyWidth)
             .clip(DefaultShape)
             .background(Theme[chainColorTokens][chainSurface])
             .border(1.dp, titleBarColor, DefaultShape)
@@ -150,7 +151,7 @@ fun GraphNodeShell(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = definition?.bodyMinHeight ?: 72.dp),
+                .height(bodyHeight),
         ) {
             if (definition != null) {
                 definition.NodeBody(node, onNodeChange)

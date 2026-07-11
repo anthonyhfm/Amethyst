@@ -71,7 +71,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableTa
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.DataCableGeometry
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GRAPH_NODE_PORT_RADIUS
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GRAPH_NODE_TITLE_HEIGHT
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GRAPH_NODE_WIDTH
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.DEFAULT_GRAPH_NODE_BODY_WIDTH
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GraphNodeShell
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.drawDataCable
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
@@ -163,7 +163,8 @@ fun GraphViewport(
 
     fun outputPortWorld(node: CompositionNode): Offset =
         Offset(
-            node.position.x + GRAPH_NODE_WIDTH - DataCableGeometry.PORT_CENTER_INSET_DP,
+            node.position.x + (NodeRegistry.definitionFor(node)?.bodyWidth?.value
+                ?: DEFAULT_GRAPH_NODE_BODY_WIDTH) - DataCableGeometry.PORT_CENTER_INSET_DP,
             node.position.y + GRAPH_NODE_TITLE_HEIGHT / 2f,
         )
 

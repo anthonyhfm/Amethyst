@@ -15,10 +15,14 @@ interface CompositionNodeDefinition {
     val isOutput: Boolean get() = false
 
     /**
-     * Minimum height reserved for the node body. The engine renders the title bar and ports;
+     * The dimensions reserved for the node body. The engine renders the title bar and ports;
      * everything below is fully owned by [NodeBody].
+     *
+     * These defaults keep existing nodes visually unchanged while allowing each node type to
+     * opt into the space its controls need.
      */
-    val bodyMinHeight: Dp get() = 96.dp
+    val bodyWidth: Dp get() = 188.dp
+    val bodyHeight: Dp get() = 96.dp
 
     fun defaultState(): CompositionNodeState
     fun acceptsState(state: CompositionNodeState): Boolean
@@ -40,4 +44,3 @@ interface CompositionNodeDefinition {
         onNodeChange: (CompositionNode) -> Unit,
     )
 }
-

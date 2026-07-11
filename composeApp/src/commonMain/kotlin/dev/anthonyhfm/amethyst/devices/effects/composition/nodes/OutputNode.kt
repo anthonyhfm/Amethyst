@@ -29,7 +29,7 @@ object OutputNode : CompositionNodeDefinition {
     override val hasInput = true
     override val hasOutput = false
     override val isOutput = true
-    override val bodyMinHeight: Dp = 72.dp
+    override val bodyHeight: Dp = 72.dp
 
     override fun defaultState(): CompositionNodeState = OutputNodeState
     override fun acceptsState(state: CompositionNodeState): Boolean = state is OutputNodeState
