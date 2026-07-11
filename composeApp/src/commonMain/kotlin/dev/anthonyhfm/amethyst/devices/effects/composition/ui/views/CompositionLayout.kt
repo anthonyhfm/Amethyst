@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GraphSplitHandle
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.PlaybackOptions
 import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
@@ -27,6 +28,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
 @Composable
 fun CompositionLayout(
     device: CompositionChainDevice,
+    editor: CompositionGraphEditor,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
@@ -86,7 +88,7 @@ fun CompositionLayout(
             modifier = Modifier
                 .weight((1f - splitRatio).coerceIn(0.05f, 0.95f))
         ) {
-            GraphViewport(device = device)
+            GraphViewport(device = device, editor = editor)
         }
     }
 }

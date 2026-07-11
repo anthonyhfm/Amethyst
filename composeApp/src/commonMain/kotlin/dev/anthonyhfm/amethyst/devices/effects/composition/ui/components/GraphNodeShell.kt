@@ -50,7 +50,9 @@ fun GraphNodeShell(
     connectedOutput: Boolean = false,
     modifier: Modifier = Modifier,
     onSelect: () -> Unit,
+    onDragStart: () -> Unit,
     onDragBy: (Float, Float) -> Unit,
+    onDragEnd: () -> Unit,
     onInputPortClick: () -> Unit,
     onInputPortDragStart: () -> Unit,
     onInputPortDragBy: (Float, Float) -> Unit,
@@ -91,10 +93,15 @@ fun GraphNodeShell(
                 .height(GRAPH_NODE_TITLE_HEIGHT.dp)
                 .background(titleBarColor)
                 .pointerInput(node.id) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        currentOnDragBy(dragAmount.x, dragAmount.y)
-                    }
+                    detectDragGestures(
+                        onDragStart = { onDragStart() },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            currentOnDragBy(dragAmount.x, dragAmount.y)
+                        },
+                        onDragEnd = onDragEnd,
+                        onDragCancel = onDragEnd,
+                    )
                 },
         ) {
             if (definition?.hasInput == true) {

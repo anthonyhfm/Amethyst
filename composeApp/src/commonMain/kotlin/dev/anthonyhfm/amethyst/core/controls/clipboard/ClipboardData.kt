@@ -8,8 +8,16 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionConnection
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
+import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 
 sealed interface ClipboardData {
+    data class CompositionSubgraph(
+        val nodes: List<CompositionNode>,
+        val connections: List<CompositionConnection>,
+    ) : ClipboardData
+
     data class ChainDevice(
         val states: List<DeviceState>,
         val type: ChainType
@@ -48,7 +56,7 @@ sealed interface ClipboardData {
     ) : ClipboardData
 
     data class PianoRollNotes(
-        val notes: List<dev.anthonyhfm.amethyst.timeline.data.MidiNote>
+        val notes: List<MidiNote>
     ) : ClipboardData
 
     data class TimelineTracks(

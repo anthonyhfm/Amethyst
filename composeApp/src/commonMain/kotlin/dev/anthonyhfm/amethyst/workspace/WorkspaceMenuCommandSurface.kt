@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.ShortcutManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
@@ -67,23 +68,27 @@ object WorkspaceMenuCommandSurface {
                 else -> UndoManager.canRedo()
             },
             canCut = when (mode) {
+                is CompositionWorkspaceMode -> mode.editor.canCopy()
                 is TimelineWorkspaceMode -> TimelineKeyHandler.canCutSelection(selections)
                 is KeyframesWorkspaceMode -> selections.any { it is Selectable.KeyframeItem }
                 else -> ShortcutManager.canCutSelection(selections)
             },
             canCopy = when (mode) {
+                is CompositionWorkspaceMode -> mode.editor.canCopy()
                 is TimelineWorkspaceMode -> TimelineKeyHandler.canCopySelection(selections)
                 is KeyframesWorkspaceMode -> selections.any { it is Selectable.KeyframeItem }
                 else -> ShortcutManager.canCopySelection(selections)
             },
             canPaste = canPasteForMode(mode, clipboard, selections),
             canDelete = when (mode) {
+                is CompositionWorkspaceMode -> mode.editor.canDelete()
                 is TimelineWorkspaceMode -> TimelineKeyHandler.canDeleteSelection(selections)
                 is KeyframesWorkspaceMode -> mode.state.value.frames.isNotEmpty()
                 is PianoRollWorkspaceMode -> selections.any { it is Selectable.PianoRollNote }
                 else -> ShortcutManager.canDeleteSelection(selections)
             },
             canDuplicate = when (mode) {
+                is CompositionWorkspaceMode -> mode.editor.canCopy()
                 is TimelineWorkspaceMode -> TimelineKeyHandler.canDeleteSelection(selections)
                 is KeyframesWorkspaceMode -> mode.state.value.frames.isNotEmpty()
                 is PianoRollWorkspaceMode -> selections.any { it is Selectable.PianoRollNote }
@@ -94,6 +99,7 @@ object WorkspaceMenuCommandSurface {
                 else -> ShortcutManager.canRenameSelection(selections)
             },
             canSelectAll = when (mode) {
+                is CompositionWorkspaceMode -> mode.editor.canSelectAll()
                 is KeyframesWorkspaceMode -> mode.state.value.frames.isNotEmpty()
                 is PianoRollWorkspaceMode -> mode.currentEntry?.notes?.isNotEmpty() == true
                 else -> ShortcutManager.canSelectAll(mode, selections)
@@ -104,18 +110,21 @@ object WorkspaceMenuCommandSurface {
 
     fun undo(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.undo()
             else -> ShortcutManager.undo()
         }
     }
 
     fun redo(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.redo()
             else -> ShortcutManager.redo()
         }
     }
 
     fun copy(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.editor.copy()
             is TimelineWorkspaceMode -> TimelineKeyHandler.copySelection()
             is KeyframesWorkspaceMode -> mode.copySelection()
             else -> ShortcutManager.copySelection()
@@ -124,6 +133,7 @@ object WorkspaceMenuCommandSurface {
 
     fun cut(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.editor.cut()
             is TimelineWorkspaceMode -> TimelineKeyHandler.cutSelection()
             is KeyframesWorkspaceMode -> mode.cutSelection()
             else -> ShortcutManager.cutSelection()
@@ -132,6 +142,7 @@ object WorkspaceMenuCommandSurface {
 
     fun paste(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.editor.paste()
             is KeyframesWorkspaceMode -> mode.pasteSelection()
             is PianoRollWorkspaceMode -> false
             else -> ShortcutManager.pasteClipboard()
@@ -140,6 +151,7 @@ object WorkspaceMenuCommandSurface {
 
     fun delete(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.editor.delete()
             is TimelineWorkspaceMode -> TimelineKeyHandler.deleteSelection()
             is KeyframesWorkspaceMode -> mode.deleteSelection()
             is PianoRollWorkspaceMode -> mode.deleteSelectedNotes()
@@ -149,6 +161,7 @@ object WorkspaceMenuCommandSurface {
 
     fun duplicate(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.editor.duplicate()
             is TimelineWorkspaceMode -> TimelineKeyHandler.duplicateSelection()
             is KeyframesWorkspaceMode -> mode.duplicateSelection()
             is PianoRollWorkspaceMode -> mode.duplicateSelectedNotes()
@@ -165,6 +178,7 @@ object WorkspaceMenuCommandSurface {
 
     fun selectAll(): Boolean {
         return when (val mode = WorkspaceRepository.mode.value) {
+            is CompositionWorkspaceMode -> mode.editor.selectAll()
             is KeyframesWorkspaceMode -> mode.selectAllFrames()
             is PianoRollWorkspaceMode -> mode.selectAllNotes()
             else -> ShortcutManager.selectAll()
@@ -217,6 +231,7 @@ object WorkspaceMenuCommandSurface {
         clipboard ?: return false
 
         return when (mode) {
+            is CompositionWorkspaceMode -> mode.editor.canPaste(clipboard)
             is TimelineWorkspaceMode -> {
                 clipboard is ClipboardData.TimelineAudioEntries ||
                     clipboard is ClipboardData.TimelineAudioRange ||

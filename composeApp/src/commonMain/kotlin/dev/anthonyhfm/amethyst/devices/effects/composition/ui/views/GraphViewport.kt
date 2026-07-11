@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphViewportState
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.NodePosition
@@ -53,6 +55,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.DEFAULT
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GraphNodeShell
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CompositionNodePicker
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.drawDataCable
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.buildDataCablePath
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -83,12 +86,15 @@ private data class CableDrag(
 @Composable
 fun GraphViewport(
     device: CompositionChainDevice,
+    editor: CompositionGraphEditor,
     modifier: Modifier = Modifier,
 ) {
     val deviceState by device.state.collectAsState()
     val graph = deviceState.graph
     var viewportSize by remember { mutableStateOf(Size.Zero) }
-    var selectedNodeId by remember(graph.outputNodeId) { mutableStateOf(graph.outputNodeId) }
+    val selection by editor.selection.collectAsState()
+    var nodeDragBefore by remember { mutableStateOf<dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph?>(null) }
+    var draggedNodeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var cableDrag by remember { mutableStateOf<CableDrag?>(null) }
     var contextMenuVisible by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
@@ -123,8 +129,8 @@ fun GraphViewport(
 
     fun addNode(type: String) {
         val node = CompositionNode(type = type, position = contextMenuWorldPosition)
-        selectedNodeId = node.id
         device.updateGraph { current -> current.copy(nodes = current.nodes + node) }
+        editor.selectNode(node.id)
         contextMenuVisible = false
     }
 
@@ -181,6 +187,15 @@ fun GraphViewport(
     val dragState = rememberUpdatedState(cableDrag)
     // Physics stays in world space, so viewport transforms never disturb a settled cable.
     val cableThicknessPx = 2.25f * densityScale * viewport.zoom
+
+    fun connectionAt(screen: Offset): String? = graph.connections.zip(cableCurves).firstOrNull { (connection, curve) ->
+        val path = buildDataCablePath(
+            curve.copy(start = worldToScreen(curve.start), mid = worldToScreen(curve.mid), end = worldToScreen(curve.end))
+        )
+        (0..16).zipWithNext().any { (a, b) ->
+            distanceToSegment(screen, path.pointAt(a / 16f), path.pointAt(b / 16f)) <= 12f * densityScale
+        }
+    }?.first?.id
 
     LaunchedEffect(Unit) {
         var lastFrame = 0L
@@ -263,10 +278,14 @@ fun GraphViewport(
                     )
                     contextMenuVisible = true
                 }
-                .pointerInput(Unit) {
+                // Keep cable hit-testing in sync with graph edits. A Unit key would retain the
+                // graph/cable snapshot from when this handler was first composed, making cables
+                // created later impossible to select until the workspace was reopened.
+                .pointerInput(graph.connections, cableCurves, viewport) {
                     detectTapGestures(
                         onTap = {
-                            selectedNodeId = ""
+                            connectionAt(it)?.let { id -> editor.selectConnection(id, additive = isAdditiveSelection()) }
+                                ?: editor.clearSelection()
                             cableDrag = null
                             contextMenuVisible = false
                         }
@@ -275,7 +294,7 @@ fun GraphViewport(
                 .pointerInput(Unit) {
                     detectTransformGestures(panZoomLock = true) { _, pan, _, _ ->
                         if (pan != Offset.Zero) {
-                            selectedNodeId = ""
+                            editor.clearSelection()
                             contextMenuVisible = false
                             updateViewport(
                                 viewport.copy(
@@ -327,7 +346,7 @@ fun GraphViewport(
             val connectedOutput = graph.connections.any { it.fromNodeId == node.id }
             GraphNodeShell(
                 node = node,
-                selected = node.id == selectedNodeId,
+                selected = node.id in selection.nodeIds,
                 connectedInput = connectedInput,
                 connectedOutput = connectedOutput,
                 modifier = Modifier.offset {
@@ -338,19 +357,34 @@ fun GraphViewport(
                         scaleY = viewport.zoom
                         transformOrigin = TransformOrigin(0f, 0f)
                     },
-                onSelect = { selectedNodeId = node.id },
+                onSelect = { editor.selectNode(node.id, additive = isAdditiveSelection()) },
+                onDragStart = {
+                    if (node.id !in selection.nodeIds) editor.selectNode(node.id)
+                    draggedNodeIds = editor.selection.value.nodeIds
+                    nodeDragBefore = graph
+                },
                 onDragBy = { dx, dy ->
                     device.updateGraph(undoable = false) { current ->
-                        val currentNode = current.nodes.firstOrNull { it.id == node.id } ?: return@updateGraph current
-                        current.withNode(
-                            currentNode.copy(
-                                position = NodePosition(
-                                    x = currentNode.position.x + dx / (densityScale * viewport.zoom),
-                                    y = currentNode.position.y + dy / (densityScale * viewport.zoom),
-                                )
-                            )
+                        current.copy(
+                            nodes = current.nodes.map { currentNode ->
+                                if (currentNode.id in draggedNodeIds) {
+                                    currentNode.copy(
+                                        position = NodePosition(
+                                            x = currentNode.position.x + dx / (densityScale * viewport.zoom),
+                                            y = currentNode.position.y + dy / (densityScale * viewport.zoom),
+                                        )
+                                    )
+                                } else {
+                                    currentNode
+                                }
+                            },
                         )
                     }
+                },
+                onDragEnd = {
+                    nodeDragBefore?.let(device::commitGraphEdit)
+                    nodeDragBefore = null
+                    draggedNodeIds = emptySet()
                 },
                 onInputPortClick = {
                     val drag = cableDrag ?: return@GraphNodeShell
@@ -361,7 +395,7 @@ fun GraphViewport(
                 },
                 onInputPortDragStart = {
                     // Pull a new cable from an input: the free output endpoint follows the cursor.
-                    selectedNodeId = node.id
+                    editor.selectNode(node.id)
                     val anchor = inputPortScreenPosition(node)
                     cableDrag = CableDrag(
                         anchorNodeId = node.id,
@@ -385,7 +419,7 @@ fun GraphViewport(
                     cableDrag = null
                 },
                 onOutputPortDragStart = {
-                    selectedNodeId = node.id
+                    editor.selectNode(node.id)
                     val start = outputPortScreenPosition(node)
                     cableDrag = CableDrag(
                         anchorNodeId = node.id,
@@ -426,12 +460,12 @@ fun GraphViewport(
         // into their abstract port centres. This canvas has no pointer input, so node interaction
         // and the endpoint handles above it keep their existing priority.
         Canvas(modifier = Modifier.fillMaxSize()) {
-            cableCurves.forEach { world ->
+            cableCurves.forEachIndexed { index, world ->
                 val screenCurve = CableCurve(
                     start = worldToScreen(world.start),
                     mid = worldToScreen(world.mid),
                     end = worldToScreen(world.end),
-                    color = world.color,
+                    color = if (graph.connections.getOrNull(index)?.id in selection.connectionIds) Color(0xFFFFD166) else world.color,
                 )
                 drawDataCable(
                     screenCurve,
@@ -456,7 +490,7 @@ fun GraphViewport(
                 density = densityScale,
                 key = "in:${connection.id}",
                 onDragStart = {
-                    selectedNodeId = ""
+                    editor.clearSelection()
                     cableDrag = CableDrag(
                         anchorNodeId = from.id,
                         grabbedInput = true,
@@ -480,7 +514,7 @@ fun GraphViewport(
                 density = densityScale,
                 key = "out:${connection.id}",
                 onDragStart = {
-                    selectedNodeId = ""
+                    editor.clearSelection()
                     cableDrag = CableDrag(
                         anchorNodeId = to.id,
                         grabbedInput = false,
@@ -501,14 +535,11 @@ fun GraphViewport(
         CompositionNodePicker(
             visible = contextMenuVisible,
             offset = contextMenuOffset,
-            selectedNode = graph.nodes.firstOrNull { it.id == selectedNodeId },
+            selectedNode = graph.nodes.firstOrNull { it.id in selection.nodeIds },
             onDismiss = { contextMenuVisible = false },
             onPickNode = ::addNode,
             onDeleteSelected = {
-                val selected = graph.nodes.firstOrNull { it.id == selectedNodeId } ?: return@CompositionNodePicker
-                selectedNodeId = graph.outputNodeId
-                device.updateGraph { current -> current.withoutNode(selected.id) }
-                contextMenuVisible = false
+                if (editor.delete()) contextMenuVisible = false
             },
         )
     }
@@ -551,3 +582,15 @@ private fun CableEndHandle(
 
 private fun GraphViewportState.normalized(): GraphViewportState =
     copy(zoom = 1f)
+
+private fun isAdditiveSelection(): Boolean =
+    ModifierKeysState.isShiftPressed || ModifierKeysState.isCtrlPressed || ModifierKeysState.isMetaPressed
+
+private fun distanceToSegment(point: Offset, start: Offset, end: Offset): Float {
+    val segment = end - start
+    val lengthSquared = segment.x * segment.x + segment.y * segment.y
+    if (lengthSquared <= 0.0001f) return (point - start).getDistance()
+    val projected = (((point.x - start.x) * segment.x + (point.y - start.y) * segment.y) / lengthSquared)
+        .coerceIn(0f, 1f)
+    return (point - (start + segment * projected)).getDistance()
+}

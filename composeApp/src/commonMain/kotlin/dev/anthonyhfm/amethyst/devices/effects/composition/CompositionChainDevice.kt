@@ -221,14 +221,22 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
         )
     }
 
-    fun updateGraph(undoable: Boolean = true, transform: (CompositionGraph) -> CompositionGraph) {
+    fun updateGraph(undoable: Boolean = true, transform: (CompositionGraph) -> CompositionGraph): Boolean {
         val before = state.value
         val after = before.copy(graph = transform(before.graph))
-        if (before == after) return
+        if (before == after) return false
         state.value = after
         if (undoable) {
             pushStateChange(before, after)
         }
+        return true
+    }
+
+    /** Commits a graph which was updated live during a drag as one history entry. */
+    fun commitGraphEdit(beforeGraph: CompositionGraph) {
+        val after = state.value
+        val before = after.copy(graph = beforeGraph)
+        if (before != after) pushStateChange(before, after)
     }
 
     @Composable

@@ -8,6 +8,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
@@ -18,11 +19,29 @@ import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 class CompositionWorkspaceMode(
     private val device: CompositionChainDevice,
 ) : WorkspaceMode() {
+    val editor = CompositionGraphEditor(device)
     override val displayName: String = "Composition"
     override val selectableMode: Boolean = false
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown) return false
+
+        if (event.key == Key.Escape && editor.selection.value != CompositionGraphSelection()) {
+            editor.clearSelection()
+            return true
+        }
+
+        val primary = event.isCtrlPressed || event.isMetaPressed
+        when {
+            primary && event.key == Key.Z -> return if (event.isShiftPressed) redo() else undo()
+            primary && event.key == Key.Y -> return redo()
+            event.key == Key.Delete || event.key == Key.Backspace -> return editor.delete()
+            primary && event.key == Key.C -> return editor.copy()
+            primary && event.key == Key.X -> return editor.cut()
+            primary && event.key == Key.V -> return editor.paste()
+            primary && event.key == Key.D -> return editor.duplicate()
+            primary && event.key == Key.A -> return editor.selectAll()
+        }
 
         val isExitKey = event.key == Key.Escape ||
             ((event.isCtrlPressed || event.isMetaPressed) && event.key == Key.W)
@@ -35,11 +54,25 @@ class CompositionWorkspaceMode(
         return false
     }
 
+    fun undo(): Boolean {
+        if (!dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.canUndo()) return false
+        dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.undo()
+        editor.reconcile()
+        return true
+    }
+
+    fun redo(): Boolean {
+        if (!dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.canRedo()) return false
+        dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.redo()
+        editor.reconcile()
+        return true
+    }
+
     override fun onMidiInput(data: MidiInputData, offset: Offset) {
     }
 
     @Composable
     override fun Content(modifier: Modifier) {
-        CompositionLayout(device = device, modifier = modifier)
+        CompositionLayout(device = device, editor = editor, modifier = modifier)
     }
 }
