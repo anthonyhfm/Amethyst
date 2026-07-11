@@ -1,6 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
@@ -93,7 +96,7 @@ object WorkspaceRepository {
     var samplingChain: Chain = Chain()
         private set
 
-    var bounds: Pair<IntOffset, IntSize> = Pair(IntOffset(0, 0), IntSize(0, 0))
+    var bounds: Pair<IntOffset, IntSize> by mutableStateOf(IntOffset(0, 0) to IntSize(0, 0))
         private set
 
     // Only keep lightweight metadata in memory instead of the full SavableWorkspaceData

@@ -8,6 +8,8 @@ object NodeRegistry {
 
     init {
         register(ScannerNode)
+        register(WaterdropNode)
+        register(SpiralNode)
         register(RotateNode)
         register(MirrorNode)
         register(SymmetryNode)

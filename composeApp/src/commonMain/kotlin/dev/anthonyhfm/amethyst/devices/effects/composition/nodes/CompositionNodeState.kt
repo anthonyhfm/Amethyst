@@ -16,6 +16,22 @@ data class ScannerNodeState(
 ) : CompositionNodeState
 
 @Serializable
+@SerialName("waterdrop")
+data class WaterdropNodeState(
+    val originX: Float = 0.5f,
+    val originY: Float = 0.5f,
+    val curvature: Float = 2f,
+) : CompositionNodeState
+
+@Serializable
+@SerialName("spiral")
+data class SpiralNodeState(
+    val originX: Float = 0.5f,
+    val originY: Float = 0.5f,
+    val turns: Float = 2f,
+) : CompositionNodeState
+
+@Serializable
 @SerialName("rotate")
 data class RotateNodeState(
     val angleDegrees: Float = 0f,

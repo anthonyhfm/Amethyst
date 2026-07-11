@@ -2,12 +2,14 @@ package dev.anthonyhfm.amethyst.devices.effects.composition.ui.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.Delete
+import androidx.compose.material.icons.twotone.Cyclone
 import androidx.compose.material.icons.twotone.Flip
 import androidx.compose.material.icons.twotone.GridView
 import androidx.compose.material.icons.twotone.RotateLeft
 import androidx.compose.material.icons.twotone.SettingsEthernet
 import androidx.compose.material.icons.twotone.Timer
 import androidx.compose.material.icons.twotone.Transform
+import androidx.compose.material.icons.twotone.WaterDrop
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.DpOffset
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
@@ -17,6 +19,8 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.PinchNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.WaterdropNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.SpiralNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.MirrorNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.SymmetryNode
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
@@ -81,6 +85,8 @@ private fun categoryIcon(category: CompositionNodePickerCategory): ImageVector =
 
 private fun nodeIcon(definition: CompositionNodeDefinition): ImageVector = when (definition.type) {
     ScannerNode.type -> Icons.TwoTone.SettingsEthernet
+    WaterdropNode.type -> Icons.TwoTone.WaterDrop
+    SpiralNode.type -> Icons.TwoTone.Cyclone
     RotateNode.type -> Icons.TwoTone.RotateLeft
     MirrorNode.type -> Icons.TwoTone.Flip
     SymmetryNode.type -> Icons.TwoTone.GridView
