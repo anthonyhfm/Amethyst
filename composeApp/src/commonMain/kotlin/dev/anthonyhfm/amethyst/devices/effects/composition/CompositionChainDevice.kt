@@ -23,8 +23,6 @@ import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphProcessor
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.defaultCompositionGraph
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.PinchNodeState
-import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
@@ -47,6 +45,10 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
     private var playbackOrigin: Any? = this
     private val playing = mutableStateOf(false)
     private val playbackProgress = mutableStateOf(0f)
+
+    init {
+        renderAnimation()
+    }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
         val activeSignals = n.filter { it.color != Color.Black }
@@ -103,8 +105,9 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
 
     private fun startPlayback(origin: Any?, progress: Float = 0f) {
         Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
+        if (state.value.renderedAnimation.isEmpty()) renderAnimation()
         playbackOrigin = origin
-        playbackRun = PlaybackRun(origin = origin, progressFrames = buildPlaybackProgressFrames())
+        playbackRun = PlaybackRun(origin = origin, frames = state.value.renderedAnimation)
         playing.value = true
         schedulePlaybackFrame(playbackRun!!.firstFrameAtOrAfter(progress.coerceIn(0f, 1f)))
     }
@@ -114,13 +117,14 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
             val run = playbackRun ?: return@schedule
             val options = state.value.playbackOptions
             val durationMs = options.durationMs().coerceAtLeast(FRAME_INTERVAL_MS)
-            val progress = run.progressFrames.getOrElse(frameIndex) { 1f }
+            val frame = run.frames.getOrElse(frameIndex) { run.frames.last() }
+            val progress = frame.progress
             playbackProgress.value = progress
-            renderPlaybackFrame(progress = progress, origin = run.origin)
+            emitFrame(frame.signals.map { it.copy(origin = run.origin) })
 
             when {
-                frameIndex < run.progressFrames.lastIndex -> {
-                    val nextProgress = run.progressFrames[frameIndex + 1]
+                frameIndex < run.frames.lastIndex -> {
+                    val nextProgress = run.frames[frameIndex + 1].progress
                     schedulePlaybackFrame(
                         frameIndex = frameIndex + 1,
                         delayMs = ((nextProgress - progress) * durationMs).coerceAtLeast(0.0),
@@ -136,7 +140,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
                     ) {
                         if (playbackRun !== run) return@schedule
                         playbackProgress.value = 0f
-                        playbackRun = PlaybackRun(origin = run.origin, progressFrames = buildPlaybackProgressFrames())
+                        playbackRun = PlaybackRun(origin = run.origin, frames = state.value.renderedAnimation)
                         schedulePlaybackFrame(0)
                     }
                 }
@@ -154,22 +158,6 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
         }
     }
 
-    private fun buildPlaybackProgressFrames(): List<Float> {
-        val frames = mutableSetOf(0f, 1f)
-        repeat(PLAYBACK_SAMPLE_COUNT + 1) { index ->
-            frames += index.toFloat() / PLAYBACK_SAMPLE_COUNT
-        }
-        state.value.graph.nodes
-            .mapNotNull { it.state as? PinchNodeState }
-            .forEach { pinch ->
-                repeat(PLAYBACK_SAMPLE_COUNT + 1) { index ->
-                    val sourceProgress = index.toDouble() / PLAYBACK_SAMPLE_COUNT
-                    frames += Pincher.mapFraction(sourceProgress, pinch.pinch, pinch.bilateral).toFloat()
-                }
-            }
-        return frames.sorted()
-    }
-
     private fun finishPlayback() {
         playbackRun = null
         playing.value = false
@@ -183,13 +171,34 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
     }
 
     private fun renderPlaybackFrame(progress: Float, origin: Any?) {
-        emitFrame(
-            GraphProcessor.renderFrame(
-                graph = state.value.graph,
+        val frame = state.value.renderedAnimation
+            .firstOrNull { it.progress >= progress }
+            ?: state.value.renderedAnimation.lastOrNull()
+        if (frame != null) {
+            emitFrame(frame.signals.map { it.copy(origin = origin) })
+        }
+    }
+
+    /** Renders the graph once into a transient, chain-playback cache at a fixed 120 FPS. */
+    fun renderAnimation() {
+        val durationMs = playbackDurationMs().coerceAtLeast(1L)
+        val intervalMs = 1_000.0 / RENDER_FPS
+        val frameCount = kotlin.math.ceil(durationMs / intervalMs).toInt().coerceAtLeast(1)
+        val graph = state.value.graph
+        val bounds = GraphProcessor.resolveBounds()
+        val rendered = (0..frameCount).map { index ->
+            val progress = index.toFloat() / frameCount
+            RenderedCompositionFrame(
                 progress = progress,
-                outputOrigin = origin,
+                signals = GraphProcessor.renderFrame(
+                    graph = graph,
+                    progress = progress,
+                    outputOrigin = this,
+                    bounds = bounds,
+                ),
             )
-        )
+        }
+        state.value = state.value.copy(renderedAnimation = rendered)
     }
 
     private fun emitFrame(signals: List<Signal.LED>) {
@@ -270,22 +279,28 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
 
     private data class PlaybackRun(
         val origin: Any?,
-        val progressFrames: List<Float>,
+        val frames: List<RenderedCompositionFrame>,
     ) {
         fun firstFrameAtOrAfter(progress: Float): Int =
-            progressFrames.indexOfFirst { it >= progress }.takeIf { it >= 0 } ?: progressFrames.lastIndex
+            frames.indexOfFirst { it.progress >= progress }.takeIf { it >= 0 } ?: frames.lastIndex
     }
 
     companion object : ChainDeviceFactory<CompositionChainDeviceState> {
         private const val PLAYBACK_IDENTIFIER = "composition-playback"
         private const val FRAME_INTERVAL_MS = 16.0
-        private const val PLAYBACK_SAMPLE_COUNT = 256
+        private const val RENDER_FPS = 120
         const val MIN_SPLIT_RATIO = 0.25f
         const val MAX_SPLIT_RATIO = 0.75f
 
         override val stateClass = CompositionChainDeviceState::class
         override val serializer = CompositionChainDeviceState.serializer()
         override fun create() = CompositionChainDevice()
+
+        override fun unpack(state: CompositionChainDeviceState): CompositionChainDevice =
+            create().apply {
+                this.state.value = state
+                renderAnimation()
+            }
     }
 }
 
@@ -294,7 +309,14 @@ data class CompositionChainDeviceState(
     val graph: CompositionGraph = defaultCompositionGraph(),
     val playbackOptions: CompositionPlaybackOptions = CompositionPlaybackOptions(),
     val splitRatio: Float = 0.5f,
+    @kotlinx.serialization.Transient
+    val renderedAnimation: List<RenderedCompositionFrame> = emptyList(),
 ) : DeviceState()
+
+data class RenderedCompositionFrame(
+    val progress: Float,
+    val signals: List<Signal.LED>,
+)
 
 @Serializable
 data class CompositionPlaybackOptions(

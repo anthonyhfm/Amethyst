@@ -26,6 +26,7 @@ class CompositionWorkspaceMode(
 
     override fun onDeactivate() {
         device.pause()
+        device.renderAnimation()
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {

@@ -13,6 +13,7 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
@@ -453,7 +454,7 @@ object WorkspaceRepository {
             Echo.audioEnter(it.filterIsInstance<Signal.AudioSignal>())
         }
 
-        fun renderKeyframesInChain(chain: Chain): Int {
+        fun renderAnimationsInChain(chain: Chain): Int {
             var rendered = 0
             chain.devices.value.forEach { device ->
                 when (device) {
@@ -462,27 +463,32 @@ object WorkspaceRepository {
                         rendered += 1
                     }
 
+                    is CompositionChainDevice -> {
+                        device.renderAnimation()
+                        rendered += 1
+                    }
+
                     is GroupChainDevice -> {
                         device.state.value.groups.forEach {
-                            rendered += renderKeyframesInChain(it.chain)
+                            rendered += renderAnimationsInChain(it.chain)
                         }
                     }
 
                     is MultiGroupChainDevice -> {
                         device.state.value.groups.forEach {
-                            rendered += renderKeyframesInChain(it.chain)
+                            rendered += renderAnimationsInChain(it.chain)
                         }
                     }
 
                     is ChokeChainDevice -> {
-                        rendered += renderKeyframesInChain(device.state.value.chain)
+                        rendered += renderAnimationsInChain(device.state.value.chain)
                     }
                 }
             }
             return rendered
         }
 
-        renderKeyframesInChain(lightsChain)
+        renderAnimationsInChain(lightsChain)
 
         if (fromRemote) {
             syncMacrosSize(workspaceData.macros, fromRemote = true)

@@ -15,46 +15,6 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 object GraphProcessor {
-    private const val DEFAULT_FRAME_COUNT = 32
-
-    data class CompositionRenderPlan(
-        val frames: List<ScheduledFrame>,
-        val errors: List<String> = emptyList(),
-    )
-
-    data class ScheduledFrame(
-        val delayMs: Double,
-        val signals: List<Signal.LED>,
-    )
-
-    fun render(inputSignals: List<Signal.LED>, graph: CompositionGraph): CompositionRenderPlan {
-        val validation = GraphValidator.validate(graph)
-        if (!validation.isValid) {
-            return CompositionRenderPlan(frames = emptyList(), errors = validation.errors)
-        }
-
-        graph.node(graph.outputNodeId)
-            ?: return CompositionRenderPlan(emptyList(), listOf("Output node is missing."))
-        val bounds = resolveBounds()
-        val outputOrigin = inputSignals.firstOrNull()?.origin
-        val frames = (0 until DEFAULT_FRAME_COUNT).map { frameIndex ->
-            val progress = frameIndex.toFloat() / (DEFAULT_FRAME_COUNT - 1).toFloat()
-            val delay = 450.0 * progress
-            val signals = renderFrame(
-                graph = graph,
-                progress = progress,
-                outputOrigin = outputOrigin,
-                bounds = bounds,
-            )
-            ScheduledFrame(
-                delayMs = delay,
-                signals = signals,
-            )
-        }
-
-        return CompositionRenderPlan(frames = frames)
-    }
-
     fun renderFrame(
         graph: CompositionGraph,
         progress: Float,
