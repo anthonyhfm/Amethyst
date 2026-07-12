@@ -6,6 +6,7 @@ import androidx.compose.material.icons.twotone.Cyclone
 import androidx.compose.material.icons.twotone.FastRewind
 import androidx.compose.material.icons.twotone.Flip
 import androidx.compose.material.icons.twotone.GridView
+import androidx.compose.material.icons.twotone.Grain
 import androidx.compose.material.icons.twotone.RotateLeft
 import androidx.compose.material.icons.twotone.SettingsEthernet
 import androidx.compose.material.icons.twotone.Timer
@@ -21,6 +22,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.PinchNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ReverseNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NoiseNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.WaterdropNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.SpiralNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.MirrorNode
@@ -87,6 +89,7 @@ private fun categoryIcon(category: CompositionNodePickerCategory): ImageVector =
 
 private fun nodeIcon(definition: CompositionNodeDefinition): ImageVector = when (definition.type) {
     ScannerNode.type -> Icons.TwoTone.SettingsEthernet
+    NoiseNode.type -> Icons.TwoTone.Grain
     WaterdropNode.type -> Icons.TwoTone.WaterDrop
     SpiralNode.type -> Icons.TwoTone.Cyclone
     RotateNode.type -> Icons.TwoTone.RotateLeft

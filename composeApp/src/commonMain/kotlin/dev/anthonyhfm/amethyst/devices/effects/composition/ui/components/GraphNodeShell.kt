@@ -84,13 +84,14 @@ fun GraphNodeShell(
             .width(bodyWidth)
             .clip(DefaultShape)
             .background(Theme[chainColorTokens][chainSurface])
-            .border(1.dp, titleBarColor, DefaultShape),
+            .border(1.dp, titleBarColor, DefaultShape)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(GRAPH_NODE_TITLE_HEIGHT.dp)
                 .background(titleBarColor)
+                .clickable(onClick = onSelect)
                 .pointerInput(node.id) {
                     detectDragGestures(
                         onDragStart = { onDragStart() },

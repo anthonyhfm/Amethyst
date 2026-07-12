@@ -16,6 +16,13 @@ data class ScannerNodeState(
 ) : CompositionNodeState
 
 @Serializable
+@SerialName("noise")
+data class NoiseNodeState(
+    val regenerations: Int = 4,
+    val intensity: Float = 0.5f,
+) : CompositionNodeState
+
+@Serializable
 @SerialName("waterdrop")
 data class WaterdropNodeState(
     val originX: Float = 0.5f,

@@ -11,6 +11,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.distanceSquared
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 object GraphProcessor {
     private const val DEFAULT_FRAME_COUNT = 32
@@ -102,6 +103,16 @@ object GraphProcessor {
         val minY = bounds.first.y
         val maxX = minX + bounds.second.width - 1
         val maxY = minY + bounds.second.height - 1
+        if (stroke.points.size == 1 && stroke.thickness <= 0f) {
+            val point = stroke.points.first()
+            val x = point.x.roundToInt()
+            val y = point.y.roundToInt()
+            return if (x in minX..maxX && y in minY..maxY) {
+                listOf(Signal.LED(origin = stroke.origin, x = x, y = y, color = stroke.color))
+            } else {
+                emptyList()
+            }
+        }
         val maxDistanceSquared = stroke.thickness * stroke.thickness
         val signals = mutableListOf<Signal.LED>()
 
