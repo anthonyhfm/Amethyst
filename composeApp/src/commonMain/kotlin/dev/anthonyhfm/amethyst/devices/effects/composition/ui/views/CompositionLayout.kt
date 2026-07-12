@@ -20,6 +20,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevic
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GraphSplitHandle
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.PlaybackOptions
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CompositionAutomationEditor
 import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportPanBoundsPolicy
@@ -34,6 +35,7 @@ fun CompositionLayout(
     val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
     val deviceState by device.state.collectAsState()
     val splitRatio = deviceState.splitRatio
+    val automationFocus by editor.automationFocus.collectAsState()
     val handleWidthPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     var totalWidthPx by remember { mutableStateOf(0f) }
@@ -84,11 +86,9 @@ fun CompositionLayout(
             },
         )
 
-        Box(
-            modifier = Modifier
-                .weight((1f - splitRatio).coerceIn(0.05f, 0.95f))
-        ) {
-            GraphViewport(device = device, editor = editor)
+        Column(modifier = Modifier.weight((1f - splitRatio).coerceIn(0.05f, 0.95f)), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(modifier = Modifier.weight(1f)) { GraphViewport(device = device, editor = editor) }
+            if (automationFocus != null) CompositionAutomationEditor(device, editor)
         }
     }
 }

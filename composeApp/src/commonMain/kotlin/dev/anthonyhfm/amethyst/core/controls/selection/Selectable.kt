@@ -123,6 +123,30 @@ interface Selectable {
             }
         }
     }
+
+    data class CompositionAutomationLane(
+        val deviceId: String,
+        val nodeId: String,
+        val parameterId: String,
+        override val selectionUUID: String = "composition-automation-lane:$deviceId:$nodeId:$parameterId",
+    ) : Selectable
+
+    data class CompositionAutomationPoint(
+        val deviceId: String,
+        val nodeId: String,
+        val parameterId: String,
+        val pointId: String,
+        override val selectionUUID: String = "composition-automation-point:$deviceId:$nodeId:$parameterId:$pointId",
+    ) : Selectable
+
+    data class CompositionAutomationHandle(
+        val deviceId: String,
+        val nodeId: String,
+        val parameterId: String,
+        val pointId: String,
+        val incoming: Boolean,
+        override val selectionUUID: String = "composition-automation-handle:$deviceId:$nodeId:$parameterId:$pointId:${if (incoming) "in" else "out"}",
+    ) : Selectable
 }
 
 fun Selectable.TimelineEntryItem.toClipKey(): TimelineClipKey {

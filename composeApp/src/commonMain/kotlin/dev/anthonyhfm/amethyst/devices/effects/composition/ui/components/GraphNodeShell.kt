@@ -25,6 +25,10 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.theme.cardForeground
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
@@ -63,6 +67,7 @@ fun GraphNodeShell(
     inputPortHighlighted: Boolean = false,
     outputPortHighlighted: Boolean = false,
     onNodeChange: (CompositionNode) -> Unit,
+    onAutomationAction: (parameterId: String, automated: Boolean, remove: Boolean) -> Unit = { _, _, _ -> },
 ) {
     val titleBarColor = if (selected) Theme[colors][selectionSurface] else Theme[chainColorTokens][chainSurfaceRaised]
     val titleColor = if (selected) Theme[colors][selectionForeground] else Theme[colors][cardForeground]
@@ -79,8 +84,11 @@ fun GraphNodeShell(
     val currentOnOutputPortDragEnd by rememberUpdatedState(onOutputPortDragEnd)
     val currentOnDragBy by rememberUpdatedState(onDragBy)
 
+    ContextMenu(
+        modifier = modifier,
+        trigger = {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .width(bodyWidth)
             .clip(DefaultShape)
             .background(Theme[chainColorTokens][chainSurface])
@@ -178,6 +186,25 @@ fun GraphNodeShell(
                     color = Theme[colors][mutedForeground],
                     modifier = Modifier.align(Alignment.Center),
                 )
+            }
+        }
+    }
+        },
+    ) {
+        val parameters = CompositionAutomationParameters.forNode(node)
+        if (parameters.isEmpty()) {
+            ContextMenuItem(onClick = {}) { Text("No automatable values") }
+        } else {
+            parameters.forEach { parameter ->
+                val automated = node.lane(parameter.id) != null
+                ContextMenuItem(onClick = { onAutomationAction(parameter.id, automated, false) }) {
+                    Text(if (automated) "Edit ${parameter.label} Automation" else "Automate ${parameter.label}")
+                }
+                if (automated) {
+                    ContextMenuItem(onClick = { onAutomationAction(parameter.id, true, true) }) {
+                        Text("Remove ${parameter.label} Automation")
+                    }
+                }
             }
         }
     }

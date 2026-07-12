@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.distanceSquared
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automatedAt
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -79,7 +80,7 @@ object GraphProcessor {
         nodeId: String,
         context: EvaluationContext,
     ): List<GeometryFrame> {
-        val node = graph.node(nodeId) ?: return emptyList()
+        val node = (graph.node(nodeId) ?: return emptyList()).automatedAt(context.progress)
         val definition = NodeRegistry.definitionFor(node) ?: return emptyList()
         val inputContext = definition.inputContext(node, context)
         val inputFrames = graph.connections

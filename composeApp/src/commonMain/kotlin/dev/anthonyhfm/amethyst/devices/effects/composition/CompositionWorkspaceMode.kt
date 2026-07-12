@@ -40,12 +40,12 @@ class CompositionWorkspaceMode(
         when {
             primary && event.key == Key.Z -> return if (event.isShiftPressed) redo() else undo()
             primary && event.key == Key.Y -> return redo()
-            event.key == Key.Delete || event.key == Key.Backspace -> return editor.delete()
+            event.key == Key.Delete || event.key == Key.Backspace -> return editor.deleteSelectedAutomation() || editor.delete()
             primary && event.key == Key.C -> return editor.copy()
             primary && event.key == Key.X -> return editor.cut()
             primary && event.key == Key.V -> return editor.paste()
             primary && event.key == Key.D -> return editor.duplicate()
-            primary && event.key == Key.A -> return editor.selectAll()
+            primary && event.key == Key.A -> return editor.selectAllAutomationPoints() || editor.selectAll()
         }
 
         val isExitKey = event.key == Key.Escape ||

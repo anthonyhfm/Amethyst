@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.OutputNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionNodeState
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationLane
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -40,6 +41,7 @@ data class CompositionNode(
     val position: NodePosition,
     val label: String = NodeRegistry.labelFor(type),
     val state: CompositionNodeState = NodeRegistry.defaultStateFor(type),
+    val automation: List<CompositionAutomationLane> = emptyList(),
 )
 
 @Serializable

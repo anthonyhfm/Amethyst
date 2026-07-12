@@ -10,7 +10,15 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.NodePosition
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutConnection
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.node
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationLane
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -19,10 +27,112 @@ data class CompositionGraphSelection(
     val connectionIds: Set<String> = emptySet(),
 )
 
+data class CompositionAutomationFocus(val nodeId: String, val parameterId: String)
+
 /** Commands and transient selection for one Composition workspace session. */
 class CompositionGraphEditor(private val device: CompositionChainDevice) {
     private val _selection = MutableStateFlow(CompositionGraphSelection())
     val selection = _selection.asStateFlow()
+    private val _automationFocus = MutableStateFlow<CompositionAutomationFocus?>(null)
+    val automationFocus = _automationFocus.asStateFlow()
+
+    fun closeAutomation() { _automationFocus.value = null }
+
+    fun automate(nodeId: String, parameterId: String) {
+        device.updateGraph { graph ->
+            val node = graph.node(nodeId) ?: return@updateGraph graph
+            val parameter = CompositionAutomationParameters.byId(node, parameterId) ?: return@updateGraph graph
+            if (node.lane(parameterId) != null) return@updateGraph graph
+            val value = parameter.normalise(parameter.get(node))
+            graph.withNode(node.copy(automation = node.automation + CompositionAutomationLane(
+                parameterId = parameterId,
+                points = listOf(CompositionAutomationPoint(0f, value), CompositionAutomationPoint(1f, value)),
+            )))
+        }
+        _automationFocus.value = CompositionAutomationFocus(nodeId, parameterId)
+    }
+
+    fun editAutomation(nodeId: String, parameterId: String) {
+        if (device.state.value.graph.node(nodeId)?.lane(parameterId) != null) {
+            _automationFocus.value = CompositionAutomationFocus(nodeId, parameterId)
+        }
+    }
+
+    fun removeAutomation(nodeId: String, parameterId: String, progress: Float) {
+        device.updateGraph { graph ->
+            val node = graph.node(nodeId) ?: return@updateGraph graph
+            val parameter = CompositionAutomationParameters.byId(node, parameterId) ?: return@updateGraph graph
+            val lane = node.lane(parameterId) ?: return@updateGraph graph
+            val staticNode = parameter.set(node, parameter.denormalise(lane.valueAt(progress, parameter.normalise(parameter.get(node)))))
+            graph.withNode(staticNode.copy(automation = staticNode.automation.filterNot { it.parameterId == parameterId }))
+        }
+        if (_automationFocus.value == CompositionAutomationFocus(nodeId, parameterId)) closeAutomation()
+    }
+
+    fun setAutomationPoint(nodeId: String, parameterId: String, progress: Float, nativeValue: Float) {
+        device.updateGraph { graph ->
+            val node = graph.node(nodeId) ?: return@updateGraph graph
+            val parameter = CompositionAutomationParameters.byId(node, parameterId) ?: return@updateGraph graph
+            val lane = node.lane(parameterId) ?: return@updateGraph graph
+            val point = CompositionAutomationPoint(progress.coerceIn(0f, 1f), parameter.normalise(nativeValue))
+            val points = lane.points.filterNot { kotlin.math.abs(it.progress - point.progress) < .002f } + point
+            graph.withNode(node.copy(automation = node.automation.map {
+                if (it.parameterId == parameterId) it.copy(points = points).normalised() else it
+            }))
+        }
+    }
+
+    fun updateAutomationLane(nodeId: String, parameterId: String, transform: (CompositionAutomationLane) -> CompositionAutomationLane) {
+        device.updateGraph { graph ->
+            val node = graph.node(nodeId) ?: return@updateGraph graph
+            val lane = node.lane(parameterId) ?: return@updateGraph graph
+            graph.withNode(node.copy(automation = node.automation.map {
+                if (it.parameterId == parameterId) transform(lane).normalised() else it
+            }))
+        }
+    }
+
+    /** One atomic automation edit; callers keep drag previews local until this is invoked. */
+    fun replaceAutomationPoints(nodeId: String, parameterId: String, points: List<CompositionAutomationPoint>) {
+        updateAutomationLane(nodeId, parameterId) { lane -> lane.copy(points = points) }
+    }
+
+    fun deleteAutomationPoints(nodeId: String, parameterId: String, pointIds: Set<String>): Boolean {
+        val lane = device.state.value.graph.node(nodeId)?.lane(parameterId) ?: return false
+        val remaining = lane.points.filterNot { it.pointId in pointIds }
+        if (remaining.isEmpty() || remaining.size == lane.points.size) return false
+        replaceAutomationPoints(nodeId, parameterId, remaining)
+        return true
+    }
+
+    fun resetAutomationHandle(nodeId: String, parameterId: String, pointId: String, incoming: Boolean): Boolean {
+        val lane = device.state.value.graph.node(nodeId)?.lane(parameterId) ?: return false
+        val updated = lane.points.map { point ->
+            if (point.pointId != pointId) point else if (incoming) point.copy(inHandleTime = null, inHandleValue = null)
+            else point.copy(outHandleTime = null, outHandleValue = null)
+        }
+        if (updated == lane.points) return false
+        replaceAutomationPoints(nodeId, parameterId, updated)
+        return true
+    }
+
+    fun deleteSelectedAutomation(): Boolean {
+        val focus = _automationFocus.value ?: return false
+        val selections = SelectionManager.selections.value
+        val handle = selections.filterIsInstance<Selectable.CompositionAutomationHandle>()
+            .lastOrNull { it.nodeId == focus.nodeId && it.parameterId == focus.parameterId }
+        if (handle != null) return resetAutomationHandle(focus.nodeId, focus.parameterId, handle.pointId, handle.incoming)
+        val pointIds = SelectionManager.selectedCompositionAutomationPointIds(device.selectionUUID, focus.nodeId, focus.parameterId)
+        return deleteAutomationPoints(focus.nodeId, focus.parameterId, pointIds)
+    }
+
+    fun selectAllAutomationPoints(): Boolean {
+        val focus = _automationFocus.value ?: return false
+        val points = device.state.value.graph.node(focus.nodeId)?.lane(focus.parameterId)?.points.orEmpty()
+        if (points.isEmpty()) return false
+        SelectionManager.selectCompositionAutomationPoints(device.selectionUUID, focus.nodeId, focus.parameterId, points.map(CompositionAutomationPoint::pointId))
+        return true
+    }
 
     fun selectNode(id: String, additive: Boolean = false) {
         _selection.value = if (additive) {
@@ -107,6 +217,7 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
             nodeIds = _selection.value.nodeIds.intersect(nodeIds),
             connectionIds = _selection.value.connectionIds.intersect(connectionIds),
         )
+        _automationFocus.value = _automationFocus.value?.takeIf { it.nodeId in nodeIds }
     }
 
     private fun pasteSubgraph(clip: ClipboardData.CompositionSubgraph): Boolean {

@@ -112,11 +112,7 @@ object ScannerNode : CompositionNodeDefinition {
 
         return GeometryStroke(
             points = points,
-            color = Color(
-                red = state.red.coerceIn(0f, 1f),
-                green = state.green.coerceIn(0f, 1f),
-                blue = state.blue.coerceIn(0f, 1f),
-            ),
+            color = Color.White,
             thickness = 1f,
             origin = context.outputOrigin,
         )

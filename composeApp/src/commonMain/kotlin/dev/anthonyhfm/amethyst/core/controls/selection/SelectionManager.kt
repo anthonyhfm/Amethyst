@@ -137,6 +137,21 @@ object SelectionManager {
         )
     }
 
+    fun selectCompositionAutomationPoints(
+        deviceId: String, nodeId: String, parameterId: String, pointIds: Collection<String>, handle: Selectable.CompositionAutomationHandle? = null,
+    ) {
+        replaceSelections(
+            listOf(Selectable.CompositionAutomationLane(deviceId, nodeId, parameterId)) +
+                pointIds.distinct().map { Selectable.CompositionAutomationPoint(deviceId, nodeId, parameterId, it) } +
+                listOfNotNull(handle)
+        )
+    }
+
+    fun selectedCompositionAutomationPointIds(deviceId: String, nodeId: String, parameterId: String): Set<String> =
+        selections.value.filterIsInstance<Selectable.CompositionAutomationPoint>()
+            .filter { it.deviceId == deviceId && it.nodeId == nodeId && it.parameterId == parameterId }
+            .mapTo(mutableSetOf(), Selectable.CompositionAutomationPoint::pointId)
+
     fun selectedTimelineAutomationPointIds(
         trackIndex: Int,
         lane: TimelineAutomationLaneKey,

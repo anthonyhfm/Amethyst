@@ -45,6 +45,9 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withViewport
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutConnection
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automatedAt
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableCurve
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableSimulator
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableTarget
@@ -97,6 +100,7 @@ fun GraphViewport(
     var draggedNodeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var cableDrag by remember { mutableStateOf<CableDrag?>(null) }
     var contextMenuVisible by remember { mutableStateOf(false) }
+    var pendingAddedNodeId by remember { mutableStateOf<String?>(null) }
     var contextMenuOffset by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
     var contextMenuWorldPosition by remember { mutableStateOf(NodePosition(96f, 96f)) }
     val externalViewport = graph.viewport.normalized()
@@ -130,8 +134,15 @@ fun GraphViewport(
     fun addNode(type: String) {
         val node = CompositionNode(type = type, position = contextMenuWorldPosition)
         device.updateGraph { current -> current.copy(nodes = current.nodes + node) }
-        editor.selectNode(node.id)
         contextMenuVisible = false
+        pendingAddedNodeId = node.id
+    }
+
+    LaunchedEffect(pendingAddedNodeId, contextMenuVisible) {
+        pendingAddedNodeId?.takeIf { !contextMenuVisible }?.let { id ->
+            editor.selectNode(id)
+            pendingAddedNodeId = null
+        }
     }
 
     fun inputPortWorld(node: CompositionNode): Offset =
@@ -341,11 +352,13 @@ fun GraphViewport(
         }
 
         graph.nodes.forEach { node ->
+            // Render the current automation result without mutating the persisted base node.
+            val displayNode = node.automatedAt(device.playbackProgress())
             val screen = worldToScreen(Offset(node.position.x, node.position.y))
             val connectedInput = graph.connections.any { it.toNodeId == node.id }
             val connectedOutput = graph.connections.any { it.fromNodeId == node.id }
             GraphNodeShell(
-                node = node,
+                node = displayNode,
                 selected = node.id in selection.nodeIds,
                 connectedInput = connectedInput,
                 connectedOutput = connectedOutput,
@@ -450,7 +463,15 @@ fun GraphViewport(
                             ?: return@updateGraph current
                         // Controls may change only their serialised node state. Position and
                         // graph identity always belong to the viewport's graph mutation path.
-                        current.withNode(currentNode.copy(state = updated.state))
+                        val next = currentNode.copy(state = updated.state)
+                        current.withNode(next)
+                    }
+                },
+                onAutomationAction = { parameterId, automated, remove ->
+                    when {
+                        remove -> editor.removeAutomation(node.id, parameterId, device.playbackProgress())
+                        automated -> editor.editAutomation(node.id, parameterId)
+                        else -> editor.automate(node.id, parameterId)
                     }
                 },
             )
