@@ -54,13 +54,17 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
         val activeSignals = n.filter { it.color != Color.Black }
 
         activeSignals.forEach { trigger ->
-            startPlayback(trigger.origin)
+            startPlayback(origin = trigger.origin, repeat = false)
         }
     }
 
     fun play() {
         val startProgress = playbackProgress.value.takeUnless { it >= 1f } ?: 0f
-        startPlayback(origin = playbackOrigin, progress = startProgress)
+        startPlayback(
+            origin = playbackOrigin,
+            progress = startProgress,
+            repeat = state.value.playbackOptions.repeat,
+        )
     }
 
     fun pause() {
@@ -103,11 +107,11 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
         state.value = before.copy(splitRatio = clamped)
     }
 
-    private fun startPlayback(origin: Any?, progress: Float = 0f) {
+    private fun startPlayback(origin: Any?, progress: Float = 0f, repeat: Boolean) {
         Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
         if (state.value.renderedAnimation.isEmpty()) renderAnimation()
         playbackOrigin = origin
-        playbackRun = PlaybackRun(origin = origin, frames = state.value.renderedAnimation)
+        playbackRun = PlaybackRun(origin = origin, frames = state.value.renderedAnimation, repeat = repeat)
         playing.value = true
         schedulePlaybackFrame(playbackRun!!.firstFrameAtOrAfter(progress.coerceIn(0f, 1f)))
     }
@@ -130,7 +134,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
                         delayMs = ((nextProgress - progress) * durationMs).coerceAtLeast(0.0),
                     )
                 }
-                options.repeat -> {
+                run.repeat -> {
                     // Keep the terminal frame visible for one presentation interval before
                     // restarting; otherwise it is replaced by frame zero in the same tick.
                     Heaven.schedule(
@@ -140,7 +144,11 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
                     ) {
                         if (playbackRun !== run) return@schedule
                         playbackProgress.value = 0f
-                        playbackRun = PlaybackRun(origin = run.origin, frames = state.value.renderedAnimation)
+                        playbackRun = PlaybackRun(
+                            origin = run.origin,
+                            frames = state.value.renderedAnimation,
+                            repeat = true,
+                        )
                         schedulePlaybackFrame(0)
                     }
                 }
@@ -280,6 +288,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
     private data class PlaybackRun(
         val origin: Any?,
         val frames: List<RenderedCompositionFrame>,
+        val repeat: Boolean,
     ) {
         fun firstFrameAtOrAfter(progress: Float): Int =
             frames.indexOfFirst { it.progress >= progress }.takeIf { it >= 0 } ?: frames.lastIndex
