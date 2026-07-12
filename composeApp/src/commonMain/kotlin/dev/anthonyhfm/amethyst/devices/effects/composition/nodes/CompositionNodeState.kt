@@ -65,6 +65,9 @@ data class PinchNodeState(
     val bilateral: Boolean = false,
 ) : CompositionNodeState
 
+@Serializable @SerialName("move") data class MoveNodeState(val offsetX: Int = 0, val offsetY: Int = 0) : CompositionNodeState
+@Serializable @SerialName("loop") data class LoopNodeState(val startProgress: Float = 0f, val endProgress: Float = 1f, val repeats: Int = 2) : CompositionNodeState
+
 @Serializable
 @SerialName("reverse")
 data object ReverseNodeState : CompositionNodeState
