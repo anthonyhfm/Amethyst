@@ -64,6 +64,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
             origin = playbackOrigin,
             progress = startProgress,
             repeat = state.value.playbackOptions.repeat,
+            livePreview = true,
         )
     }
 
@@ -83,12 +84,17 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
     fun seekTo(progress: Float) {
         val clampedProgress = progress.coerceIn(0f, 1f)
         playbackProgress.value = clampedProgress
-        renderPlaybackFrame(progress = clampedProgress, origin = playbackRun?.origin ?: playbackOrigin)
+        val run = playbackRun
+        if (run?.livePreview != false) {
+            renderLivePlaybackFrame(progress = clampedProgress, origin = run?.origin ?: playbackOrigin)
+        } else {
+            renderPlaybackFrame(progress = clampedProgress, origin = run.origin)
+        }
 
         if (playing.value) {
             Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-            val run = playbackRun ?: return
-            schedulePlaybackFrame(run.firstFrameAtOrAfter(clampedProgress))
+            val activeRun = playbackRun ?: return
+            schedulePlaybackFrame(activeRun.firstFrameAtOrAfter(clampedProgress))
         }
     }
 
@@ -107,11 +113,21 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
         state.value = before.copy(splitRatio = clamped)
     }
 
-    private fun startPlayback(origin: Any?, progress: Float = 0f, repeat: Boolean) {
+    private fun startPlayback(
+        origin: Any?,
+        progress: Float = 0f,
+        repeat: Boolean,
+        livePreview: Boolean = false,
+    ) {
         Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-        if (state.value.renderedAnimation.isEmpty()) renderAnimation()
+        if (!livePreview && state.value.renderedAnimation.isEmpty()) renderAnimation()
         playbackOrigin = origin
-        playbackRun = PlaybackRun(origin = origin, frames = state.value.renderedAnimation, repeat = repeat)
+        playbackRun = PlaybackRun(
+            origin = origin,
+            frames = if (livePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
+            repeat = repeat,
+            livePreview = livePreview,
+        )
         playing.value = true
         schedulePlaybackFrame(playbackRun!!.firstFrameAtOrAfter(progress.coerceIn(0f, 1f)))
     }
@@ -124,7 +140,11 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
             val frame = run.frames.getOrElse(frameIndex) { run.frames.last() }
             val progress = frame.progress
             playbackProgress.value = progress
-            emitFrame(frame.signals.map { it.copy(origin = run.origin) })
+            if (run.livePreview) {
+                renderLivePlaybackFrame(progress = progress, origin = run.origin)
+            } else {
+                emitFrame(frame.signals.map { it.copy(origin = run.origin) })
+            }
 
             when {
                 frameIndex < run.frames.lastIndex -> {
@@ -146,8 +166,9 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
                         playbackProgress.value = 0f
                         playbackRun = PlaybackRun(
                             origin = run.origin,
-                            frames = state.value.renderedAnimation,
+                            frames = if (run.livePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
                             repeat = true,
+                            livePreview = run.livePreview,
                         )
                         schedulePlaybackFrame(0)
                     }
@@ -184,6 +205,24 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
             ?: state.value.renderedAnimation.lastOrNull()
         if (frame != null) {
             emitFrame(frame.signals.map { it.copy(origin = origin) })
+        }
+    }
+
+    private fun renderLivePlaybackFrame(progress: Float, origin: Any?) {
+        emitFrame(
+            GraphProcessor.renderFrame(
+                graph = state.value.graph,
+                progress = progress,
+                outputOrigin = origin,
+            )
+        )
+    }
+
+    private fun buildLivePreviewFrames(): List<RenderedCompositionFrame> {
+        val durationMs = playbackDurationMs().coerceAtLeast(1L)
+        val frameCount = kotlin.math.ceil(durationMs / (1_000.0 / RENDER_FPS)).toInt().coerceAtLeast(1)
+        return (0..frameCount).map { index ->
+            RenderedCompositionFrame(progress = index.toFloat() / frameCount, signals = emptyList())
         }
     }
 
@@ -289,6 +328,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
         val origin: Any?,
         val frames: List<RenderedCompositionFrame>,
         val repeat: Boolean,
+        val livePreview: Boolean,
     ) {
         fun firstFrameAtOrAfter(progress: Float): Int =
             frames.indexOfFirst { it.progress >= progress }.takeIf { it >= 0 } ?: frames.lastIndex
