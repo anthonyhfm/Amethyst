@@ -31,27 +31,43 @@ data class MxDeviceMidiEffect(
 @Serializable
 sealed interface MxParameter {
     val id: Int
+    val index: Int
 
     @Serializable
     data class MxDIntParameter(
         @SerialName("Id")
         override val id: Int = 0,
+        @XmlElement
+        @XmlSerialName("Index")
+        val indexObj: AbletonIndex = AbletonIndex(0),
         val timeable: MxParameterValue<Int>
-    ) : MxParameter
+    ) : MxParameter {
+        override val index: Int get() = indexObj.value
+    }
 
     @Serializable
     data class MxDEnumParameter(
         @SerialName("Id")
         override val id: Int = 0,
+        @XmlElement
+        @XmlSerialName("Index")
+        val indexObj: AbletonIndex = AbletonIndex(0),
         val timeable: MxParameterValue<Int>
-    ) : MxParameter
+    ) : MxParameter {
+        override val index: Int get() = indexObj.value
+    }
 
     @Serializable
     data class MxDFloatParameter(
         @SerialName("Id")
         override val id: Int = 0,
+        @XmlElement
+        @XmlSerialName("Index")
+        val indexObj: AbletonIndex = AbletonIndex(0),
         val timeable: MxParameterValue<Float>
-    ) : MxParameter
+    ) : MxParameter {
+        override val index: Int get() = indexObj.value
+    }
 
     @Serializable
     @SerialName("Timeable")
@@ -60,3 +76,10 @@ sealed interface MxParameter {
         val manual: AbletonManual<T>
     )
 }
+
+@Serializable
+@SerialName("Index")
+data class AbletonIndex(
+    @SerialName("Value")
+    val value: Int = 0
+)

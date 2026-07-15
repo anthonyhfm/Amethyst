@@ -198,6 +198,19 @@ class MxDeviceMidiEffectAdapter(
 
                 else -> {
                     val maxFile = PlatformFile(path)
+                    val fileName = maxFile.nameWithoutExtension.lowercase()
+
+                    if (fileName.contains("resonator")) {
+                        val paramCount = device.parameterList.parameterList.parameters.size
+                        if (paramCount >= 34) {
+                            val is301 = blob.contains("\"Up\"") || blob.contains("\"Down\"") || blob.contains("\"Left\"")
+                            return Resonator3Adapter(is301, blob, device).toDeviceStates()
+                        } else if (paramCount >= 18) {
+                            return Resonator2Adapter(blob, device).toDeviceStates()
+                        } else {
+                            return Resonator1Adapter(blob).toDeviceStates()
+                        }
+                    }
 
                     if (!MULTI_HASHES.contains(hash) && !KASKOBI_MULTI_HASHES.contains(hash)) { // Multi is handled in DrumGroupDeviceAdapter/MidiEffectGroupDeviceAdapter
                         println("Max device not supported: ${maxFile.nameWithoutExtension} - Hash: $hash")

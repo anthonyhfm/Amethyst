@@ -404,7 +404,7 @@ object AbletonConverter : AmethystConverter {
         LIVE_9
     }
 
-    private fun sanitizeAlsXml(raw: String): String = raw
+    internal fun sanitizeAlsXml(raw: String): String = raw
         .replace("> ", ">")
         .replace(" <", "<")
         .replace("\n", "")
