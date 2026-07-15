@@ -12,6 +12,7 @@ abstract class WorkspaceMode {
     open val claimMidiInputs: Boolean = false
     open val selectableMode: Boolean = false
 
+    open fun onActivate() = Unit
     open fun onDeactivate() = Unit
 
     abstract fun onKeyEvent(event: KeyEvent): Boolean

@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Waves
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
@@ -20,15 +22,23 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.serialization.Serializable
 
 private const val MIN_REGENERATIONS = 1
 private const val MAX_REGENERATIONS = 32
 private const val DEFAULT_REGENERATIONS = 4
 private const val DEFAULT_INTENSITY = 0.5f
 
+@Serializable
+data class NoiseNodeState(
+    val regenerations: Int = DEFAULT_REGENERATIONS,
+    val intensity: Float = DEFAULT_INTENSITY,
+) : CompositionNodeState
+
 object NoiseNode : CompositionNodeDefinition {
     override val type = "noise"
     override val label = "Noise"
+    override val icon = Lucide.Waves
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
@@ -36,9 +46,11 @@ object NoiseNode : CompositionNodeDefinition {
     override val bodyHeight: Dp = 128.dp
 
     override fun defaultState(): CompositionNodeState = NoiseNodeState()
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is NoiseNodeState
 
-    override fun sourceFrames(node: CompositionNode, context: EvaluationContext): List<GeometryFrame> {
+    override fun sourceFrames(
+        node: CompositionNode,
+        context: EvaluationContext,
+    ): List<GeometryFrame> {
         val state = node.state as? NoiseNodeState ?: return emptyList()
         val regenerations = state.regenerations.coerceIn(MIN_REGENERATIONS, MAX_REGENERATIONS)
         val intensity = state.intensity.coerceIn(0f, 1f)
@@ -50,14 +62,28 @@ object NoiseNode : CompositionNodeDefinition {
         val maxY = minY + context.bounds.second.height - 1
         if (maxX < minX || maxY < minY) return emptyList()
 
-        val segment = noiseSegment(context.progress, regenerations)
+        val segment = noiseSegment(
+            progress = context.progress,
+            regenerations = regenerations,
+        )
         val strokes = buildList {
             for (x in minX..maxX) {
                 for (y in minY..maxY) {
-                    if (noiseValue(node.id, x, y, segment) < intensity) {
+                    if (noiseValue(
+                            nodeId = node.id,
+                            x = x,
+                            y = y,
+                            segment = segment,
+                        ) < intensity
+                    ) {
                         add(
                             GeometryStroke(
-                                points = listOf(Vec2(x.toFloat(), y.toFloat())),
+                                points = listOf(
+                                    Vec2(
+                                        x = x.toFloat(),
+                                        y = y.toFloat(),
+                                    )
+                                ),
                                 color = Color.White,
                                 thickness = 0f,
                                 origin = context.outputOrigin,
@@ -67,11 +93,19 @@ object NoiseNode : CompositionNodeDefinition {
                 }
             }
         }
-        return listOf(GeometryFrame(timeMs = 0.0, strokes = strokes))
+        return listOf(
+            GeometryFrame(
+                timeMs = 0.0,
+                strokes = strokes,
+            )
+        )
     }
 
     @Composable
-    override fun NodeBody(node: CompositionNode, onNodeChange: (CompositionNode) -> Unit) {
+    override fun NodeBody(
+        node: CompositionNode,
+        onNodeChange: (CompositionNode) -> Unit,
+    ) {
         val state = node.state as? NoiseNodeState ?: return
         val regenerations = state.regenerations.coerceIn(MIN_REGENERATIONS, MAX_REGENERATIONS)
         val intensity = state.intensity.coerceIn(0f, 1f)
@@ -84,17 +118,29 @@ object NoiseNode : CompositionNodeDefinition {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Dial(
-                type = DialType.Steps((MIN_REGENERATIONS..MAX_REGENERATIONS).toList()),
+                type = DialType.Steps(values = (MIN_REGENERATIONS..MAX_REGENERATIONS).toList()),
                 value = regenerations,
                 defaultValue = DEFAULT_REGENERATIONS,
                 title = "Generate",
                 text = regenerations.toString(),
                 onValueChange = { value ->
-                    onNodeChange(node.copy(state = state.copy(regenerations = value.coerceIn(MIN_REGENERATIONS, MAX_REGENERATIONS))))
+                    onNodeChange(
+                        node.copy(
+                            state = state.copy(
+                                regenerations = value.coerceIn(MIN_REGENERATIONS, MAX_REGENERATIONS),
+                            )
+                        )
+                    )
                 },
                 onResolveTextValue = { value ->
                     value.trim().toIntOrNull()?.let { regenerations ->
-                        onNodeChange(node.copy(state = state.copy(regenerations = regenerations.coerceIn(MIN_REGENERATIONS, MAX_REGENERATIONS))))
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    regenerations = regenerations.coerceIn(MIN_REGENERATIONS, MAX_REGENERATIONS),
+                                )
+                            )
+                        )
                     }
                 },
             )
@@ -106,11 +152,23 @@ object NoiseNode : CompositionNodeDefinition {
                 title = "Intensity",
                 text = "${(intensity * 100).roundToInt()}%",
                 onValueChange = { value ->
-                    onNodeChange(node.copy(state = state.copy(intensity = value.coerceIn(0f, 1f))))
+                    onNodeChange(
+                        node.copy(
+                            state = state.copy(
+                                intensity = value.coerceIn(0f, 1f),
+                            )
+                        )
+                    )
                 },
                 onResolveTextValue = { value ->
                     value.removeSuffix("%").trim().toFloatOrNull()?.let { intensity ->
-                        onNodeChange(node.copy(state = state.copy(intensity = (intensity / 100f).coerceIn(0f, 1f))))
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    intensity = (intensity / 100f).coerceIn(0f, 1f),
+                                )
+                            )
+                        )
                     }
                 },
             )

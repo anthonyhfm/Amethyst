@@ -11,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.RotateCcw
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
@@ -21,10 +23,17 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class RotateNodeState(
+    val angleDegrees: Float = 0f,
+) : CompositionNodeState
 
 object RotateNode : CompositionNodeDefinition {
     override val type = "rotate"
     override val label = "Rotate"
+    override val icon = Lucide.RotateCcw
     override val hasInput = true
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Transform
@@ -32,7 +41,6 @@ object RotateNode : CompositionNodeDefinition {
     override val bodyWidth: Dp = 128.dp
 
     override fun defaultState(): CompositionNodeState = RotateNodeState()
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is RotateNodeState
 
     override fun transformFrames(
         node: CompositionNode,
@@ -41,7 +49,15 @@ object RotateNode : CompositionNodeDefinition {
     ): List<GeometryFrame> {
         val state = node.state as? RotateNodeState ?: return inputFrames
         return inputFrames.map { frame ->
-            frame.copy(strokes = frame.strokes.map { rotateStroke(it, state.angleDegrees, context) })
+            frame.copy(
+                strokes = frame.strokes.map { stroke ->
+                    rotateStroke(
+                        stroke = stroke,
+                        angleDegrees = state.angleDegrees,
+                        context = context,
+                    )
+                }
+            )
         }
     }
 
@@ -80,7 +96,6 @@ object RotateNode : CompositionNodeDefinition {
         Box(
             modifier = Modifier
                 .fillMaxSize(),
-
             contentAlignment = Alignment.Center,
         ) {
             Dial(
@@ -91,11 +106,23 @@ object RotateNode : CompositionNodeDefinition {
                 defaultValue = 0f,
                 onValueChange = { value ->
                     val angle = (value * 360f).roundToInt().toFloat()
-                    onNodeChange(node.copy(state = state.copy(angleDegrees = angle)))
+                    onNodeChange(
+                        node.copy(
+                            state = state.copy(
+                                angleDegrees = angle,
+                            )
+                        )
+                    )
                 },
                 onResolveTextValue = { value ->
                     value.removeSuffix("°").trim().toFloatOrNull()?.let { angle ->
-                        onNodeChange(node.copy(state = state.copy(angleDegrees = angle.coerceIn(0f, 360f))))
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    angleDegrees = angle.coerceIn(0f, 360f),
+                                )
+                            )
+                        )
                     }
                 },
             )

@@ -16,10 +16,15 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
+import kotlinx.serialization.Serializable
+
+@Serializable
+data object ReverseNodeState : CompositionNodeState
 
 object ReverseNode : CompositionNodeDefinition {
     override val type = "reverse"
     override val label = "Reverse"
+    override val icon = Lucide.Rewind
     override val hasInput = true
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Time
@@ -27,10 +32,13 @@ object ReverseNode : CompositionNodeDefinition {
     override val bodyWidth: Dp = 100.dp
 
     override fun defaultState(): CompositionNodeState = ReverseNodeState
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is ReverseNodeState
 
-    override fun inputContext(node: CompositionNode, context: EvaluationContext): EvaluationContext =
-        context.copy(progress = 1f - context.progress)
+    override fun inputContext(
+        node: CompositionNode,
+        context: EvaluationContext,
+    ): EvaluationContext = context.copy(
+        progress = 1f - context.progress,
+    )
 
     @Composable
     override fun NodeBody(
@@ -44,7 +52,7 @@ object ReverseNode : CompositionNodeDefinition {
             Icon(
                 imageVector = Lucide.Rewind,
                 contentDescription = null,
-                tint = Theme[colors][foreground].copy(0.5f),
+                tint = Theme[colors][foreground].copy(alpha = 0.5f),
                 modifier = Modifier.size(48.dp),
             )
         }

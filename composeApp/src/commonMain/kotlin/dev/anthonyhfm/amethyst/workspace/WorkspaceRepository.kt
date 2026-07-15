@@ -171,6 +171,7 @@ object WorkspaceRepository {
         if (current == mode) return
         current.onDeactivate()
         _mode.update { mode }
+        mode.onActivate()
     }
 
     @Volatile var isApplyingRemoteBpmUpdate: Boolean = false

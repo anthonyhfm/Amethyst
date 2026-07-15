@@ -29,10 +29,15 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import kotlinx.serialization.Serializable
+
+@Serializable
+data object OutputNodeState : CompositionNodeState
 
 object OutputNode : CompositionNodeDefinition {
     override val type = "output"
     override val label = "Output"
+    override val icon = Lucide.Plug
     override val hasInput = true
     override val hasOutput = false
     override val isOutput = true
@@ -40,7 +45,6 @@ object OutputNode : CompositionNodeDefinition {
     override val bodyWidth: Dp = 100.dp
 
     override fun defaultState(): CompositionNodeState = OutputNodeState
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is OutputNodeState
 
     @Composable
     override fun NodeBody(
@@ -56,7 +60,7 @@ object OutputNode : CompositionNodeDefinition {
             Icon(
                 imageVector = Lucide.Plug,
                 contentDescription = null,
-                tint = Theme[colors][foreground].copy(0.5f),
+                tint = Theme[colors][foreground].copy(alpha = 0.5f),
                 modifier = Modifier
                     .size(48.dp)
             )

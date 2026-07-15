@@ -1,39 +1,24 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.ui.components
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.twotone.Delete
-import androidx.compose.material.icons.twotone.Cyclone
-import androidx.compose.material.icons.twotone.FastRewind
-import androidx.compose.material.icons.twotone.Flip
-import androidx.compose.material.icons.twotone.GridView
-import androidx.compose.material.icons.twotone.Grain
-import androidx.compose.material.icons.twotone.RotateLeft
-import androidx.compose.material.icons.twotone.SettingsEthernet
-import androidx.compose.material.icons.twotone.Timer
-import androidx.compose.material.icons.twotone.Transform
-import androidx.compose.material.icons.twotone.WaterDrop
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.DpOffset
+import com.composables.icons.lucide.Cable
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Move
+import com.composables.icons.lucide.Palette
+import com.composables.icons.lucide.Timer
+import com.composables.icons.lucide.Trash2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionNodeDefinition
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionNodePickerCategory
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.PinchNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ReverseNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NoiseNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.WaterdropNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.SpiralNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.MirrorNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.SymmetryNode
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainContextMenuItem
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainContextMenuSubmenuItem
 import dev.anthonyhfm.amethyst.workspace.chain.ui.NavigableChainContextMenu
 
-@androidx.compose.runtime.Composable
+@Composable
 fun CompositionNodePicker(
     visible: Boolean,
     offset: DpOffset,
@@ -60,7 +45,7 @@ fun CompositionNodePicker(
                     ContextMenuSeparator()
                     ChainContextMenuItem(
                         label = "Delete ${selectedNode.label}",
-                        icon = Icons.TwoTone.Delete,
+                        icon = Lucide.Trash2,
                         variant = ContextMenuItemVariant.Destructive,
                         onClick = onDeleteSelected,
                     )
@@ -72,7 +57,7 @@ fun CompositionNodePicker(
                     NodeRegistry.pickerDefinitions(category).forEach { definition ->
                         ChainContextMenuItem(
                             label = definition.label,
-                            icon = nodeIcon(definition),
+                            icon = definition.icon,
                             onClick = { onPickNode(definition.type) },
                         )
                     }
@@ -82,20 +67,8 @@ fun CompositionNodePicker(
 }
 
 private fun categoryIcon(category: CompositionNodePickerCategory): ImageVector = when (category) {
-    CompositionNodePickerCategory.Generators -> Icons.TwoTone.SettingsEthernet
-    CompositionNodePickerCategory.Transform -> Icons.TwoTone.Transform
-    CompositionNodePickerCategory.Time -> Icons.TwoTone.Timer
-}
-
-private fun nodeIcon(definition: CompositionNodeDefinition): ImageVector = when (definition.type) {
-    ScannerNode.type -> Icons.TwoTone.SettingsEthernet
-    NoiseNode.type -> Icons.TwoTone.Grain
-    WaterdropNode.type -> Icons.TwoTone.WaterDrop
-    SpiralNode.type -> Icons.TwoTone.Cyclone
-    RotateNode.type -> Icons.TwoTone.RotateLeft
-    MirrorNode.type -> Icons.TwoTone.Flip
-    SymmetryNode.type -> Icons.TwoTone.GridView
-    PinchNode.type -> Icons.TwoTone.Timer
-    ReverseNode.type -> Icons.TwoTone.FastRewind
-    else -> categoryIcon(requireNotNull(definition.pickerCategory))
+    CompositionNodePickerCategory.Generators -> Lucide.Cable
+    CompositionNodePickerCategory.Transform -> Lucide.Move
+    CompositionNodePickerCategory.Color -> Lucide.Palette
+    CompositionNodePickerCategory.Time -> Lucide.Timer
 }

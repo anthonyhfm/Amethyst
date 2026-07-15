@@ -8,6 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Shrink
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
@@ -19,10 +21,18 @@ import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.roundToInt
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class PinchNodeState(
+    val pinch: Float = 0f,
+    val bilateral: Boolean = false,
+) : CompositionNodeState
 
 object PinchNode : CompositionNodeDefinition {
     override val type = "pinch"
     override val label = "Pinch"
+    override val icon = Lucide.Shrink
     override val hasInput = true
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Time
@@ -30,7 +40,6 @@ object PinchNode : CompositionNodeDefinition {
     override val bodyHeight = 128.dp
 
     override fun defaultState(): CompositionNodeState = PinchNodeState()
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is PinchNodeState
 
     override fun inputContext(node: CompositionNode, context: EvaluationContext): EvaluationContext {
         val state = node.state as? PinchNodeState ?: return context
@@ -44,23 +53,42 @@ object PinchNode : CompositionNodeDefinition {
     }
 
     @Composable
-    override fun NodeBody(node: CompositionNode, onNodeChange: (CompositionNode) -> Unit) {
+    override fun NodeBody(
+        node: CompositionNode,
+        onNodeChange: (CompositionNode) -> Unit,
+    ) {
         val state = node.state as? PinchNodeState ?: return
         val clampedPinch = state.pinch.coerceIn(-2f, 2f)
 
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(
+                space = 4.dp,
+                alignment = Alignment.CenterVertically,
+            ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             PinchGraph(
                 pinch = clampedPinch,
                 onPinchChange = { value ->
-                    onNodeChange(node.copy(state = state.copy(pinch = value.coerceIn(-2f, 2f))))
+                    onNodeChange(
+                        node.copy(
+                            state = state.copy(
+                                pinch = value.coerceIn(-2f, 2f),
+                            )
+                        )
+                    )
                 },
                 bilateral = state.bilateral,
                 onToggleBilateral = {
-                    onNodeChange(node.copy(state = state.copy(pinch = 0f, bilateral = !state.bilateral)))
+                    onNodeChange(
+                        node.copy(
+                            state = state.copy(
+                                pinch = 0f,
+                                bilateral = !state.bilateral,
+                            )
+                        )
+                    )
                 },
                 modifier = Modifier.size(80.dp),
             )

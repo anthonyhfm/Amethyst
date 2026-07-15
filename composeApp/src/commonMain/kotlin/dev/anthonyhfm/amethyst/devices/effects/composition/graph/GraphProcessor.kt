@@ -33,6 +33,8 @@ object GraphProcessor {
             .flatMap { evaluateNode(graph, it.fromNodeId, context) }
             .flatMap { it.strokes }
             .flatMap { stroke -> rasterizeStroke(stroke, bounds) }
+            .groupBy { it.x to it.y }
+            .map { (_, samples) -> samples.reduce(::over) }
     }
 
     private fun evaluateNode(
@@ -69,7 +71,10 @@ object GraphProcessor {
             val x = point.x.roundToInt()
             val y = point.y.roundToInt()
             return if (x in minX..maxX && y in minY..maxY) {
-                listOf(Signal.LED(origin = stroke.origin, x = x, y = y, color = stroke.color))
+                val sample = Vec2(x.toFloat(), y.toFloat())
+                val color = stroke.paint.colorAt(sample, bounds)
+                val opacity = (color.alpha * stroke.paint.opacityAt(sample, bounds)).coerceIn(0f, 1f)
+                if (opacity > 0f) listOf(Signal.LED(origin = stroke.origin, x = x, y = y, color = color.copy(alpha = 1f), opacity = opacity)) else emptyList()
             } else {
                 emptyList()
             }
@@ -82,12 +87,23 @@ object GraphProcessor {
                 val point = Vec2(x.toFloat(), y.toFloat())
                 val distanceSquared = distanceToPolylineSquared(point, stroke.points)
                 if (distanceSquared <= maxDistanceSquared) {
-                    signals.add(Signal.LED(origin = stroke.origin, x = x, y = y, color = stroke.color))
+                    val pointColor = stroke.paint.colorAt(point, bounds)
+                    val opacity = (pointColor.alpha * stroke.paint.opacityAt(point, bounds)).coerceIn(0f, 1f)
+                    if (opacity > 0f) signals.add(Signal.LED(origin = stroke.origin, x = x, y = y, color = pointColor.copy(alpha = 1f), opacity = opacity))
                 }
             }
         }
 
         return signals
+    }
+
+    private fun over(bottom: Signal.LED, top: Signal.LED): Signal.LED {
+        val topAlpha = top.opacity.coerceIn(0f, 1f)
+        val bottomAlpha = bottom.opacity.coerceIn(0f, 1f)
+        val alpha = topAlpha + bottomAlpha * (1f - topAlpha)
+        if (alpha <= 0f) return top.copy(color = androidx.compose.ui.graphics.Color.Black, opacity = 0f)
+        fun channel(a: Float, b: Float) = (a * topAlpha + b * bottomAlpha * (1f - topAlpha)) / alpha
+        return top.copy(color = androidx.compose.ui.graphics.Color(channel(top.color.red, bottom.color.red), channel(top.color.green, bottom.color.green), channel(top.color.blue, bottom.color.blue)), opacity = alpha)
     }
 
     private fun distanceToPolylineSquared(point: Vec2, polyline: List<Vec2>): Float {

@@ -1,41 +1,34 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.composeunstyled.theme.Theme
-import com.composeunstyled.Text
+import com.composables.icons.lucide.Grid3x3
+import com.composables.icons.lucide.Lucide
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
-import dev.anthonyhfm.amethyst.ui.components.primitives.Select
-import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
-import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
-import dev.anthonyhfm.amethyst.ui.theme.small
-import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.abs
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class SymmetryNodeState(
+    val mode: String = "mirror-half",
+    val axis: String = "horizontal",
+    val sourceAnchor: String = "bl",
+) : CompositionNodeState
 
 object SymmetryNode : CompositionNodeDefinition {
     override val type = "symmetry"
     override val label = "Symmetry"
+    override val icon = Lucide.Grid3x3
     override val hasInput = true
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Transform
     override val bodyHeight = 180.dp
 
     override fun defaultState(): CompositionNodeState = SymmetryNodeState()
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is SymmetryNodeState
 
     override fun transformFrames(
         node: CompositionNode,
@@ -44,7 +37,15 @@ object SymmetryNode : CompositionNodeDefinition {
     ): List<GeometryFrame> {
         val state = node.state as? SymmetryNodeState ?: return inputFrames
         return inputFrames.map { frame ->
-            frame.copy(strokes = frame.strokes.flatMap { applySymmetry(it, state, context) })
+            frame.copy(
+                strokes = frame.strokes.flatMap { stroke ->
+                    applySymmetry(
+                        stroke = stroke,
+                        state = state,
+                        context = context,
+                    )
+                }
+            )
         }
     }
 

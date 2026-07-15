@@ -15,17 +15,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Orbit
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.WorkspaceOriginSelector
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
+import kotlinx.serialization.Serializable
 
 private const val SPIRAL_TRAVEL_SPAN = 18f
 private const val SPIRAL_STRIDE = 4.5f
@@ -33,9 +37,17 @@ private const val MIN_TURNS = 0.25f
 private const val MAX_TURNS = 8f
 private const val POLYLINE_STEP = 1f
 
+@Serializable
+data class SpiralNodeState(
+    val originX: Float = 0.5f,
+    val originY: Float = 0.5f,
+    val turns: Float = 2f,
+) : CompositionNodeState
+
 object SpiralNode : CompositionNodeDefinition {
     override val type = "spiral"
     override val label = "Spiral"
+    override val icon = Lucide.Orbit
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
@@ -43,11 +55,13 @@ object SpiralNode : CompositionNodeDefinition {
     override val bodyHeight: Dp = 208.dp
 
     override fun defaultState(): CompositionNodeState = SpiralNodeState()
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is SpiralNodeState
 
-    override fun sourceFrames(node: CompositionNode, context: EvaluationContext): List<GeometryFrame> {
+    override fun sourceFrames(
+        node: CompositionNode,
+        context: EvaluationContext,
+    ): List<GeometryFrame> {
         val state = node.state as? SpiralNodeState ?: return emptyList()
-        val center = state.resolveOrigin(context.bounds)
+        val center = state.resolveOrigin(bounds = context.bounds)
         val targetDistance = context.progress.coerceIn(0f, 1f) * SPIRAL_TRAVEL_SPAN
         val turns = state.turns.coerceIn(MIN_TURNS, MAX_TURNS)
         val angleSteps = max(
@@ -59,11 +73,18 @@ object SpiralNode : CompositionNodeDefinition {
                 val angleFraction = index.toFloat() / angleSteps
                 val radius = targetDistance - angleFraction * turns * SPIRAL_STRIDE
                 if (radius < 0f) {
-                    if (size == 1) add(center)
+                    if (size == 1) {
+                        add(center)
+                    }
                     break
                 }
                 val angle = angleFraction * 2f * PI.toFloat()
-                add(Vec2(center.x + cos(angle) * radius, center.y + sin(angle) * radius))
+                add(
+                    Vec2(
+                        x = center.x + cos(angle) * radius,
+                        y = center.y + sin(angle) * radius,
+                    )
+                )
             }
         }
         if (points.size < 2) return emptyList()
@@ -77,14 +98,17 @@ object SpiralNode : CompositionNodeDefinition {
                         color = Color.White,
                         thickness = 1f,
                         origin = context.outputOrigin,
-                    ),
+                    )
                 ),
-            ),
+            )
         )
     }
 
     @Composable
-    override fun NodeBody(node: CompositionNode, onNodeChange: (CompositionNode) -> Unit) {
+    override fun NodeBody(
+        node: CompositionNode,
+        onNodeChange: (CompositionNode) -> Unit,
+    ) {
         val state = node.state as? SpiralNodeState ?: return
         val bounds = WorkspaceRepository.bounds.validOrFallbackBounds()
         val onOriginChange = rememberUpdatedState { position: Offset, size: IntSize ->
@@ -94,8 +118,8 @@ object SpiralNode : CompositionNodeDefinition {
                     state = state.copy(
                         originX = (position.x / size.width).coerceIn(0f, 1f),
                         originY = (position.y / size.height).coerceIn(0f, 1f),
-                    ),
-                ),
+                    )
+                )
             )
         }
 
@@ -105,22 +129,35 @@ object SpiralNode : CompositionNodeDefinition {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            WorkspaceOriginPicker(
+            WorkspaceOriginSelector(
                 originX = state.originX,
                 originY = state.originY,
                 bounds = bounds,
-                onOriginChange = { position, size -> onOriginChange.value(position, size) },
-                modifier = Modifier.weight(1f, fill = true),
+                onOriginChange = { position, size ->
+                    onOriginChange.value(position, size)
+                },
+                modifier = Modifier.weight(
+                    weight = 1f,
+                    fill = true,
+                ),
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(
+                modifier = Modifier.height(12.dp)
+            )
 
             LabeledSlider(
                 label = "Turns",
                 value = state.turns,
                 range = MIN_TURNS..MAX_TURNS,
                 onValueChange = { turns ->
-                    onNodeChange(node.copy(state = state.copy(turns = turns.coerceIn(MIN_TURNS, MAX_TURNS))))
+                    onNodeChange(
+                        node.copy(
+                            state = state.copy(
+                                turns = turns.coerceIn(MIN_TURNS, MAX_TURNS),
+                            )
+                        )
+                    )
                 },
             )
         }

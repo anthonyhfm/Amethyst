@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Scan
 import com.composeunstyled.Icon
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
@@ -40,10 +41,20 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ScannerNodeState(
+    val angleDegrees: Float = 0f,
+    val red: Float = 1f,
+    val green: Float = 1f,
+    val blue: Float = 1f,
+) : CompositionNodeState
 
 object ScannerNode : CompositionNodeDefinition {
     override val type = "scanner"
     override val label = "Scanner"
+    override val icon = Lucide.Scan
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
@@ -55,7 +66,6 @@ object ScannerNode : CompositionNodeDefinition {
     private const val POLYLINE_STEP = 1f
 
     override fun defaultState(): CompositionNodeState = ScannerNodeState()
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is ScannerNodeState
 
     override fun sourceFrames(node: CompositionNode, context: EvaluationContext): List<GeometryFrame> {
         val state = node.state as? ScannerNodeState ?: return emptyList()
@@ -130,7 +140,13 @@ object ScannerNode : CompositionNodeDefinition {
             val centerX = size.width / 2f
             val centerY = size.height / 2f
             val angle = (atan2(position.y - centerY, position.x - centerX) * 180.0 / PI).toFloat()
-            onNodeChange(node.copy(state = state.copy(angleDegrees = angle)))
+            onNodeChange(
+                node.copy(
+                    state = state.copy(
+                        angleDegrees = angle,
+                    )
+                )
+            )
         }
 
         Box(
@@ -144,13 +160,17 @@ object ScannerNode : CompositionNodeDefinition {
                     .background(Theme[colors][secondary])
                     .pointerHoverIcon(PointerIcon.Hand)
                     .pointerInput(Unit) {
-                        detectTapGestures { position ->
-                            onAngleChange.value(position, size)
-                        }
+                        detectTapGestures(
+                            onTap = { position ->
+                                onAngleChange.value(position, size)
+                            }
+                        )
                     }
                     .pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { position -> onAngleChange.value(position, size) },
+                            onDragStart = { position ->
+                                onAngleChange.value(position, size)
+                            },
                             onDrag = { change, _ ->
                                 change.consume()
                                 onAngleChange.value(change.position, size)
@@ -167,7 +187,9 @@ object ScannerNode : CompositionNodeDefinition {
                         .size(32.dp)
                         .rotate(state.angleDegrees + 90f),
                 )
-                Canvas(modifier = Modifier.fillMaxSize()) {
+                Canvas(
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     val angleRadians = state.angleDegrees * PI / 180.0
                     val distance = min(size.width, size.height) / 2f - 8.dp.toPx()
                     drawCircle(

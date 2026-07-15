@@ -11,6 +11,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.views.CompositionLayout
@@ -23,9 +24,16 @@ class CompositionWorkspaceMode(
     val editor = CompositionGraphEditor(device)
     override val displayName: String = "Composition"
     override val selectableMode: Boolean = false
+    override val claimMidiInputs: Boolean = true
+
+    override fun onActivate() {
+        Heaven.clear()
+        device.startWorkspacePreview()
+    }
 
     override fun onDeactivate() {
-        device.pause()
+        device.stopWorkspacePreview()
+        Heaven.clear()
         device.renderAnimation()
     }
 
@@ -75,6 +83,9 @@ class CompositionWorkspaceMode(
     }
 
     override fun onMidiInput(data: MidiInputData, offset: Offset) {
+        if (data.velocity != 0) {
+            device.triggerWorkspacePreview()
+        }
     }
 
     @Composable

@@ -18,6 +18,15 @@ object NodeRegistry {
         register(MoveNode)
         register(LoopNode)
         register(ReverseNode)
+        register(LineNode)
+        register(ColorNode)
+        register(TimeCutNode)
+        register(VortexNode)
+        register(FocusNode)
+        register(ColorShiftNode)
+        register(TimeWrapNode)
+        register(SliceNode)
+        register(FrameLimitNode)
         register(OutputNode)
     }
 
@@ -28,7 +37,7 @@ object NodeRegistry {
     fun definitionFor(type: String): CompositionNodeDefinition? = definitionsByType[type]
 
     fun definitionFor(node: CompositionNode): CompositionNodeDefinition? =
-        definitionFor(node.type)?.takeIf { it.acceptsState(node.state) }
+        definitionFor(node.type)
 
     fun labelFor(type: String): String = definitionFor(type)?.label ?: type
 

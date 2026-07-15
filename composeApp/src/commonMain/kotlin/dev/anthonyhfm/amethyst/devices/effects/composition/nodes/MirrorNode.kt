@@ -22,6 +22,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.FlipHorizontal2
+import com.composables.icons.lucide.Lucide
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
@@ -37,10 +39,17 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class MirrorNodeState(
+    val angleDegrees: Float = 90f,
+) : CompositionNodeState
 
 object MirrorNode : CompositionNodeDefinition {
     override val type = "mirror"
     override val label = "Mirror"
+    override val icon = Lucide.FlipHorizontal2
     override val hasInput = true
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Transform
@@ -48,7 +57,6 @@ object MirrorNode : CompositionNodeDefinition {
     override val bodyHeight = 128.dp
 
     override fun defaultState(): CompositionNodeState = MirrorNodeState()
-    override fun acceptsState(state: CompositionNodeState): Boolean = state is MirrorNodeState
 
     override fun transformFrames(
         node: CompositionNode,
@@ -57,7 +65,15 @@ object MirrorNode : CompositionNodeDefinition {
     ): List<GeometryFrame> {
         val state = node.state as? MirrorNodeState ?: return inputFrames
         return inputFrames.map { frame ->
-            frame.copy(strokes = frame.strokes.map { mirrorStroke(it, state.angleDegrees, context) })
+            frame.copy(
+                strokes = frame.strokes.map { stroke ->
+                    mirrorStroke(
+                        stroke = stroke,
+                        angleDegrees = state.angleDegrees,
+                        context = context,
+                    )
+                }
+            )
         }
     }
 
@@ -105,7 +121,13 @@ object MirrorNode : CompositionNodeDefinition {
                 position.y - size.height / 2f,
                 position.x - size.width / 2f,
             ) * 180.0 / PI).toFloat()
-            onNodeChange(node.copy(state = state.copy(angleDegrees = angle)))
+            onNodeChange(
+                node.copy(
+                    state = state.copy(
+                        angleDegrees = angle,
+                    )
+                )
+            )
         }
 
         Box(
@@ -120,11 +142,17 @@ object MirrorNode : CompositionNodeDefinition {
                     .semantics { contentDescription = "Mirror axis" }
                     .pointerHoverIcon(PointerIcon.Hand)
                     .pointerInput(Unit) {
-                        detectTapGestures { position -> onAngleChange.value(position, size) }
+                        detectTapGestures(
+                            onTap = { position ->
+                                onAngleChange.value(position, size)
+                            }
+                        )
                     }
                     .pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { position -> onAngleChange.value(position, size) },
+                            onDragStart = { position ->
+                                onAngleChange.value(position, size)
+                            },
                             onDrag = { change, _ ->
                                 change.consume()
                                 onAngleChange.value(change.position, size)
@@ -132,7 +160,9 @@ object MirrorNode : CompositionNodeDefinition {
                         )
                     },
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
+                Canvas(
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     val angleRadians = state.angleDegrees * PI / 180.0
                     val direction = Offset(
                         x = cos(angleRadians).toFloat(),
@@ -151,12 +181,18 @@ object MirrorNode : CompositionNodeDefinition {
                         strokeWidth = 2.dp.toPx(),
                         cap = StrokeCap.Round,
                     )
-                    drawCircle(color = Color.White, radius = markerRadius, center = filledEndpoint)
+                    drawCircle(
+                        color = Color.White,
+                        radius = markerRadius,
+                        center = filledEndpoint,
+                    )
                     drawCircle(
                         color = Color.White,
                         radius = markerRadius,
                         center = hollowEndpoint,
-                        style = Stroke(width = 2.dp.toPx()),
+                        style = Stroke(
+                            width = 2.dp.toPx(),
+                        ),
                     )
                 }
             }
