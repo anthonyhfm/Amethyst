@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Scissors
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
@@ -24,6 +26,9 @@ object TimeCutNode : TransformNode() {
     override val label = "Time Cut"
     override val icon = Lucide.Scissors
     override val pickerCategory = CompositionNodePickerCategory.Time
+
+    override val bodyWidth: Dp = 208.dp
+    override val bodyHeight: Dp = 72.dp
 
     override fun defaultState() = TimeCutNodeState()
 

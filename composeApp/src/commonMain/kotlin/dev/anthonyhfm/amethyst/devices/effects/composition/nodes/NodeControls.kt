@@ -73,13 +73,19 @@ internal fun LabeledRangeSlider(
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = Theme[typography][small], color = Theme[colors][mutedForeground])
             Text(
-                text = "${(selectedStart * 100).toInt()}% – ${(selectedEnd * 100).toInt()}%",
+                text = label,
+                style = Theme[typography][small],
+                color = Theme[colors][mutedForeground]
+            )
+
+            Text(
+                text = "${(selectedStart * 100).toInt()}% - ${(selectedEnd * 100).toInt()}%",
                 style = Theme[typography][small],
                 color = Theme[colors][foreground],
             )
         }
+
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -110,7 +116,6 @@ internal fun LabeledRangeSlider(
                     )
                 },
         ) {
-            // Canvas and pointer coordinates are pixels; visual dimensions remain density-aware dp values.
             val thumbRadius = RangeSliderThumbRadius.toPx()
             val trackStart = thumbRadius
             val trackEnd = size.width - thumbRadius
@@ -122,6 +127,7 @@ internal fun LabeledRangeSlider(
 
             drawLine(trackColor, Offset(trackStart, centerY), Offset(trackEnd, centerY), trackStroke, cap = StrokeCap.Round)
             drawLine(activeTrackColor, Offset(startX, centerY), Offset(endX, centerY), trackStroke, cap = StrokeCap.Round)
+
             listOf(startX, endX).forEach { x ->
                 drawCircle(thumbColor, thumbRadius, Offset(x, centerY))
                 drawCircle(activeTrackColor, thumbRadius, Offset(x, centerY), style = Stroke(2.dp.toPx()))
@@ -129,46 +135,3 @@ internal fun LabeledRangeSlider(
         }
     }
 }
-
-@Composable
-internal fun ColorButton(
-    label: String,
-    value: Float,
-    onChange: (Float) -> Unit,
-) {
-    Button(
-        onClick = {
-            val next = when {
-                value < 0.34f -> 0.5f
-                value < 0.67f -> 1f
-                else -> 0f
-            }
-            onChange(next)
-        },
-        variant = ButtonVariant.Outline,
-        size = ButtonSize.Small,
-    ) {
-        Text(
-            text = "$label ${(value * 100).toInt()}",
-            style = Theme[typography][small],
-            color = Theme[colors][foreground],
-        )
-    }
-}
-
-@Composable
-internal fun ColorButtons(
-    red: Float,
-    green: Float,
-    blue: Float,
-    onRed: (Float) -> Unit,
-    onGreen: (Float) -> Unit,
-    onBlue: (Float) -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        ColorButton("R", red, onRed)
-        ColorButton("G", green, onGreen)
-        ColorButton("B", blue, onBlue)
-    }
-}
-

@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -15,11 +16,11 @@ abstract class TransformNode : CompositionNodeDefinition {
 }
 
 @Composable
-internal fun NodeControls(content: @Composable () -> Unit) =
+internal fun NodeControls(content: @Composable ColumnScope.() -> Unit) =
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(10.dp)
+            .padding(12.dp)
     ) {
         content()
     }
