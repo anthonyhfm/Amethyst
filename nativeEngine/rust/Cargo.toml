@@ -6,6 +6,8 @@ rust-version = "1.85"
 
 [dependencies]
 uniffi = "0.29.4"
+cpal = "0.15.3"
+symphonia = { version = "0.5.4", features = ["all-codecs", "all-formats"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 coremidi = "0.8.0"

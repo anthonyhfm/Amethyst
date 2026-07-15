@@ -7,13 +7,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.application
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.DiscordRPCManager
 import dev.anthonyhfm.amethyst.desktop.about.setupAboutHandler
 import dev.anthonyhfm.amethyst.settings.setupPreferencesHandler
 import dev.anthonyhfm.amethyst.start.EarlyAccessWindow
 import dev.anthonyhfm.amethyst.settings.data.SettingsRepository
+import dev.anthonyhfm.amethyst.settings.data.AudioSettings
 import dev.anthonyhfm.amethyst.start.StartWindow
 import dev.anthonyhfm.amethyst.workspace.WorkspaceWindow
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenHelper
@@ -38,7 +39,11 @@ fun main(args: Array<String>) {
         setupPreferencesHandler()
     }
 
-    AudioOutput // <- Initialize AudioOutput, no constructor call, just reference
+    Echo.setPreferredBufferFrames(AudioSettings.renderBufferFrames.value)
+    Echo.setPreferredOutputDevice(
+        AudioSettings.outputDevice.value.takeUnless { it == AudioSettings.SystemDefaultOutputDevice }
+    )
+    Echo.initialize()
     
     // Initialize Discord RPC manager (will connect if enabled in settings)
     DiscordRPCManager.initialize()

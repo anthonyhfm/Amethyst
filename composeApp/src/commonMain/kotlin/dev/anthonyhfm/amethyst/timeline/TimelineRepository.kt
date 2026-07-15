@@ -1,6 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline
 
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.util.mainDispatcherOrDefault
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
@@ -149,7 +149,7 @@ object TimelineRepository {
             return
         }
         println("PLAYBACK: startAudioEntry — ${entry.entry.fileName} startAt=$startAt entryStart=${entry.entry.startTimeMs} clipStart=${entry.entry.clipStartSample} clipEnd=${entry.entry.clipEndSample} signalBytes=${signal.rawData?.size} durationMs=${signal.durationMs}")
-        val ids = AudioOutput.playMultiple(listOf(signal))
+        val ids = Echo.playMultiple(listOf(signal))
         entry.entry.receiveSourceId(ids.firstOrNull())
     }
 
@@ -160,7 +160,7 @@ object TimelineRepository {
         // Build playback signals for all entries, then start them atomically.
         val automations = entries.map { TimelineAutomationEvaluator.evaluate(it.track, startAt) }
         val signals = entries.mapIndexed { i, e -> e.entry.buildPlaybackSignal(startAt, automations[i]) }
-        val sourceIds = AudioOutput.playMultiple(signals.filterNotNull())
+        val sourceIds = Echo.playMultiple(signals.filterNotNull())
 
         var sourceIdx = 0
         entries.forEachIndexed { i, e ->

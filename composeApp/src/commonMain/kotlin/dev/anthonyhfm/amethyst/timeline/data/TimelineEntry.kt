@@ -1,7 +1,7 @@
 package dev.anthonyhfm.amethyst.timeline.data
 
 import androidx.compose.ui.graphics.Color
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.timeline.automation.TimelineTrackAutomationState
@@ -97,7 +97,7 @@ data class AudioEntry(
         )
     }
 
-    /** Stores the source ID returned by [AudioOutput.playMultiple]. */
+    /** Stores the source ID returned by [Echo.playMultiple]. */
     internal fun receiveSourceId(id: String?) {
         audioSourceId = id
         if (id != null) {
@@ -128,7 +128,7 @@ data class AudioEntry(
         }
         val trimmedData = src.rawData.sliceArray(startByte until endByte)
         val remainingDurationMs = usToRoundedMs(samplesToUs(clipEndSample - actualStartSample, sampleRate))
-        audioSourceId = AudioOutput.play(
+        audioSourceId = Echo.play(
             audioSignal = Signal.AudioSignal(
                 rawData = trimmedData,
                 sampleRate = sampleRate,
@@ -149,13 +149,13 @@ data class AudioEntry(
 
     override fun updateAutomation(automation: TimelineTrackAutomationState) {
         audioSourceId?.let { sid ->
-            AudioOutput.update(sourceId = sid, gain = automation.volume, pan = 0f)
+            Echo.update(sourceId = sid, gain = automation.volume, pan = 0f)
         }
     }
 
     override fun stop() {
         audioSourceId?.let { sid ->
-            AudioOutput.stop(sid)
+            Echo.stop(sid)
             println("AUDIO: Stopped $fileName (source: $sid)")
             audioSourceId = null
         }

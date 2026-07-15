@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.timeline.data
 
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.path
@@ -40,7 +40,7 @@ class AudioTimelineTrack : TimelineTrack<AudioEntry>() {
             return
         }
 
-        val audio = AudioDecoder.decodeAudioFile(file.path)
+        val audio = Echo.decodeAudioFile(file.path)
 
         if (audio == null) {
             println("AudioTimelineTrack: Failed to decode audio file: ${file.path}")

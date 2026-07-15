@@ -75,3 +75,21 @@ abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericCha
 
     abstract override fun signalEnter(n: List<Signal>)
 }
+
+/**
+ * A fixed-size interleaved PCM block used by Echo-capable chain devices.
+ *
+ * Processing is deliberately in-place so implementations can be promoted to the
+ * native render path without changing their public contract.
+ */
+data class AudioProcessingBlock(
+    val samples: FloatArray,
+    val sampleRate: Int,
+    val channels: Int,
+    val frameOffset: Long,
+)
+
+/** Marker contract for future real-time Echo processors (EQ, limiter, etc.). */
+interface EchoAudioProcessor {
+    fun processAudio(block: AudioProcessingBlock)
+}

@@ -42,6 +42,28 @@ internal fun computeWaveformEnvelope(
         return floatArrayOf(amp, amp)
     }
 
+    // Editors such as SampleChainDevice already know their concrete render width.
+    // Derive buckets directly from sample indices in that case. The timeline-based
+    // calculation below is useful for timeline positioning, but can round every
+    // bucket outside a clip when a short/fixed editor width is supplied.
+    widthPx?.takeIf { it > 0 }?.let { width ->
+        val bucketCount = width.coerceIn(2, maxBuckets)
+        return FloatArray(bucketCount) { bucketIndex ->
+            val localStart = ((bucketIndex.toLong() * subsetLen) / bucketCount)
+                .toInt()
+                .coerceIn(0, subsetLen - 1)
+            val localEnd = (((bucketIndex + 1L) * subsetLen + bucketCount - 1) / bucketCount)
+                .toInt()
+                .coerceIn(localStart + 1, subsetLen)
+            var maxAmp = 0f
+            for (sampleIndex in (sStart + localStart) until (sStart + localEnd)) {
+                val value = kotlin.math.abs(samples[sampleIndex])
+                if (value > maxAmp) maxAmp = value
+            }
+            maxAmp.coerceIn(0f, 1f)
+        }
+    }
+
     val safeZoom = zoomLevel.coerceAtLeast(0.0001f)
     val clipDurationUs = (subsetLen.toDouble() * 1_000_000.0) / sampleRate.toDouble()
     val exactStartPx = (timelineStartUs.toDouble() / 1000.0) * safeZoom.toDouble()
@@ -186,7 +208,9 @@ fun WaveformView(
                                     val startX = w * currentStartPosition
                                     val endX = w * currentEndPosition
                                     val activeWidth = endX - startX
-                                    val edgeHandleSize = 24f
+                                    // The trim boundary is the primary editing action. Give it a
+                                    // larger hit target than fades so boundaries stay draggable.
+                                    val edgeHandleSize = 32f
 
                                     val durationMs = if (sampleRate > 0) (samples.size.toFloat() / sampleRate) * 1000f else 0f
                                     val activeDurationMs = durationMs * (currentEndPosition - currentStartPosition)
@@ -196,10 +220,10 @@ fun WaveformView(
                                     val fadeOutX = endX - activeWidth * fadeOutRatio
 
                                     when {
-                                        onFadeInChange != null && kotlin.math.abs(x - fadeInX) < 16f && fadeInX > startX -> isDraggingFadeIn = true
-                                        onFadeOutChange != null && kotlin.math.abs(x - fadeOutX) < 16f && fadeOutX < endX -> isDraggingFadeOut = true
                                         onStartPositionChange != null && x in (startX - edgeHandleSize)..(startX + edgeHandleSize) -> isDraggingStart = true
                                         onEndPositionChange != null && x in (endX - edgeHandleSize)..(endX + edgeHandleSize) -> isDraggingEnd = true
+                                        onFadeInChange != null && kotlin.math.abs(x - fadeInX) < 18f && fadeInX > startX + edgeHandleSize -> isDraggingFadeIn = true
+                                        onFadeOutChange != null && kotlin.math.abs(x - fadeOutX) < 18f && fadeOutX < endX - edgeHandleSize -> isDraggingFadeOut = true
                                         onStartPositionChange != null && onEndPositionChange != null && x in startX..endX -> isDraggingBody = true
                                     }
                                 },
@@ -303,7 +327,7 @@ fun WaveformView(
             }
 
             // Trim handles
-            val tabW = 14f; val tabH = 18f
+            val tabW = 16f; val tabH = 24f
             if (onStartPositionChange != null) {
                 val lineColor = if (isDraggingStart || isDraggingBody) Color.White else Color.White.copy(alpha = 0.9f)
                 drawLine(lineColor, Offset(startX, 0f), Offset(startX, h), 3f)

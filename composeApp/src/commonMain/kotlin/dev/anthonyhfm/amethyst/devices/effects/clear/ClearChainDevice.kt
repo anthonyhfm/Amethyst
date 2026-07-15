@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
@@ -117,7 +117,7 @@ class ClearChainDevice : GenericChainDevice<ClearChainDeviceState>() {
                 Heaven.schedule(1.0) {
                     val s = state.value
                     if (s.clearLights) Heaven.clear()
-                    if (s.clearAudio)  AudioOutput.stopAll()
+                    if (s.clearAudio) Echo.stopAll()
                     if (s.clearMulti)  WorkspaceRepository.resetMulti()
                 }
             }

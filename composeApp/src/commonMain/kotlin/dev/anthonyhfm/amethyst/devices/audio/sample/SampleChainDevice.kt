@@ -46,7 +46,7 @@ import com.composeunstyled.Icon
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
@@ -195,7 +195,8 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                 )
             }
 
-            // Waveform display
+            // Clip editing and automation deliberately live in separate lanes. Keeping the
+            // automation pointer input out of this surface makes trim/fade handles reliable.
             Box(
                 modifier = Modifier
                     .padding(4.dp)
@@ -247,27 +248,6 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                     modifier = Modifier.fillMaxSize()
                 )
 
-                SampleVolumeEnvelopeEditor(
-                    modifier = Modifier.fillMaxSize(),
-                    lane = deviceState.volumeAutomationLane
-                        ?: TimelineAutomationLane(target = TimelineTrackAutomationTarget.VOLUME),
-                    durationMs = deviceState.totalDurationMs,
-                    onLaneCommitted = { beforeLane, afterLane ->
-                        val normalizedBeforeLane = beforeLane
-                            .normalized()
-                            .takeIf { it.points.isNotEmpty() }
-                        val normalizedAfterLane = afterLane
-                            .normalized()
-                            .takeIf { it.points.isNotEmpty() }
-                        pushStateChange(
-                            before = state.value.copy(volumeAutomationLane = normalizedBeforeLane),
-                            after = state.value.copy(volumeAutomationLane = normalizedAfterLane)
-                        )
-                        state.update { currentState ->
-                            currentState.copy(volumeAutomationLane = normalizedAfterLane)
-                        }
-                    }
-                )
             }
 
             // Controls: Fade In | Fade Out | Volume  (Start/End via waveform handles)
@@ -407,13 +387,13 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                             mode = FileKitMode.Single,
                             title = "Select Audio File",
                             type = FileKitType.File(
-                                extensions = AudioDecoder.getSupportedFormats()
+                                extensions = Echo.getSupportedFormats()
                             )
                         )
 
                         file?.let { selectedFile ->
                             try {
-                                val audioSignal = AudioDecoder.decodeAudioData(
+                                val audioSignal = Echo.decodeAudioData(
                                     audioData = selectedFile.readBytes(),
                                     fileName = selectedFile.name
                                 )

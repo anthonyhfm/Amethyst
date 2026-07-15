@@ -35,7 +35,7 @@ import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -260,7 +260,7 @@ fun TimelineLane(
                 .fileDropTarget(
                     onHover = { _: Boolean, _: Offset?, _: List<PlatformFile> -> },
                     onDrop = { files: List<PlatformFile> ->
-                        val audioFiles = files.filter { it.extension.lowercase() in AudioDecoder.getSupportedFormats() }
+                        val audioFiles = files.filter { it.extension.lowercase() in Echo.getSupportedFormats() }
                         if (audioFiles.isNotEmpty()) onDropInFile(audioFiles.first())
                     }
                 )

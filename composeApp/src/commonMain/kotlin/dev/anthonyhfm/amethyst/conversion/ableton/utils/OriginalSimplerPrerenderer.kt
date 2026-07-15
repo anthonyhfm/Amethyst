@@ -5,7 +5,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimpl
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
 import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
@@ -87,7 +87,7 @@ class OriginalSimplerPrerenderer {
     ): SampleChainDeviceState? = withContext(Dispatchers.IO) {
         val audioFileBytes = readAudioFileBytes(filePath) ?: return@withContext null
 
-        val audioSignal = AudioDecoder.decodeAudioData(
+        val audioSignal = Echo.decodeAudioData(
             audioData = audioFileBytes,
             fileName = filePath,
             sampleStart = sampleStart.takeIf { it > 0 },
@@ -116,7 +116,7 @@ class OriginalSimplerPrerenderer {
     private suspend fun decodeFull(filePath: String): FullAudio? = withContext(Dispatchers.IO) {
         val audioFileBytes = readAudioFileBytes(filePath) ?: return@withContext null
 
-        val audioSignal = AudioDecoder.decodeAudioData(
+        val audioSignal = Echo.decodeAudioData(
             audioData = audioFileBytes,
             fileName = filePath,
             sampleStart = null,

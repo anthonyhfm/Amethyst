@@ -113,28 +113,6 @@ kotlin {
             implementation(libs.nucleus.native.http)
             implementation(libs.nucleus.taskbar.progress)
             implementation(libs.nucleus.decorated.window)
-
-            // LWJGL Platform Detection
-            val lwjglVersion = "3.3.6"
-            val lwjglNatives = when (org.gradle.internal.os.OperatingSystem.current()) {
-                org.gradle.internal.os.OperatingSystem.LINUX -> "natives-linux"
-                org.gradle.internal.os.OperatingSystem.MAC_OS -> if (System.getProperty("os.arch") == "aarch64") "natives-macos-arm64" else "natives-macos"
-                org.gradle.internal.os.OperatingSystem.WINDOWS -> "natives-windows"
-                else -> throw GradleException("Unsupported OS")
-            }
-
-            // LWJGL Core Dependencies
-            implementation("org.lwjgl:lwjgl:$lwjglVersion")
-            implementation("org.lwjgl:lwjgl-openal:$lwjglVersion")
-            runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:$lwjglNatives")
-            runtimeOnly("org.lwjgl:lwjgl-openal:$lwjglVersion:$lwjglNatives")
-
-            // Audio Decoding Libraries
-            implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
-            implementation("com.googlecode.soundlibs:jlayer:1.0.1.4")
-            implementation("com.googlecode.soundlibs:vorbisspi:1.0.3.3")
-            implementation("org.jflac:jflac-codec:1.5.2")
-            implementation("com.github.stephenc.java-iso-tools:java-iso-tools-parent:2.0.1")
         }
     }
 }
@@ -191,7 +169,6 @@ nucleus.application {
         "--add-opens=java.base/java.util=ALL-UNNAMED",
         "--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED",
         "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-        "-Dorg.lwjgl.util.Debug=false"
     )
 
     nativeDistributions {

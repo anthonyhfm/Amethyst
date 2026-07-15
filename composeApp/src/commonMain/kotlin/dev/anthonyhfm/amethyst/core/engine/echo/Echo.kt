@@ -1,65 +1,27 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 
-object Echo {
-    private val audioSignalQueue = Channel<List<Signal.AudioSignal>>(UNLIMITED)
-    private val audioScope = CoroutineScope(Dispatchers.Default.limitedParallelism(1) + SupervisorJob())
+/** Cross-platform output-only interface for the Echo audio engine. */
+expect object Echo {
+    suspend fun decodeAudioFile(filePath: String, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal?
+    suspend fun decodeAudioData(audioData: ByteArray, fileName: String, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal?
+    fun isFormatSupported(fileName: String): Boolean
+    fun getSupportedFormats(): List<String>
 
-    fun reset() {
-        drainPendingSignals()
-        AudioOutput.stopAll()
-    }
-
-    fun audioEnter(signals: List<Signal.AudioSignal>) {
-        audioScope.launch {
-            audioSignalQueue.send(signals)
-            cancel()
-        }
-        processAudioSignals()
-    }
-
-    private fun processAudioSignals() {
-        audioScope.launch {
-            val signalBatch = mutableListOf<Signal.AudioSignal>()
-
-            while (true) {
-                val result = audioSignalQueue.tryReceive()
-                if (result.isSuccess) {
-                    signalBatch.addAll(result.getOrNull() ?: emptyList())
-                } else {
-                    break
-                }
-            }
-
-            if (signalBatch.isNotEmpty()) {
-                signalBatch.forEach { signal ->
-                    signal.rawData?.let {
-                        try {
-                            AudioOutput.play(signal)
-                        } catch (e: Exception) {
-                            println("Audio output error: ${e.message}")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fun cancel(signalOrigin: Any?) {
-        if (signalOrigin == null) return
-        try {
-            AudioOutput.stopByOrigin(signalOrigin)
-        } catch (e: Exception) {
-            println("Audio cancel error: ${e.message}")
-        }
-    }
-
-    private fun drainPendingSignals() {
-        while (audioSignalQueue.tryReceive().isSuccess) {
-        }
-    }
+    /** Opens the platform output. Mobile stubs return false. */
+    fun initialize(): Boolean
+    fun setPreferredBufferFrames(frames: Int)
+    fun outputDevices(): List<String>
+    fun setPreferredOutputDevice(name: String?)
+    fun play(audioSignal: Signal.AudioSignal): String?
+    fun playMultiple(signals: List<Signal.AudioSignal>): List<String?>
+    fun update(sourceId: String, gain: Float, pan: Float)
+    fun stop(sourceId: String)
+    fun stopAll()
+    fun stopByOrigin(origin: Any?)
+    fun audioEnter(signals: List<Signal.AudioSignal>)
+    fun cancel(signalOrigin: Any?)
+    fun reset()
+    fun shutdown()
 }

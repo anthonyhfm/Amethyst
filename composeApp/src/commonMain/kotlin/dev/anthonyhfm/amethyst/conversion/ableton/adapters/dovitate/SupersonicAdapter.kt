@@ -5,7 +5,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceFileDropList
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceInstrument
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
@@ -124,7 +124,7 @@ class SupersonicAdapter (
     private suspend fun decodeAudioFile(filePath: String): SampleChainDeviceState? {
         val audioFileBytes = readAudioFileBytes(filePath) ?: return null
 
-        val audioSignal = AudioDecoder.decodeAudioData(
+        val audioSignal = Echo.decodeAudioData(
             audioData = audioFileBytes,
             fileName = filePath,
             sampleStart = null,

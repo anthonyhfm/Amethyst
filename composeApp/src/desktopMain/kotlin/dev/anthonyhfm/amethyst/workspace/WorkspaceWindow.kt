@@ -30,7 +30,7 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState.updateFromKeyEvent
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.ShortcutManager
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutput
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
@@ -69,7 +69,7 @@ fun WorkspaceWindow(
     val windowTitle = "Amethyst - [${projectName ?: "Untitled Project"}]"
 
     fun closeWorkspace(afterClose: () -> Unit) {
-        AudioOutput.stopAll()
+        Echo.stopAll()
         WorkspaceRepository.clean()
         afterClose()
     }

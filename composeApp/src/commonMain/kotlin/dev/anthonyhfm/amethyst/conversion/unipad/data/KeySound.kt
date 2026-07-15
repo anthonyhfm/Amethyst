@@ -1,7 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.unipad.data
 
 import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
-import dev.anthonyhfm.amethyst.core.engine.echo.AudioDecoder
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
@@ -60,7 +60,7 @@ object KeySound {
                 val clipName = entry.path.substring(entry.path.indexOf('/') + 1).trim()
 
                 try {
-                    val audioSignal = AudioDecoder.decodeAudioData(entry.data, clipName)
+                    val audioSignal = Echo.decodeAudioData(entry.data, clipName)
 
                     if (audioSignal != null) {
                         clipName to DecodedAudioClip(
