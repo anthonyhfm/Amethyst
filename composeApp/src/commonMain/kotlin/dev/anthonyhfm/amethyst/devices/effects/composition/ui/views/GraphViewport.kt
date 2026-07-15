@@ -501,7 +501,6 @@ fun GraphViewport(
         graph.connections.forEach { connection ->
             val from = graph.nodes.firstOrNull { it.id == connection.fromNodeId } ?: return@forEach
             val to = graph.nodes.firstOrNull { it.id == connection.toNodeId } ?: return@forEach
-            val outScreen = outputPortScreenPosition(from)
             val inScreen = inputPortScreenPosition(to)
 
             // Input endpoint: keep the output anchored and rewire the destination.
@@ -523,30 +522,6 @@ fun GraphViewport(
                 onDrag = { amount -> cableDrag = cableDrag?.let { it.copy(end = it.end + amount) } },
                 onDragEnd = {
                     cableDrag?.let { commitDrag(it, inputNodeAt(it.end)?.id) }
-                    cableDrag = null
-                },
-                onDragCancel = { cableDrag = null },
-            )
-
-            // Output endpoint: keep the input anchored and rewire the source.
-            CableEndHandle(
-                centerScreen = outScreen,
-                diameterDp = handleDiameterDp,
-                density = densityScale,
-                key = "out:${connection.id}",
-                onDragStart = {
-                    editor.clearSelection()
-                    cableDrag = CableDrag(
-                        anchorNodeId = to.id,
-                        grabbedInput = false,
-                        grabbedConnectionId = connection.id,
-                        start = outputPortScreenPosition(from),
-                        end = inputPortScreenPosition(to),
-                    )
-                },
-                onDrag = { amount -> cableDrag = cableDrag?.let { it.copy(start = it.start + amount) } },
-                onDragEnd = {
-                    cableDrag?.let { commitDrag(it, outputNodeAt(it.start)?.id) }
                     cableDrag = null
                 },
                 onDragCancel = { cableDrag = null },
