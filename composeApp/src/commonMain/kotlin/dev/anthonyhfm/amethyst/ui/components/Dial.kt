@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,6 +96,25 @@ private const val DialRotationSweep = 296f
 private const val DialArcStart = 122f
 private const val DialArcSweep = 296f
 
+enum class DialEditPhase { Direct, Preview, Commit }
+
+class DialEditSession {
+    var phase: DialEditPhase = DialEditPhase.Direct
+        private set
+
+    fun <T> dispatch(nextPhase: DialEditPhase, block: () -> T): T {
+        val previous = phase
+        phase = nextPhase
+        return try {
+            block()
+        } finally {
+            phase = previous
+        }
+    }
+}
+
+val LocalDialEditSession = staticCompositionLocalOf<DialEditSession?> { null }
+
 @Composable
 fun <T> Dial(
     type: DialType<T>,
@@ -111,12 +131,20 @@ fun <T> Dial(
     enabled: Boolean = true,
     defaultValue: T? = null,
 ) {
+    val editSession = LocalDialEditSession.current
+    val previewValueChange: (T) -> Unit = { next ->
+        editSession?.dispatch(DialEditPhase.Preview) { onValueChange(next) } ?: onValueChange(next)
+    }
+    val finishValueChange: (T) -> Unit = { next ->
+        editSession?.dispatch(DialEditPhase.Commit) { onValueChange(next) }
+        onFinishValueChange(next)
+    }
     when (type) {
         DialType.Continuous -> ContinuousDial(
             value = value as Float,
             onStartValueChange = { onStartValueChange(it as T) },
-            onValueChange = { onValueChange(it as T) },
-            onFinishValueChange = { onFinishValueChange(it as T) },
+            onValueChange = { previewValueChange(it as T) },
+            onFinishValueChange = { finishValueChange(it as T) },
             defaultValue = (defaultValue as? Float) ?: 0.5f,
             knob = false,
             title = title,
@@ -131,8 +159,8 @@ fun <T> Dial(
         DialType.Knob -> ContinuousDial(
             value = value as Float,
             onStartValueChange = { onStartValueChange(it as T) },
-            onValueChange = { onValueChange(it as T) },
-            onFinishValueChange = { onFinishValueChange(it as T) },
+            onValueChange = { previewValueChange(it as T) },
+            onFinishValueChange = { finishValueChange(it as T) },
             defaultValue = (defaultValue as? Float) ?: 0.5f,
             knob = true,
             title = title,
@@ -148,8 +176,8 @@ fun <T> Dial(
             values = type.values as List<T>,
             value = value,
             onStartValueChange = onStartValueChange,
-            onValueChange = onValueChange,
-            onFinishValueChange = onFinishValueChange,
+            onValueChange = previewValueChange,
+            onFinishValueChange = finishValueChange,
             defaultValue = defaultValue,
             title = title,
             text = text,
@@ -178,7 +206,7 @@ private fun ContinuousDial(
     modifier: Modifier,
     enabled: Boolean,
 ) {
-    var dialValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
+    var dialValue by remember(value) { mutableStateOf(value.coerceIn(0f, 1f)) }
     LaunchedEffect(value) { dialValue = value.coerceIn(0f, 1f) }
     LaunchedEffect(dialValue) { onValueChange(dialValue) }
 
@@ -226,8 +254,8 @@ private fun <T> SteppedDial(
     onResolveTextValue: ((String) -> Unit)?, containerColor: Color, dialColor: Color,
     modifier: Modifier, enabled: Boolean,
 ) {
-    var index by remember { mutableStateOf(values.indexOf(value).coerceAtLeast(0)) }
-    var progress by remember { mutableStateOf(progressForSelection(index, values.size)) }
+    var index by remember(value, values) { mutableStateOf(values.indexOf(value).coerceAtLeast(0)) }
+    var progress by remember(value, values) { mutableStateOf(progressForSelection(index, values.size)) }
     LaunchedEffect(value, values) {
         index = values.indexOf(value).coerceAtLeast(0); progress = progressForSelection(index, values.size)
     }

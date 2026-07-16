@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -30,6 +32,9 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
+import dev.anthonyhfm.amethyst.ui.components.DialEditSession
+import dev.anthonyhfm.amethyst.ui.components.LocalDialEditSession
 import dev.anthonyhfm.amethyst.ui.theme.cardForeground
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.chainSurface
@@ -66,7 +71,7 @@ fun GraphNodeShell(
     onOutputPortDragEnd: () -> Unit,
     inputPortHighlighted: Boolean = false,
     outputPortHighlighted: Boolean = false,
-    onNodeChange: (CompositionNode) -> Unit,
+    onNodeChange: (CompositionNode, DialEditPhase) -> Unit,
     onAutomationAction: (parameterId: String, automated: Boolean, remove: Boolean) -> Unit = { _, _, _ -> },
 ) {
     val titleBarColor = if (selected) Theme[colors][selectionSurface] else Theme[chainColorTokens][chainSurfaceRaised]
@@ -178,7 +183,10 @@ fun GraphNodeShell(
                 },
         ) {
             if (definition != null) {
-                definition.NodeBody(node, onNodeChange)
+                val dialEditSession = remember { DialEditSession() }
+                CompositionLocalProvider(LocalDialEditSession provides dialEditSession) {
+                    definition.NodeBody(node) { updated -> onNodeChange(updated, dialEditSession.phase) }
+                }
             } else {
                 Text(
                     text = "Unknown node",

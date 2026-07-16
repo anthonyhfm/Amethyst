@@ -13,6 +13,7 @@ class CompositionAutomationParameter internal constructor(
     val integer: Boolean = false,
     private val readState: (CompositionNodeState) -> Float?,
     private val writeState: (CompositionNodeState, Float) -> CompositionNodeState?,
+    private val formatter: (Float) -> String,
 ) {
     fun normalise(value: Float): Float = if (maximum == minimum) 0f else
         (((value.coerceIn(minimum, maximum) - minimum) / (maximum - minimum)) * 2f - 1f).coerceIn(-1f, 1f)
@@ -22,16 +23,27 @@ class CompositionAutomationParameter internal constructor(
         return if (integer) raw.roundToInt().toFloat() else raw
     }
 
-    fun format(value: Float): String = when {
-        integer -> value.roundToInt().toString()
-        maximum == 360f -> "${value.roundToInt()}°"
-        else -> ((value * 100f).roundToInt() / 100f).toString()
-    }
+    fun format(value: Float): String = formatter(value.coerceIn(minimum, maximum))
 
     fun valueOf(node: CompositionNode): Float? = readState(node.state)
 
     fun withValue(node: CompositionNode, value: Float): CompositionNode? =
         writeState(node.state, value)?.let { state -> node.copy(state = state) }
+}
+
+internal fun formatAutomationDecimal(value: Float): String =
+    ((value * 100f).roundToInt() / 100f).toString()
+
+internal fun formatAutomationInteger(value: Float): String = value.roundToInt().toString()
+
+internal fun formatAutomationDegrees(value: Float): String = "${value.roundToInt()}°"
+
+internal fun formatAutomationPercentage(value: Float): String = "${(value * 100f).roundToInt()}%"
+
+private fun defaultAutomationFormatter(minimum: Float, maximum: Float): (Float) -> String = when {
+    (minimum == -180f && maximum == 180f) || (minimum == 0f && maximum == 360f) -> ::formatAutomationDegrees
+    minimum == 0f && maximum == 1f -> ::formatAutomationPercentage
+    else -> ::formatAutomationDecimal
 }
 
 internal inline fun <reified State : CompositionNodeState> floatAutomationParameter(
@@ -43,6 +55,7 @@ internal inline fun <reified State : CompositionNodeState> floatAutomationParame
     noinline set: (State, Float) -> State,
 ): CompositionAutomationParameter = typedAutomationParameter<State>(
     id, label, minimum, maximum, integer = false, get = get, set = set,
+    format = defaultAutomationFormatter(minimum, maximum),
 )
 
 internal inline fun <reified State : CompositionNodeState> intAutomationParameter(
@@ -56,6 +69,7 @@ internal inline fun <reified State : CompositionNodeState> intAutomationParamete
     id, label, minimum.toFloat(), maximum.toFloat(), integer = true,
     get = { get(it).toFloat() },
     set = { state, value -> set(state, value.roundToInt()) },
+    format = ::formatAutomationInteger,
 )
 
 internal inline fun <reified State : CompositionNodeState> choiceAutomationParameter(
@@ -68,6 +82,7 @@ internal inline fun <reified State : CompositionNodeState> choiceAutomationParam
     id, label, 0f, (values.size - 1).toFloat(), integer = true,
     get = { values.indexOf(get(it)).coerceAtLeast(0).toFloat() },
     set = { state, value -> set(state, values[value.roundToInt().coerceIn(0, values.lastIndex)]) },
+    format = { value -> values[value.roundToInt().coerceIn(0, values.lastIndex)] },
 )
 
 internal inline fun <reified State : CompositionNodeState> typedAutomationParameter(
@@ -78,6 +93,7 @@ internal inline fun <reified State : CompositionNodeState> typedAutomationParame
     integer: Boolean,
     noinline get: (State) -> Float,
     noinline set: (State, Float) -> State,
+    noinline format: (Float) -> String,
 ): CompositionAutomationParameter = CompositionAutomationParameter(
     id = id,
     label = label,
@@ -86,4 +102,5 @@ internal inline fun <reified State : CompositionNodeState> typedAutomationParame
     integer = integer,
     readState = { state -> (state as? State)?.let(get) },
     writeState = { state, value -> (state as? State)?.let { set(it, value.coerceIn(minimum, maximum)) } },
+    formatter = format,
 )

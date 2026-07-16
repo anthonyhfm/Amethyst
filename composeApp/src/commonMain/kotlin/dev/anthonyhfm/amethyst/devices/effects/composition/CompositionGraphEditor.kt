@@ -35,6 +35,8 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
     val selection = _selection.asStateFlow()
     private val _automationFocus = MutableStateFlow<CompositionAutomationFocus?>(null)
     val automationFocus = _automationFocus.asStateFlow()
+    /** Graph before the current live automation edit, used to make its many frames one undo step. */
+    private var automationPreviewBefore: CompositionGraph? = null
 
     fun closeAutomation() { _automationFocus.value = null }
 
@@ -82,6 +84,58 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
                 if (it.parameterId == parameterId) it.copy(points = points).normalised() else it
             }))
         }
+    }
+
+    /** Updates only a selected point's value, preserving its time and curve handles. */
+    fun updateAutomationPointValue(nodeId: String, parameterId: String, pointId: String, nativeValue: Float): Boolean {
+        val node = device.state.value.graph.node(nodeId) ?: return false
+        val parameter = node.automationParameter(parameterId) ?: return false
+        val lane = node.lane(parameterId) ?: return false
+        if (lane.points.none { it.pointId == pointId }) return false
+
+        val normalisedValue = parameter.normalise(nativeValue)
+        return device.updateGraph { graph ->
+            val currentNode = graph.node(nodeId) ?: return@updateGraph graph
+            graph.withNode(currentNode.copy(automation = currentNode.automation.map { currentLane ->
+                if (currentLane.parameterId != parameterId) currentLane else currentLane.copy(
+                    points = currentLane.points.map { point ->
+                        if (point.pointId == pointId) point.copy(value = normalisedValue) else point
+                    }
+                ).normalised()
+            }))
+        }
+    }
+
+    /**
+     * Applies a point value immediately so the graph, node controls and curve all observe the
+     * same value during an interaction. Call [commitAutomationPreview] when the gesture ends.
+     */
+    fun previewAutomationPointValue(nodeId: String, parameterId: String, pointId: String, nativeValue: Float): Boolean {
+        val node = device.state.value.graph.node(nodeId) ?: return false
+        val parameter = node.automationParameter(parameterId) ?: return false
+        val points = node.lane(parameterId)?.points ?: return false
+        if (points.none { it.pointId == pointId }) return false
+        return previewAutomationPoints(nodeId, parameterId, points.map { point ->
+            if (point.pointId == pointId) point.copy(value = parameter.normalise(nativeValue)) else point
+        })
+    }
+
+    /** Live, shared preview for moving points or their curve handles. */
+    fun previewAutomationPoints(nodeId: String, parameterId: String, points: List<CompositionAutomationPoint>): Boolean {
+        if (automationPreviewBefore == null) automationPreviewBefore = device.state.value.graph
+        return device.updateGraph(undoable = false) { graph ->
+            val node = graph.node(nodeId) ?: return@updateGraph graph
+            if (node.lane(parameterId) == null) return@updateGraph graph
+            graph.withNode(node.copy(automation = node.automation.map { lane ->
+                if (lane.parameterId == parameterId) lane.copy(points = points).normalised() else lane
+            }))
+        }
+    }
+
+    /** Records the shared live preview as one undoable edit. */
+    fun commitAutomationPreview() {
+        automationPreviewBefore?.let(device::commitGraphEdit)
+        automationPreviewBefore = null
     }
 
     fun updateAutomationLane(nodeId: String, parameterId: String, transform: (CompositionAutomationLane) -> CompositionAutomationLane) {

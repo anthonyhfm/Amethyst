@@ -32,7 +32,7 @@ data class RotateNodeState(
 
 object RotateNode : CompositionNodeDefinition {
     override val automationParameters = listOf(
-        floatAutomationParameter<RotateNodeState>("angle", "Angle", -180f, 180f, RotateNodeState::angleDegrees) { state, value -> state.copy(angleDegrees = value) },
+        floatAutomationParameter<RotateNodeState>("angle", "Angle", 0f, 360f, RotateNodeState::angleDegrees) { state, value -> state.copy(angleDegrees = value) },
     )
 
     override val type = "rotate"

@@ -2,6 +2,9 @@ package dev.anthonyhfm.amethyst.ui.components.primitives
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +19,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Slider
 import com.composeunstyled.SliderState
@@ -25,6 +29,8 @@ import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
+import dev.anthonyhfm.amethyst.ui.components.LocalDialEditSession
 
 @Composable
 fun Slider(
@@ -82,6 +88,7 @@ fun Slider(
     steps: Int = 0,
     enabled: Boolean = true,
 ) {
+    val editSession = LocalDialEditSession.current
     val state = rememberSliderState(
         initialValue = value,
         valueRange = valueRange,
@@ -96,14 +103,24 @@ fun Slider(
         snapshotFlow { state.value }
             .collect { newValue ->
                 if (newValue != currentValue) {
-                    currentOnValueChange(newValue)
+                    editSession?.dispatch(DialEditPhase.Preview) { currentOnValueChange(newValue) }
+                        ?: currentOnValueChange(newValue)
                 }
             }
     }
 
     Slider(
         state = state,
-        modifier = modifier,
+        modifier = modifier.then(
+            if (editSession == null) Modifier else Modifier.pointerInput(editSession) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    if (waitForUpOrCancellation() != null) {
+                        editSession.dispatch(DialEditPhase.Commit) { currentOnValueChange(state.value) }
+                    }
+                }
+            }
+        ),
         valueRange = valueRange,
         enabled = enabled,
     )

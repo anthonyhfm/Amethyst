@@ -36,6 +36,8 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphViewportState
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.NodePosition
@@ -47,6 +49,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automatedAt
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameter
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableCurve
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableSimulator
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableTarget
@@ -59,6 +62,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.Composi
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.drawDataCable
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.buildDataCablePath
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -95,6 +99,8 @@ fun GraphViewport(
     val graph = deviceState.graph
     var viewportSize by remember { mutableStateOf(Size.Zero) }
     val selection by editor.selection.collectAsState()
+    val automationFocus by editor.automationFocus.collectAsState()
+    val automationSelections by SelectionManager.selections.collectAsState()
     var nodeDragBefore by remember { mutableStateOf<dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph?>(null) }
     var draggedNodeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var cableDrag by remember { mutableStateOf<CableDrag?>(null) }
@@ -353,11 +359,22 @@ fun GraphViewport(
         graph.nodes.forEach { node ->
             // Render the current automation result without mutating the persisted base node.
             val displayNode = node.automatedAt(device.playbackProgress())
+            val focusedPoint = automationFocus?.takeIf { it.nodeId == node.id }?.let { focus ->
+                val pointId = automationSelections.filterIsInstance<Selectable.CompositionAutomationPoint>()
+                    .lastOrNull { it.deviceId == device.selectionUUID && it.nodeId == node.id && it.parameterId == focus.parameterId }
+                    ?.pointId
+                val parameter = node.automationParameter(focus.parameterId)
+                val point = node.lane(focus.parameterId)?.points?.firstOrNull { it.pointId == pointId }
+                if (pointId != null && parameter != null && point != null) Triple(focus, parameter, point) else null
+            }
+            val controlNode = focusedPoint?.let { (_, parameter, point) ->
+                parameter.withValue(displayNode, parameter.denormalise(point.value))
+            } ?: displayNode
             val screen = worldToScreen(Offset(node.position.x, node.position.y))
             val connectedInput = graph.connections.any { it.toNodeId == node.id }
             val connectedOutput = graph.connections.any { it.fromNodeId == node.id }
             GraphNodeShell(
-                node = displayNode,
+                node = controlNode,
                 selected = node.id in selection.nodeIds,
                 connectedInput = connectedInput,
                 connectedOutput = connectedOutput,
@@ -456,7 +473,35 @@ fun GraphViewport(
                 },
                 inputPortHighlighted = node.id == highlightedInputNodeId,
                 outputPortHighlighted = node.id == highlightedOutputNodeId,
-                onNodeChange = { updated ->
+                onNodeChange = { updated, editPhase ->
+                    val focus = automationFocus?.takeIf { it.nodeId == node.id }
+                    val selectedPointId = focus?.let { activeFocus ->
+                        automationSelections.filterIsInstance<Selectable.CompositionAutomationPoint>()
+                            .lastOrNull {
+                                it.deviceId == device.selectionUUID &&
+                                    it.nodeId == node.id &&
+                                    it.parameterId == activeFocus.parameterId
+                            }
+                            ?.pointId
+                    }
+                    val parameter = focus?.let { controlNode.automationParameter(it.parameterId) }
+                    val changedAutomationValue = parameter?.let { activeParameter ->
+                        val displayedValue = activeParameter.valueOf(controlNode)
+                        val updatedValue = activeParameter.valueOf(updated)
+                        displayedValue != null && updatedValue != null && displayedValue != updatedValue
+                    } == true
+                    if (focus != null && selectedPointId != null && parameter != null &&
+                        (changedAutomationValue || editPhase == DialEditPhase.Commit)
+                    ) {
+                        parameter.valueOf(updated)?.let { nativeValue ->
+                            when (editPhase) {
+                                DialEditPhase.Preview -> editor.previewAutomationPointValue(node.id, focus.parameterId, selectedPointId, nativeValue)
+                                DialEditPhase.Commit -> editor.commitAutomationPreview()
+                                DialEditPhase.Direct -> editor.updateAutomationPointValue(node.id, focus.parameterId, selectedPointId, nativeValue)
+                            }
+                        }
+                        return@GraphNodeShell
+                    }
                     device.updateGraph { current ->
                         val currentNode = current.nodes.firstOrNull { it.id == updated.id }
                             ?: return@updateGraph current

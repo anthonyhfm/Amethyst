@@ -24,6 +24,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.Slider
+import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
+import dev.anthonyhfm.amethyst.ui.components.LocalDialEditSession
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.foreground
@@ -62,6 +64,7 @@ internal fun LabeledRangeSlider(
     end: Float,
     onRangeChange: (start: Float, end: Float) -> Unit,
 ) {
+    val editSession = LocalDialEditSession.current
     val selectedStart = minOf(start, end).coerceIn(0f, 1f)
     val selectedEnd = maxOf(start, end).coerceIn(0f, 1f)
     val trackColor = Theme[colors][secondary]
@@ -109,9 +112,17 @@ internal fun LabeledRangeSlider(
                             val value = (kotlin.math.round(((change.position.x - trackStart) / trackWidth).coerceIn(0f, 1f) * 100f) / 100f)
                             val currentStart = latestStart.value
                             val currentEnd = latestEnd.value
-                            if (draggingStart) latestOnRangeChange.value(value.coerceAtMost(currentEnd), currentEnd)
-                            else latestOnRangeChange.value(currentStart, value.coerceAtLeast(currentStart))
+                            val update = {
+                                if (draggingStart) latestOnRangeChange.value(value.coerceAtMost(currentEnd), currentEnd)
+                                else latestOnRangeChange.value(currentStart, value.coerceAtLeast(currentStart))
+                            }
+                            editSession?.dispatch(DialEditPhase.Preview, update) ?: update()
                             change.consume()
+                        },
+                        onDragEnd = {
+                            editSession?.dispatch(DialEditPhase.Commit) {
+                                latestOnRangeChange.value(latestStart.value, latestEnd.value)
+                            }
                         },
                     )
                 },

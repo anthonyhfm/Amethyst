@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
@@ -73,32 +76,38 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
     val selectedPointId = selections.filterIsInstance<dev.anthonyhfm.amethyst.core.controls.selection.Selectable.CompositionAutomationPoint>()
         .lastOrNull { it.deviceId == deviceId && it.nodeId == node.id && it.parameterId == parameter.id }
         ?.pointId
-    var previewPoints by remember(node.id, parameter.id) { mutableStateOf<List<CompositionAutomationPoint>?>(null) }
-    val editorPoints = previewPoints ?: lane.points
+    val editorPoints = lane.points
+    val selectedPoint = editorPoints.firstOrNull { it.pointId == selectedPointId }
+    val pointLabel = selectedPoint?.let { point ->
+        "Point · ${parameter.format(parameter.denormalise(point.value))} · ${((point.progress * 100).toInt())}%"
+    } ?: "Point · —"
 
     Column(
         modifier = Modifier.fillMaxWidth().height(200.dp).background(Theme[chainColorTokens][chainSurface], DefaultShape)
             .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("${node.label} · ${parameter.label}", style = Theme[typography][small], color = Theme[colors][foreground])
-                Text("${parameter.format(parameter.denormalise(lane.valueAt(progress, parameter.normalise(fallback)))) } · ${((progress * 100).toInt())}%", style = Theme[typography][small], color = Theme[colors][mutedForeground])
+        Box(modifier = Modifier.fillMaxWidth().height(32.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(end = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("${node.label} · ${parameter.label}", style = Theme[typography][small], color = Theme[colors][foreground], maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Spacer(Modifier.width(16.dp))
+                Text(pointLabel, style = Theme[typography][small], color = Theme[colors][mutedForeground], maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.weight(1f))
             }
-            UnstyledButton(onClick = editor::closeAutomation, modifier = Modifier.size(32.dp)) {
+            UnstyledButton(onClick = editor::closeAutomation, modifier = Modifier.size(32.dp).align(Alignment.CenterEnd)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Text("×", color = Theme[colors][foreground]) }
             }
         }
-        AutomationCanvas(
-            points = editorPoints,
-            playhead = progress,
-            selectedPointId = selectedPointId,
-            bipolar = parameter.bipolar,
-            onSelect = { id -> SelectionManager.selectCompositionAutomationPoints(deviceId, node.id, parameter.id, listOfNotNull(id)) },
-            onAdd = { p, value -> editor.updateAutomationLane(node.id, parameter.id) { current -> current.copy(points = current.points + CompositionAutomationPoint(p, value)) } },
-            onMove = { id, p, value -> previewPoints = editorPoints.map { if (it.pointId == id) it.copy(progress = p, value = value) else it } },
-            onMoveHandle = { id, incoming, time, value -> previewPoints = editorPoints.map { point ->
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            AutomationCanvas(
+                points = editorPoints,
+                playhead = progress,
+                selectedPointId = selectedPointId,
+                bipolar = parameter.bipolar,
+                onSelect = { id -> SelectionManager.selectCompositionAutomationPoints(deviceId, node.id, parameter.id, listOfNotNull(id)) },
+                onAdd = { p, value -> editor.updateAutomationLane(node.id, parameter.id) { current -> current.copy(points = current.points + CompositionAutomationPoint(p, value)) } },
+                onMove = { id, p, value -> editor.previewAutomationPoints(node.id, parameter.id, editorPoints.map { if (it.pointId == id) it.copy(progress = p, value = value) else it }) },
+                onMoveHandle = { id, incoming, time, value -> editor.previewAutomationPoints(node.id, parameter.id, editorPoints.map { point ->
                     if (point.pointId != id) point else if (incoming) point.copy(
                         inHandleTime = time, inHandleValue = value,
                         outHandleTime = 1f - time, outHandleValue = (2f * point.value - value).coerceIn(-1f, 1f),
@@ -106,13 +115,29 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
                         outHandleTime = time, outHandleValue = value,
                         inHandleTime = 1f - time, inHandleValue = (2f * point.value - value).coerceIn(-1f, 1f),
                     )
-                } },
-            onDragFinished = {
-                previewPoints?.let { editor.replaceAutomationPoints(node.id, parameter.id, it) }
-                previewPoints = null
-            },
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
+                    }) },
+                onDragFinished = editor::commitAutomationPreview,
+                modifier = Modifier.fillMaxSize(),
+            )
+            AutomationValueAxis(
+                parameter = parameter,
+                modifier = Modifier.fillMaxSize().padding(4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AutomationValueAxis(
+    parameter: dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionAutomationParameter,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        Text(parameter.format(parameter.maximum), style = Theme[typography][small], color = Theme[colors][mutedForeground], modifier = Modifier.align(Alignment.TopStart).background(Theme[colors][secondary], DefaultShape).padding(horizontal = 2.dp))
+        if (parameter.bipolar) {
+            Text(parameter.format(0f), style = Theme[typography][small], color = Theme[colors][mutedForeground], modifier = Modifier.align(Alignment.CenterStart).background(Theme[colors][secondary], DefaultShape).padding(horizontal = 2.dp))
+        }
+        Text(parameter.format(parameter.minimum), style = Theme[typography][small], color = Theme[colors][mutedForeground], modifier = Modifier.align(Alignment.BottomStart).background(Theme[colors][secondary], DefaultShape).padding(horizontal = 2.dp))
     }
 }
 
@@ -194,7 +219,6 @@ private fun AutomationCanvas(
             }, onDragEnd = { draggedTarget = null; onDragFinished() }, onDragCancel = { draggedTarget = null; onDragFinished() }) },
     ) {
         val zeroY = size.height / 2f
-        drawLine(mutedColor.copy(alpha = .35f), Offset(0f, if (bipolar) zeroY else size.height), Offset(size.width, if (bipolar) zeroY else size.height), 1.dp.toPx())
         listOf(.25f, .5f, .75f).forEach { x -> drawLine(mutedColor.copy(alpha = .18f), Offset(size.width * x, 0f), Offset(size.width * x, size.height), 1.dp.toPx()) }
         val sorted = points.sortedBy(CompositionAutomationPoint::progress)
         if (sorted.size > 1) {
@@ -211,6 +235,8 @@ private fun AutomationCanvas(
             drawPath(fillPath, primaryColor.copy(alpha = .14f), style = Fill)
             drawPath(strokePath, primaryColor, style = Stroke(3.dp.toPx()))
         }
+        val baselineY = if (bipolar) zeroY else size.height - .5.dp.toPx()
+        drawLine(mutedColor.copy(alpha = .5f), Offset(0f, baselineY), Offset(size.width, baselineY), 1.dp.toPx())
         drawLine(Color.White.copy(alpha = .65f), Offset(playhead * size.width, 0f), Offset(playhead * size.width, size.height), 1.dp.toPx())
         sorted.forEach { point ->
             val center = Offset(point.progress * size.width, (1f - (point.value + 1f) * .5f) * size.height)
