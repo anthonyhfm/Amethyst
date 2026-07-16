@@ -14,7 +14,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.ui.components.DialType
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -76,7 +76,8 @@ object MoveNode : CompositionNodeDefinition {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Dial(
+            AutomatableDial(
+                parameterId = "offset-x",
                 type = DialType.Steps(values = (-64..64).toList()),
                 value = s.offsetX,
                 defaultValue = 0,
@@ -92,7 +93,8 @@ object MoveNode : CompositionNodeDefinition {
                     )
                 },
             )
-            Dial(
+            AutomatableDial(
+                parameterId = "offset-y",
                 type = DialType.Steps(values = (-64..64).toList()),
                 value = s.offsetY,
                 defaultValue = 0,

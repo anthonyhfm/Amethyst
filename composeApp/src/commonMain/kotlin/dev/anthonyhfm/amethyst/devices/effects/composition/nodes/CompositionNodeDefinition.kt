@@ -1,12 +1,26 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
+
+val LocalCompositionNode = staticCompositionLocalOf<CompositionNode?> { null }
+val LocalAutomationHandler = staticCompositionLocalOf<((parameterId: String, automated: Boolean, remove: Boolean) -> Unit)?> { null }
+
+fun getParameterByTitle(title: String, parameters: List<CompositionAutomationParameter>): CompositionAutomationParameter? {
+    val cleanTitle = title.trim().lowercase()
+    return parameters.firstOrNull {
+        val cleanLabel = it.label.trim().lowercase()
+        val cleanId = it.id.trim().lowercase()
+        cleanLabel == cleanTitle || cleanId == cleanTitle ||
+        (cleanTitle == "opacity" && (cleanLabel == "alpha" || cleanId == "alpha"))
+    }
+}
 
 interface CompositionNodeDefinition {
     val type: String

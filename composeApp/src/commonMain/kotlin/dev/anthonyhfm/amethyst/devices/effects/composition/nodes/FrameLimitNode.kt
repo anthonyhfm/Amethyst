@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Timer
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
@@ -48,7 +49,8 @@ object FrameLimitNode : TransformNode() {
         val state = node.state as? FrameLimitNodeState ?: return
 
         NodeControls {
-            LabeledSlider(
+            AutomatableSlider(
+                parameterId = "frames",
                 label = "Frames per cycle",
                 value = state.frames.toFloat(),
                 range = 1f..120f,

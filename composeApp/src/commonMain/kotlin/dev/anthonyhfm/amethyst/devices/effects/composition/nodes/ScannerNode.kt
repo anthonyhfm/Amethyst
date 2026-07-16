@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableAngleControl
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -138,50 +139,27 @@ object ScannerNode : CompositionNodeDefinition {
         onNodeChange: (CompositionNode) -> Unit,
     ) {
         val state = node.state as? ScannerNodeState ?: return
-        val onAngleChange = rememberUpdatedState { position: Offset, size: androidx.compose.ui.unit.IntSize ->
-            if (size.width == 0 || size.height == 0) return@rememberUpdatedState
-
-            val centerX = size.width / 2f
-            val centerY = size.height / 2f
-            val angle = (atan2(position.y - centerY, position.x - centerX) * 180.0 / PI).toFloat()
-            onNodeChange(
-                node.copy(
-                    state = state.copy(
-                        angleDegrees = angle,
-                    )
-                )
-            )
-        }
 
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
+            AutomatableAngleControl(
+                parameterId = "angle",
+                angleDegrees = state.angleDegrees,
+                onAngleChange = { angle ->
+                    onNodeChange(
+                        node.copy(
+                            state = state.copy(
+                                angleDegrees = angle,
+                            )
+                        )
+                    )
+                },
                 modifier = Modifier
                     .size(80.dp)
                     .clip(DefaultShape)
-                    .background(Theme[colors][secondary])
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { position ->
-                                onAngleChange.value(position, size)
-                            }
-                        )
-                    }
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { position ->
-                                onAngleChange.value(position, size)
-                            },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                onAngleChange.value(change.position, size)
-                            },
-                        )
-                    },
-                contentAlignment = Alignment.Center,
+                    .background(Theme[colors][secondary]),
             ) {
                 Icon(
                     imageVector = Lucide.ArrowUp,

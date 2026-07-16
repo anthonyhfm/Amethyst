@@ -16,7 +16,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.WorkspaceOriginSelector
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.serialization.Serializable
@@ -127,7 +127,9 @@ object VortexNode : TransformNode() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            WorkspaceOriginSelector(
+            AutomatableWorkspaceOriginSelector(
+                originXParameterId = "origin-x",
+                originYParameterId = "origin-y",
                 originX = state.originX,
                 originY = state.originY,
                 bounds = bounds,

@@ -9,6 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.ui.components.DialType
 
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
+
 abstract class TransformNode : CompositionNodeDefinition {
     override val hasInput = true
     override val hasOutput = true
@@ -33,11 +36,27 @@ internal fun <T> Dial(
     title: String,
     text: String,
     onValueChange: (T) -> Unit,
-) = dev.anthonyhfm.amethyst.ui.components.primitives.Dial(
-    type = type,
-    value = value,
-    defaultValue = defaultValue,
-    title = title,
-    text = text,
-    onValueChange = onValueChange,
-)
+) {
+    val node = LocalCompositionNode.current
+    val parameter = if (node != null) getParameterByTitle(title, node.automationParameters()) else null
+    if (parameter != null) {
+        AutomatableDial(
+            parameterId = parameter.id,
+            type = type,
+            value = value,
+            defaultValue = defaultValue,
+            title = title,
+            text = text,
+            onValueChange = onValueChange,
+        )
+    } else {
+        dev.anthonyhfm.amethyst.ui.components.primitives.Dial(
+            type = type,
+            value = value,
+            defaultValue = defaultValue,
+            title = title,
+            text = text,
+            onValueChange = onValueChange,
+        )
+    }
+}

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableAngleControl
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -163,38 +164,17 @@ private fun SliceAngleControl(
     angleDegrees: Float,
     onAngleChange: (Float) -> Unit,
 ) {
-    val onAngle = rememberUpdatedState { point: Offset, size: IntSize ->
-        if (size.width > 0 && size.height > 0) {
-            onAngleChange((atan2(point.y - size.height / 2f, point.x - size.width / 2f) * 180.0 / PI).toFloat())
-        }
-    }
     val foregroundColor = Theme[colors][foreground]
 
-    Box(
+    AutomatableAngleControl(
+        parameterId = "angle",
+        angleDegrees = angleDegrees,
+        onAngleChange = onAngleChange,
         modifier = Modifier
             .size(80.dp)
             .clip(DefaultShape)
             .background(Theme[colors][secondary])
-            .semantics { contentDescription = "Slice angle" }
-            .pointerHoverIcon(PointerIcon.Hand)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { position ->
-                        onAngle.value(position, size)
-                    }
-                )
-            }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { position ->
-                        onAngle.value(position, size)
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        onAngle.value(change.position, size)
-                    },
-                )
-            }
+            .semantics { contentDescription = "Slice angle" },
     ) {
         Canvas(
             modifier = Modifier.fillMaxSize()

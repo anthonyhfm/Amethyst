@@ -18,7 +18,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.ui.components.DialType
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -122,7 +122,8 @@ object NoiseNode : CompositionNodeDefinition {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Dial(
+            AutomatableDial(
+                parameterId = "regenerations",
                 type = DialType.Steps(values = (MIN_REGENERATIONS..MAX_REGENERATIONS).toList()),
                 value = regenerations,
                 defaultValue = DEFAULT_REGENERATIONS,
@@ -150,7 +151,8 @@ object NoiseNode : CompositionNodeDefinition {
                 },
             )
 
-            Dial(
+            AutomatableDial(
+                parameterId = "intensity",
                 type = DialType.Continuous,
                 value = intensity,
                 defaultValue = DEFAULT_INTENSITY,

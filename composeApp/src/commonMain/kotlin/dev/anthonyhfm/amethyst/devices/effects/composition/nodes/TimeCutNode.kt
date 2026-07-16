@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableRangeSlider
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
@@ -72,7 +73,9 @@ object TimeCutNode : TransformNode() {
         val state = node.state as? TimeCutNodeState ?: return
 
         NodeControls {
-            LabeledRangeSlider(
+            AutomatableRangeSlider(
+                startParameterId = "start",
+                endParameterId = "end",
                 label = "Playback range",
                 start = state.startProgress,
                 end = state.endProgress,

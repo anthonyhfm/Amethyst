@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
 import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.PenLine
@@ -93,7 +94,8 @@ object LineNode : CompositionNodeDefinition {
         val state = node.state as? LineNodeState ?: return
 
         NodeControls {
-            LabeledSlider(
+            AutomatableSlider(
+                parameterId = "start-x",
                 label = "Start X",
                 value = state.startX,
                 range = 0f..1f,
@@ -107,7 +109,8 @@ object LineNode : CompositionNodeDefinition {
                     )
                 },
             )
-            LabeledSlider(
+            AutomatableSlider(
+                parameterId = "start-y",
                 label = "Start Y",
                 value = state.startY,
                 range = 0f..1f,
@@ -121,7 +124,8 @@ object LineNode : CompositionNodeDefinition {
                     )
                 },
             )
-            LabeledSlider(
+            AutomatableSlider(
+                parameterId = "end-x",
                 label = "End X",
                 value = state.endX,
                 range = 0f..1f,
@@ -135,7 +139,8 @@ object LineNode : CompositionNodeDefinition {
                     )
                 },
             )
-            LabeledSlider(
+            AutomatableSlider(
+                parameterId = "thickness",
                 label = "Thickness",
                 value = state.thickness,
                 range = 0f..4f,

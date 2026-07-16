@@ -28,10 +28,13 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
-import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalAutomationHandler
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableContextMenuItem
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Trash2
 import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
 import dev.anthonyhfm.amethyst.ui.components.DialEditSession
 import dev.anthonyhfm.amethyst.ui.components.LocalDialEditSession
@@ -73,6 +76,7 @@ fun GraphNodeShell(
     outputPortHighlighted: Boolean = false,
     onNodeChange: (CompositionNode, DialEditPhase) -> Unit,
     onAutomationAction: (parameterId: String, automated: Boolean, remove: Boolean) -> Unit = { _, _, _ -> },
+    onDelete: () -> Unit = {},
 ) {
     val titleBarColor = if (selected) Theme[colors][selectionSurface] else Theme[chainColorTokens][chainSurfaceRaised]
     val titleColor = if (selected) Theme[colors][selectionForeground] else Theme[colors][cardForeground]
@@ -89,83 +93,99 @@ fun GraphNodeShell(
     val currentOnOutputPortDragEnd by rememberUpdatedState(onOutputPortDragEnd)
     val currentOnDragBy by rememberUpdatedState(onDragBy)
 
-    ContextMenu(
-        modifier = modifier,
-        trigger = {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .width(bodyWidth)
             .clip(DefaultShape)
             .background(Theme[chainColorTokens][chainSurface])
             .border(1.dp, titleBarColor, DefaultShape)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(GRAPH_NODE_TITLE_HEIGHT.dp)
-                .background(titleBarColor)
-                .clickable(onClick = onSelect)
-                .pointerInput(node.id) {
-                    detectDragGestures(
-                        onDragStart = { onDragStart() },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            currentOnDragBy(dragAmount.x, dragAmount.y)
-                        },
-                        onDragEnd = onDragEnd,
-                        onDragCancel = onDragEnd,
+        val isDeletable = definition?.isOutput != true
+
+        @Composable
+        fun RenderTitleBar() {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(GRAPH_NODE_TITLE_HEIGHT.dp)
+                    .background(titleBarColor)
+                    .clickable(onClick = onSelect)
+                    .pointerInput(node.id) {
+                        detectDragGestures(
+                            onDragStart = { onDragStart() },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                currentOnDragBy(dragAmount.x, dragAmount.y)
+                            },
+                            onDragEnd = onDragEnd,
+                            onDragCancel = onDragEnd,
+                        )
+                    },
+            ) {
+                if (definition?.hasInput == true) {
+                    DataPort(
+                        input = true,
+                        connected = connectedInput,
+                        highlighted = inputPortHighlighted,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .clickable(onClick = { currentOnInputPortClick() })
+                            .pointerInput(node.id) {
+                                detectDragGestures(
+                                    onDragStart = { currentOnInputPortDragStart() },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        currentOnInputPortDragBy(dragAmount.x, dragAmount.y)
+                                    },
+                                    onDragEnd = { currentOnInputPortDragEnd() },
+                                    onDragCancel = { currentOnInputPortDragEnd() },
+                                )
+                            },
                     )
-                },
-        ) {
-            if (definition?.hasInput == true) {
-                DataPort(
-                    input = true,
-                    connected = connectedInput,
-                    highlighted = inputPortHighlighted,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .clickable(onClick = { currentOnInputPortClick() })
-                        .pointerInput(node.id) {
-                            detectDragGestures(
-                                onDragStart = { currentOnInputPortDragStart() },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    currentOnInputPortDragBy(dragAmount.x, dragAmount.y)
-                                },
-                                onDragEnd = { currentOnInputPortDragEnd() },
-                                onDragCancel = { currentOnInputPortDragEnd() },
-                            )
-                        },
+                }
+
+                Text(
+                    text = node.label,
+                    style = Theme[typography][small],
+                    color = titleColor,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+
+                if (definition?.hasOutput == true) {
+                    DataPort(
+                        input = false,
+                        connected = connectedOutput,
+                        highlighted = outputPortHighlighted,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .pointerInput(node.id) {
+                                detectDragGestures(
+                                    onDragStart = { currentOnOutputPortDragStart() },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        currentOnOutputPortDragBy(dragAmount.x, dragAmount.y)
+                                    },
+                                    onDragEnd = { currentOnOutputPortDragEnd() },
+                                    onDragCancel = { currentOnOutputPortDragEnd() },
+                                )
+                            },
+                    )
+                }
+            }
+        }
+
+        if (isDeletable) {
+            ContextMenu(
+                trigger = { RenderTitleBar() }
+            ) {
+                AutomatableContextMenuItem(
+                    label = "Delete ${node.label}",
+                    icon = Lucide.Trash2,
+                    onClick = onDelete,
                 )
             }
-
-            Text(
-                text = node.label,
-                style = Theme[typography][small],
-                color = titleColor,
-                modifier = Modifier.align(Alignment.Center),
-            )
-
-            if (definition?.hasOutput == true) {
-                DataPort(
-                    input = false,
-                    connected = connectedOutput,
-                    highlighted = outputPortHighlighted,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .pointerInput(node.id) {
-                            detectDragGestures(
-                                onDragStart = { currentOnOutputPortDragStart() },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    currentOnOutputPortDragBy(dragAmount.x, dragAmount.y)
-                                },
-                                onDragEnd = { currentOnOutputPortDragEnd() },
-                                onDragCancel = { currentOnOutputPortDragEnd() },
-                            )
-                        },
-                )
-            }
+        } else {
+            RenderTitleBar()
         }
 
         Box(
@@ -184,7 +204,11 @@ fun GraphNodeShell(
         ) {
             if (definition != null) {
                 val dialEditSession = remember { DialEditSession() }
-                CompositionLocalProvider(LocalDialEditSession provides dialEditSession) {
+                CompositionLocalProvider(
+                    LocalDialEditSession provides dialEditSession,
+                    LocalCompositionNode provides node,
+                    LocalAutomationHandler provides onAutomationAction,
+                ) {
                     definition.NodeBody(node) { updated -> onNodeChange(updated, dialEditSession.phase) }
                 }
             } else {
@@ -194,25 +218,6 @@ fun GraphNodeShell(
                     color = Theme[colors][mutedForeground],
                     modifier = Modifier.align(Alignment.Center),
                 )
-            }
-        }
-    }
-        },
-    ) {
-        val parameters = node.automationParameters()
-        if (parameters.isEmpty()) {
-            ContextMenuItem(onClick = {}) { Text("No automatable values") }
-        } else {
-            parameters.forEach { parameter ->
-                val automated = node.lane(parameter.id) != null
-                ContextMenuItem(onClick = { onAutomationAction(parameter.id, automated, false) }) {
-                    Text(if (automated) "Edit ${parameter.label} Automation" else "Automate ${parameter.label}")
-                }
-                if (automated) {
-                    ContextMenuItem(onClick = { onAutomationAction(parameter.id, true, true) }) {
-                        Text("Remove ${parameter.label} Automation")
-                    }
-                }
             }
         }
     }

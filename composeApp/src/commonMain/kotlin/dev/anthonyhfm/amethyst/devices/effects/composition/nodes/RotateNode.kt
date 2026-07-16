@@ -19,7 +19,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.ui.components.DialType
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -102,7 +102,8 @@ object RotateNode : CompositionNodeDefinition {
                 .fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Dial(
+            AutomatableDial(
+                parameterId = "angle",
                 type = DialType.Knob,
                 title = "Rotation",
                 text = "${state.angleDegrees.roundToInt()}°",

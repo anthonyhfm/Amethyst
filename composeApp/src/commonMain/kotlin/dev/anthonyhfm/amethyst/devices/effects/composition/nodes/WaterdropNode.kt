@@ -36,7 +36,8 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.WorkspaceOriginSelector
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.secondary
@@ -141,7 +142,9 @@ object WaterdropNode : CompositionNodeDefinition {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            WorkspaceOriginSelector(
+            AutomatableWorkspaceOriginSelector(
+                originXParameterId = "origin-x",
+                originYParameterId = "origin-y",
                 originX = state.originX,
                 originY = state.originY,
                 bounds = bounds,
@@ -158,7 +161,8 @@ object WaterdropNode : CompositionNodeDefinition {
                 modifier = Modifier.height(12.dp)
             )
 
-            LabeledSlider(
+            AutomatableSlider(
+                parameterId = "curvature",
                 label = "Curvature",
                 value = state.curvature,
                 range = MIN_CURVATURE..MAX_CURVATURE,

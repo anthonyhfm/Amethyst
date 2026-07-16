@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableRangeSlider
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
@@ -78,7 +79,9 @@ object TimeWrapNode : TransformNode() {
         val state = node.state as? TimeWrapNodeState ?: return
 
         NodeControls {
-            LabeledRangeSlider(
+            AutomatableRangeSlider(
+                startParameterId = "target-start",
+                endParameterId = "target-end",
                 label = "Target range",
                 start = state.targetStart,
                 end = state.targetEnd,

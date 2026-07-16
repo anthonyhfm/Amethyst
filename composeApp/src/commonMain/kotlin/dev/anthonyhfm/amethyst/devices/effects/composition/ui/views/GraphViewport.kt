@@ -518,6 +518,12 @@ fun GraphViewport(
                         else -> editor.automate(node.id, parameterId)
                     }
                 },
+                onDelete = {
+                    device.updateGraph { current ->
+                        current.withoutNode(node.id)
+                    }
+                    editor.reconcile()
+                },
             )
         }
 

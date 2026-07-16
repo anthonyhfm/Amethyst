@@ -22,7 +22,8 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.WorkspaceOriginSelector
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.PI
 import kotlin.math.ceil
@@ -135,7 +136,9 @@ object SpiralNode : CompositionNodeDefinition {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            WorkspaceOriginSelector(
+            AutomatableWorkspaceOriginSelector(
+                originXParameterId = "origin-x",
+                originYParameterId = "origin-y",
                 originX = state.originX,
                 originY = state.originY,
                 bounds = bounds,
@@ -152,7 +155,8 @@ object SpiralNode : CompositionNodeDefinition {
                 modifier = Modifier.height(12.dp)
             )
 
-            LabeledSlider(
+            AutomatableSlider(
+                parameterId = "turns",
                 label = "Turns",
                 value = state.turns,
                 range = MIN_TURNS..MAX_TURNS,

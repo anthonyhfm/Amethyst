@@ -10,7 +10,7 @@ import com.composables.icons.lucide.Repeat
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.ui.components.DialType
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import kotlin.math.floor
 import kotlinx.serialization.Serializable
 
@@ -70,7 +70,8 @@ object LoopNode : CompositionNodeDefinition {
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Dial(
+            AutomatableDial(
+                parameterId = "repeats",
                 type = DialType.Steps(values = (1..16).toList()),
                 value = s.repeats,
                 defaultValue = 2,

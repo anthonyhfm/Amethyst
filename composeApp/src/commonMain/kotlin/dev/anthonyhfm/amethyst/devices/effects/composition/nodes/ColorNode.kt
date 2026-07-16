@@ -21,7 +21,7 @@ import dev.anthonyhfm.amethyst.ui.components.ColorPicker
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.HexColorEditor
 import dev.anthonyhfm.amethyst.ui.components.HuePickerBar
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.rememberColorPickerState
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
@@ -112,7 +112,8 @@ object ColorNode : TransformNode() {
 
             HexColorEditor(state = picker)
 
-            Dial(
+            AutomatableDial(
+                parameterId = "alpha",
                 type = DialType.Continuous,
                 value = state.alpha,
                 defaultValue = 1f,

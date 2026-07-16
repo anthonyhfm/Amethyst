@@ -10,6 +10,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 
@@ -18,7 +19,7 @@ actual fun Modifier.rightClickable(onRightClick: (position: Offset) -> Unit): Mo
     Modifier.pointerInput(onRightClick) {
         awaitPointerEventScope {
             while (true) {
-                val event = awaitPointerEvent()
+                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
 
                 if (event.type == PointerEventType.Press &&
                     event.buttons.isSecondaryPressed &&
