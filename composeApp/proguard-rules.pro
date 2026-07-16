@@ -15,3 +15,10 @@
 # Ktor's SocketBase uses an enclosing method that the ProGuard shrinker cannot
 # resolve across the coroutine transformation boundary.
 -dontwarn io.ktor.network.sockets.**
+
+# Sentry probes optional XMLutil serialization providers via ServiceLoader. They
+# are not bundled in the Android artifact, so R8 must not treat their absence as
+# a release-build error.
+-dontwarn nl.adaptivity.xmlutil.serialization.KotlinxSerializationProvider
+-dontwarn nl.adaptivity.xmlutil.util.SerializationProvider
+-dontwarn nl.adaptivity.xmlutil.util.DefaultSerializationProvider

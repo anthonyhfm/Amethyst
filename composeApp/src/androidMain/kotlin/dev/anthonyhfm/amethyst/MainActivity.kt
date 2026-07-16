@@ -1,7 +1,10 @@
 package dev.anthonyhfm.amethyst
 
 import android.graphics.Color
+import android.Manifest
 import android.os.Bundle
+import android.os.Build
+import android.content.pm.PackageManager
 import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
-import dev.anthonyhfm.amethyst.core.midi.platformMidiAccess
+import dev.anthonyhfm.amethyst.core.midi.AndroidMidiAccessProvider
 import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
 import dev.anthonyhfm.amethyst.ui.theme.ComposeAmethystTheme
 import io.github.vinceglb.filekit.FileKit
@@ -24,6 +27,8 @@ class MainActivity : ComponentActivity() {
         initializeSentry()
 
         FileKit.init(this)
+        AndroidMidiAccessProvider.initialize(applicationContext)
+        requestBluetoothMidiPermissionIfNeeded()
 
         setContent {
             val darkMode = true
@@ -41,6 +46,19 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun requestBluetoothMidiPermissionIfNeeded() {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), BLUETOOTH_MIDI_PERMISSION_REQUEST)
+        }
+    }
+
+    private companion object {
+        const val BLUETOOTH_MIDI_PERMISSION_REQUEST = 4101
     }
 }
 

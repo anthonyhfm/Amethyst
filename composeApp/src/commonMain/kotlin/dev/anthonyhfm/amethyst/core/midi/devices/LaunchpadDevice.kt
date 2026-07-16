@@ -14,7 +14,10 @@ abstract class LaunchpadDevice(
 ) {
     val screen: Screen = Screen()
 
-    protected val outscope = CoroutineScope(Dispatchers.Default)
+    // SysEx updates must retain their order. Individual device implementations
+    // launch one coroutine per update, so a serial dispatcher is required to
+    // prevent concurrent writes to the same physical MIDI port.
+    protected val outscope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     init {
         screen.screenExit = { updates, colors ->

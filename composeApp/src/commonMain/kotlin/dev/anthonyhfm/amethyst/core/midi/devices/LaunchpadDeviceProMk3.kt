@@ -35,9 +35,9 @@ class LaunchpadDeviceProMk3(
                     arrayOf(
                         3.toByte(),
                         update.index,
-                        (update.color.red * 127).toInt().toByte(),
-                        (update.color.green * 127).toInt().toByte(),
-                        (update.color.blue * 127).toInt().toByte(),
+                        (update.color.red * 63).toInt().toByte(),
+                        (update.color.green * 63).toInt().toByte(),
+                        (update.color.blue * 63).toInt().toByte(),
                     )
                 )
             }
