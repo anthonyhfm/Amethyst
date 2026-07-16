@@ -1,4 +1,5 @@
 import gobley.gradle.GobleyHost
+import gobley.gradle.Variant
 import gobley.gradle.cargo.dsl.jvm
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -27,6 +28,7 @@ kotlin {
 
 cargo {
     packageDirectory = layout.projectDirectory.dir("rust")
+    jvmVariant = Variant(providers.gradleProperty("amethyst.native.variant").getOrElse("debug"))
 
     builds.jvm {
         embedRustLibrary = rustTarget == GobleyHost.current.rustTarget

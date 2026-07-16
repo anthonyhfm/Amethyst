@@ -98,7 +98,7 @@ impl MidiConnection {
     }
 
     pub fn is_open(&self) -> bool {
-        *self.inner.is_open.lock().unwrap()
+        *self.inner.is_open.lock().unwrap() && self.inner.handle.is_open()
     }
 
     pub fn disconnect(&self) -> Result<(), MidiError> {

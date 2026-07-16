@@ -7,6 +7,7 @@ pub trait BackendPortHandle: Send + Sync {
     fn send(&self, data: &[u8]) -> Result<(), MidiError>;
     fn close(&self) -> Result<(), MidiError>;
     fn port_id(&self) -> &str;
+    fn is_open(&self) -> bool { true }
 }
 
 pub trait MidiBackend: Send + Sync {

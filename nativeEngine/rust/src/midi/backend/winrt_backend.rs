@@ -1,9 +1,11 @@
 use crate::midi::backend::{BackendPortHandle, MidiBackend};
 use crate::midi::error::MidiError;
 use crate::midi::grouping::sort_ports;
+use crate::midi::parser::split_midi_messages;
 use crate::midi::types::*;
 use std::collections::BTreeMap;
-use std::sync::{Mutex, OnceLock, mpsc};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use windows::Devices::Enumeration::{DeviceInformation, DeviceInformationUpdate, DeviceWatcher};
 use windows::Devices::Midi::{MidiInPort, MidiMessageReceivedEventArgs, MidiOutPort};
 use windows::Foundation::{EventRegistrationToken, IPropertyValue, TypedEventHandler};
@@ -138,15 +140,37 @@ impl MidiBackend for WinRtBackend {
             .map_err(to_connection_error)?;
 
         let port_id_clone = port_id.to_string();
+        let connection_open = Arc::new(AtomicBool::new(true));
+        let callback_connection_open = connection_open.clone();
+        let callback_lock = Mutex::new(());
         let handler = TypedEventHandler::<MidiInPort, MidiMessageReceivedEventArgs>::new(
             move |_port, args: &Option<MidiMessageReceivedEventArgs>| {
+                let _callback_guard = callback_lock.lock().unwrap();
                 if let Some(args) = args {
-                    if let Some((data, timestamp_us)) = read_midi_message(args) {
-                        let _ = sender.send(MidiMessage {
-                            data,
-                            timestamp_us,
-                            port_id: port_id_clone.clone(),
-                        });
+                    match read_midi_message(args) {
+                        Ok((data, timestamp_us)) => {
+                            for message_data in split_midi_messages(&data) {
+                                if sender
+                                    .send(MidiMessage {
+                                        data: message_data,
+                                        timestamp_us,
+                                        port_id: port_id_clone.clone(),
+                                    })
+                                    .is_err()
+                                {
+                                    callback_connection_open.store(false, Ordering::Release);
+                                    break;
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            if callback_connection_open.swap(false, Ordering::AcqRel) {
+                                eprintln!(
+                                    "WinRT MIDI input '{}' disconnected: {}",
+                                    port_id_clone, error
+                                );
+                            }
+                        }
                     }
                 }
                 Ok(())
@@ -160,6 +184,7 @@ impl MidiBackend for WinRtBackend {
             port_id: port_id.to_string(),
             port: input_port,
             event_token: Mutex::new(Some(event_token)),
+            connection_open,
         }))
     }
 
@@ -192,6 +217,7 @@ struct WinRtInputPortHandle {
     port_id: String,
     port: MidiInPort,
     event_token: Mutex<Option<EventRegistrationToken>>,
+    connection_open: Arc<AtomicBool>,
 }
 
 impl BackendPortHandle for WinRtInputPortHandle {
@@ -210,6 +236,10 @@ impl BackendPortHandle for WinRtInputPortHandle {
 
     fn port_id(&self) -> &str {
         &self.port_id
+    }
+
+    fn is_open(&self) -> bool {
+        self.connection_open.load(Ordering::Acquire)
     }
 }
 
@@ -367,15 +397,15 @@ fn port_from_device_info(
     })
 }
 
-fn read_midi_message(args: &MidiMessageReceivedEventArgs) -> Option<(Vec<u8>, u64)> {
-    let message = args.Message().ok()?;
-    let timestamp_us = message.Timestamp().ok()?.Duration as u64 / 10;
-    let buffer = message.RawData().ok()?;
-    let length = buffer.Length().ok()? as usize;
-    let reader = DataReader::FromBuffer(&buffer).ok()?;
+fn read_midi_message(args: &MidiMessageReceivedEventArgs) -> Result<(Vec<u8>, u64), MidiError> {
+    let message = args.Message().map_err(to_connection_error)?;
+    let timestamp_us = message.Timestamp().map_err(to_connection_error)?.Duration as u64 / 10;
+    let buffer = message.RawData().map_err(to_connection_error)?;
+    let length = buffer.Length().map_err(to_connection_error)? as usize;
+    let reader = DataReader::FromBuffer(&buffer).map_err(to_connection_error)?;
     let mut bytes = vec![0; length];
-    reader.ReadBytes(&mut bytes).ok()?;
-    Some((bytes, timestamp_us))
+    reader.ReadBytes(&mut bytes).map_err(to_connection_error)?;
+    Ok((bytes, timestamp_us))
 }
 
 fn property_string(info: &DeviceInformation, key: &str) -> Option<String> {

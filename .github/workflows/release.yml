@@ -35,6 +35,13 @@ jobs:
             artifact-ext: msi
             artifact-name: amethyst-windows
 
+          - os: windows-11-arm
+            name: Windows ARM
+            task: packageReleaseMsi
+            artifact-dir: msi
+            artifact-ext: msi
+            artifact-name: amethyst-windows-arm64
+
           - os: macos-26
             name: macOS ARM
             task: packageReleaseDmg
@@ -80,11 +87,33 @@ jobs:
           setup-gradle: 'true'
           setup-node: 'true'
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify Windows ARM toolchains
+        if: matrix.os == 'windows-11-arm'
+        shell: pwsh
+        run: |
+          $rustHost = rustc -vV | Select-String '^host:'
+          if ($rustHost -notmatch 'aarch64-pc-windows-msvc') {
+            throw "Expected an ARM64 Rust host, got: $rustHost"
+          }
+
+          $javaArch = java -XshowSettings:properties -version 2>&1 | Select-String 'os.arch ='
+          if ($javaArch -notmatch 'aarch64') {
+            throw "Expected an ARM64 JVM, got: $javaArch"
+          }
+
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev
+
       - name: Build
         shell: bash
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:${{ matrix.task }}
+        run: ./gradlew :composeApp:${{ matrix.task }} -Pamethyst.native.variant=release
 
       - name: Rename artifact
         shell: bash
@@ -141,6 +170,7 @@ jobs:
             **Build #${{ github.run_number }}** · Commit: `${{ github.sha }}` · @${{ github.actor }}
           files: |
             release-artifacts/release-assets-amethyst-windows/*.msi
+            release-artifacts/release-assets-amethyst-windows-arm64/*.msi
             release-artifacts/release-assets-amethyst-macos-arm64/*.dmg
             release-artifacts/release-assets-amethyst-macos-amd64/*.dmg
             release-artifacts/release-assets-amethyst-linux-deb/*.deb
