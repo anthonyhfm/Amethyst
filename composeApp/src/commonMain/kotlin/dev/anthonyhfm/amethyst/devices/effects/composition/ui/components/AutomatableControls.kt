@@ -35,6 +35,7 @@ import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Trash2
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalNodeChangeCallbacks
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.Dial as PrimitiveDial
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledSlider as PrimitiveLabeledSlider
@@ -54,6 +55,7 @@ fun <T> AutomatableDial(
 ) {
     val node = LocalCompositionNode.current
     val onAutomationAction = LocalAutomationHandler.current
+    val nodeChangeCallbacks = LocalNodeChangeCallbacks.current
     val parameter = if (node != null) {
         node.automationParameters().firstOrNull { it.id == parameterId }
     } else {
@@ -68,7 +70,9 @@ fun <T> AutomatableDial(
             defaultValue = defaultValue,
             title = title,
             text = text,
+            onStartValueChange = { nodeChangeCallbacks.onStart() },
             onValueChange = onValueChange,
+            onFinishValueChange = { nodeChangeCallbacks.onFinish() },
             onResolveTextValue = onResolveTextValue,
             modifier = modifier,
         )

@@ -62,7 +62,6 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.Composi
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.drawDataCable
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.buildDataCablePath
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
-import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -473,7 +472,8 @@ fun GraphViewport(
                 },
                 inputPortHighlighted = node.id == highlightedInputNodeId,
                 outputPortHighlighted = node.id == highlightedOutputNodeId,
-                onNodeChange = { updated, editPhase ->
+                onStartNodeChange = { },
+                onNodeChange = { updated ->
                     val focus = automationFocus?.takeIf { it.nodeId == node.id }
                     val selectedPointId = focus?.let { activeFocus ->
                         automationSelections.filterIsInstance<Selectable.CompositionAutomationPoint>()
@@ -485,31 +485,32 @@ fun GraphViewport(
                             ?.pointId
                     }
                     val parameter = focus?.let { controlNode.automationParameter(it.parameterId) }
+                    val lane = focus?.let { node.lane(it.parameterId) }
                     val changedAutomationValue = parameter?.let { activeParameter ->
                         val displayedValue = activeParameter.valueOf(controlNode)
                         val updatedValue = activeParameter.valueOf(updated)
                         displayedValue != null && updatedValue != null && displayedValue != updatedValue
                     } == true
-                    if (focus != null && selectedPointId != null && parameter != null &&
-                        (changedAutomationValue || editPhase == DialEditPhase.Commit)
+                    // Only take the automation path when a point is explicitly selected.
+                    // Without a selection the change goes through the normal graph update so
+                    // the static/base value is stored and no phantom points are created.
+                    if (focus != null && parameter != null && lane != null &&
+                        selectedPointId != null && changedAutomationValue
                     ) {
                         parameter.valueOf(updated)?.let { nativeValue ->
-                            when (editPhase) {
-                                DialEditPhase.Preview -> editor.previewAutomationPointValue(node.id, focus.parameterId, selectedPointId, nativeValue)
-                                DialEditPhase.Commit -> editor.commitAutomationPreview()
-                                DialEditPhase.Direct -> editor.updateAutomationPointValue(node.id, focus.parameterId, selectedPointId, nativeValue)
-                            }
+                            editor.previewAutomationPointValue(node.id, focus.parameterId, selectedPointId, nativeValue)
                         }
                         return@GraphNodeShell
                     }
                     device.updateGraph { current ->
                         val currentNode = current.nodes.firstOrNull { it.id == updated.id }
                             ?: return@updateGraph current
-                        // Controls may change only their serialised node state. Position and
-                        // graph identity always belong to the viewport's graph mutation path.
                         val next = currentNode.copy(state = updated.state)
                         current.withNode(next)
                     }
+                },
+                onFinishNodeChange = {
+                    editor.commitAutomationPreview()
                 },
                 onAutomationAction = { parameterId, automated, remove ->
                     when {

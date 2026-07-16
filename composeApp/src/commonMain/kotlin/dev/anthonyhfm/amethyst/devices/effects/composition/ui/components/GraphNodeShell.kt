@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,14 +31,14 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalAutomationHandler
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalNodeChangeCallbacks
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeChangeCallbacks
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableContextMenuItem
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Trash2
-import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
-import dev.anthonyhfm.amethyst.ui.components.DialEditSession
-import dev.anthonyhfm.amethyst.ui.components.LocalDialEditSession
+
 import dev.anthonyhfm.amethyst.ui.theme.cardForeground
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.chainSurface
@@ -74,7 +75,9 @@ fun GraphNodeShell(
     onOutputPortDragEnd: () -> Unit,
     inputPortHighlighted: Boolean = false,
     outputPortHighlighted: Boolean = false,
-    onNodeChange: (CompositionNode, DialEditPhase) -> Unit,
+    onNodeChange: (CompositionNode) -> Unit,
+    onStartNodeChange: () -> Unit = {},
+    onFinishNodeChange: () -> Unit = {},
     onAutomationAction: (parameterId: String, automated: Boolean, remove: Boolean) -> Unit = { _, _, _ -> },
     onDelete: () -> Unit = {},
 ) {
@@ -195,21 +198,30 @@ fun GraphNodeShell(
                 // Node controls own their pointer stream. Consume after child controls have seen
                 // it so the shell's selection click and graph gestures cannot react to a drag.
                 .pointerInput(node.id) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent().changes.forEach { it.consume() }
+                    detectTapGestures(
+                        onTap = { onSelect() }
+                    )
+                }
+                .pointerInput(node.id) {
+                    detectDragGestures(
+                        onDrag = { change, _ ->
+                            change.consume()
                         }
-                    }
+                    )
                 },
         ) {
             if (definition != null) {
-                val dialEditSession = remember { DialEditSession() }
                 CompositionLocalProvider(
-                    LocalDialEditSession provides dialEditSession,
                     LocalCompositionNode provides node,
                     LocalAutomationHandler provides onAutomationAction,
+                    LocalNodeChangeCallbacks provides NodeChangeCallbacks(
+                        onStart = onStartNodeChange,
+                        onFinish = onFinishNodeChange,
+                    ),
                 ) {
-                    definition.NodeBody(node) { updated -> onNodeChange(updated, dialEditSession.phase) }
+                    definition.NodeBody(node) { updated ->
+                        onNodeChange(updated)
+                    }
                 }
             } else {
                 Text(

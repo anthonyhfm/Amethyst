@@ -11,6 +11,12 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 
 val LocalCompositionNode = staticCompositionLocalOf<CompositionNode?> { null }
 val LocalAutomationHandler = staticCompositionLocalOf<((parameterId: String, automated: Boolean, remove: Boolean) -> Unit)?> { null }
+val LocalNodeChangeCallbacks = staticCompositionLocalOf<NodeChangeCallbacks> { NodeChangeCallbacks() }
+
+data class NodeChangeCallbacks(
+    val onStart: () -> Unit = {},
+    val onFinish: () -> Unit = {},
+)
 
 fun getParameterByTitle(title: String, parameters: List<CompositionAutomationParameter>): CompositionAutomationParameter? {
     val cleanTitle = title.trim().lowercase()

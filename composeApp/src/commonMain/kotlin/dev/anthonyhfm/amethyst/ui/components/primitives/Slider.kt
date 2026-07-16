@@ -29,8 +29,7 @@ import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.secondary
-import dev.anthonyhfm.amethyst.ui.components.DialEditPhase
-import dev.anthonyhfm.amethyst.ui.components.LocalDialEditSession
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalNodeChangeCallbacks
 
 @Composable
 fun Slider(
@@ -88,7 +87,7 @@ fun Slider(
     steps: Int = 0,
     enabled: Boolean = true,
 ) {
-    val editSession = LocalDialEditSession.current
+    val nodeChangeCallbacks = LocalNodeChangeCallbacks.current
     val state = rememberSliderState(
         initialValue = value,
         valueRange = valueRange,
@@ -103,8 +102,7 @@ fun Slider(
         snapshotFlow { state.value }
             .collect { newValue ->
                 if (newValue != currentValue) {
-                    editSession?.dispatch(DialEditPhase.Preview) { currentOnValueChange(newValue) }
-                        ?: currentOnValueChange(newValue)
+                    currentOnValueChange(newValue)
                 }
             }
     }
@@ -112,11 +110,12 @@ fun Slider(
     Slider(
         state = state,
         modifier = modifier.then(
-            if (editSession == null) Modifier else Modifier.pointerInput(editSession) {
+            Modifier.pointerInput(nodeChangeCallbacks) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
+                    nodeChangeCallbacks.onStart()
                     if (waitForUpOrCancellation() != null) {
-                        editSession.dispatch(DialEditPhase.Commit) { currentOnValueChange(state.value) }
+                        nodeChangeCallbacks.onFinish()
                     }
                 }
             }
