@@ -23,6 +23,7 @@ object NodeRegistry {
         register(TimeCutNode)
         register(VortexNode)
         register(FocusNode)
+        register(CutoutNode)
         register(ColorShiftNode)
         register(TimeWrapNode)
         register(SliceNode)
