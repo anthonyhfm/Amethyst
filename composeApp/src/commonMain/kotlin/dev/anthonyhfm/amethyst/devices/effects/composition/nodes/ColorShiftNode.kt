@@ -25,6 +25,12 @@ data class ColorShiftNodeState(
 ) : CompositionNodeState
 
 object ColorShiftNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<ColorShiftNodeState>("hue", "Hue", -180f, 180f, ColorShiftNodeState::hueDegrees) { state, value -> state.copy(hueDegrees = value) },
+        floatAutomationParameter<ColorShiftNodeState>("saturation", "Saturation", -1f, 1f, ColorShiftNodeState::saturationDelta) { state, value -> state.copy(saturationDelta = value) },
+        floatAutomationParameter<ColorShiftNodeState>("lightness", "Lightness", -1f, 1f, ColorShiftNodeState::lightnessDelta) { state, value -> state.copy(lightnessDelta = value) },
+    )
+
     override val type = "color-shift"
     override val label = "Color Shift"
     override val icon = Lucide.Palette

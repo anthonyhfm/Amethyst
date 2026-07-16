@@ -65,6 +65,12 @@ data class WaterdropNodeState(
 ) : CompositionNodeState
 
 object WaterdropNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<WaterdropNodeState>("origin-x", "Origin X", 0f, 1f, WaterdropNodeState::originX) { state, value -> state.copy(originX = value) },
+        floatAutomationParameter<WaterdropNodeState>("origin-y", "Origin Y", 0f, 1f, WaterdropNodeState::originY) { state, value -> state.copy(originY = value) },
+        floatAutomationParameter<WaterdropNodeState>("curvature", "Curvature", MIN_CURVATURE, MAX_CURVATURE, WaterdropNodeState::curvature) { state, value -> state.copy(curvature = value) },
+    )
+
     override val type = "waterdrop"
     override val label = "Waterdrop"
     override val icon = Lucide.Droplet

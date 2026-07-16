@@ -31,6 +31,10 @@ data class ColorNodeState(val red: Float = 1f, val green: Float = 1f, val blue: 
     CompositionNodeState
 
 object ColorNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<ColorNodeState>("alpha", "Alpha", 0f, 1f, ColorNodeState::alpha) { state, value -> state.copy(alpha = value) },
+    )
+
     override val type = "color";
     override val label = "Color";
     override val icon = Lucide.Palette

@@ -22,6 +22,11 @@ data class TimeCutNodeState(
 ) : CompositionNodeState
 
 object TimeCutNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<TimeCutNodeState>("start", "Start", 0f, 1f, TimeCutNodeState::startProgress) { state, value -> state.copy(startProgress = value.coerceAtMost(state.endProgress)) },
+        floatAutomationParameter<TimeCutNodeState>("end", "End", 0f, 1f, TimeCutNodeState::endProgress) { state, value -> state.copy(endProgress = value.coerceAtLeast(state.startProgress)) },
+    )
+
     override val type = "time-cut"
     override val label = "Time Cut"
     override val icon = Lucide.Scissors

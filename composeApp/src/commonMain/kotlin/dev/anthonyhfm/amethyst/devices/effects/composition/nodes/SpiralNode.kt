@@ -45,6 +45,12 @@ data class SpiralNodeState(
 ) : CompositionNodeState
 
 object SpiralNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<SpiralNodeState>("origin-x", "Origin X", 0f, 1f, SpiralNodeState::originX) { state, value -> state.copy(originX = value) },
+        floatAutomationParameter<SpiralNodeState>("origin-y", "Origin Y", 0f, 1f, SpiralNodeState::originY) { state, value -> state.copy(originY = value) },
+        floatAutomationParameter<SpiralNodeState>("turns", "Turns", MIN_TURNS, MAX_TURNS, SpiralNodeState::turns) { state, value -> state.copy(turns = value) },
+    )
+
     override val type = "spiral"
     override val label = "Spiral"
     override val icon = Lucide.Orbit

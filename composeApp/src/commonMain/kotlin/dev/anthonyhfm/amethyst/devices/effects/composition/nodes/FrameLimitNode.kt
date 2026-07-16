@@ -15,6 +15,10 @@ data class FrameLimitNodeState(
 ) : CompositionNodeState
 
 object FrameLimitNode : TransformNode() {
+    override val automationParameters = listOf(
+        intAutomationParameter<FrameLimitNodeState>("frames", "Frames per cycle", 1, 120, FrameLimitNodeState::frames) { state, value -> state.copy(frames = value) },
+    )
+
     override val type = "frame-limit"
     override val label = "Frame Limit"
     override val icon = Lucide.Timer

@@ -47,6 +47,10 @@ data class MirrorNodeState(
 ) : CompositionNodeState
 
 object MirrorNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<MirrorNodeState>("angle", "Angle", -180f, 180f, MirrorNodeState::angleDegrees) { state, value -> state.copy(angleDegrees = value) },
+    )
+
     override val type = "mirror"
     override val label = "Mirror"
     override val icon = Lucide.FlipHorizontal2

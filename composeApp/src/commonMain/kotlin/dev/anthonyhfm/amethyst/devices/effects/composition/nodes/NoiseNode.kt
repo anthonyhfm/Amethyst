@@ -36,6 +36,11 @@ data class NoiseNodeState(
 ) : CompositionNodeState
 
 object NoiseNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        intAutomationParameter<NoiseNodeState>("regenerations", "Regenerations", MIN_REGENERATIONS, MAX_REGENERATIONS, NoiseNodeState::regenerations) { state, value -> state.copy(regenerations = value) },
+        floatAutomationParameter<NoiseNodeState>("intensity", "Intensity", 0f, 1f, NoiseNodeState::intensity) { state, value -> state.copy(intensity = value) },
+    )
+
     override val type = "noise"
     override val label = "Noise"
     override val icon = Lucide.Waves

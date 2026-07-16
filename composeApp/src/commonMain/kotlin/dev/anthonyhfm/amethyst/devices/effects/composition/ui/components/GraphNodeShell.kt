@@ -25,7 +25,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
-import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
@@ -191,7 +191,7 @@ fun GraphNodeShell(
     }
         },
     ) {
-        val parameters = CompositionAutomationParameters.forNode(node)
+        val parameters = node.automationParameters()
         if (parameters.isEmpty()) {
             ContextMenuItem(onClick = {}) { Text("No automatable values") }
         } else {

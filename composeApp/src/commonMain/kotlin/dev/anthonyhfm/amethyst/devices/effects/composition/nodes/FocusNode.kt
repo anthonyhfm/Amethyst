@@ -36,6 +36,11 @@ data class FocusNodeState(
 ) : CompositionNodeState
 
 object FocusNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<FocusNodeState>("radius", "Radius", 0f, 1f, FocusNodeState::radius) { state, value -> state.copy(radius = value) },
+        floatAutomationParameter<FocusNodeState>("feather", "Feather", 0f, 1f, FocusNodeState::feather) { state, value -> state.copy(feather = value) },
+    )
+
     override val type = "focus"
     override val label = "Focus"
     override val icon = Lucide.Focus

@@ -24,6 +24,14 @@ data class LineNodeState(
 ) : CompositionNodeState
 
 object LineNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<LineNodeState>("start-x", "Start X", 0f, 1f, LineNodeState::startX) { state, value -> state.copy(startX = value) },
+        floatAutomationParameter<LineNodeState>("start-y", "Start Y", 0f, 1f, LineNodeState::startY) { state, value -> state.copy(startY = value) },
+        floatAutomationParameter<LineNodeState>("end-x", "End X", 0f, 1f, LineNodeState::endX) { state, value -> state.copy(endX = value) },
+        floatAutomationParameter<LineNodeState>("end-y", "End Y", 0f, 1f, LineNodeState::endY) { state, value -> state.copy(endY = value) },
+        floatAutomationParameter<LineNodeState>("thickness", "Thickness", 0f, 4f, LineNodeState::thickness) { state, value -> state.copy(thickness = value) },
+    )
+
     override val type = "line"
     override val label = "Line"
     override val icon = Lucide.PenLine

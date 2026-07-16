@@ -16,6 +16,7 @@ interface CompositionNodeDefinition {
     val hasOutput: Boolean
     val isOutput: Boolean get() = false
     val pickerCategory: CompositionNodePickerCategory? get() = null
+    val automationParameters: List<CompositionAutomationParameter> get() = emptyList()
 
     val bodyWidth: Dp get() = 188.dp
     val bodyHeight: Dp get() = 96.dp

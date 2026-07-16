@@ -45,7 +45,6 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withViewport
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutConnection
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withoutNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
-import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationParameters
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automatedAt
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableCurve

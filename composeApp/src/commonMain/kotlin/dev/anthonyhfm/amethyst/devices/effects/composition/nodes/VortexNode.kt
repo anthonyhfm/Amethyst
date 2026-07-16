@@ -45,6 +45,14 @@ data class VortexNodeState(
 ) : CompositionNodeState
 
 object VortexNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<VortexNodeState>("origin-x", "Origin X", 0f, 1f, VortexNodeState::originX) { state, value -> state.copy(originX = value) },
+        floatAutomationParameter<VortexNodeState>("origin-y", "Origin Y", 0f, 1f, VortexNodeState::originY) { state, value -> state.copy(originY = value) },
+        floatAutomationParameter<VortexNodeState>("strength", "Strength", -2f, 2f, VortexNodeState::strength) { state, value -> state.copy(strength = value) },
+        floatAutomationParameter<VortexNodeState>("radius", "Radius", 0f, 1f, VortexNodeState::radius) { state, value -> state.copy(radius = value) },
+        floatAutomationParameter<VortexNodeState>("falloff", "Falloff", .1f, 4f, VortexNodeState::falloff) { state, value -> state.copy(falloff = value) },
+    )
+
     override val type = "vortex"
     override val label = "Vortex"
     override val icon = Lucide.Tornado

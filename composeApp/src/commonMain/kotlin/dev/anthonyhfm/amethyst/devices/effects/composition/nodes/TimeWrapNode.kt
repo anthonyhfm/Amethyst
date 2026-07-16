@@ -20,6 +20,11 @@ data class TimeWrapNodeState(
 ) : CompositionNodeState
 
 object TimeWrapNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<TimeWrapNodeState>("target-start", "Target start", 0f, 1f, TimeWrapNodeState::targetStart) { state, value -> state.copy(targetStart = value) },
+        floatAutomationParameter<TimeWrapNodeState>("target-end", "Target end", 0f, 1f, TimeWrapNodeState::targetEnd) { state, value -> state.copy(targetEnd = value) },
+    )
+
     override val type = "time-wrap"
     override val label = "Time Wrap"
     override val icon = Lucide.Repeat

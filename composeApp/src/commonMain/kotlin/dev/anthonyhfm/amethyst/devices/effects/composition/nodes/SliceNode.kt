@@ -55,6 +55,11 @@ data class SliceNodeState(
 ) : CompositionNodeState
 
 object SliceNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<SliceNodeState>("angle", "Angle", -180f, 180f, SliceNodeState::angleDegrees) { state, value -> state.copy(angleDegrees = value) },
+        floatAutomationParameter<SliceNodeState>("width", "Width", 0f, 1f, SliceNodeState::width) { state, value -> state.copy(width = value) },
+    )
+
     override val type = "slice"
     override val label = "Slice"
     override val icon = Lucide.Scissors

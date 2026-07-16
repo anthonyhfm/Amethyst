@@ -35,7 +35,7 @@ import com.composeunstyled.UnstyledButton
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor
-import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameter
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.segmentValueAt
@@ -65,8 +65,9 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
     val selections by SelectionManager.selections.collectAsState()
     val target = focus?.let { key -> state.graph.node(key.nodeId)?.let { it to key.parameterId } } ?: return
     val node = target.first
-    val parameter = CompositionAutomationParameters.byId(node, target.second) ?: return
+    val parameter = node.automationParameter(target.second) ?: return
     val lane = node.lane(parameter.id) ?: return
+    val fallback = parameter.valueOf(node) ?: return
     val progress = device.playbackProgress()
     val deviceId = device.selectionUUID
     val selectedPointId = selections.filterIsInstance<dev.anthonyhfm.amethyst.core.controls.selection.Selectable.CompositionAutomationPoint>()
@@ -83,7 +84,7 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("${node.label} · ${parameter.label}", style = Theme[typography][small], color = Theme[colors][foreground])
-                Text("${parameter.format(parameter.denormalise(lane.valueAt(progress, parameter.normalise(parameter.get(node))))) } · ${((progress * 100).toInt())}%", style = Theme[typography][small], color = Theme[colors][mutedForeground])
+                Text("${parameter.format(parameter.denormalise(lane.valueAt(progress, parameter.normalise(fallback)))) } · ${((progress * 100).toInt())}%", style = Theme[typography][small], color = Theme[colors][mutedForeground])
             }
             UnstyledButton(onClick = editor::closeAutomation, modifier = Modifier.size(32.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Text("×", color = Theme[colors][foreground]) }

@@ -20,6 +20,12 @@ data class SymmetryNodeState(
 ) : CompositionNodeState
 
 object SymmetryNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        choiceAutomationParameter<SymmetryNodeState>("mode", "Mode", listOf("mirror-half", "quad-mirror", "quad-pinwheel"), SymmetryNodeState::mode) { state, value -> state.copy(mode = value) },
+        choiceAutomationParameter<SymmetryNodeState>("axis", "Axis", listOf("horizontal", "vertical"), SymmetryNodeState::axis) { state, value -> state.copy(axis = value) },
+        choiceAutomationParameter<SymmetryNodeState>("anchor", "Source anchor", listOf("bl", "br", "tr", "tl"), SymmetryNodeState::sourceAnchor) { state, value -> state.copy(sourceAnchor = value) },
+    )
+
     override val type = "symmetry"
     override val label = "Symmetry"
     override val icon = Lucide.Grid3x3

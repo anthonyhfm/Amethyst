@@ -22,6 +22,12 @@ data class LoopNodeState(
 ) : CompositionNodeState
 
 object LoopNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<LoopNodeState>("start", "Start", 0f, 1f, LoopNodeState::startProgress) { state, value -> state.copy(startProgress = value) },
+        floatAutomationParameter<LoopNodeState>("end", "End", 0f, 1f, LoopNodeState::endProgress) { state, value -> state.copy(endProgress = value) },
+        intAutomationParameter<LoopNodeState>("repeats", "Repeats", 1, 16, LoopNodeState::repeats) { state, value -> state.copy(repeats = value) },
+    )
+
     override val type = "loop"
     override val label = "Loop"
     override val icon = Lucide.Repeat

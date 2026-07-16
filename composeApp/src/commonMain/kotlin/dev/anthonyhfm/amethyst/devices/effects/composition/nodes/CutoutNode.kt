@@ -36,6 +36,11 @@ data class CutoutNodeState(
 
 /** Removes the circular area from the image while preserving the outside. */
 object CutoutNode : TransformNode() {
+    override val automationParameters = listOf(
+        floatAutomationParameter<CutoutNodeState>("radius", "Radius", 0f, 1f, CutoutNodeState::radius) { state, value -> state.copy(radius = value) },
+        floatAutomationParameter<CutoutNodeState>("feather", "Feather", 0f, 1f, CutoutNodeState::feather) { state, value -> state.copy(feather = value) },
+    )
+
     override val type = "cutout"
     override val label = "Cutout"
     override val icon = Lucide.Focus

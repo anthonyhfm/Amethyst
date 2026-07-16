@@ -52,6 +52,10 @@ data class ScannerNodeState(
 ) : CompositionNodeState
 
 object ScannerNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<ScannerNodeState>("angle", "Angle", -180f, 180f, ScannerNodeState::angleDegrees) { state, value -> state.copy(angleDegrees = value) },
+    )
+
     override val type = "scanner"
     override val label = "Scanner"
     override val icon = Lucide.Scan

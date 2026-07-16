@@ -30,6 +30,11 @@ data class PinchNodeState(
 ) : CompositionNodeState
 
 object PinchNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<PinchNodeState>("pinch", "Pinch", -2f, 2f, PinchNodeState::pinch) { state, value -> state.copy(pinch = value) },
+        choiceAutomationParameter<PinchNodeState>("bilateral", "Bilateral", listOf("Off", "On"), { if (it.bilateral) "On" else "Off" }) { state, value -> state.copy(bilateral = value == "On") },
+    )
+
     override val type = "pinch"
     override val label = "Pinch"
     override val icon = Lucide.Shrink

@@ -14,7 +14,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.node
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.withNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationLane
-import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameter
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -41,9 +41,9 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
     fun automate(nodeId: String, parameterId: String) {
         device.updateGraph { graph ->
             val node = graph.node(nodeId) ?: return@updateGraph graph
-            val parameter = CompositionAutomationParameters.byId(node, parameterId) ?: return@updateGraph graph
+            val parameter = node.automationParameter(parameterId) ?: return@updateGraph graph
             if (node.lane(parameterId) != null) return@updateGraph graph
-            val value = parameter.normalise(parameter.get(node))
+            val value = parameter.normalise(parameter.valueOf(node) ?: return@updateGraph graph)
             graph.withNode(node.copy(automation = node.automation + CompositionAutomationLane(
                 parameterId = parameterId,
                 points = listOf(CompositionAutomationPoint(0f, value), CompositionAutomationPoint(1f, value)),
@@ -61,9 +61,11 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
     fun removeAutomation(nodeId: String, parameterId: String, progress: Float) {
         device.updateGraph { graph ->
             val node = graph.node(nodeId) ?: return@updateGraph graph
-            val parameter = CompositionAutomationParameters.byId(node, parameterId) ?: return@updateGraph graph
+            val parameter = node.automationParameter(parameterId) ?: return@updateGraph graph
             val lane = node.lane(parameterId) ?: return@updateGraph graph
-            val staticNode = parameter.set(node, parameter.denormalise(lane.valueAt(progress, parameter.normalise(parameter.get(node)))))
+            val fallback = parameter.valueOf(node) ?: return@updateGraph graph
+            val staticNode = parameter.withValue(node, parameter.denormalise(lane.valueAt(progress, parameter.normalise(fallback))))
+                ?: return@updateGraph graph
             graph.withNode(staticNode.copy(automation = staticNode.automation.filterNot { it.parameterId == parameterId }))
         }
         if (_automationFocus.value == CompositionAutomationFocus(nodeId, parameterId)) closeAutomation()
@@ -72,7 +74,7 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
     fun setAutomationPoint(nodeId: String, parameterId: String, progress: Float, nativeValue: Float) {
         device.updateGraph { graph ->
             val node = graph.node(nodeId) ?: return@updateGraph graph
-            val parameter = CompositionAutomationParameters.byId(node, parameterId) ?: return@updateGraph graph
+            val parameter = node.automationParameter(parameterId) ?: return@updateGraph graph
             val lane = node.lane(parameterId) ?: return@updateGraph graph
             val point = CompositionAutomationPoint(progress.coerceIn(0f, 1f), parameter.normalise(nativeValue))
             val points = lane.points.filterNot { kotlin.math.abs(it.progress - point.progress) < .002f } + point

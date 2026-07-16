@@ -31,6 +31,10 @@ data class RotateNodeState(
 ) : CompositionNodeState
 
 object RotateNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        floatAutomationParameter<RotateNodeState>("angle", "Angle", -180f, 180f, RotateNodeState::angleDegrees) { state, value -> state.copy(angleDegrees = value) },
+    )
+
     override val type = "rotate"
     override val label = "Rotate"
     override val icon = Lucide.RotateCcw

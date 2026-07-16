@@ -24,6 +24,11 @@ data class MoveNodeState(
 ) : CompositionNodeState
 
 object MoveNode : CompositionNodeDefinition {
+    override val automationParameters = listOf(
+        intAutomationParameter<MoveNodeState>("offset-x", "Offset X", -64, 64, MoveNodeState::offsetX) { state, value -> state.copy(offsetX = value) },
+        intAutomationParameter<MoveNodeState>("offset-y", "Offset Y", -64, 64, MoveNodeState::offsetY) { state, value -> state.copy(offsetY = value) },
+    )
+
     override val type = "move"
     override val label = "Move"
     override val icon = Lucide.Move
