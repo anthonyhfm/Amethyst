@@ -71,7 +71,6 @@ actual fun LaunchpadViewportElementActions(
             onClick = { element.onEvent?.invoke(WorkspaceContract.Event.OnClickDeviceConfigure(element.selectionUUID)) },
             icon = Lucide.Cable,
             contentDescription = "Connection",
-            backgroundColor = actionButtonBg,
             backgroundHoverColor = actionButtonBgHover,
         )
 
@@ -80,7 +79,6 @@ actual fun LaunchpadViewportElementActions(
                 onClick = { styleDialogState.visible = true },
                 icon = Lucide.Palette,
                 contentDescription = "Style",
-                backgroundColor = actionButtonBg,
                 backgroundHoverColor = actionButtonBgHover,
             )
         }
@@ -92,7 +90,6 @@ actual fun LaunchpadViewportElementActions(
             },
             icon = Lucide.RotateCw,
             contentDescription = "Rotate 90°",
-            backgroundColor = actionButtonBg,
             backgroundHoverColor = actionButtonBgHover,
         )
 
@@ -147,7 +144,7 @@ private fun LaunchpadActionButton(
     onClick: () -> Unit,
     icon: ImageVector,
     contentDescription: String?,
-    backgroundColor: Color,
+    backgroundColor: Color = Color.Transparent,
     backgroundHoverColor: Color,
 ) {
     val interactionSource = remember { MutableInteractionSource() }

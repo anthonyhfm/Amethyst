@@ -1,9 +1,10 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
@@ -23,12 +24,14 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.serialization.Serializable
 
@@ -58,8 +61,8 @@ object SpiralNode : CompositionNodeDefinition {
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
-    override val bodyWidth: Dp = 160.dp
-    override val bodyHeight: Dp = 208.dp
+    override val bodyWidth: Dp = 216.dp
+    override val bodyHeight: Dp = 128.dp
 
     override fun defaultState(): CompositionNodeState = SpiralNodeState()
 
@@ -130,11 +133,9 @@ object SpiralNode : CompositionNodeDefinition {
             )
         }
 
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .fillMaxSize(),
         ) {
             AutomatableWorkspaceOriginSelector(
                 originXParameterId = "origin-x",
@@ -145,31 +146,48 @@ object SpiralNode : CompositionNodeDefinition {
                 onOriginChange = { position, size ->
                     onOriginChange.value(position, size)
                 },
-                modifier = Modifier.weight(
-                    weight = 1f,
-                    fill = true,
-                ),
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .padding(start = 12.dp)
+                    .fillMaxHeight()
+                    .aspectRatio(1f),
             )
 
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-            AutomatableSlider(
-                parameterId = "turns",
-                label = "Turns",
-                value = state.turns,
-                range = MIN_TURNS..MAX_TURNS,
-                onValueChange = { turns ->
-                    onNodeChange(
-                        node.copy(
-                            state = state.copy(
-                                turns = turns.coerceIn(MIN_TURNS, MAX_TURNS),
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center,
+            ) {
+                AutomatableDial(
+                    parameterId = "turns",
+                    type = DialType.Continuous,
+                    value = (state.turns - MIN_TURNS) / (MAX_TURNS - MIN_TURNS),
+                    defaultValue = (2f - MIN_TURNS) / (MAX_TURNS - MIN_TURNS),
+                    title = "Turns",
+                    text = "${(state.turns * 10).roundToInt() / 10f}",
+                    onValueChange = { value ->
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    turns = (MIN_TURNS + value * (MAX_TURNS - MIN_TURNS)).coerceIn(MIN_TURNS, MAX_TURNS),
+                                )
                             )
                         )
-                    )
-                },
-            )
+                    },
+                    onResolveTextValue = { value ->
+                        value.toFloatOrNull()?.let { turns ->
+                            onNodeChange(
+                                node.copy(
+                                    state = state.copy(
+                                        turns = turns.coerceIn(MIN_TURNS, MAX_TURNS),
+                                    )
+                                )
+                            )
+                        }
+                    },
+                )
+            }
         }
     }
 }

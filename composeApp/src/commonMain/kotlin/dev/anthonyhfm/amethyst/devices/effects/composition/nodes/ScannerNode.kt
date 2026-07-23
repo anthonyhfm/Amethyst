@@ -5,11 +5,16 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableAngleControl
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +36,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.dot
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
@@ -41,6 +47,7 @@ import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.serialization.Serializable
 
@@ -50,11 +57,13 @@ data class ScannerNodeState(
     val red: Float = 1f,
     val green: Float = 1f,
     val blue: Float = 1f,
+    val thickness: Float = 1f,
 ) : CompositionNodeState
 
 object ScannerNode : CompositionNodeDefinition {
     override val automationParameters = listOf(
         floatAutomationParameter<ScannerNodeState>("angle", "Angle", -180f, 180f, ScannerNodeState::angleDegrees) { state, value -> state.copy(angleDegrees = value) },
+        floatAutomationParameter<ScannerNodeState>("thickness", "Thickness", 0f, 4f, ScannerNodeState::thickness) { state, value -> state.copy(thickness = value) },
     )
 
     override val type = "scanner"
@@ -63,7 +72,7 @@ object ScannerNode : CompositionNodeDefinition {
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
-    override val bodyWidth = 128.dp
+    override val bodyWidth = 216.dp
     override val bodyHeight = 128.dp
 
     private const val SCAN_TRAVEL_PADDING = 0.5f
@@ -128,7 +137,7 @@ object ScannerNode : CompositionNodeDefinition {
         return GeometryStroke(
             points = points,
             color = Color.White,
-            thickness = 1f,
+            thickness = state.thickness.coerceAtLeast(0f),
             origin = context.outputOrigin,
         )
     }
@@ -140,9 +149,9 @@ object ScannerNode : CompositionNodeDefinition {
     ) {
         val state = node.state as? ScannerNodeState ?: return
 
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier
+                .fillMaxSize(),
         ) {
             AutomatableAngleControl(
                 parameterId = "angle",
@@ -157,7 +166,10 @@ object ScannerNode : CompositionNodeDefinition {
                     )
                 },
                 modifier = Modifier
-                    .size(80.dp)
+                    .padding(vertical = 12.dp)
+                    .padding(start = 12.dp)
+                    .fillMaxHeight()
+                    .aspectRatio(1f)
                     .clip(DefaultShape)
                     .background(Theme[colors][secondary]),
             ) {
@@ -169,6 +181,7 @@ object ScannerNode : CompositionNodeDefinition {
                         .size(32.dp)
                         .rotate(state.angleDegrees + 90f),
                 )
+
                 Canvas(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -183,6 +196,43 @@ object ScannerNode : CompositionNodeDefinition {
                         ),
                     )
                 }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+
+                contentAlignment = Alignment.Center,
+            ) {
+                AutomatableDial(
+                    parameterId = "thickness",
+                    type = DialType.Continuous,
+                    value = (state.thickness / 4f).coerceIn(0f, 1f),
+                    defaultValue = 0.25f,
+                    title = "Thickness",
+                    text = "${(state.thickness * 10).roundToInt() / 10f}",
+                    onValueChange = { value ->
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    thickness = (value * 4f).coerceIn(0f, 4f),
+                                )
+                            )
+                        )
+                    },
+                    onResolveTextValue = { value ->
+                        value.toFloatOrNull()?.let { thickness ->
+                            onNodeChange(
+                                node.copy(
+                                    state = state.copy(
+                                        thickness = thickness.coerceIn(0f, 4f),
+                                    )
+                                )
+                            )
+                        }
+                    },
+                )
             }
         }
     }

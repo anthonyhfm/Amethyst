@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -229,19 +230,20 @@ fun AutomatableWorkspaceOriginSelector(
     }
 
     @Composable
-    fun RenderSelector() {
+    fun RenderSelector(selectorModifier: Modifier) {
         WorkspaceOriginSelector(
             originX = originX,
             originY = originY,
             bounds = bounds,
             onOriginChange = onOriginChange,
-            modifier = modifier,
+            modifier = selectorModifier,
         )
     }
 
     if (originParameters.isNotEmpty() && onAutomationAction != null) {
         ContextMenu(
-            trigger = { RenderSelector() }
+            modifier = modifier,
+            trigger = { RenderSelector(Modifier.fillMaxSize()) }
         ) {
             originParameters.forEach { parameter ->
                 val automated = node?.lane(parameter.id) != null
@@ -260,7 +262,7 @@ fun AutomatableWorkspaceOriginSelector(
             }
         }
     } else {
-        RenderSelector()
+        RenderSelector(modifier)
     }
 }
 
@@ -281,14 +283,14 @@ fun AutomatableAngleControl(
     }
 
     @Composable
-    fun RenderControl() {
+    fun RenderControl(controlModifier: Modifier) {
         val onAngle = rememberUpdatedState { point: Offset, size: IntSize ->
             if (size.width > 0 && size.height > 0) {
                 onAngleChange((atan2(point.y - size.height / 2f, point.x - size.width / 2f) * 180.0 / PI).toFloat())
             }
         }
         Box(
-            modifier = modifier
+            modifier = controlModifier
                 .pointerHoverIcon(PointerIcon.Hand)
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -317,7 +319,8 @@ fun AutomatableAngleControl(
     if (parameter != null && onAutomationAction != null) {
         val automated = node?.lane(parameter.id) != null
         ContextMenu(
-            trigger = { RenderControl() }
+            modifier = modifier,
+            trigger = { RenderControl(Modifier.fillMaxSize()) }
         ) {
             AutomatableContextMenuItem(
                 label = if (automated) "Edit ${parameter.label} Automation" else "Automate ${parameter.label}",
@@ -333,7 +336,7 @@ fun AutomatableAngleControl(
             }
         }
     } else {
-        RenderControl()
+        RenderControl(modifier)
     }
 }
 
@@ -363,5 +366,51 @@ fun AutomatableContextMenuItem(
             text = label,
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+@Composable
+fun AutomatableSymmetryControl(
+    modeParameterId: String = "mode",
+    axisParameterId: String = "axis",
+    anchorParameterId: String = "anchor",
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val node = LocalCompositionNode.current
+    val onAutomationAction = LocalAutomationHandler.current
+    val symmetryParameters = if (node != null) {
+        node.automationParameters().filter {
+            it.id == modeParameterId || it.id == axisParameterId || it.id == anchorParameterId
+        }
+    } else {
+        emptyList()
+    }
+
+    if (symmetryParameters.isNotEmpty() && onAutomationAction != null) {
+        ContextMenu(
+            modifier = modifier,
+            trigger = { content() }
+        ) {
+            symmetryParameters.forEach { parameter ->
+                val automated = node?.lane(parameter.id) != null
+                AutomatableContextMenuItem(
+                    label = if (automated) "Edit ${parameter.label} Automation" else "Automate ${parameter.label}",
+                    icon = if (automated) Lucide.Pencil else Lucide.Plus,
+                    onClick = { onAutomationAction(parameter.id, automated, false) }
+                )
+                if (automated) {
+                    AutomatableContextMenuItem(
+                        label = "Remove ${parameter.label} Automation",
+                        icon = Lucide.Trash2,
+                        onClick = { onAutomationAction(parameter.id, true, true) }
+                    )
+                }
+            }
+        }
+    } else {
+        Box(modifier = modifier) {
+            content()
+        }
     }
 }

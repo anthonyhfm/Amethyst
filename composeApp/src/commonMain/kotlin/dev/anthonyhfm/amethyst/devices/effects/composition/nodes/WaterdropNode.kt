@@ -5,42 +5,31 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Droplet
 import com.composables.icons.lucide.Lucide
-import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
-import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
-import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.PI
 import kotlin.math.abs
@@ -49,6 +38,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
 import kotlinx.serialization.Serializable
@@ -78,8 +68,8 @@ object WaterdropNode : CompositionNodeDefinition {
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
-    override val bodyWidth: Dp = 160.dp
-    override val bodyHeight: Dp = 208.dp
+    override val bodyWidth: Dp = 216.dp
+    override val bodyHeight: Dp = 128.dp
 
     override fun defaultState(): CompositionNodeState = WaterdropNodeState()
 
@@ -136,11 +126,9 @@ object WaterdropNode : CompositionNodeDefinition {
             )
         }
 
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .fillMaxSize(),
         ) {
             AutomatableWorkspaceOriginSelector(
                 originXParameterId = "origin-x",
@@ -151,31 +139,48 @@ object WaterdropNode : CompositionNodeDefinition {
                 onOriginChange = { position, size ->
                     onOriginChange.value(position, size)
                 },
-                modifier = Modifier.weight(
-                    weight = 1f,
-                    fill = true,
-                ),
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .padding(start = 12.dp)
+                    .fillMaxHeight()
+                    .aspectRatio(1f),
             )
 
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-            AutomatableSlider(
-                parameterId = "curvature",
-                label = "Curvature",
-                value = state.curvature,
-                range = MIN_CURVATURE..MAX_CURVATURE,
-                onValueChange = { curvature ->
-                    onNodeChange(
-                        node.copy(
-                            state = state.copy(
-                                curvature = curvature.coerceIn(MIN_CURVATURE, MAX_CURVATURE),
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center,
+            ) {
+                AutomatableDial(
+                    parameterId = "curvature",
+                    type = DialType.Continuous,
+                    value = (state.curvature - MIN_CURVATURE) / (MAX_CURVATURE - MIN_CURVATURE),
+                    defaultValue = (2f - MIN_CURVATURE) / (MAX_CURVATURE - MIN_CURVATURE),
+                    title = "Curvature",
+                    text = "${(state.curvature * 10).roundToInt() / 10f}",
+                    onValueChange = { value ->
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    curvature = (MIN_CURVATURE + value * (MAX_CURVATURE - MIN_CURVATURE)).coerceIn(MIN_CURVATURE, MAX_CURVATURE),
+                                )
                             )
                         )
-                    )
-                },
-            )
+                    },
+                    onResolveTextValue = { value ->
+                        value.toFloatOrNull()?.let { curvature ->
+                            onNodeChange(
+                                node.copy(
+                                    state = state.copy(
+                                        curvature = curvature.coerceIn(MIN_CURVATURE, MAX_CURVATURE),
+                                    )
+                                )
+                            )
+                        }
+                    },
+                )
+            }
         }
     }
 }

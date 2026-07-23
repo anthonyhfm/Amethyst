@@ -67,8 +67,6 @@ import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.clear.ClearChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
-import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
 fun ChainDevicePicker(
@@ -115,6 +113,9 @@ fun ChainDevicePicker(
                 }
                 "shape" -> {
                     ChainContextMenuItem("Copy", icon = Icons.TwoTone.ContentCopy, onClick = { onPickComponent(CopyChainDevice()) })
+                    if (crystalCompositions) {
+                        ChainContextMenuItem("Composition", icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
+                    }
                     ChainContextMenuItem("Keyframes", icon = Icons.TwoTone.Timeline, onClick = { onPickComponent(KeyframesChainDevice()) })
                     ChainContextMenuItem("Piano Roll", icon = Icons.TwoTone.Piano, onClick = { onPickComponent(PianoRollChainDevice()) })
                 }
@@ -132,9 +133,6 @@ fun ChainDevicePicker(
                 "effects" -> {
                     ChainContextMenuItem("Blur", icon = Icons.TwoTone.BlurOn, onClick = { onPickComponent(BlurChainDevice()) })
                     ChainContextMenuItem("Opacity", icon = Icons.TwoTone.Opacity, onClick = { onPickComponent(OpacityChainDevice()) })
-                    if (crystalCompositions) {
-                        ChainContextMenuItem("Composition", icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
-                    }
                 }
                 "misc" -> {
                     ChainContextMenuItem("Clear", icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
@@ -174,6 +172,3 @@ fun ChainDevicePicker(
         }
     }
 }
-
-private fun getLightsMenu() {}
-private fun getSamplingMenu() {}

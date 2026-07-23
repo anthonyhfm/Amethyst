@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
@@ -137,7 +138,8 @@ object MirrorNode : CompositionNodeDefinition {
                     )
                 },
                 modifier = Modifier
-                    .size(80.dp)
+                    .padding(12.dp)
+                    .fillMaxSize()
                     .clip(DefaultShape)
                     .background(Theme[colors][secondary])
                     .semantics { contentDescription = "Mirror axis" },

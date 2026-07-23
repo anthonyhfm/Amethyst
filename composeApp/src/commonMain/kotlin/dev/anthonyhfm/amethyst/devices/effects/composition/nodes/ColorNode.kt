@@ -41,7 +41,7 @@ object ColorNode : TransformNode() {
     override val pickerCategory = CompositionNodePickerCategory.Color
 
     override val bodyWidth = 220.dp;
-    override val bodyHeight = 248.dp
+    override val bodyHeight = 226.dp
 
     override fun defaultState() = ColorNodeState()
 
@@ -111,29 +111,6 @@ object ColorNode : TransformNode() {
             }
 
             HexColorEditor(state = picker)
-
-            AutomatableDial(
-                parameterId = "alpha",
-                type = DialType.Continuous,
-                value = state.alpha,
-                defaultValue = 1f,
-                title = "Opacity",
-                text = "${(state.alpha * 100).roundToInt()}%",
-                onValueChange = {
-                    onNodeChange(node.copy(state = state.copy(alpha = it)))
-                },
-                onResolveTextValue = {
-                    it.removeSuffix("%").trim().toFloatOrNull()?.let { value ->
-                        onNodeChange(
-                            node.copy(
-                                state = state.copy(
-                                    alpha = (value / 100f).coerceIn(0f, 1f)
-                                )
-                            )
-                        )
-                    }
-                }
-            )
         }
     }
 }
