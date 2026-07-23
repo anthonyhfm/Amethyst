@@ -125,6 +125,7 @@ private class SubMenuPositionProvider : PopupPositionProvider {
 @Composable
 fun ContextMenu(
     modifier: Modifier = Modifier,
+    onRightClick: ((Offset) -> Unit)? = null,
     trigger: @Composable () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -134,6 +135,7 @@ fun ContextMenu(
     Box(
         modifier = modifier.rightClickable { position ->
             cursorPosition = position
+            onRightClick?.invoke(position)
             expanded = true
         },
     ) {

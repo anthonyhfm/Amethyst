@@ -1,8 +1,21 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.PenLine
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
@@ -10,10 +23,22 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceLineSelector
+import dev.anthonyhfm.amethyst.ui.components.DialType
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class LinePoint(
+    val x: Float,
+    val y: Float,
+)
+
+@Serializable
 data class LineNodeState(
+    val points: List<LinePoint> = listOf(LinePoint(0.25f, 0.5f), LinePoint(0.75f, 0.5f)),
     val startX: Float = 0.25f,
     val startY: Float = 0.5f,
     val endX: Float = 0.75f,
@@ -22,7 +47,12 @@ data class LineNodeState(
     val red: Float = 1f,
     val green: Float = 1f,
     val blue: Float = 1f,
-) : CompositionNodeState
+) : CompositionNodeState {
+    fun resolvedPoints(): List<LinePoint> {
+        if (points.isNotEmpty()) return points
+        return listOf(LinePoint(startX, startY), LinePoint(endX, endY))
+    }
+}
 
 object LineNode : CompositionNodeDefinition {
     override val automationParameters = listOf(
@@ -40,6 +70,8 @@ object LineNode : CompositionNodeDefinition {
     override val hasInput = false
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Generators
+    override val bodyWidth: Dp = 216.dp
+    override val bodyHeight: Dp = 128.dp
 
     override fun defaultState() = LineNodeState()
 
@@ -62,21 +94,20 @@ object LineNode : CompositionNodeDefinition {
             blue = state.blue.coerceIn(0f, 1f),
         )
 
+        val resolvedPts = state.resolvedPoints()
+        val strokePoints = resolvedPts.map { p ->
+            Vec2(
+                x = x(p.x),
+                y = y(p.y),
+            )
+        }
+
         return listOf(
             GeometryFrame(
                 timeMs = 0.0,
                 strokes = listOf(
                     GeometryStroke(
-                        points = listOf(
-                            Vec2(
-                                x = x(state.startX),
-                                y = y(state.startY),
-                            ),
-                            Vec2(
-                                x = x(state.endX),
-                                y = y(state.endY),
-                            ),
-                        ),
+                        points = strokePoints,
                         color = color,
                         thickness = state.thickness.coerceAtLeast(0f),
                         origin = context.outputOrigin,
@@ -92,68 +123,102 @@ object LineNode : CompositionNodeDefinition {
         onNodeChange: (CompositionNode) -> Unit,
     ) {
         val state = node.state as? LineNodeState ?: return
+        val bounds = WorkspaceRepository.bounds.validOrFallbackBounds()
+        var selectedIndex by remember { mutableStateOf(0) }
 
-        NodeControls {
-            AutomatableSlider(
-                parameterId = "start-x",
-                label = "Start X",
-                value = state.startX,
-                range = 0f..1f,
-                onValueChange = {
+        val resolvedPoints = state.resolvedPoints()
+        val safeSelectedIndex = selectedIndex.coerceIn(0, (resolvedPoints.size - 1).coerceAtLeast(0))
+
+        Row(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            AutomatableWorkspaceLineSelector(
+                points = resolvedPoints,
+                selectedIndex = safeSelectedIndex,
+                bounds = bounds,
+                onPointsChange = { newPoints, newSelIdx ->
+                    selectedIndex = newSelIdx
+                    val first = newPoints.firstOrNull() ?: LinePoint(0.25f, 0.5f)
+                    val last = newPoints.lastOrNull() ?: LinePoint(0.75f, 0.5f)
                     onNodeChange(
                         node.copy(
                             state = state.copy(
-                                startX = it,
+                                points = newPoints,
+                                startX = first.x,
+                                startY = first.y,
+                                endX = last.x,
+                                endY = last.y,
                             )
                         )
                     )
                 },
-            )
-            AutomatableSlider(
-                parameterId = "start-y",
-                label = "Start Y",
-                value = state.startY,
-                range = 0f..1f,
-                onValueChange = {
-                    onNodeChange(
-                        node.copy(
-                            state = state.copy(
-                                startY = it,
+                onSelectPoint = { index ->
+                    selectedIndex = index
+                },
+                onDeletePoint = if (resolvedPoints.size > 2) {
+                    {
+                        val newPoints = resolvedPoints.toMutableList()
+                        val idxToRemove = safeSelectedIndex
+                        newPoints.removeAt(idxToRemove)
+                        val newSel = (idxToRemove - 1).coerceIn(0, newPoints.size - 1)
+                        selectedIndex = newSel
+                        val first = newPoints.firstOrNull() ?: LinePoint(0.25f, 0.5f)
+                        val last = newPoints.lastOrNull() ?: LinePoint(0.75f, 0.5f)
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    points = newPoints,
+                                    startX = first.x,
+                                    startY = first.y,
+                                    endX = last.x,
+                                    endY = last.y,
+                                )
                             )
                         )
-                    )
-                },
+                    }
+                } else null,
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .padding(start = 12.dp)
+                    .fillMaxHeight()
+                    .aspectRatio(1f),
             )
-            AutomatableSlider(
-                parameterId = "end-x",
-                label = "End X",
-                value = state.endX,
-                range = 0f..1f,
-                onValueChange = {
-                    onNodeChange(
-                        node.copy(
-                            state = state.copy(
-                                endX = it,
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center,
+            ) {
+                AutomatableDial(
+                    parameterId = "thickness",
+                    type = DialType.Continuous,
+                    value = (state.thickness / 4f).coerceIn(0f, 1f),
+                    defaultValue = 0.25f,
+                    title = "Thickness",
+                    text = "${(state.thickness * 10).roundToInt() / 10f}",
+                    onValueChange = { value ->
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    thickness = (value * 4f).coerceIn(0f, 4f),
+                                )
                             )
                         )
-                    )
-                },
-            )
-            AutomatableSlider(
-                parameterId = "thickness",
-                label = "Thickness",
-                value = state.thickness,
-                range = 0f..4f,
-                onValueChange = {
-                    onNodeChange(
-                        node.copy(
-                            state = state.copy(
-                                thickness = it,
+                    },
+                    onResolveTextValue = { value ->
+                        value.toFloatOrNull()?.let { thickness ->
+                            onNodeChange(
+                                node.copy(
+                                    state = state.copy(
+                                        thickness = thickness.coerceIn(0f, 4f),
+                                    )
+                                )
                             )
-                        )
-                    )
-                },
-            )
+                        }
+                    },
+                )
+            }
         }
     }
 }

@@ -39,6 +39,11 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automation
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalNodeChangeCallbacks
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.Dial as PrimitiveDial
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.min
+import kotlin.math.pow
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LinePoint
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledSlider as PrimitiveLabeledSlider
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledRangeSlider as PrimitiveLabeledRangeSlider
 
@@ -265,6 +270,119 @@ fun AutomatableWorkspaceOriginSelector(
         RenderSelector(modifier)
     }
 }
+
+@Composable
+fun AutomatableWorkspaceLineSelector(
+    points: List<LinePoint>,
+    selectedIndex: Int,
+    bounds: Pair<IntOffset, IntSize>,
+    onPointsChange: (newPoints: List<LinePoint>, newSelectedIndex: Int) -> Unit,
+    onSelectPoint: (index: Int) -> Unit,
+    onDeletePoint: (() -> Unit)? = null,
+    startXParameterId: String = "start-x",
+    startYParameterId: String = "start-y",
+    endXParameterId: String = "end-x",
+    endYParameterId: String = "end-y",
+    modifier: Modifier = Modifier,
+) {
+    val node = LocalCompositionNode.current
+    val onAutomationAction = LocalAutomationHandler.current
+    val aspectRatio = bounds.second.width.toFloat() / bounds.second.height.coerceAtLeast(1).toFloat()
+
+    val isStartPoint = selectedIndex == 0
+    val isEndPoint = selectedIndex == points.size - 1
+
+    val activeParameterIds = when {
+        isStartPoint -> listOf(startXParameterId, startYParameterId)
+        isEndPoint -> listOf(endXParameterId, endYParameterId)
+        else -> emptyList()
+    }
+
+    val lineParameters = if (node != null && activeParameterIds.isNotEmpty()) {
+        node.automationParameters().filter {
+            it.id in activeParameterIds
+        }
+    } else {
+        emptyList()
+    }
+
+    @Composable
+    fun RenderSelector(selectorModifier: Modifier) {
+        WorkspaceLineSelector(
+            points = points,
+            selectedIndex = selectedIndex,
+            bounds = bounds,
+            onPointsChange = onPointsChange,
+            onSelectPoint = onSelectPoint,
+            modifier = selectorModifier,
+        )
+    }
+
+    fun handleRightClick(position: Offset, containerSize: IntSize) {
+        if (points.isEmpty() || containerSize.width <= 0 || containerSize.height <= 0) return
+        val maxWidthPx = containerSize.width.toFloat()
+        val maxHeightPx = containerSize.height.toFloat()
+        val widthPx = min(maxWidthPx, maxHeightPx * aspectRatio)
+        val heightPx = widthPx / aspectRatio
+        val offsetX = (maxWidthPx - widthPx) / 2f
+        val offsetY = (maxHeightPx - heightPx) / 2f
+
+        val localX = position.x - offsetX
+        val localY = position.y - offsetY
+
+        var minDistanceSq = Float.MAX_VALUE
+        var closestIdx = 0
+        points.forEachIndexed { index, point ->
+            val px = Offset(point.x.coerceIn(0f, 1f) * widthPx, point.y.coerceIn(0f, 1f) * heightPx)
+            val distSq = (localX - px.x).pow(2) + (localY - px.y).pow(2)
+            if (distSq < minDistanceSq) {
+                minDistanceSq = distSq
+                closestIdx = index
+            }
+        }
+        onSelectPoint(closestIdx)
+    }
+
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val containerWidthPx = with(density) { maxWidth.toPx() }
+        val containerHeightPx = with(density) { maxHeight.toPx() }
+        val containerSize = IntSize(containerWidthPx.toInt(), containerHeightPx.toInt())
+
+        ContextMenu(
+            modifier = Modifier.fillMaxSize(),
+            onRightClick = { position ->
+                handleRightClick(position, containerSize)
+            },
+            trigger = { RenderSelector(Modifier.fillMaxSize()) }
+        ) {
+            if (onDeletePoint != null && points.size > 2) {
+                AutomatableContextMenuItem(
+                    label = "Delete Selected Point",
+                    icon = Lucide.Trash2,
+                    onClick = onDeletePoint,
+                )
+            }
+            lineParameters.forEach { parameter ->
+                val automated = node?.lane(parameter.id) != null
+                AutomatableContextMenuItem(
+                    label = if (automated) "Edit ${parameter.label} Automation" else "Automate ${parameter.label}",
+                    icon = if (automated) Lucide.Pencil else Lucide.Plus,
+                    onClick = { onAutomationAction?.invoke(parameter.id, automated, false) }
+                )
+                if (automated) {
+                    AutomatableContextMenuItem(
+                        label = "Remove ${parameter.label} Automation",
+                        icon = Lucide.Trash2,
+                        onClick = { onAutomationAction?.invoke(parameter.id, true, true) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+
 
 @Composable
 fun AutomatableAngleControl(
