@@ -165,7 +165,8 @@ fun SimplerWaveformEditor(
                 canvasHeightPx = it.height.toFloat()
             }
             .pointerInput(viewStart, viewEnd) {
-                // Zoom & Pan via Scroll Wheel
+                // Pan via scroll wheel. Plain vertical scrolling is left untouched;
+                // waveform zooming is temporarily disabled.
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -184,17 +185,8 @@ fun SimplerWaveformEditor(
                                 val newStart = (viewStart + panStepFrac).coerceIn(0f, 1f - currentViewSpan)
                                 viewStart = newStart
                                 viewEnd = newStart + currentViewSpan
-                            } else if (deltaY != 0f) {
-                                // Zoom mode anchored at cursor X
-                                val cursorX = change.position.x
-                                val cursorFrac = viewStart + (cursorX / w) * currentViewSpan
-                                val zoomFactor = if (deltaY > 0) 1.15f else 0.85f
-                                val newSpan = (currentViewSpan * zoomFactor).coerceIn(0.005f, 1.0f)
-                                val newStart = (cursorFrac - (cursorFrac - viewStart) * zoomFactor).coerceIn(0f, 1f - newSpan)
-                                viewStart = newStart
-                                viewEnd = newStart + newSpan
+                                change.consume()
                             }
-                            change.consume()
                         }
                     }
                 }
