@@ -45,7 +45,8 @@ object UnipadConverter : AmethystConverter {
             println("Detected ZIP root prefix: '$rootPrefix' — re-indexing entries")
             val reindexed = entries.values
                 .filter { it.path.startsWith(rootPrefix) }
-                .associateBy { it.path.removePrefix(rootPrefix) }
+                .map { it.copy(path = it.path.removePrefix(rootPrefix)) }
+                .associateBy { it.path }
             entries.clear()
             entries.putAll(reindexed)
             println("Entries after re-indexing: ${entries.size}")
@@ -162,7 +163,7 @@ object UnipadConverter : AmethystConverter {
                                 page = index,
                                 entries = entries.filter {
                                     it.key.lowercase().startsWith("keyled/${index + 1} ") ||
-                                    it.key.lowercase() == "keyled/${index + 1}"
+                                            it.key.lowercase() == "keyled/${index + 1}"
                                 }.map { it.key }
                             )
                         ).also {
