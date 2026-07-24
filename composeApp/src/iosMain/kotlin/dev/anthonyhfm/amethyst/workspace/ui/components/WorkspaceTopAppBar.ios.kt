@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -30,11 +34,11 @@ private data class IosModeEntry(
 )
 
 private val selectableModes = listOf(
-    IosModeEntry(PerformanceWorkspaceMode(), "Performance", "play.fill"),
-    IosModeEntry(TimelineWorkspaceMode(), "Timeline", "chart.bar.doc.horizontal"),
-    IosModeEntry(LightsChainWorkspaceMode(), "Lights", "lightbulb.fill"),
-    IosModeEntry(SamplingChainWorkspaceMode(), "Sampling", "waveform.path"),
-    IosModeEntry(LayoutWorkspaceMode(), "Layout", "square.grid.3x3.fill"),
+    IosModeEntry(PerformanceWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_performance_ios), "play.fill"),
+    IosModeEntry(TimelineWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_timeline_ios), "chart.bar.doc.horizontal"),
+    IosModeEntry(LightsChainWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_lights_ios), "lightbulb.fill"),
+    IosModeEntry(SamplingChainWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_sampling_ios), "waveform.path"),
+    IosModeEntry(LayoutWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_layout_ios), "square.grid.3x3.fill"),
 )
 
 private fun modeMatches(
@@ -129,7 +133,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
         image = UIImage.systemImageNamed(if (mode.selectableMode) "chevron.left" else "xmark")
         baseForegroundColor = UIColor.labelColor
     }
-    leftButton.setAccessibilityLabel(if (mode.selectableMode) "Back to home" else "Close ${mode.displayName}")
+    leftButton.setAccessibilityLabel(if (mode.selectableMode) stringResource(Res.string.workspace_topappbar_back_to_home_ios) else "Close ${mode.displayName}")
     leftButton.addAction(
         UIAction.actionWithHandler {
             if (mode.selectableMode) {
@@ -159,7 +163,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
         image = UIImage.systemImageNamed("gearshape")
         baseForegroundColor = UIColor.labelColor
     }
-    settingsButton.setAccessibilityLabel("Open settings")
+    settingsButton.setAccessibilityLabel(stringResource(Res.string.workspace_topappbar_open_settings_ios))
     settingsButton.addAction(
         UIAction.actionWithHandler {
             IosWorkspaceBridge.onShowSettings?.invoke()
@@ -181,7 +185,7 @@ private fun modeMenuButton(mode: WorkspaceMode): UIView {
         baseForegroundColor = UIColor.labelColor
         contentInsets = NSDirectionalEdgeInsetsMake(8.0, 20.0, 8.0, 20.0)
     }
-    menuButton.setAccessibilityLabel("Switch workspace mode")
+    menuButton.setAccessibilityLabel(stringResource(Res.string.workspace_topappbar_switch_mode_ios))
 
     val menuActions = selectableModes.map { entry ->
         UIAction.actionWithTitle(

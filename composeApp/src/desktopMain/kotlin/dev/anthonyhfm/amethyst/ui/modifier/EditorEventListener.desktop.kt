@@ -20,8 +20,6 @@ actual fun Modifier.editorEventListener(onEvent: (EditorEvent) -> Unit): Modifie
     var meta by remember { mutableStateOf(false) }
     var shift by remember { mutableStateOf(false) }
 
-
-
     return this.onKeyEvent {
         meta = it.isCtrlPressed
         shift = it.isShiftPressed

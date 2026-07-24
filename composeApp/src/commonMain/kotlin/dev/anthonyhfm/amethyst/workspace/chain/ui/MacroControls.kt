@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -181,12 +185,12 @@ fun BoxScope.MacroControls(
             ) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Toggle Macros",
+                    contentDescription = stringResource(Res.string.workspace_chain_macrocontrols_toggle_macros),
                     modifier = Modifier.rotate(chevronRotation),
                 )
 
                 Text(
-                    text = "Global Macros",
+                    text = stringResource(Res.string.workspace_chain_macrocontrols_global_macros),
                     style = Theme[typography][small],
                     color = Theme[colors][cardForeground],
                     modifier = Modifier
@@ -255,7 +259,7 @@ fun MacroList(
                         tint = Theme[colors][destructive],
                     )
                     Text(
-                        text = "Delete Macro",
+                        text = stringResource(Res.string.workspace_chain_macrocontrols_delete_macro),
                         modifier = Modifier.weight(1f),
                         color = Theme[colors][destructive],
                     )
@@ -284,7 +288,7 @@ fun MacroList(
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Add Macro",
+                    contentDescription = stringResource(Res.string.workspace_chain_macrocontrols_add_macro),
                 )
             }
         }

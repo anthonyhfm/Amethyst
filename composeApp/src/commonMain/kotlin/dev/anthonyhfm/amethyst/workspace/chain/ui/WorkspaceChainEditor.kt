@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -345,7 +349,7 @@ fun ChainDeviceContextMenu(
         offset = offset
     ) {
         ChainContextMenuItem(
-            label = "Copy",
+            label = stringResource(Res.string.workspace_chain_chaineditor_copy),
             icon = Lucide.Copy,
             onClick = {
                 ClipboardManager.setClipboardData(
@@ -362,7 +366,7 @@ fun ChainDeviceContextMenu(
         )
 
         ChainContextMenuItem(
-            label = "Duplicate",
+            label = stringResource(Res.string.workspace_chain_chaineditor_duplicate),
             icon = Lucide.CopyPlus,
             onClick = {
                 val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
@@ -377,7 +381,7 @@ fun ChainDeviceContextMenu(
 
         if (device.helpRef != null) {
             ChainContextMenuItem(
-                label = "Get Help",
+                label = stringResource(Res.string.workspace_chain_chaineditor_get_help),
                 icon = Lucide.BookOpenText,
                 onClick = {
                     WorkspaceRepository.switchMode(
@@ -391,7 +395,7 @@ fun ChainDeviceContextMenu(
 
         if (currentClipboard is ClipboardData.ChainDevice) {
             ChainContextMenuItem(
-                label = "Paste",
+                label = stringResource(Res.string.workspace_chain_chaineditor_paste),
                 icon = Lucide.ClipboardPaste,
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
@@ -409,7 +413,7 @@ fun ChainDeviceContextMenu(
             )
 
             ChainContextMenuItem(
-                label = "Paste Replace",
+                label = stringResource(Res.string.workspace_chain_chaineditor_paste_replace),
                 icon = Lucide.Replace,
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
@@ -432,7 +436,7 @@ fun ChainDeviceContextMenu(
         ContextMenuSeparator()
 
         ChainContextMenuItem(
-            label = "Delete",
+            label = stringResource(Res.string.workspace_chain_chaineditor_delete),
             icon = Lucide.Trash2,
             variant = ContextMenuItemVariant.Destructive,
             onClick = {

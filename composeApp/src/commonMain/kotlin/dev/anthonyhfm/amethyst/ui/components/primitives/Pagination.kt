@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -145,7 +149,7 @@ fun PaginationLink(
 fun PaginationPrevious(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    text: String = "Previous",
+    text: String = stringResource(Res.string.ui_primitive_pagination_previous),
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -188,7 +192,7 @@ fun PaginationPrevious(
 fun PaginationNext(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    text: String = "Next",
+    text: String = stringResource(Res.string.ui_primitive_pagination_next),
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -238,7 +242,7 @@ fun PaginationEllipsis(
     ) {
         Icon(
             imageVector = Icons.Default.MoreHoriz,
-            contentDescription = "More pages",
+            contentDescription = stringResource(Res.string.ui_primitive_pagination_more),
             modifier = Modifier.size(16.dp),
             tint = Theme[colors][mutedForeground],
         )

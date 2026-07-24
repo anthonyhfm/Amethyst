@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -66,7 +70,7 @@ fun DatePicker(
     selectedDate: SimpleDate?,
     onDateSelected: (SimpleDate) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Pick a date",
+    placeholder: String = stringResource(Res.string.ui_primitive_datepicker_placeholder),
     today: SimpleDate? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -187,8 +191,8 @@ private fun DatePickerCalendar(
     onDateClick: (SimpleDate) -> Unit,
 ) {
     val monthNames = listOf(
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        stringResource(Res.string.ui_primitive_calendar_month_january), stringResource(Res.string.ui_primitive_calendar_month_february), stringResource(Res.string.ui_primitive_calendar_month_march), stringResource(Res.string.ui_primitive_calendar_month_april), stringResource(Res.string.ui_primitive_calendar_month_may), stringResource(Res.string.ui_primitive_calendar_month_june),
+        stringResource(Res.string.ui_primitive_calendar_month_july), stringResource(Res.string.ui_primitive_calendar_month_august), stringResource(Res.string.ui_primitive_calendar_month_september), stringResource(Res.string.ui_primitive_calendar_month_october), stringResource(Res.string.ui_primitive_calendar_month_november), stringResource(Res.string.ui_primitive_calendar_month_december),
     )
     val dayLabels = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 
@@ -277,7 +281,7 @@ private fun DatePickerHeader(
         DatePickerNavButton(onClick = onPreviousMonth) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Previous month",
+                contentDescription = stringResource(Res.string.ui_primitive_calendar_prev_month),
                 modifier = Modifier.size(16.dp),
                 tint = Theme[colors][foreground],
             )
@@ -290,7 +294,7 @@ private fun DatePickerHeader(
         DatePickerNavButton(onClick = onNextMonth) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "Next month",
+                contentDescription = stringResource(Res.string.ui_primitive_calendar_next_month),
                 modifier = Modifier.size(16.dp),
                 tint = Theme[colors][foreground],
             )
@@ -375,10 +379,11 @@ private fun DatePickerDayCell(
 
 // -- Date formatting --
 
+@Composable
 private fun formatDate(date: SimpleDate): String {
     val monthNames = listOf(
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        stringResource(Res.string.ui_primitive_calendar_month_january), stringResource(Res.string.ui_primitive_calendar_month_february), stringResource(Res.string.ui_primitive_calendar_month_march), stringResource(Res.string.ui_primitive_calendar_month_april), stringResource(Res.string.ui_primitive_calendar_month_may), stringResource(Res.string.ui_primitive_calendar_month_june),
+        stringResource(Res.string.ui_primitive_calendar_month_july), stringResource(Res.string.ui_primitive_calendar_month_august), stringResource(Res.string.ui_primitive_calendar_month_september), stringResource(Res.string.ui_primitive_calendar_month_october), stringResource(Res.string.ui_primitive_calendar_month_november), stringResource(Res.string.ui_primitive_calendar_month_december),
     )
     return "${monthNames[date.month - 1]} ${date.day}, ${date.year}"
 }

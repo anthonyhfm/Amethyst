@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace
 
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_linux
 import amethyst.composeapp.generated.resources.amethyst_macos
@@ -66,7 +68,7 @@ fun WorkspaceWindow(
     var pendingCancelAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val projectName by WorkspaceRepository.projectName.collectAsState()
-    val windowTitle = "Amethyst - [${projectName ?: "Untitled Project"}]"
+    val windowTitle = "Amethyst - [${projectName ?: stringResource(Res.string.workspace_window_untitled_project)}]"
 
     fun closeWorkspace(afterClose: () -> Unit) {
         Echo.stopAll()

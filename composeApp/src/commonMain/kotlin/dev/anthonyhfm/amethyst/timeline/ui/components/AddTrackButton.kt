@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,11 +60,11 @@ fun AddTrackButton(
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Add Track",
+                contentDescription = stringResource(Res.string.timeline_add_track_description),
                 tint = timelinePalette.trackHeaderContent
             )
             Text(
-                text = "Add track",
+                text = stringResource(Res.string.timeline_add_track_label),
                 style = Theme[typography][small].copy(color = timelinePalette.trackHeaderContent),
             )
         }
@@ -70,7 +74,7 @@ fun AddTrackButton(
             onDismissRequest = { showDropdown = false }
         ) { _, _, _ ->
             ContextMenuItem(
-                label = "Midi Track",
+                label = stringResource(Res.string.timeline_add_track_midi),
                 icon = Icons.TwoTone.Lightbulb,
                 onClick = {
                     onAddLightsTrack()
@@ -78,7 +82,7 @@ fun AddTrackButton(
                 }
             )
             ContextMenuItem(
-                label = "Audio Track",
+                label = stringResource(Res.string.timeline_add_track_audio),
                 icon = Icons.TwoTone.Audiotrack,
                 onClick = {
                     onAddAudioTrack()

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,7 +65,7 @@ fun ProjectCreationSheet(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = if (isEditing) "Edit Project" else "New Project",
+            text = if (isEditing) stringResource(Res.string.home_project_creation_sheet_edit_title) else stringResource(Res.string.home_project_creation_sheet_new_title),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -69,9 +73,9 @@ fun ProjectCreationSheet(
 
         Text(
             text = if (isEditing)
-                "Update the name and author for this project."
+                stringResource(Res.string.home_project_creation_sheet_edit_desc)
             else
-                "Give your performance a name to get started.",
+                stringResource(Res.string.home_project_creation_sheet_new_desc),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -83,11 +87,11 @@ fun ProjectCreationSheet(
             onValueChange = {
                 viewModel.onEvent(ProjectCreationSheetContract.Event.OnChangeName(it))
             },
-            label = { Text("Project Name") },
-            placeholder = { Text("My next performance") },
+            label = { Text(stringResource(Res.string.home_project_creation_sheet_name_label)) },
+            placeholder = { Text(stringResource(Res.string.home_project_creation_sheet_name_placeholder)) },
             isError = state.name.isNotEmpty() && !state.isNameValid,
             supportingText = if (state.name.isNotEmpty() && !state.isNameValid) {
-                { Text("Project name cannot be blank.") }
+                { Text(stringResource(Res.string.home_project_creation_sheet_name_error)) }
             } else null,
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -100,9 +104,9 @@ fun ProjectCreationSheet(
             onValueChange = {
                 viewModel.onEvent(ProjectCreationSheetContract.Event.OnChangeAuthor(it))
             },
-            label = { Text("Author") },
-            placeholder = { Text("Your name") },
-            supportingText = { Text("Saved as your default. Leave blank for \"Unknown Author\".") },
+            label = { Text(stringResource(Res.string.home_project_creation_sheet_author_label)) },
+            placeholder = { Text(stringResource(Res.string.home_project_creation_sheet_author_placeholder)) },
+            supportingText = { Text(stringResource(Res.string.home_project_creation_sheet_author_desc)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(
@@ -123,13 +127,13 @@ fun ProjectCreationSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(Res.string.home_project_creation_sheet_cancel))
             }
             Button(
                 onClick = { viewModel.onEvent(ProjectCreationSheetContract.Event.OnClickSubmit) },
                 enabled = state.isNameValid,
             ) {
-                Text(if (isEditing) "Save" else "Create")
+                Text(if (isEditing) stringResource(Res.string.home_project_creation_sheet_save) else stringResource(Res.string.home_project_creation_sheet_create))
             }
         }
     }

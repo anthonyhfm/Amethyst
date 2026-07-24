@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.ui
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -250,7 +254,7 @@ fun NoteGradientEditorBar(
                             onDeleteStop(stop.selectionUUID)
                         },
                     ) {
-                        Text("Delete")
+                        Text(stringResource(Res.string.timeline_gradient_editor_action_delete))
                     }
                 }
             }

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -131,10 +135,10 @@ fun AutoPlayButtons() {
                 },
                 imageVector = if (autoPlayState == AutoPlayState.PLAYING) Lucide.Pause else Lucide.Play,
                 contentDescription = when (autoPlayState) {
-                    AutoPlayState.STOPPED -> "Start AutoPlay"
-                    AutoPlayState.PLAYING -> "Pause AutoPlay"
-                    AutoPlayState.PAUSED -> "Resume AutoPlay"
-                    AutoPlayState.LEARNING -> "Switch to Normal Playback"
+                    AutoPlayState.STOPPED -> stringResource(Res.string.workspace_autoplay_start)
+                    AutoPlayState.PLAYING -> stringResource(Res.string.workspace_autoplay_pause)
+                    AutoPlayState.PAUSED -> stringResource(Res.string.workspace_autoplay_resume)
+                    AutoPlayState.LEARNING -> stringResource(Res.string.workspace_autoplay_switch_to_normal)
                 },
                 variant = if (autoPlayState == AutoPlayState.PLAYING) ButtonVariant.Default else ButtonVariant.Ghost,
             )
@@ -148,14 +152,14 @@ fun AutoPlayButtons() {
                     }
                 },
                 imageVector = Lucide.BookOpenText,
-                contentDescription = if (autoPlayState == AutoPlayState.PLAYING) "Switch to Learning Mode" else "Learning Mode",
+                contentDescription = if (autoPlayState == AutoPlayState.PLAYING) stringResource(Res.string.workspace_autoplay_switch_to_learning) else stringResource(Res.string.workspace_autoplay_learning_mode),
                 variant = if (autoPlayState == AutoPlayState.LEARNING) ButtonVariant.Default else ButtonVariant.Ghost,
             )
 
             WorkspaceToolbarIconButton(
                 onClick = { AutoPlayRepository.stopAutoPlay() },
                 imageVector = Lucide.Square,
-                contentDescription = "Stop AutoPlay",
+                contentDescription = stringResource(Res.string.workspace_autoplay_stop),
                 enabled = autoPlayState != AutoPlayState.STOPPED,
             )
 
@@ -164,7 +168,7 @@ fun AutoPlayButtons() {
             WorkspaceToolbarIconButton(
                 onClick = { showSettingsDialog = true },
                 imageVector = Lucide.Settings,
-                contentDescription = "AutoPlay Settings",
+                contentDescription = stringResource(Res.string.workspace_autoplay_settings),
             )
         }
     }

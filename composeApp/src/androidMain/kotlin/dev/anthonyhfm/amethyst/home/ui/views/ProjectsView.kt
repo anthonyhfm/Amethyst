@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -146,18 +150,18 @@ fun ProjectsView(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("Recent Projects") },
+                title = { Text(stringResource(Res.string.home_projects_title)) },
                 actions = {
                     IconButton(onClick = { viewModel.onEvent(Event.OnClickOpenProject) }) {
                         Icon(
                             imageVector = Lucide.FolderOpen,
-                            contentDescription = "Open Project",
+                            contentDescription = stringResource(Res.string.home_projects_action_open_desc),
                         )
                     }
                     IconButton(onClick = { viewModel.onEvent(Event.OnClickNewProject) }) {
                         Icon(
                             imageVector = Lucide.Plus,
-                            contentDescription = "New Project",
+                            contentDescription = stringResource(Res.string.home_project_creation_sheet_new_title),
                         )
                     }
                 },
@@ -235,7 +239,7 @@ private fun EmptyProjectsState(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "No Recent Projects",
+                text = stringResource(Res.string.home_projects_empty_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -245,7 +249,7 @@ private fun EmptyProjectsState(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Open an existing workspace or create a new project to get started.",
+                text = stringResource(Res.string.home_projects_empty_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -264,7 +268,7 @@ private fun EmptyProjectsState(
                         .padding(end = 8.dp)
                         .size(18.dp),
                 )
-                Text("New Project")
+                Text(stringResource(Res.string.home_project_creation_sheet_new_title))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -280,7 +284,7 @@ private fun EmptyProjectsState(
                         .padding(end = 8.dp)
                         .size(18.dp),
                 )
-                Text("Open File")
+                Text(stringResource(Res.string.home_projects_open_button))
             }
         }
     }
@@ -336,7 +340,7 @@ private fun RecentProjectItem(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Project options",
+                        contentDescription = stringResource(Res.string.home_projects_item_options_desc),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -346,7 +350,7 @@ private fun RecentProjectItem(
                     onDismissRequest = { menuExpanded = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Open") },
+                        text = { Text(stringResource(Res.string.home_projects_item_menu_open)) },
                         leadingIcon = { Icon(Lucide.FolderOpen, contentDescription = null) },
                         onClick = {
                             menuExpanded = false
@@ -354,7 +358,7 @@ private fun RecentProjectItem(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Edit details") },
+                        text = { Text(stringResource(Res.string.home_projects_item_menu_edit)) },
                         leadingIcon = { Icon(Lucide.Pencil, contentDescription = null) },
                         onClick = {
                             menuExpanded = false
@@ -365,7 +369,7 @@ private fun RecentProjectItem(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = "Remove from recent",
+                                text = stringResource(Res.string.home_projects_item_menu_remove),
                                 color = MaterialTheme.colorScheme.error,
                             )
                         },

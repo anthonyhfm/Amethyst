@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
@@ -271,7 +275,7 @@ fun SheetClose(
     ) {
         Icon(
             imageVector = Icons.Default.Close,
-            contentDescription = "Close",
+            contentDescription = stringResource(Res.string.ui_primitive_sheet_close),
             modifier = Modifier.size(16.dp),
             tint = Theme[colors][mutedForeground],
         )

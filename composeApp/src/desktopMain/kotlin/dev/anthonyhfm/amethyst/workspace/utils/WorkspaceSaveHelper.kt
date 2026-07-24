@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.utils
 
+import org.jetbrains.compose.resources.getString
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
@@ -25,7 +28,7 @@ object WorkspaceSaveHelper {
 
         if (path == null) {
             path = FileKit.openFileSaver(
-                suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+                suggestedName = WorkspaceRepository.workspaceMeta?.title ?: getString(Res.string.workspace_save_untitled),
                 extension = "ame"
             )?.path ?: return false
         }
@@ -39,7 +42,7 @@ object WorkspaceSaveHelper {
      */
     suspend fun saveWorkspaceAs(): Boolean {
         val path = FileKit.openFileSaver(
-            suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+            suggestedName = WorkspaceRepository.workspaceMeta?.title ?: getString(Res.string.workspace_save_untitled),
             extension = "ame"
         )?.path ?: return false
 
@@ -67,7 +70,7 @@ object WorkspaceSaveHelper {
                 ?: WorkspaceRepository.workspaceMeta
 
             HomeRepository.rememberRecentWorkspace(
-                title = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
+                title = WorkspaceRepository.workspaceMeta?.title ?: getString(Res.string.workspace_save_untitled),
                 path = path,
             )
 
@@ -77,7 +80,7 @@ object WorkspaceSaveHelper {
             JOptionPane.showMessageDialog(
                 null,
                 "Unable to save workspace:\n${cause.message ?: cause::class.simpleName}",
-                "Save Workspace Failed",
+                getString(Res.string.workspace_save_failed_title),
                 JOptionPane.ERROR_MESSAGE
             )
             false

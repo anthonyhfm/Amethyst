@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -74,31 +78,31 @@ fun WorkspaceMode(
         WorkspaceModePickerItem(
             key = "performance",
             mode = PerformanceWorkspaceMode(),
-            text = "Performance",
+            text = stringResource(Res.string.workspace_mode_performance),
             icon = Lucide.Play,
         ),
         WorkspaceModePickerItem(
             key = "timeline",
             mode = TimelineWorkspaceMode(),
-            text = "Timeline",
+            text = stringResource(Res.string.workspace_mode_timeline),
             icon = Lucide.ChartNoAxesGantt,
         ),
         WorkspaceModePickerItem(
             key = "lights-chain",
             mode = LightsChainWorkspaceMode(),
-            text = "Lights",
+            text = stringResource(Res.string.workspace_mode_lights),
             icon = Lucide.Lightbulb,
         ),
         WorkspaceModePickerItem(
             key = "sampling-chain",
             mode = SamplingChainWorkspaceMode(),
-            text = "Sampling",
+            text = stringResource(Res.string.workspace_mode_sampling),
             icon = Lucide.AudioLines,
         ),
         WorkspaceModePickerItem(
             key = "layout",
             mode = LayoutWorkspaceMode(),
-            text = "Layout",
+            text = stringResource(Res.string.workspace_mode_layout),
             icon = Lucide.LayoutGrid,
         ),
     )

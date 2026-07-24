@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.ui
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -20,7 +23,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.DialogContent
 
 @Composable
 fun SaveChangesDialog(
-    description: String = "You have unsaved changes. Do you want to save them before closing?",
+    description: String = stringResource(Res.string.workspace_savechanges_description),
     onSave: () -> Unit,
     onDontSave: () -> Unit,
     onCancel: () -> Unit,
@@ -40,13 +43,13 @@ fun SaveChangesDialog(
             showCloseButton = false,
         ) {
             AlertDialogHeader {
-                AlertDialogTitle("Save Changes?")
+                AlertDialogTitle(stringResource(Res.string.workspace_savechanges_title))
                 AlertDialogDescription(description)
             }
 
             AlertDialogFooter {
                 AlertDialogCancel(onClick = onCancel) {
-                    Text("Keep Editing")
+                    Text(stringResource(Res.string.workspace_savechanges_keep_editing))
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -55,11 +58,11 @@ fun SaveChangesDialog(
                     onClick = onDontSave,
                     variant = ButtonVariant.Secondary,
                 ) {
-                    Text("Don't Save")
+                    Text(stringResource(Res.string.workspace_savechanges_dont_save))
                 }
 
                 AlertDialogAction(onClick = onSave) {
-                    Text("Save")
+                    Text(stringResource(Res.string.workspace_savechanges_save))
                 }
             }
         }

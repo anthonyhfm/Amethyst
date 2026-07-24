@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -58,7 +62,7 @@ fun DeviceSettingsDialog(
         },
     ) {
         AlertDialogHeader {
-            AlertDialogTitle("Device Configuration")
+            AlertDialogTitle(stringResource(Res.string.workspace_device_settings_title))
             AlertDialogDescription("Choose the MIDI device for this layout element.")
         }
 
@@ -67,14 +71,14 @@ fun DeviceSettingsDialog(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Field {
-                FieldLabel("MIDI Device")
+                FieldLabel(stringResource(Res.string.workspace_device_settings_midi_device_label))
                 Combobox(
                     items = devices,
                     selectedItem = selectedDevice,
                     onItemSelected = { selectedDevice = it },
                     itemLabel = { it.friendlyName },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = if (devices.isEmpty()) "No devices available" else "Select a device",
+                    placeholder = if (devices.isEmpty()) stringResource(Res.string.workspace_device_settings_no_devices) else stringResource(Res.string.workspace_device_settings_select_device),
                     searchPlaceholder = "Search devices...",
                     emptyMessage = "No devices found.",
                     enabled = devices.isNotEmpty(),
@@ -89,7 +93,7 @@ fun DeviceSettingsDialog(
                     onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
                 },
             ) {
-                Text("Cancel")
+                Text(stringResource(Res.string.workspace_device_settings_cancel))
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -105,7 +109,7 @@ fun DeviceSettingsDialog(
                     onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
                 },
             ) {
-                Text("Save")
+                Text(stringResource(Res.string.workspace_device_settings_save))
             }
         }
     }

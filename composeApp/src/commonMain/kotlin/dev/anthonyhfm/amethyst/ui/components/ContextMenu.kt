@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -103,7 +107,7 @@ fun AmethystContextMenu(
                         Column(modifier = Modifier.width(IntrinsicSize.Max)) {
                             if (level != "main") {
                                 ContextMenuItem(
-                                    label = "Back",
+                                    label = stringResource(Res.string.ui_contextmenu_back),
                                     icon = Icons.Default.ChevronLeft,
                                     onClick = {
                                         if (navigationStack.size > 1) {

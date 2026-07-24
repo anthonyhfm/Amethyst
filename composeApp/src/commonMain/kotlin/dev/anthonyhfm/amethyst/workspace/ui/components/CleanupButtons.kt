@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,7 +22,7 @@ fun CleanupButtons() {
         WorkspaceToolbarIconButton(
             onClick = { WorkspaceRepository.resetMulti() },
             imageVector = Lucide.RefreshCcw,
-            contentDescription = "Reset Multi",
+            contentDescription = stringResource(Res.string.workspace_cleanup_reset_multi),
         )
 
         Separator(
@@ -29,7 +33,7 @@ fun CleanupButtons() {
         WorkspaceToolbarIconButton(
             onClick = { Heaven.clear() },
             imageVector = Lucide.BrushCleaning,
-            contentDescription = "Lights Cleanup",
+            contentDescription = stringResource(Res.string.workspace_cleanup_lights),
         )
     }
 }

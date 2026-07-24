@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,7 +60,7 @@ fun AutoPlaySettingsDialog(
         onDismiss = onDismiss,
     ) {
         AlertDialogHeader {
-            AlertDialogTitle("AutoPlay Settings")
+            AlertDialogTitle(stringResource(Res.string.workspace_autoplay_settings))
             AlertDialogDescription("Configure what is shown during AutoPlay playback.")
         }
 
@@ -74,13 +78,13 @@ fun AutoPlaySettingsDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = "Show Button Presses",
+                        text = stringResource(Res.string.workspace_autoplay_settings_show_presses),
                         style = Theme[typography][p],
                         color = Theme[colors][foreground],
                     )
 
                     Text(
-                        text = "Display white LEDs to indicate button presses",
+                        text = stringResource(Res.string.workspace_autoplay_settings_show_presses_description),
                         style = Theme[typography][small],
                         color = Theme[colors][mutedForeground],
                         lineHeight = 16.sp,
@@ -108,13 +112,13 @@ fun AutoPlaySettingsDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = "Show Lights",
+                        text = stringResource(Res.string.workspace_autoplay_settings_show_lights),
                         style = Theme[typography][p],
                         color = Theme[colors][foreground],
                     )
 
                     Text(
-                        text = "Process project lights and show them during AutoPlay",
+                        text = stringResource(Res.string.workspace_autoplay_settings_show_lights_description),
                         style = Theme[typography][small],
                         color = Theme[colors][mutedForeground],
                         lineHeight = 16.sp,
@@ -129,7 +133,7 @@ fun AutoPlaySettingsDialog(
 
         AlertDialogFooter {
             AlertDialogCancel(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(Res.string.workspace_autoplay_settings_cancel))
             }
 
             Spacer(Modifier.weight(1f))
@@ -143,7 +147,7 @@ fun AutoPlaySettingsDialog(
                     onDismiss()
                 },
             ) {
-                Text("Save")
+                Text(stringResource(Res.string.workspace_autoplay_settings_save))
             }
         }
     }

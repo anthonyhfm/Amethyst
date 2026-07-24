@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.start
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -104,13 +107,13 @@ fun AppPreview() {
                             }
                             AlertDialogFooter {
                                 AlertDialogCancel(onClick = { alertState.visible = false }) {
-                                    Text("Cancel")
+                                    Text(stringResource(Res.string.home_import_wizard_cancel))
                                 }
                                 AlertDialogAction(
                                     onClick = { alertState.visible = false },
                                     variant = ButtonVariant.Destructive,
                                 ) {
-                                    Text("Delete")
+                                    Text(stringResource(Res.string.device_group_editor_delete))
                                 }
                             }
                         }
@@ -133,7 +136,7 @@ fun AppPreview() {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Avatar(fallbackText = "John Doe", size = 40.dp)
                             Avatar(fallbackText = "Alice B", size = 40.dp)
-                            Avatar(fallbackText = "X", size = 32.dp)
+                            Avatar(fallbackText = stringResource(Res.string.device_offset_x_label), size = 32.dp)
                         }
                     }
 
@@ -156,7 +159,7 @@ fun AppPreview() {
                         Breadcrumb {
                             BreadcrumbList {
                                 BreadcrumbItem {
-                                    BreadcrumbLink("Home", onClick = {})
+                                    BreadcrumbLink(stringResource(Res.string.home_widescreen_navbar_group_home), onClick = {})
                                 }
                                 BreadcrumbSeparator()
                                 BreadcrumbItem {
@@ -232,8 +235,8 @@ fun AppPreview() {
                                 Text("Card body content goes here.", style = Theme[typography][small], color = Theme[colors][foreground])
                             }
                             CardFooter {
-                                Button(onClick = {}, variant = ButtonVariant.Outline, size = ButtonSize.Small) { Text("Cancel") }
-                                Button(onClick = {}, size = ButtonSize.Small) { Text("Save") }
+                                Button(onClick = {}, variant = ButtonVariant.Outline, size = ButtonSize.Small) { Text(stringResource(Res.string.home_import_wizard_cancel)) }
+                                Button(onClick = {}, size = ButtonSize.Small) { Text(stringResource(Res.string.home_project_creation_sheet_save)) }
                             }
                         }
                     }
@@ -301,7 +304,7 @@ fun AppPreview() {
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = c3, onCheckedChange = { c3 = it }, enabled = false)
-                                Label("Disabled")
+                                Label(stringResource(Res.string.device_hold_disabled_label))
                             }
                         }
                     }
@@ -348,7 +351,7 @@ fun AppPreview() {
                                 CommandGroup(heading = "Suggestions") {
                                     CommandItem(onClick = {}) { Text("Calendar") }
                                     CommandItem(onClick = {}) { Text("Search") }
-                                    CommandItem(onClick = {}) { Text("Settings") }
+                                    CommandItem(onClick = {}) { Text(stringResource(Res.string.home_nav_tab_settings)) }
                                 }
                             }
                         }
@@ -369,10 +372,10 @@ fun AppPreview() {
                             },
                         ) {
                             ContextMenuLabel { Text("Actions") }
-                            ContextMenuItem(onClick = {}) { Text("Copy") }
-                            ContextMenuItem(onClick = {}) { Text("Paste") }
+                            ContextMenuItem(onClick = {}) { Text(stringResource(Res.string.device_copy_title)) }
+                            ContextMenuItem(onClick = {}) { Text(stringResource(Res.string.device_group_editor_paste)) }
                             ContextMenuSeparator()
-                            ContextMenuItem(onClick = {}, variant = ContextMenuItemVariant.Destructive) { Text("Delete") }
+                            ContextMenuItem(onClick = {}, variant = ContextMenuItemVariant.Destructive) { Text(stringResource(Res.string.device_group_editor_delete)) }
                         }
                     }
 
@@ -388,7 +391,7 @@ fun AppPreview() {
                             columns = listOf(
                                 DataTableColumn(header = "Invoice") { Text(it.id, style = Theme[typography][small], color = Theme[colors][foreground]) },
                                 DataTableColumn(header = "Status") { Badge { Text(it.status) } },
-                                DataTableColumn(header = "Amount") { Text(it.amount, style = Theme[typography][small], color = Theme[colors][foreground]) },
+                                DataTableColumn(header = stringResource(Res.string.device_blur_amount)) { Text(it.amount, style = Theme[typography][small], color = Theme[colors][foreground]) },
                             ),
                             modifier = Modifier.heightIn(max = 250.dp),
                         )
@@ -427,10 +430,10 @@ fun AppPreview() {
                                 }
                                 DialogFooter {
                                     Button(onClick = { dialogState.visible = false }, variant = ButtonVariant.Outline, size = ButtonSize.Small) {
-                                        Text("Cancel")
+                                        Text(stringResource(Res.string.home_import_wizard_cancel))
                                     }
                                     Button(onClick = { dialogState.visible = false }, size = ButtonSize.Small) {
-                                        Text("Save")
+                                        Text(stringResource(Res.string.home_project_creation_sheet_save))
                                     }
                                 }
                             }
@@ -452,7 +455,7 @@ fun AppPreview() {
                                     DrawerDescription("This is a drawer description.")
                                 }
                                 DrawerFooter {
-                                    DrawerClose(state = drawerState) { Text("Close") }
+                                    DrawerClose(state = drawerState) { Text(stringResource(Res.string.home_import_wizard_close_desc)) }
                                 }
                             }
                         }
@@ -474,7 +477,7 @@ fun AppPreview() {
                                 DropdownMenuLabel { Text("My Account") }
                                 DropdownMenuSeparator()
                                 DropdownMenuItem(onClick = { expanded = false }) { Text("Profile") }
-                                DropdownMenuItem(onClick = { expanded = false }) { Text("Settings") }
+                                DropdownMenuItem(onClick = { expanded = false }) { Text(stringResource(Res.string.home_nav_tab_settings)) }
                                 DropdownMenuSeparator()
                                 DropdownMenuItem(onClick = { expanded = false }) { Text("Log out") }
                             }
@@ -538,7 +541,7 @@ fun AppPreview() {
                                 modifier = Modifier.fillMaxWidth(),
                             )
 
-                            Label("Disabled")
+                            Label(stringResource(Res.string.device_hold_disabled_label))
                             Input(
                                 value = "Can't edit",
                                 onValueChange = {},
@@ -598,7 +601,7 @@ fun AppPreview() {
                                     Icon(Icons.Filled.Settings, contentDescription = null)
                                 }
                                 ItemContent {
-                                    ItemTitle { Text("Settings") }
+                                    ItemTitle { Text(stringResource(Res.string.home_nav_tab_settings)) }
                                     ItemDescription { Text("Manage preferences") }
                                 }
                             }
@@ -627,20 +630,20 @@ fun AppPreview() {
                         Menubar {
                             var fileExpanded by remember { mutableStateOf(false) }
                             MenubarMenu {
-                                MenubarTrigger(onClick = { fileExpanded = !fileExpanded }) { Text("File") }
+                                MenubarTrigger(onClick = { fileExpanded = !fileExpanded }) { Text(stringResource(Res.string.workspace_menubar_file)) }
                                 MenubarContent(expanded = fileExpanded, onDismissRequest = { fileExpanded = false }) {
                                     MenubarItem(onClick = { fileExpanded = false }) { Text("New") }
-                                    MenubarItem(onClick = { fileExpanded = false }) { Text("Open") }
+                                    MenubarItem(onClick = { fileExpanded = false }) { Text(stringResource(Res.string.home_projects_item_menu_open)) }
                                     MenubarSeparator()
                                     MenubarItem(onClick = { fileExpanded = false }) { Text("Exit") }
                                 }
                             }
                             var editExpanded by remember { mutableStateOf(false) }
                             MenubarMenu {
-                                MenubarTrigger(onClick = { editExpanded = !editExpanded }) { Text("Edit") }
+                                MenubarTrigger(onClick = { editExpanded = !editExpanded }) { Text(stringResource(Res.string.workspace_menubar_edit)) }
                                 MenubarContent(expanded = editExpanded, onDismissRequest = { editExpanded = false }) {
                                     MenubarItem(onClick = { editExpanded = false }) { Text("Undo") }
-                                    MenubarItem(onClick = { editExpanded = false }) { Text("Redo") }
+                                    MenubarItem(onClick = { editExpanded = false }) { Text(stringResource(Res.string.workspace_menubar_edit_redo)) }
                                 }
                             }
                         }
@@ -667,10 +670,10 @@ fun AppPreview() {
                         NavigationMenu {
                             NavigationMenuList {
                                 NavigationMenuItem {
-                                    NavigationMenuLink(onClick = {}, active = true) { Text("Home") }
+                                    NavigationMenuLink(onClick = {}, active = true) { Text(stringResource(Res.string.home_widescreen_navbar_group_home)) }
                                 }
                                 NavigationMenuItem {
-                                    NavigationMenuLink(onClick = {}) { Text("About") }
+                                    NavigationMenuLink(onClick = {}) { Text(stringResource(Res.string.home_widescreen_navbar_about)) }
                                 }
                                 NavigationMenuItem {
                                     NavigationMenuLink(onClick = {}) { Text("Contact") }
@@ -777,7 +780,7 @@ fun AppPreview() {
                     }
 
                     // ========== SELECT ==========
-                    CatalogCell("Select", width = 240) {
+                    CatalogCell(stringResource(Res.string.workspace_menubar_view_tool_select), width = 240) {
                         var selected by remember { mutableStateOf("") }
 
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -828,7 +831,7 @@ fun AppPreview() {
                                 }
                                 SheetFooter {
                                     Button(onClick = { sheetState.visible = false }, size = ButtonSize.Small) {
-                                        Text("Save Changes")
+                                        Text(stringResource(Res.string.home_project_creation_save_changes))
                                     }
                                 }
                             }
@@ -840,7 +843,7 @@ fun AppPreview() {
                         val sidebarState = rememberSidebarState()
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { sidebarState.toggle() }, size = ButtonSize.Small, variant = ButtonVariant.Outline) {
-                                Text(if (sidebarState.expanded) "Collapse" else "Expand")
+                                Text(if (sidebarState.expanded) stringResource(Res.string.ui_primitive_accordion_collapse) else stringResource(Res.string.ui_primitive_accordion_expand))
                             }
                             SidebarProvider(state = sidebarState) {
                                 Sidebar(state = sidebarState) {
@@ -850,10 +853,10 @@ fun AppPreview() {
                                             SidebarGroupContent {
                                                 SidebarMenu {
                                                     SidebarMenuItem {
-                                                        SidebarMenuButton(onClick = {}) { Text("Home") }
+                                                        SidebarMenuButton(onClick = {}) { Text(stringResource(Res.string.home_widescreen_navbar_group_home)) }
                                                     }
                                                     SidebarMenuItem {
-                                                        SidebarMenuButton(onClick = {}) { Text("Settings") }
+                                                        SidebarMenuButton(onClick = {}) { Text(stringResource(Res.string.home_nav_tab_settings)) }
                                                     }
                                                 }
                                             }
@@ -922,7 +925,7 @@ fun AppPreview() {
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Switch(checked = false, onCheckedChange = {}, enabled = false)
-                                Label("Disabled")
+                                Label(stringResource(Res.string.device_hold_disabled_label))
                             }
                         }
                     }

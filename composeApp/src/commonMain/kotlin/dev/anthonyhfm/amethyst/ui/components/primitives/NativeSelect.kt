@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -118,7 +122,7 @@ fun NativeSelect(
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Open select",
+                    contentDescription = stringResource(Res.string.ui_primitive_select_open),
                     modifier = Modifier.size(16.dp),
                     tint = Theme[colors][mutedForeground],
                 )

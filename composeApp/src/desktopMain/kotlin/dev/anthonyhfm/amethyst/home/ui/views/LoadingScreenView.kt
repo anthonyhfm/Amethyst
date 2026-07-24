@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_studio_logo
 import androidx.compose.foundation.Image
@@ -51,16 +53,16 @@ fun LoadingScreenView(message: String) {
         ) {
             Image(
                 painter = painterResource(Res.drawable.amethyst_studio_logo),
-                contentDescription = "Loading",
+                contentDescription = stringResource(Res.string.home_loading_desc),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.size(84.dp),
             )
 
             Spinner(size = 28.dp)
 
-            DialogTitle("Working on it")
+            DialogTitle(stringResource(Res.string.home_loading_title))
             DialogDescription(message)
-            TypographyMuted("This may take a moment for larger projects.")
+            TypographyMuted(stringResource(Res.string.home_loading_subtitle))
         }
     }
 }

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.data
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import kotlinx.serialization.Serializable
 
 @Serializable

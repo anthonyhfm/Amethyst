@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
@@ -78,7 +81,7 @@ class RecentViewModel(
                         type = FileKitType.File(
                             extensions = listOf("ame", "als", "zip", "approj")
                         ),
-                        title = "Open Project File"
+                        title = getString(Res.string.home_recent_dialog_file_picker_title)
                     )
 
                     if (file == null) return@launch
@@ -86,8 +89,8 @@ class RecentViewModel(
                     when (file.extension.lowercase()) {
                         "ame" -> { // Native Amethyst Projects
                             runWorkspaceLoad(
-                                loadingText = "Loading Project",
-                                errorMessage = "Invalid Amethyst Project File",
+                                loadingText = getString(Res.string.home_recent_loading_project_msg),
+                                errorMessage = getString(Res.string.home_recent_invalid_project_msg),
                             ) {
                                 val workspace = HomeRepository.loadWorkspaceData(file)
                                 HomeRepository.openWorkspace(workspace)
@@ -100,8 +103,8 @@ class RecentViewModel(
 
                         "approj" -> { // Apollo Projects
                             runWorkspaceLoad(
-                                loadingText = "Translating your Apollo Project",
-                                errorMessage = "Failed to convert Apollo Project",
+                                loadingText = getString(Res.string.home_recent_translating_apollo_msg),
+                                errorMessage = getString(Res.string.home_recent_failed_apollo_msg),
                                 printStackTrace = true,
                             ) {
                                 val workspace = HomeRepository.loadWorkspaceData(file)
@@ -119,8 +122,8 @@ class RecentViewModel(
 
                                 ZippedProjectFormat.ABLETON_APOLLO -> {
                                     runWorkspaceLoad(
-                                        loadingText = "Translating your Ableton + Apollo Project",
-                                        errorMessage = "Failed to convert Ableton + Apollo Project",
+                                        loadingText = getString(Res.string.home_recent_translating_ableton_apollo_msg),
+                                        errorMessage = getString(Res.string.home_recent_failed_ableton_apollo_msg),
                                         printStackTrace = true,
                                     ) {
                                         val workspace = HomeRepository.loadWorkspaceData(file)
@@ -130,8 +133,8 @@ class RecentViewModel(
 
                                 ZippedProjectFormat.UNIPAD -> {
                                     runWorkspaceLoad(
-                                        loadingText = "Translating your UniPad Project",
-                                        errorMessage = "Failed to convert UniPad Project",
+                                        loadingText = getString(Res.string.home_recent_translating_unipad_msg),
+                                        errorMessage = getString(Res.string.home_recent_failed_unipad_msg),
                                     ) {
                                         val workspace = HomeRepository.loadWorkspaceData(file)
                                         HomeRepository.openWorkspace(workspace)
@@ -150,7 +153,7 @@ class RecentViewModel(
             is RecentViewContract.Event.OpenProjectFromHistory -> {
                 viewModelScope.launch {
                     runWorkspaceLoad(
-                        errorMessage = "Failed to open recent project",
+                        errorMessage = getString(Res.string.home_recent_failed_open_recent_msg),
                         printStackTrace = true,
                     ) {
                         HomeRepository.openRecentWorkspace(event.project)
@@ -167,7 +170,7 @@ class RecentViewModel(
                 viewModelScope.launch {
                     if (!ExperimentalSettings.liveCollaboration.value) {
                         snackbarHostState.showSnackbar(
-                            message = "Live Collaboration is disabled in Settings",
+                            message = getString(Res.string.home_recent_collab_disabled_msg),
                             withDismissAction = true,
                         )
                         return@launch
@@ -188,7 +191,7 @@ class RecentViewModel(
                         log("join failed ${exception::class.simpleName}: ${exception.message}")
                         exception.printStackTrace()
                         snackbarHostState.showSnackbar(
-                            message = "Failed to join shared workspace",
+                            message = getString(Res.string.home_recent_collab_failed_join_msg),
                             withDismissAction = true,
                         )
                     }

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -376,9 +380,9 @@ private fun SortableHeaderCell(
             Icon(
                 imageVector = icon,
                 contentDescription = when (currentSort?.direction) {
-                    SortDirection.Ascending -> "Sorted ascending"
-                    SortDirection.Descending -> "Sorted descending"
-                    null -> "Sort"
+                    SortDirection.Ascending -> stringResource(Res.string.ui_primitive_datatable_sorted_ascending)
+                    SortDirection.Descending -> stringResource(Res.string.ui_primitive_datatable_sorted_descending)
+                    null -> stringResource(Res.string.ui_primitive_datatable_sort)
                 },
                 modifier = Modifier
                     .height(16.dp)

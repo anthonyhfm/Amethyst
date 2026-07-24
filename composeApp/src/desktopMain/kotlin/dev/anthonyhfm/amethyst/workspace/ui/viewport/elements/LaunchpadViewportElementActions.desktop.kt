@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.ui.viewport.elements
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -70,7 +73,7 @@ actual fun LaunchpadViewportElementActions(
         LaunchpadActionButton(
             onClick = { element.onEvent?.invoke(WorkspaceContract.Event.OnClickDeviceConfigure(element.selectionUUID)) },
             icon = Lucide.Cable,
-            contentDescription = "Connection",
+            contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_connection),
             backgroundHoverColor = actionButtonBgHover,
         )
 
@@ -78,7 +81,7 @@ actual fun LaunchpadViewportElementActions(
             LaunchpadActionButton(
                 onClick = { styleDialogState.visible = true },
                 icon = Lucide.Palette,
-                contentDescription = "Style",
+                contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_style),
                 backgroundHoverColor = actionButtonBgHover,
             )
         }
@@ -89,14 +92,14 @@ actual fun LaunchpadViewportElementActions(
                 DeviceSyncCoordinator.onDeviceRotationChanged(element)
             },
             icon = Lucide.RotateCw,
-            contentDescription = "Rotate 90°",
+            contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_rotate),
             backgroundHoverColor = actionButtonBgHover,
         )
 
         LaunchpadActionButton(
             onClick = { deleteDialogState.visible = true },
             icon = Lucide.Trash2,
-            contentDescription = "Delete",
+            contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_delete),
             backgroundColor = deleteButtonBg,
             backgroundHoverColor = deleteButtonBgHover,
         )
@@ -105,7 +108,7 @@ actual fun LaunchpadViewportElementActions(
     Dialog(state = styleDialogState) {
         DialogContent {
             DialogHeader {
-                DialogTitle("Style")
+                DialogTitle(stringResource(Res.string.workspace_viewport_launchpad_actions_style))
             }
             element.StyleConfigContent(onDismiss = { styleDialogState.visible = false })
         }
@@ -115,7 +118,7 @@ actual fun LaunchpadViewportElementActions(
         state = deleteDialogState,
     ) {
         AlertDialogHeader {
-            AlertDialogTitle("Delete device?")
+            AlertDialogTitle(stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_title))
             AlertDialogDescription("This will permanently remove \"${element.name}\" from the layout.")
         }
 
@@ -123,7 +126,7 @@ actual fun LaunchpadViewportElementActions(
             AlertDialogCancel(
                 onClick = { deleteDialogState.visible = false },
             ) {
-                Text("Cancel")
+                Text(stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_cancel))
             }
 
             AlertDialogAction(
@@ -133,7 +136,7 @@ actual fun LaunchpadViewportElementActions(
                 },
                 variant = ButtonVariant.Destructive,
             ) {
-                Text("Delete")
+                Text(stringResource(Res.string.workspace_viewport_launchpad_actions_delete))
             }
         }
     }

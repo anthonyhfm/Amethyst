@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -14,7 +18,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun TimeDial(
-    title: String? = "Duration",
+    title: String? = stringResource(Res.string.ui_timedial_default_headline),
     timing: Timing,
     onSelectTiming: (timing: Timing, msValue: Long) -> Unit,
     onStartValueChange: (timing: Timing, msValue: Long) -> Unit = { _, _ -> },

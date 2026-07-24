@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.viewport.elements
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -59,7 +63,7 @@ actual fun LaunchpadViewportElementActions(
     Dialog(state = styleDialogState) {
         DialogContent {
             DialogHeader {
-                DialogTitle("Style")
+                DialogTitle(stringResource(Res.string.workspace_viewport_launchpad_actions_style_dialog_title_ios))
             }
             element.StyleConfigContent(onDismiss = { styleDialogState.visible = false })
         }
@@ -76,7 +80,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
         add(
             actionItem(
                 systemImageName = "cable.connector",
-                accessibilityLabel = "Connection",
+                accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_connection_ios),
                 tintColor = UIColor.labelColor,
                 onClick = {
                     element.onEvent?.invoke(WorkspaceContract.Event.OnClickDeviceConfigure(element.selectionUUID))
@@ -88,7 +92,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
             add(
                 actionItem(
                     systemImageName = "paintpalette",
-                    accessibilityLabel = "Style",
+                    accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_style_dialog_title_ios),
                     tintColor = UIColor.labelColor,
                     onClick = onShowStyle,
                 ),
@@ -98,7 +102,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
         add(
             actionItem(
                 systemImageName = "rotate.right",
-                accessibilityLabel = "Rotate 90 degrees",
+                accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_rotate_ios),
                 tintColor = UIColor.labelColor,
                 onClick = {
                     element.rotationDegrees.floatValue += 90f
@@ -110,7 +114,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
         add(
             actionItem(
                 systemImageName = "trash",
-                accessibilityLabel = "Delete",
+                accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_delete_ios),
                 tintColor = UIColor.systemRedColor,
                 onClick = onShowDelete,
             ),
@@ -126,20 +130,20 @@ private fun UIView.presentDeleteAlert(element: LaunchpadViewportElement) {
     if (presenter.presentedViewController is UIAlertController) return
 
     val alertController = UIAlertController.alertControllerWithTitle(
-        title = "Delete device?",
+        title = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_title_ios),
         message = "This will permanently remove \"${element.name}\" from the layout.",
         preferredStyle = UIAlertControllerStyleAlert,
     )
     alertController.addAction(
         UIAlertAction.actionWithTitle(
-            title = "Cancel",
+            title = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_cancel_ios),
             style = UIAlertActionStyleCancel,
             handler = null,
         ),
     )
     alertController.addAction(
         UIAlertAction.actionWithTitle(
-            title = "Delete",
+            title = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_delete_ios),
             style = UIAlertActionStyleDestructive,
         ) {
             element.onEvent?.invoke(WorkspaceContract.Event.OnDeleteDevice(element.selectionUUID))

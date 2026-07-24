@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -463,7 +467,7 @@ fun MidiClip(
         }
     ) {
         TimelineContextMenuAction(
-            label = "Rename Clip",
+            label = stringResource(Res.string.timeline_clip_action_rename),
             shortcut = primaryModifierShortcutLabel("R"),
             enabled = renameTarget != null,
             onClick = {
@@ -476,14 +480,14 @@ fun MidiClip(
             }
         )
         TimelineContextMenuAction(
-            label = if (contextEntryTargets.size > 1) "Duplicate Clips" else "Duplicate Clip",
+            label = if (contextEntryTargets.size > 1) stringResource(Res.string.timeline_clip_action_duplicate_multiple) else stringResource(Res.string.timeline_clip_action_duplicate_single),
             shortcut = primaryModifierShortcutLabel("D"),
             onClick = { TimelineCommandSurface.duplicateEntries(contextEntryTargets) }
         )
         ContextMenuSeparator()
         TimelineContextMenuAction(
-            label = if (contextEntryTargets.size > 1) "Delete Clips" else "Delete Clip",
-            shortcut = "Delete",
+            label = if (contextEntryTargets.size > 1) stringResource(Res.string.timeline_clip_action_delete_multiple) else stringResource(Res.string.timeline_clip_action_delete_single),
+            shortcut = stringResource(Res.string.timeline_gradient_editor_action_delete),
             destructive = true,
             onClick = { TimelineCommandSurface.deleteEntries(contextEntryTargets) }
         )

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -104,7 +108,7 @@ fun AccordionItem(
                 )
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    contentDescription = if (expanded) stringResource(Res.string.ui_primitive_accordion_collapse) else stringResource(Res.string.ui_primitive_accordion_expand),
                     modifier = Modifier.size(16.dp).rotate(rotation),
                     tint = Theme[colors][mutedForeground],
                 )

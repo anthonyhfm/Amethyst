@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
@@ -34,7 +38,7 @@ fun TimelinePlaybackControls() {
                     }
                 },
                 imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (playing) "Pause" else "Play",
+                contentDescription = if (playing) stringResource(Res.string.timeline_playback_pause) else stringResource(Res.string.timeline_playback_play),
                 variant = playVariant,
             )
         }
@@ -47,7 +51,7 @@ fun TimelinePlaybackControls() {
         WorkspaceToolbarIconButton(
             onClick = { TimelineRepository.stop() },
             imageVector = Icons.Default.Stop,
-            contentDescription = "Stop Timeline",
+            contentDescription = stringResource(Res.string.timeline_playback_stop),
         )
     }
 }

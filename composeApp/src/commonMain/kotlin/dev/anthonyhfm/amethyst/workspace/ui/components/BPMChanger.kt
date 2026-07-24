@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -58,7 +62,7 @@ fun BPMChanger() {
         ) {
             Icon(
                 imageVector = Lucide.Timer,
-                contentDescription = "Beats per minute",
+                contentDescription = stringResource(Res.string.workspace_bpm_changer_content_description),
                 tint = Theme[colors][mutedForeground],
                 modifier = Modifier.size(16.dp),
             )

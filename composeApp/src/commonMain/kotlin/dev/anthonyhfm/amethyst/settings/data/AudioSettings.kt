@@ -2,11 +2,15 @@ package dev.anthonyhfm.amethyst.settings.data
 
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 
-object AudioSettings : SettingsGroup("Audio") {
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+
+object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_title) {
     const val SystemDefaultOutputDevice = "System Default"
     val masterVolume: Setting.Slider = slider(
         key = "masterVolume",
         title = "Master Volume",
+        titleRes = Res.string.settings_audio_master_volume_title,
         default = 1f,
         range = 0f..1f,
     )

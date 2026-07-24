@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,14 +59,14 @@ fun TutorialsView() {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        TypographyH2("Tutorials")
-                        TypographyLead("Learn how to use Amethyst Studio.")
+                        TypographyH2(stringResource(Res.string.home_tutorials_title))
+                        TypographyLead(stringResource(Res.string.home_tutorials_subtitle))
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
                     if (loadedTutorials.isEmpty()) {
-                        Text("Loading tutorials...", color = Theme[colors][mutedForeground])
+                        Text(stringResource(Res.string.home_tutorials_loading), color = Theme[colors][mutedForeground])
                     } else {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
@@ -121,7 +124,7 @@ private fun TutorialItem(
                 color = Theme[colors][cardForeground],
             )
             Text(
-                text = "Click to read documentation",
+                text = stringResource(Res.string.home_tutorials_card_action_desc),
                 maxLines = 1,
                 overflow = TextOverflow.MiddleEllipsis,
                 style = Theme[typography][small],

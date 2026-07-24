@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.utils
 
+import org.jetbrains.compose.resources.getString
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import io.github.vinceglb.filekit.FileKit
@@ -28,7 +31,7 @@ object WorkspaceProjectOpenHelper {
 
         val file = FileKit.openFilePicker(
             type = FileKitType.File(extensions = extensions),
-            title = "Open Project File"
+            title = getString(Res.string.workspace_open_dialog_title)
         ) ?: return WorkspaceProjectOpenResult.Cancelled
 
         return openProject(file)
@@ -52,7 +55,7 @@ object WorkspaceProjectOpenHelper {
         } catch (cause: Exception) {
             WorkspaceProjectOpenResult.Failure(
                 message = buildString {
-                    append("Unable to open ")
+                    append(getString(Res.string.workspace_open_error_prefix))
                     append(file.path.substringAfterLast('/'))
                     append(".")
                 },

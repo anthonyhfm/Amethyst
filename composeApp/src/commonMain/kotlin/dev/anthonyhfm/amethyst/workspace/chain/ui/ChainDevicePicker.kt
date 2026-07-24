@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.material.icons.twotone.Adjust
 import androidx.compose.material.icons.twotone.AudioFile
 import androidx.compose.material.icons.twotone.BlurOn
@@ -85,88 +89,88 @@ fun ChainDevicePicker(
             // Lights Menu
             when (level) {
                 "main" -> {
-                    ChainContextMenuSubmenuItem("Container", icon = Icons.TwoTone.Group, onClick = { onNavigate("container") })
-                    ChainContextMenuSubmenuItem("Filter", icon = Icons.TwoTone.Filter, onClick = { onNavigate("filter") })
-                    ChainContextMenuSubmenuItem("Color", icon = Icons.TwoTone.ColorLens, onClick = { onNavigate("color") })
-                    ChainContextMenuSubmenuItem("Shape", icon = Icons.TwoTone.ShapeLine, onClick = { onNavigate("shape") })
-                    ChainContextMenuSubmenuItem("Timing", icon = Icons.TwoTone.Timer, onClick = { onNavigate("timing") })
-                    ChainContextMenuSubmenuItem("Transform", icon = Icons.TwoTone.Transform, onClick = { onNavigate("transform") })
-                    ChainContextMenuSubmenuItem("Effects", icon = Icons.TwoTone.Science, onClick = { onNavigate("effects") })
-                    ChainContextMenuSubmenuItem("Misc", icon = Icons.TwoTone.Adjust, onClick = { onNavigate("misc") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_container), icon = Icons.TwoTone.Group, onClick = { onNavigate("container") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_filter), icon = Icons.TwoTone.Filter, onClick = { onNavigate("filter") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_color), icon = Icons.TwoTone.ColorLens, onClick = { onNavigate("color") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_shape), icon = Icons.TwoTone.ShapeLine, onClick = { onNavigate("shape") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), icon = Icons.TwoTone.Timer, onClick = { onNavigate("timing") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_transform), icon = Icons.TwoTone.Transform, onClick = { onNavigate("transform") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_effects), icon = Icons.TwoTone.Science, onClick = { onNavigate("effects") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_misc), icon = Icons.TwoTone.Adjust, onClick = { onNavigate("misc") })
                 }
                 "container" -> {
-                    ChainContextMenuItem("Group", icon = Icons.TwoTone.Group, onClick = { onPickComponent(GroupChainDevice()) })
-                    ChainContextMenuItem("Choke", icon = Icons.TwoTone.StopCircle, onClick = { onPickComponent(ChokeChainDevice()) })
-                    ChainContextMenuItem("Multi", icon = Icons.TwoTone._123, onClick = { onPickComponent(MultiGroupChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_group), icon = Icons.TwoTone.Group, onClick = { onPickComponent(GroupChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_choke), icon = Icons.TwoTone.StopCircle, onClick = { onPickComponent(ChokeChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_multi), icon = Icons.TwoTone._123, onClick = { onPickComponent(MultiGroupChainDevice()) })
                 }
                 "filter" -> {
-                    ChainContextMenuItem("Coordinate Filter", icon = Icons.TwoTone.MyLocation, onClick = { onPickComponent(CoordinateFilterChainDevice()) })
-                    ChainContextMenuItem("Layer Filter", icon = Icons.TwoTone.Layers, onClick = { onPickComponent(LayerFilterChainDevice()) })
-                    ChainContextMenuItem("Macro Filter", icon = Icons.TwoTone.FilterTiltShift, onClick = { onPickComponent(MacroFilterChainDevice()) })
-                    ChainContextMenuItem("Color Filter", icon = Icons.TwoTone.ColorLens, onClick = { onPickComponent(ColorFilterChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_coordinate_filter), icon = Icons.TwoTone.MyLocation, onClick = { onPickComponent(CoordinateFilterChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_layer_filter), icon = Icons.TwoTone.Layers, onClick = { onPickComponent(LayerFilterChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_macro_filter), icon = Icons.TwoTone.FilterTiltShift, onClick = { onPickComponent(MacroFilterChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_color_filter), icon = Icons.TwoTone.ColorLens, onClick = { onPickComponent(ColorFilterChainDevice()) })
                 }
                 "color" -> {
-                    ChainContextMenuItem("Color", icon = Icons.TwoTone.ColorLens, onClick = { onPickComponent(ColorChainDevice()) })
-                    ChainContextMenuItem("Gradient", icon = Icons.TwoTone.Gradient, onClick = { onPickComponent(GradientChainDevice()) })
-                    ChainContextMenuItem("Shift", icon = Icons.TwoTone.Contrast, onClick = { onPickComponent(ShiftChainDevice()) })
-                    ChainContextMenuItem("Adjust", icon = Icons.TwoTone.Tune, onClick = { onPickComponent(AdjustChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_color), icon = Icons.TwoTone.ColorLens, onClick = { onPickComponent(ColorChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_gradient), icon = Icons.TwoTone.Gradient, onClick = { onPickComponent(GradientChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_shift), icon = Icons.TwoTone.Contrast, onClick = { onPickComponent(ShiftChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_adjust), icon = Icons.TwoTone.Tune, onClick = { onPickComponent(AdjustChainDevice()) })
                 }
                 "shape" -> {
-                    ChainContextMenuItem("Copy", icon = Icons.TwoTone.ContentCopy, onClick = { onPickComponent(CopyChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_copy), icon = Icons.TwoTone.ContentCopy, onClick = { onPickComponent(CopyChainDevice()) })
                     if (crystalCompositions) {
-                        ChainContextMenuItem("Composition", icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
+                        ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_composition), icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
                     }
-                    ChainContextMenuItem("Keyframes", icon = Icons.TwoTone.Timeline, onClick = { onPickComponent(KeyframesChainDevice()) })
-                    ChainContextMenuItem("Piano Roll", icon = Icons.TwoTone.Piano, onClick = { onPickComponent(PianoRollChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_keyframes), icon = Icons.TwoTone.Timeline, onClick = { onPickComponent(KeyframesChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_piano_roll), icon = Icons.TwoTone.Piano, onClick = { onPickComponent(PianoRollChainDevice()) })
                 }
                 "timing" -> {
-                    ChainContextMenuItem("Delay", icon = Icons.TwoTone.Timer, onClick = { onPickComponent(DelayChainDevice()) })
-                    ChainContextMenuItem("Hold", icon = Icons.TwoTone.Pause, onClick = { onPickComponent(HoldChainDevice()) })
-                    ChainContextMenuItem("Loop", icon = Icons.TwoTone.Loop, onClick = { onPickComponent(LoopChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_delay), icon = Icons.TwoTone.Timer, onClick = { onPickComponent(DelayChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_hold), icon = Icons.TwoTone.Pause, onClick = { onPickComponent(HoldChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_loop), icon = Icons.TwoTone.Loop, onClick = { onPickComponent(LoopChainDevice()) })
                 }
                 "transform" -> {
-                    ChainContextMenuItem("Offset", icon = Icons.TwoTone.LineAxis, onClick = { onPickComponent(OffsetChainDevice()) })
-                    ChainContextMenuItem("Layer", icon = Icons.TwoTone.Layers, onClick = { onPickComponent(LayerChainDevice()) })
-                    ChainContextMenuItem("Flip", icon = Icons.TwoTone.Flip, onClick = { onPickComponent(FlipChainDevice()) })
-                    ChainContextMenuItem("Rotate", icon = Icons.TwoTone.RotateLeft, onClick = { onPickComponent(RotateChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_offset), icon = Icons.TwoTone.LineAxis, onClick = { onPickComponent(OffsetChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_layer), icon = Icons.TwoTone.Layers, onClick = { onPickComponent(LayerChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_flip), icon = Icons.TwoTone.Flip, onClick = { onPickComponent(FlipChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_rotate), icon = Icons.TwoTone.RotateLeft, onClick = { onPickComponent(RotateChainDevice()) })
                 }
                 "effects" -> {
-                    ChainContextMenuItem("Blur", icon = Icons.TwoTone.BlurOn, onClick = { onPickComponent(BlurChainDevice()) })
-                    ChainContextMenuItem("Opacity", icon = Icons.TwoTone.Opacity, onClick = { onPickComponent(OpacityChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_blur), icon = Icons.TwoTone.BlurOn, onClick = { onPickComponent(BlurChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_opacity), icon = Icons.TwoTone.Opacity, onClick = { onPickComponent(OpacityChainDevice()) })
                 }
                 "misc" -> {
-                    ChainContextMenuItem("Clear", icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
-                    ChainContextMenuItem("Macro Control", icon = Icons.TwoTone.Adjust, onClick = { onPickComponent(MacroControlChainDevice()) })
-                    ChainContextMenuItem("Preview", icon = Icons.TwoTone.Preview, onClick = { onPickComponent(PreviewChainDevice()) })
-                    ChainContextMenuItem("Transmit", icon = Icons.AutoMirrored.TwoTone.Send, onClick = { onPickComponent(TransmitChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_clear), icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_macro_control), icon = Icons.TwoTone.Adjust, onClick = { onPickComponent(MacroControlChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_preview), icon = Icons.TwoTone.Preview, onClick = { onPickComponent(PreviewChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_transmit), icon = Icons.AutoMirrored.TwoTone.Send, onClick = { onPickComponent(TransmitChainDevice()) })
                 }
             }
         } else {
             // Sampling Menu
             when (level) {
                 "main" -> {
-                    ChainContextMenuSubmenuItem("Container", icon = Icons.TwoTone.Group, onClick = { onNavigate("container") })
-                    ChainContextMenuItem("Sample", icon = Icons.TwoTone.AudioFile, onClick = { onPickComponent(SampleChainDevice()) })
-                    ChainContextMenuSubmenuItem("Filter", icon = Icons.TwoTone.Filter, onClick = { onNavigate("filter") })
-                    ChainContextMenuSubmenuItem("Timing", icon = Icons.TwoTone.Timer, onClick = { onNavigate("timing") })
-                    ChainContextMenuSubmenuItem("Misc", icon = Icons.TwoTone.Adjust, onClick = { onNavigate("misc") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_container), icon = Icons.TwoTone.Group, onClick = { onNavigate("container") })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_sample), icon = Icons.TwoTone.AudioFile, onClick = { onPickComponent(SampleChainDevice()) })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_filter), icon = Icons.TwoTone.Filter, onClick = { onNavigate("filter") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), icon = Icons.TwoTone.Timer, onClick = { onNavigate("timing") })
+                    ChainContextMenuSubmenuItem(stringResource(Res.string.workspace_chain_devicepicker_misc), icon = Icons.TwoTone.Adjust, onClick = { onNavigate("misc") })
                 }
                 "container" -> {
-                    ChainContextMenuItem("Group", icon = Icons.TwoTone.Group, onClick = { onPickComponent(GroupChainDevice()) })
-                    ChainContextMenuItem("Multi", icon = Icons.TwoTone._123, onClick = { onPickComponent(MultiGroupChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_group), icon = Icons.TwoTone.Group, onClick = { onPickComponent(GroupChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_multi), icon = Icons.TwoTone._123, onClick = { onPickComponent(MultiGroupChainDevice()) })
                 }
                 "filter" -> {
-                    ChainContextMenuItem("Coordinate Filter", icon = Icons.TwoTone.MyLocation, onClick = { onPickComponent(CoordinateFilterChainDevice()) })
-                    ChainContextMenuItem("Macro Filter", icon = Icons.TwoTone.FilterTiltShift, onClick = { onPickComponent(MacroFilterChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_coordinate_filter), icon = Icons.TwoTone.MyLocation, onClick = { onPickComponent(CoordinateFilterChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_macro_filter), icon = Icons.TwoTone.FilterTiltShift, onClick = { onPickComponent(MacroFilterChainDevice()) })
                 }
                 "timing" -> {
-                    ChainContextMenuItem("Delay", icon = Icons.TwoTone.Timer, onClick = { onPickComponent(DelayChainDevice()) })
-                    ChainContextMenuItem("Hold", icon = Icons.TwoTone.Pause, onClick = { onPickComponent(HoldChainDevice()) })
-                    ChainContextMenuItem("Loop", icon = Icons.TwoTone.Loop, onClick = { onPickComponent(LoopChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_delay), icon = Icons.TwoTone.Timer, onClick = { onPickComponent(DelayChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_hold), icon = Icons.TwoTone.Pause, onClick = { onPickComponent(HoldChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_loop), icon = Icons.TwoTone.Loop, onClick = { onPickComponent(LoopChainDevice()) })
                 }
                 "misc" -> {
-                    ChainContextMenuItem("Clear", icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
-                    ChainContextMenuItem("Macro Control", icon = Icons.TwoTone.Adjust, onClick = { onPickComponent(MacroControlChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_clear), icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_macro_control), icon = Icons.TwoTone.Adjust, onClick = { onPickComponent(MacroControlChainDevice()) })
                 }
             }
         }

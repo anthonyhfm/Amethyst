@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -95,34 +98,34 @@ fun ProjectCreationDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Field {
-                        FieldLabel("Project name")
+                        FieldLabel(stringResource(Res.string.home_project_creation_name_label))
                         Input(
                             value = state.name,
                             onValueChange = {
                                 viewModel.onEvent(ProjectCreationDialogContract.Event.OnChangeName(it))
                             },
-                            placeholder = "My next performance",
+                            placeholder = stringResource(Res.string.home_project_creation_name_placeholder),
                             modifier = Modifier.fillMaxWidth(),
                         )
 
                         if (!state.isNameValid) {
-                            FieldError("Please enter a project name.")
+                            FieldError(stringResource(Res.string.home_project_creation_name_error))
                         } else {
-                            FieldDescription("This is the title that will be shown in your workspace and recent projects.")
+                            FieldDescription(stringResource(Res.string.home_project_creation_name_desc))
                         }
                     }
 
                     Field {
-                        FieldLabel("Author")
+                        FieldLabel(stringResource(Res.string.home_project_creation_author_label))
                         Input(
                             value = state.author,
                             onValueChange = {
                                 viewModel.onEvent(ProjectCreationDialogContract.Event.OnChangeAuthor(it))
                             },
-                            placeholder = "Unknown Author",
+                            placeholder = stringResource(Res.string.home_project_creation_author_placeholder),
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        FieldDescription("Saved as your default author.")
+                        FieldDescription(stringResource(Res.string.home_project_creation_author_desc))
                     }
                 }
 
@@ -154,12 +157,12 @@ private fun DialogHeaderRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            DialogTitle(if (isEditing) "Edit Project" else "Create a new Project")
+            DialogTitle(if (isEditing) stringResource(Res.string.home_project_creation_edit_title) else stringResource(Res.string.home_project_creation_new_title))
             DialogDescription(
                 if (isEditing) {
-                    "Update the project details shown for this workspace."
+                    stringResource(Res.string.home_project_creation_edit_desc)
                 } else {
-                    "Set up the basics for a fresh workspace before jumping into the editor."
+                    stringResource(Res.string.home_project_creation_new_desc)
                 }
             )
         }
@@ -171,7 +174,7 @@ private fun DialogHeaderRow(
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Close",
+                contentDescription = stringResource(Res.string.home_project_creation_close_desc),
                 tint = Theme[colors][foreground],
             )
         }
@@ -186,7 +189,7 @@ private fun ProjectCreationActions(
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
 ) {
-    val submitText = if (isEditing) "Save Changes" else "Create Project"
+    val submitText = if (isEditing) stringResource(Res.string.home_project_creation_save_changes) else stringResource(Res.string.home_project_creation_create_project)
 
     if (stacked) {
         Column(
@@ -206,7 +209,7 @@ private fun ProjectCreationActions(
                 variant = ButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Cancel")
+                Text(stringResource(Res.string.home_project_creation_cancel))
             }
         }
     } else {
@@ -215,7 +218,7 @@ private fun ProjectCreationActions(
                 onClick = onCancel,
                 variant = ButtonVariant.Outline,
             ) {
-                Text("Cancel")
+                Text(stringResource(Res.string.home_project_creation_cancel))
             }
 
             Button(

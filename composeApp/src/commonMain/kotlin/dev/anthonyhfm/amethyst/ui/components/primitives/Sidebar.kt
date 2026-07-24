@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -377,7 +381,7 @@ fun SidebarTrigger(
             } else {
                 Icons.AutoMirrored.Filled.KeyboardArrowRight
             },
-            contentDescription = if (state.expanded) "Collapse sidebar" else "Expand sidebar",
+            contentDescription = if (state.expanded) stringResource(Res.string.ui_primitive_sidebar_collapse) else stringResource(Res.string.ui_primitive_sidebar_expand),
             tint = Theme[colors][foreground],
         )
     }

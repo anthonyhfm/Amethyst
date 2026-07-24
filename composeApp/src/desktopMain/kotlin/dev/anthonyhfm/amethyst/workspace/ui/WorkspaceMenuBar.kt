@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.ui
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,7 +81,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
     }
 
     MenuBar {
-        Menu(text = "File") {
+        Menu(text = stringResource(Res.string.workspace_menubar_file)) {
             Item(
                 text = "Open Project...",
                 shortcut = primaryKeyShortcut(Key.O),
@@ -92,7 +95,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Menu(text = "Open Recent") {
                 if (recentProjects.isEmpty()) {
                     Item(
-                        text = "No Recent Projects",
+                        text = stringResource(Res.string.home_projects_empty_title),
                         enabled = false,
                         onClick = {}
                     )
@@ -113,7 +116,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Separator()
 
             Item(
-                text = "Save",
+                text = stringResource(Res.string.workspace_menubar_file_save),
                 shortcut = primaryKeyShortcut(Key.S),
                 onClick = {
                     viewModel.saveProject()
@@ -121,7 +124,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
 
             Item(
-                text = "Save As...",
+                text = stringResource(Res.string.workspace_menubar_file_save_as),
                 shortcut = primaryKeyShortcut(Key.S, shift = true),
                 onClick = {
                     viewModel.saveProjectAs()
@@ -139,7 +142,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
         }
 
-        Menu(text = "Edit") {
+        Menu(text = stringResource(Res.string.workspace_menubar_edit)) {
             Item(
                 text = "Undo",
                 enabled = editState.canUndo,
@@ -150,7 +153,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
 
             Item(
-                text = "Redo",
+                text = stringResource(Res.string.workspace_menubar_edit_redo),
                 enabled = editState.canRedo,
                 shortcut = redoKeyShortcut(),
                 onClick = {
@@ -161,7 +164,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Separator()
 
             Item(
-                text = "Cut",
+                text = stringResource(Res.string.workspace_menubar_edit_cut),
                 enabled = editState.canCut,
                 shortcut = primaryKeyShortcut(Key.X),
                 onClick = {
@@ -170,7 +173,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
 
             Item(
-                text = "Copy",
+                text = stringResource(Res.string.workspace_menubar_edit_copy),
                 enabled = editState.canCopy,
                 shortcut = primaryKeyShortcut(Key.C),
                 onClick = {
@@ -179,7 +182,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
 
             Item(
-                text = "Paste",
+                text = stringResource(Res.string.workspace_menubar_edit_paste),
                 enabled = editState.canPaste,
                 shortcut = primaryKeyShortcut(Key.V),
                 onClick = {
@@ -190,7 +193,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Separator()
 
             Item(
-                text = "Delete",
+                text = stringResource(Res.string.workspace_menubar_edit_delete),
                 enabled = editState.canDelete,
                 onClick = {
                     WorkspaceMenuCommandSurface.delete()
@@ -198,7 +201,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
 
             Item(
-                text = "Duplicate",
+                text = stringResource(Res.string.workspace_menubar_edit_duplicate),
                 enabled = editState.canDuplicate,
                 shortcut = primaryKeyShortcut(Key.D),
                 onClick = {
@@ -207,7 +210,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
 
             Item(
-                text = "Rename",
+                text = stringResource(Res.string.device_group_editor_rename),
                 enabled = editState.canRename,
                 shortcut = primaryKeyShortcut(Key.R),
                 onClick = {
@@ -218,7 +221,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Separator()
 
             Item(
-                text = "Select All",
+                text = stringResource(Res.string.workspace_menubar_edit_select_all),
                 enabled = editState.canSelectAll,
                 shortcut = primaryKeyShortcut(Key.A),
                 onClick = {
@@ -227,7 +230,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
         }
 
-        Menu(text = "View") {
+        Menu(text = stringResource(Res.string.workspace_menubar_view)) {
             if (editState.canCloseCurrentTool) {
                 Item(
                     text = "Close ${mode.displayName}",
@@ -241,7 +244,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             }
             Menu(text = "Workspace Mode") {
                 RadioButtonItem(
-                    text = "Layout",
+                    text = stringResource(Res.string.workspace_menubar_view_layout),
                     selected = primaryMode == WorkspacePrimaryMode.Layout,
                     onClick = {
                         viewModel.switchMode(LayoutWorkspaceMode())
@@ -249,7 +252,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                 )
 
                 RadioButtonItem(
-                    text = "Performance",
+                    text = stringResource(Res.string.workspace_mode_performance),
                     selected = primaryMode == WorkspacePrimaryMode.Performance,
                     onClick = {
                         viewModel.switchMode(PerformanceWorkspaceMode())
@@ -257,7 +260,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                 )
 
                 RadioButtonItem(
-                    text = "Timeline",
+                    text = stringResource(Res.string.workspace_mode_timeline),
                     selected = primaryMode == WorkspacePrimaryMode.Timeline,
                     onClick = {
                         viewModel.switchMode(TimelineWorkspaceMode())
@@ -285,7 +288,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
         if (mode is TimelineWorkspaceMode) {
             Menu(text = "Transport") {
                 Item(
-                    text = if (isTimelinePlaying) "Pause" else "Play",
+                    text = if (isTimelinePlaying) stringResource(Res.string.workspace_menubar_view_pause) else stringResource(Res.string.workspace_menubar_view_play),
                     enabled = timelineTracks.isNotEmpty(),
                     onClick = {
                         if (isTimelinePlaying) {
@@ -297,7 +300,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                 )
 
                 Item(
-                    text = "Stop",
+                    text = stringResource(Res.string.workspace_menubar_view_stop),
                     enabled = timelineTracks.isNotEmpty(),
                     onClick = {
                         TimelineRepository.stop()
@@ -309,9 +312,9 @@ fun FrameWindowScope.WorkspaceMenuBar() {
         if (keyframesMode != null) {
             val keyframesState by keyframesMode.state.collectAsState()
 
-            Menu(text = "Keyframes") {
+            Menu(text = stringResource(Res.string.workspace_chain_devicepicker_keyframes)) {
                 CheckboxItem(
-                    text = "Wrap",
+                    text = stringResource(Res.string.device_blur_edge_wrap),
                     checked = keyframesState.wrap,
                     onCheckedChange = { checked ->
                         keyframesMode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeWrap(checked))
@@ -319,7 +322,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                 )
 
                 CheckboxItem(
-                    text = "Isolate",
+                    text = stringResource(Res.string.workspace_menubar_view_isolate),
                     checked = keyframesState.isolate,
                     onCheckedChange = { checked ->
                         keyframesMode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeIsolate(checked))
@@ -339,10 +342,10 @@ fun FrameWindowScope.WorkspaceMenuBar() {
         }
 
         if (pianoRollMode != null) {
-            Menu(text = "Piano Roll") {
-                Menu(text = "Tool") {
+            Menu(text = stringResource(Res.string.workspace_chain_devicepicker_piano_roll)) {
+                Menu(text = stringResource(Res.string.workspace_menubar_view_tool)) {
                     RadioButtonItem(
-                        text = "Select",
+                        text = stringResource(Res.string.workspace_menubar_view_tool_select),
                         selected = pianoRollMode.activeTool == TimelineEditorTool.SELECT,
                         onClick = {
                             pianoRollMode.activeTool = TimelineEditorTool.SELECT
@@ -350,7 +353,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
                     )
 
                     RadioButtonItem(
-                        text = "Draw",
+                        text = stringResource(Res.string.device_keyframes_draw_tooltip),
                         selected = pianoRollMode.activeTool == TimelineEditorTool.DRAW,
                         onClick = {
                             pianoRollMode.activeTool = TimelineEditorTool.DRAW
@@ -368,7 +371,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
 
                 Menu(text = "Grid") {
                     RadioButtonItem(
-                        text = "Auto",
+                        text = stringResource(Res.string.workspace_menubar_view_tool_auto),
                         selected = !pianoRollMode.gridResolutionLocked,
                         onClick = {
                             pianoRollMode.gridResolutionLocked = false
@@ -399,7 +402,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
 
             Item(
-                text = "Zoom",
+                text = stringResource(Res.string.workspace_menubar_view_zoom),
                 onClick = {
                     val isMaximized = window.extendedState and Frame.MAXIMIZED_BOTH == Frame.MAXIMIZED_BOTH
                     window.extendedState = if (isMaximized) Frame.NORMAL else Frame.MAXIMIZED_BOTH
@@ -407,7 +410,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             )
         }
 
-        Menu(text = "Help") {
+        Menu(text = stringResource(Res.string.workspace_menubar_help)) {
             Item(
                 text = "Settings...",
                 shortcut = primaryKeyShortcut(Key.Comma),
@@ -419,7 +422,7 @@ fun FrameWindowScope.WorkspaceMenuBar() {
             Separator()
 
             Item(
-                text = "About Amethyst",
+                text = stringResource(Res.string.workspace_menubar_help_about),
                 onClick = {
                     showAboutDialog()
                 }
@@ -457,11 +460,12 @@ fun FrameWindowScope.WorkspaceMenuBar() {
     }
 }
 
+@Composable
 private fun pianoRollGridOptions(): List<Pair<GridResolution, String>> {
     return listOf(
-        GridResolution.Quarter to "1/4",
-        GridResolution.Eighth to "1/8",
-        GridResolution.Sixteenth to "1/16",
-        GridResolution.ThirtySecond to "1/32"
+        GridResolution.Quarter to stringResource(Res.string.workspace_menubar_grid_quarter),
+        GridResolution.Eighth to stringResource(Res.string.workspace_menubar_grid_eighth),
+        GridResolution.Sixteenth to stringResource(Res.string.workspace_menubar_grid_sixteenth),
+        GridResolution.ThirtySecond to stringResource(Res.string.workspace_menubar_grid_thirty_second)
     )
 }

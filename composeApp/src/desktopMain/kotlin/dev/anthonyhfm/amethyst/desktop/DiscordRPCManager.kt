@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.desktop
 
+import kotlinx.coroutines.runBlocking
+import org.jetbrains.compose.resources.getString
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
 import dev.anthonyhfm.amethyst.settings.data.DiscordSettings
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
@@ -117,7 +121,7 @@ actual object DiscordRPCManager {
                 details = if (showProject && projectName != null) {
                     projectName
                 } else {
-                    "Home"
+                    runBlocking { getString(Res.string.home_widescreen_navbar_group_home) }
                 }
                 
                 if (showState && projectName != null) {

@@ -225,7 +225,7 @@ private fun ContinuousDial(
     }
 }
 
-private fun changeContinuousValue(value: Float, delta: Float, onStart: (Float) -> Unit, onChanged: (Float) -> Unit) {
+internal fun changeContinuousValue(value: Float, delta: Float, onStart: (Float) -> Unit, onChanged: (Float) -> Unit) {
     val next = (value + delta).coerceIn(0f, 1f)
     if (next != value) {
         onStart(value); onChanged(next)
@@ -287,8 +287,8 @@ private fun <T> SteppedDial(
     }
 }
 
-private fun progressForSelection(index: Int, size: Int): Float = if (size <= 1) 0f else index.toFloat() / (size - 1)
-private fun displayProgressForSelection(index: Int, size: Int): Float =
+internal fun progressForSelection(index: Int, size: Int): Float = if (size <= 1) 0f else index.toFloat() / (size - 1)
+internal fun displayProgressForSelection(index: Int, size: Int): Float =
     if (size <= 1) 1f else index.toFloat() / (size - 1)
 
 @Composable
@@ -577,7 +577,7 @@ internal fun DialControlFrame(
 }
 
 @Composable
-private fun DialReadoutLabel(
+internal fun DialReadoutLabel(
     text: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
@@ -606,7 +606,7 @@ private fun DialReadoutLabel(
 }
 
 @Composable
-private fun DialReadoutEditor(
+internal fun DialReadoutEditor(
     value: String,
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -102,8 +106,8 @@ fun Calendar(
     onDateSelected: ((CalendarDate) -> Unit)? = null,
 ) {
     val monthNames = listOf(
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
+        stringResource(Res.string.ui_primitive_calendar_month_january), stringResource(Res.string.ui_primitive_calendar_month_february), stringResource(Res.string.ui_primitive_calendar_month_march), stringResource(Res.string.ui_primitive_calendar_month_april), stringResource(Res.string.ui_primitive_calendar_month_may), stringResource(Res.string.ui_primitive_calendar_month_june),
+        stringResource(Res.string.ui_primitive_calendar_month_july), stringResource(Res.string.ui_primitive_calendar_month_august), stringResource(Res.string.ui_primitive_calendar_month_september), stringResource(Res.string.ui_primitive_calendar_month_october), stringResource(Res.string.ui_primitive_calendar_month_november), stringResource(Res.string.ui_primitive_calendar_month_december)
     )
     val dayLabels = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 
@@ -203,7 +207,7 @@ private fun CalendarHeader(
             content = {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "Previous month",
+                    contentDescription = stringResource(Res.string.ui_primitive_calendar_prev_month),
                     modifier = Modifier.size(16.dp),
                     tint = Theme[colors][foreground],
                 )
@@ -219,7 +223,7 @@ private fun CalendarHeader(
             content = {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "Next month",
+                    contentDescription = stringResource(Res.string.ui_primitive_calendar_next_month),
                     modifier = Modifier.size(16.dp),
                     tint = Theme[colors][foreground],
                 )

@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -165,7 +168,7 @@ fun RecentView(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         if (state.discoveredSessions.isNotEmpty()) {
-                            TypographyMuted("Available on the network")
+                            TypographyMuted(stringResource(Res.string.home_recent_collaboration_network_status))
                             state.discoveredSessions.forEach { session ->
                                 DiscoveredSessionCard(
                                     session = session,
@@ -177,7 +180,7 @@ fun RecentView(
                         if (recentProjects.isEmpty()) {
                             EmptyRecentProjectsCard()
                         } else {
-                            TypographyMuted("Recently opened")
+                            TypographyMuted(stringResource(Res.string.home_recent_collaboration_recent_opened))
                             recentProjects.forEachIndexed { index, project ->
                                 RecentProjectCard(
                                     project = project,
@@ -235,8 +238,8 @@ private fun InitialSyncProgressDialog(
         onDismiss = {},
     ) {
         AlertDialogHeader {
-            AlertDialogTitle("Joining workspace")
-            AlertDialogDescription(progress.phase.ifBlank { "Preparing collaboration session" })
+            AlertDialogTitle(stringResource(Res.string.home_recent_join_loading_title))
+            AlertDialogDescription(progress.phase.ifBlank { stringResource(Res.string.home_recent_join_loading_desc) })
         }
 
         Column(
@@ -285,7 +288,7 @@ private fun DiscoveredSessionCard(
                 color = Theme[colors][cardForeground],
             )
             Text(
-                text = "Host: ${session.session.host.name.ifBlank { "Unknown" }} · ${session.session.participants.size} participants",
+                text = "Host: ${session.session.host.name.ifBlank { stringResource(Res.string.home_recent_collaboration_session_unknown_host) }} · ${session.session.participants.size} participants",
                 style = Theme[typography][small],
                 color = Theme[colors][mutedForeground],
             )
@@ -295,7 +298,7 @@ private fun DiscoveredSessionCard(
             onClick = onJoin,
             size = ButtonSize.Small,
         ) {
-            UnstyledText("Join")
+            UnstyledText(stringResource(Res.string.home_recent_join_button))
         }
     }
 }
@@ -325,25 +328,25 @@ private fun JoinSessionDialog(
         Column(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            TypographyMuted("Host: ${session.session.host.name.ifBlank { "Unknown" }}")
+            TypographyMuted("Host: ${session.session.host.name.ifBlank { stringResource(Res.string.home_recent_collaboration_session_unknown_host) }}")
             Input(
                 value = userName,
                 onValueChange = { userName = it },
-                placeholder = "Your name",
+                placeholder = stringResource(Res.string.home_recent_join_dialog_name_placeholder),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         AlertDialogFooter {
             AlertDialogCancel(onClick = onDismiss) {
-                UnstyledText("Cancel")
+                UnstyledText(stringResource(Res.string.home_recent_join_dialog_cancel))
             }
             Button(
                 onClick = { onJoin(userName.trim()) },
                 size = ButtonSize.Small,
                 enabled = userName.isNotBlank(),
             ) {
-                UnstyledText("Join")
+                UnstyledText(stringResource(Res.string.home_recent_join_button))
             }
         }
     }
@@ -366,8 +369,8 @@ private fun RecentViewHeader(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    TypographyH2("Recent Projects")
-                    TypographyLead("Open an existing workspace, continue where you left off, or start a new project.")
+                    TypographyH2(stringResource(Res.string.home_recent_title))
+                    TypographyLead(stringResource(Res.string.home_recent_subtitle))
                 }
 
                 RecentActions(
@@ -386,8 +389,8 @@ private fun RecentViewHeader(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    TypographyH2("Recent Projects")
-                    TypographyLead("Open an existing workspace, continue where you left off, or start a new project.")
+                    TypographyH2(stringResource(Res.string.home_recent_title))
+                    TypographyLead(stringResource(Res.string.home_recent_subtitle))
                 }
 
                 RecentActions(
@@ -424,7 +427,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(openVariant),
                 )
-                UnstyledText("Open Project")
+                UnstyledText(stringResource(Res.string.home_recent_open_project))
             }
 
             Button(
@@ -437,7 +440,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(createVariant),
                 )
-                UnstyledText("New Project")
+                UnstyledText(stringResource(Res.string.home_recent_new_project))
             }
         }
     } else {
@@ -453,7 +456,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(openVariant),
                 )
-                UnstyledText("Open Project")
+                UnstyledText(stringResource(Res.string.home_recent_open_project))
             }
 
             Button(
@@ -465,7 +468,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(createVariant),
                 )
-                UnstyledText("New Project")
+                UnstyledText(stringResource(Res.string.home_recent_new_project))
             }
         }
     }
@@ -480,7 +483,7 @@ private fun EmptyRecentProjectsCard(
             .widthIn(max = 560.dp),
     ) {
         CardHeader {
-            CardTitle("No recent projects yet")
+            CardTitle(stringResource(Res.string.home_recent_empty_title))
             CardDescription("Create a new project or open an existing `.ame` workspace. Alternatively, convert an Ableton, Apollo or UniPad project into an Amethyst workspace!")
         }
 
@@ -546,7 +549,7 @@ private fun RecentProjectCard(
                 ) {
                     Icon(
                         imageVector = Lucide.Ellipsis,
-                        contentDescription = "Project actions",
+                        contentDescription = stringResource(Res.string.home_recent_actions_desc),
                         tint = buttonContentColor(ButtonVariant.Ghost),
                     )
                 }
@@ -568,7 +571,7 @@ private fun RecentProjectCard(
                         modifier = Modifier.size(16.dp),
                         tint = Theme[colors][popoverForeground],
                     )
-                    UnstyledText("Open")
+                    UnstyledText(stringResource(Res.string.home_recent_menu_open))
                 }
                 DropdownMenuItem(
                     onClick = {
@@ -582,7 +585,7 @@ private fun RecentProjectCard(
                         modifier = Modifier.size(16.dp),
                         tint = Theme[colors][popoverForeground],
                     )
-                    UnstyledText("Edit details")
+                    UnstyledText(stringResource(Res.string.home_recent_menu_edit))
                 }
                 DropdownMenuItem(
                     onClick = {
@@ -597,7 +600,7 @@ private fun RecentProjectCard(
                         modifier = Modifier.size(16.dp),
                         tint = Theme[colors][destructive],
                     )
-                    UnstyledText("Remove from recent")
+                    UnstyledText(stringResource(Res.string.home_recent_menu_remove))
                 }
             }
         }

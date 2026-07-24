@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.help
 
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import amethyst.composeapp.generated.resources.Res
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -107,7 +110,7 @@ internal fun HelpViewer(
         when {
             loadError -> {
                 Text(
-                    text = "Could not load help content.",
+                    text = stringResource(Res.string.workspace_help_viewer_failed_to_load),
                     style = typoSmall,
                     color = mutedFg,
                     modifier = Modifier.padding(32.dp),

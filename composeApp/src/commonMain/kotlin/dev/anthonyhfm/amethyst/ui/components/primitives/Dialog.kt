@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.border
@@ -177,7 +181,7 @@ fun DialogClose(
     ) {
         Icon(
             imageVector = Icons.Default.Close,
-            contentDescription = "Close",
+            contentDescription = stringResource(Res.string.ui_primitive_dialog_close),
             modifier = Modifier.size(16.dp),
             tint = Theme[colors][mutedForeground],
         )

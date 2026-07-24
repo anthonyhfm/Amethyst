@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,12 +22,12 @@ fun BrowserView() {
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
     ) {
         Text(
-            text = "Work in Progress",
+            text = stringResource(Res.string.home_browser_wip),
             style = MaterialTheme.typography.headlineMedium,
         )
 
         Text(
-            text = "Nothing to see here.."
+            text = stringResource(Res.string.home_browser_empty)
         )
     }
 }

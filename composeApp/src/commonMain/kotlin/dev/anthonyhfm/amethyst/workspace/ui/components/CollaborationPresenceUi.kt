@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -91,7 +95,7 @@ private fun RemoteCursorIndicator(cursor: RemoteCursor) {
                 .padding(horizontal = 6.dp, vertical = 3.dp),
         ) {
             Text(
-                text = cursor.user.name.ifBlank { "Guest" },
+                text = cursor.user.name.ifBlank { stringResource(Res.string.workspace_collab_guest) },
                 color = Color.White,
                 style = Theme[typography][small],
             )

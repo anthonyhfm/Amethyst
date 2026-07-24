@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -56,7 +60,7 @@ fun AbletonImportWizardSheet(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Ableton Import",
+                        text = stringResource(Res.string.home_import_wizard_sheet_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -65,7 +69,7 @@ fun AbletonImportWizardSheet(
                     IconButton(onClick = { navigator.popBackStack() }) {
                         Icon(
                             imageVector = Lucide.X,
-                            contentDescription = "Close",
+                            contentDescription = stringResource(Res.string.home_import_wizard_sheet_close_desc),
                         )
                     }
                 },
@@ -84,7 +88,7 @@ fun AbletonImportWizardSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Configure optional settings for your Ableton Live-Set import. Both fields are optional.",
+                text = stringResource(Res.string.home_import_wizard_sheet_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -94,12 +98,12 @@ fun AbletonImportWizardSheet(
             // Custom palette section
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Custom Palette",
+                    text = stringResource(Res.string.home_import_wizard_sheet_palette_title),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Override the default colour mapping with a custom palette file.",
+                    text = stringResource(Res.string.home_import_wizard_sheet_palette_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -114,19 +118,19 @@ fun AbletonImportWizardSheet(
                     onClick = { viewModel.onClickImportCustomPalette() },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (customPalettePath.isEmpty()) "Select Palette File" else "Change Palette File")
+                    Text(if (customPalettePath.isEmpty()) stringResource(Res.string.home_import_wizard_sheet_palette_select) else stringResource(Res.string.home_import_wizard_sheet_palette_change))
                 }
             }
 
             // Apollo project section
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Apollo Project",
+                    text = stringResource(Res.string.home_import_wizard_sheet_apollo_title),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Import lighting data from a companion Apollo project file.",
+                    text = stringResource(Res.string.home_import_wizard_sheet_apollo_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -141,19 +145,20 @@ fun AbletonImportWizardSheet(
                     onClick = { viewModel.onClickImportApolloProjFile() },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (apolloProjPath.isEmpty()) "Select Apollo Project" else "Change Apollo Project")
+                    Text(if (apolloProjPath.isEmpty()) stringResource(Res.string.home_import_wizard_sheet_apollo_select) else stringResource(Res.string.home_import_wizard_sheet_apollo_change))
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
+            val loadingMsg = stringResource(Res.string.home_import_wizard_sheet_loading_msg)
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     coroutineScope.launch {
                         navigator.navigate(
                             dev.anthonyhfm.amethyst.home.nav.HomeNavRoute.LoadingScreen(
-                                "Translating your Ableton Live-Set"
+                                loadingMsg
                             )
                         )
                         try {
@@ -166,7 +171,7 @@ fun AbletonImportWizardSheet(
                     }
                 },
             ) {
-                Text("Import")
+                Text(stringResource(Res.string.home_import_wizard_sheet_import_button))
             }
         }
     }

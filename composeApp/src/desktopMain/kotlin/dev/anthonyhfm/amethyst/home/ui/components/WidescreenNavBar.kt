@@ -1,7 +1,10 @@
 package dev.anthonyhfm.amethyst.home.ui.components
 
+import amethyst.composeapp.generated.resources.*
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_studio_logo
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -233,42 +236,45 @@ fun WidescreenNavBar(
 }
 
 private data class NavRailItem(
-    val label: String,
-    val expandedLabel: String = label,
+    val labelRes: StringResource,
+    val expandedLabelRes: StringResource = labelRes,
     val icon: ImageVector,
     val route: HomeNavRoute
 ) {
+    val label: String @Composable get() = stringResource(labelRes)
+    val expandedLabel: String @Composable get() = stringResource(expandedLabelRes)
+
     companion object {
         val RECENT = NavRailItem(
-            label = "Recent",
-            expandedLabel = "Recent Projects",
+            labelRes = Res.string.home_widescreen_navbar_recent,
+            expandedLabelRes = Res.string.home_widescreen_navbar_recent_projects,
             icon = Lucide.History,
             route = HomeNavRoute.Recent
         )
 
         val BROWSER = NavRailItem(
-            label = "Browser",
-            expandedLabel = "Project Browser",
+            labelRes = Res.string.home_widescreen_navbar_browser,
+            expandedLabelRes = Res.string.home_widescreen_navbar_project_browser,
             icon = Lucide.FolderOpen,
             route = HomeNavRoute.Browser
         )
 
         val SETTINGS = NavRailItem(
-            label = "Settings",
+            labelRes = Res.string.home_widescreen_navbar_settings,
             icon = Lucide.Settings2,
             route = HomeNavRoute.Settings
         )
 
         val TUTORIALS = NavRailItem(
-            label = "Tutorials",
-            expandedLabel = "Tutorials",
+            labelRes = Res.string.home_widescreen_navbar_tutorials,
+            expandedLabelRes = Res.string.home_widescreen_navbar_tutorials,
             icon = Lucide.BookOpen,
             route = HomeNavRoute.Tutorials
         )
 
         val ABOUT = NavRailItem(
-            label = "About",
-            expandedLabel = "About Amethyst",
+            labelRes = Res.string.home_widescreen_navbar_about,
+            expandedLabelRes = Res.string.home_widescreen_navbar_about_amethyst,
             icon = Lucide.BadgeInfo,
             route = HomeNavRoute.About
         )

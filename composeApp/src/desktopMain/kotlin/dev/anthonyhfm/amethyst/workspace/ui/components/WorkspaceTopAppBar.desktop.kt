@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -191,7 +194,7 @@ actual fun WorkspaceTopAppBar(
             WorkspaceToolbarIconButton(
                 onClick = { showSettingsDialog = true },
                 imageVector = Lucide.Settings,
-                contentDescription = "Open settings",
+                contentDescription = stringResource(Res.string.workspace_topappbar_open_settings),
             )
         }
     }
@@ -255,14 +258,14 @@ private fun ShareWorkspaceDialog(
             Input(
                 value = userName,
                 onValueChange = { userName = it },
-                placeholder = "Your name",
+                placeholder = stringResource(Res.string.home_project_creation_sheet_author_placeholder),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         AlertDialogFooter {
             AlertDialogCancel(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(Res.string.workspace_autoplay_settings_cancel))
             }
             Button(
                 onClick = { onShare(sessionName.trim(), userName.trim()) },
@@ -288,7 +291,7 @@ private fun AutomappingStatusIndicator(armed: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "AUTOMAPPING ACTIVE",
+            text = stringResource(Res.string.workspace_topappbar_automapping_active),
             color = contentColor,
             style = Theme[typography][small],
         )
@@ -337,9 +340,9 @@ private fun KeyframesOptions(mode: KeyframesWorkspaceMode) {
         state.rootKey != null -> {
             val x = state.rootKey!! % 10
             val y = state.rootKey!! / 10
-            "Root: X$x Y$y"
+            stringResource(Res.string.workspace_topappbar_root_key_format)
         }
-        else -> "Set Root Key"
+        else -> stringResource(Res.string.workspace_topappbar_set_root_key)
     }
 
     val rootVariant = when {
@@ -379,7 +382,7 @@ private fun KeyframesOptions(mode: KeyframesWorkspaceMode) {
         )
 
         KeyframesToggleOption(
-            label = "Wrap",
+            label = stringResource(Res.string.device_blur_edge_wrap),
             checked = state.wrap,
             onCheckedChange = {
                 mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeWrap(it))
@@ -392,7 +395,7 @@ private fun KeyframesOptions(mode: KeyframesWorkspaceMode) {
         )
 
         KeyframesToggleOption(
-            label = "Isolate",
+            label = stringResource(Res.string.workspace_topappbar_isolate),
             checked = state.isolate,
             onCheckedChange = {
                 mode.onEvent?.invoke(KeyframesChainDeviceContract.Event.OnChangeIsolate(it))
@@ -442,12 +445,12 @@ private fun PianoRollOptions(mode: PianoRollWorkspaceMode) {
 
     var gridMenuExpanded by remember { mutableStateOf(false) }
     val gridLabel = when {
-        !mode.gridResolutionLocked -> "Auto"
-        mode.gridResolution == GridResolution.Quarter      -> "1/4"
-        mode.gridResolution == GridResolution.Eighth       -> "1/8"
-        mode.gridResolution == GridResolution.Sixteenth    -> "1/16"
-        mode.gridResolution == GridResolution.ThirtySecond -> "1/32"
-        else -> "Auto"
+        !mode.gridResolutionLocked -> stringResource(Res.string.workspace_topappbar_grid_auto)
+        mode.gridResolution == GridResolution.Quarter      -> stringResource(Res.string.workspace_topappbar_grid_quarter)
+        mode.gridResolution == GridResolution.Eighth       -> stringResource(Res.string.workspace_topappbar_grid_eighth)
+        mode.gridResolution == GridResolution.Sixteenth    -> stringResource(Res.string.workspace_topappbar_grid_sixteenth)
+        mode.gridResolution == GridResolution.ThirtySecond -> stringResource(Res.string.workspace_topappbar_grid_thirty_second)
+        else -> stringResource(Res.string.workspace_topappbar_grid_auto)
     }
 
     WorkspaceToolbarSurface {
@@ -487,13 +490,13 @@ private fun PianoRollOptions(mode: PianoRollWorkspaceMode) {
                 DropdownMenuRadioItem(
                     selected = !mode.gridResolutionLocked,
                     onClick = { mode.gridResolutionLocked = false; gridMenuExpanded = false },
-                ) { Text("Auto") }
+                ) { Text(stringResource(Res.string.workspace_topappbar_grid_auto)) }
 
                 listOf(
-                    GridResolution.Quarter      to "1/4",
-                    GridResolution.Eighth       to "1/8",
-                    GridResolution.Sixteenth    to "1/16",
-                    GridResolution.ThirtySecond to "1/32",
+                    GridResolution.Quarter      to stringResource(Res.string.workspace_topappbar_grid_quarter),
+                    GridResolution.Eighth       to stringResource(Res.string.workspace_topappbar_grid_eighth),
+                    GridResolution.Sixteenth    to stringResource(Res.string.workspace_topappbar_grid_sixteenth),
+                    GridResolution.ThirtySecond to stringResource(Res.string.workspace_topappbar_grid_thirty_second),
                 ).forEach { (res, label) ->
                     DropdownMenuRadioItem(
                         selected = mode.gridResolutionLocked && mode.gridResolution == res,

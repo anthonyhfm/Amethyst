@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
@@ -18,7 +22,7 @@ actual fun AddDeviceButton(
     ) {
         Icon(
             imageVector = Icons.Default.Add,
-            contentDescription = "Add Device",
+            contentDescription = stringResource(Res.string.workspace_add_device_button_content_description),
         )
     }
 }

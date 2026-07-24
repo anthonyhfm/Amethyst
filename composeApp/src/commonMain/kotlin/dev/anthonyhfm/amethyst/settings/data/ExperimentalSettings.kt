@@ -1,21 +1,27 @@
 package dev.anthonyhfm.amethyst.settings.data
 
-object ExperimentalSettings : SettingsGroup("Experimental Features") {
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+
+object ExperimentalSettings : SettingsGroup("Experimental Features", Res.string.settings_experimental_group_title) {
     val liveCollaboration: Setting.Toggle = toggle(
         key = "liveCollaboration",
         title = "Live Collaboration (LAN-only)",
+        titleRes = Res.string.settings_experimental_live_collab_title,
         default = false,
     )
 
     val abletonTutorial: Setting.Toggle = toggle(
         key = "abletonTutorial",
         title = "Ableton Tutorial Detection",
+        titleRes = Res.string.settings_experimental_ableton_tutorial_title,
         default = false,
     )
 
     val crystalCompositions: Setting.Toggle = toggle(
         key = "crystalCompositions",
         title = "Crystal Compositions",
+        titleRes = Res.string.settings_experimental_crystal_compositions_title,
         default = false,
     )
 }

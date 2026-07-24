@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.home
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.determineFormat
@@ -98,7 +102,7 @@ object HomeSwiftBridge {
         scope.launch {
             runCatching { HomeRepository.createProject(name, author) }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Unknown error") }
+                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -113,7 +117,7 @@ object HomeSwiftBridge {
                 HomeRepository.openWorkspace(workspace, rememberRecent = true)
             }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Unknown error") }
+                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -125,7 +129,7 @@ object HomeSwiftBridge {
         scope.launch {
             runCatching { HomeRepository.openRecentWorkspace(project) }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Unknown error") }
+                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -145,7 +149,7 @@ object HomeSwiftBridge {
                 )
             }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Unknown error") }
+                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -159,7 +163,7 @@ object HomeSwiftBridge {
         scope.launch {
             runCatching { HomeRepository.updateProject(path = path, name = name, author = author) }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Unknown error") }
+                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 

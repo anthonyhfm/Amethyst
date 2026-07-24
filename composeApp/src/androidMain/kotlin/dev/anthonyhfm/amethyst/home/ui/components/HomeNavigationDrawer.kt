@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.home.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -54,7 +58,7 @@ fun HomeNavigationDrawer(
                         modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
                     )
                     Text(
-                        text = "Studio Home",
+                        text = stringResource(Res.string.home_nav_drawer_title),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 4.dp, bottom = 16.dp),

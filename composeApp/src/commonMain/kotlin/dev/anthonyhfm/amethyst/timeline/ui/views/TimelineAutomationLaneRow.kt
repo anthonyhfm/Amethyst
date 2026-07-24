@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1073,7 +1077,7 @@ internal fun TimelineAutomationLaneRow(
                             contextMenuState = null
                         }
                     ) {
-                        com.composeunstyled.Text("Reset Curve to Linear")
+                        com.composeunstyled.Text(stringResource(Res.string.timeline_automation_reset_curve))
                     }
                 }
             }

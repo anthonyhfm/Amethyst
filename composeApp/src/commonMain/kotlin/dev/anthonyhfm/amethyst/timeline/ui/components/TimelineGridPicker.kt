@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -46,7 +50,7 @@ fun TimelineGridPicker() {
         WorkspaceToolbarIconButton(
             onClick = { open = true },
             imageVector = Icons.TwoTone.GridView,
-            contentDescription = "Grid Type",
+            contentDescription = stringResource(Res.string.timeline_grid_picker_description),
         )
 
         Separator(
@@ -79,20 +83,20 @@ fun TimelineGridPicker() {
         expanded = open,
         onDismissRequest = { open = false },
     ) { _, _, _ ->
-        ContextMenuItem(label = "No Grid", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.NoGrid); open = false })
-        ContextMenuItem(label = "Flexible: Smallest", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Smallest); open = false })
-        ContextMenuItem(label = "Flexible: Small", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Small); open = false })
-        ContextMenuItem(label = "Flexible: Medium", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Medium); open = false })
-        ContextMenuItem(label = "Flexible: Large", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Large); open = false })
-        ContextMenuItem(label = "Flexible: Largest", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Largest); open = false })
-        ContextMenuItem(label = "Fixed: 1 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_1); open = false })
-        ContextMenuItem(label = "Fixed: 2 Bars", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_2); open = false })
-        ContextMenuItem(label = "Fixed: 4 Bars", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_4); open = false })
-        ContextMenuItem(label = "Fixed: 8 Bars", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_8); open = false })
-        ContextMenuItem(label = "Fixed: 1/2 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_2); open = false })
-        ContextMenuItem(label = "Fixed: 1/4 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_4); open = false })
-        ContextMenuItem(label = "Fixed: 1/8 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_8); open = false })
-        ContextMenuItem(label = "Fixed: 1/16 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_16); open = false })
-        ContextMenuItem(label = "Fixed: 1/32 Bar", onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_32); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_no_grid), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.NoGrid); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_flex_smallest), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Smallest); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_flex_small), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Small); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_flex_medium), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Medium); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_flex_large), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Large); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_flex_largest), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Flexible.Largest); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_1_bar), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_1); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_2_bars), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_2); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_4_bars), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_4); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_8_bars), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed.Bar_8); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_half_bar), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_2); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_quarter_bar), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_4); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_eighth_bar), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_8); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_sixteenth_bar), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_16); open = false })
+        ContextMenuItem(label = stringResource(Res.string.timeline_grid_picker_fixed_thirty_second_bar), onClick = { WorkspaceRepository.setGridType(GridUtils.GridType.Fixed._1_32); open = false })
     }
 }

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -168,7 +172,7 @@ fun BreadcrumbEllipsis(
         ) {
             Icon(
                 imageVector = Icons.Default.MoreHoriz,
-                contentDescription = "More",
+                contentDescription = stringResource(Res.string.ui_primitive_breadcrumb_more),
                 modifier = Modifier.size(16.dp),
                 tint = Theme[colors][mutedForeground],
             )
@@ -176,7 +180,7 @@ fun BreadcrumbEllipsis(
     } else {
         Icon(
             imageVector = Icons.Default.MoreHoriz,
-            contentDescription = "More",
+            contentDescription = stringResource(Res.string.ui_primitive_breadcrumb_more),
             modifier = modifier.size(16.dp),
             tint = Theme[colors][mutedForeground],
         )

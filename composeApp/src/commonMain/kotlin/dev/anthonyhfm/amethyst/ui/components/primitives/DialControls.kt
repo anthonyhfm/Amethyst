@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,7 +43,7 @@ fun <T> Dial(
 
 @Composable
 fun TimeDial(
-    title: String? = "Duration",
+    title: String? = stringResource(Res.string.ui_dialcontrols_default_headline),
     timing: Timing,
     onSelectTiming: (timing: Timing, msValue: Long) -> Unit,
     onStartValueChange: (timing: Timing, msValue: Long) -> Unit = { _, _ -> },

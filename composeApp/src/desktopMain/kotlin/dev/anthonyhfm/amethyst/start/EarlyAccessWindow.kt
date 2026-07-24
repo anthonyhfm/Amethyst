@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.start
 
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_linux
 import amethyst.composeapp.generated.resources.amethyst_windows
@@ -96,7 +98,7 @@ fun EarlyAccessWindow(
                     ) {
                         Image(
                             painter = painterResource(Res.drawable.amethyst_studio_logo),
-                            contentDescription = "Amethyst Logo",
+                            contentDescription = stringResource(Res.string.home_about_logo_desc),
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.height(64.dp)
                         )
@@ -133,7 +135,7 @@ fun EarlyAccessWindow(
                                 variant = ButtonVariant.Outline,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Cancel")
+                                Text(stringResource(Res.string.home_import_wizard_cancel))
                             }
 
                             Button(

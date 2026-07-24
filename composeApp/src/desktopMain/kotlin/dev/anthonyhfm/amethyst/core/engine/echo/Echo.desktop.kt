@@ -14,7 +14,7 @@ actual object Echo {
 
     @Volatile
     private var initialized = false
-    private val formats = listOf("wav", "mp3", "flac", "ogg")
+    private val formats = listOf("wav", "mp3", "flac", "ogg", "aiff", "aif", "aifc")
 
     actual fun initialize(): Boolean {
         if (initialized) return true

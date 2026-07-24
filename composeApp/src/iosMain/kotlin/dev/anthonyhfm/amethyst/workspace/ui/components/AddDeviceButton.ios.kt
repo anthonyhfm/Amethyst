@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -19,7 +23,7 @@ actual fun AddDeviceButton(
         factory = {
             UIButton.buttonWithType(UIButtonTypeSystem).apply {
                 configuration = liquidGlassButtonConfiguration().apply {
-                    title = "Add Device"
+                    title = stringResource(Res.string.workspace_add_device_button_content_description)
                     image = UIImage.systemImageNamed("plus")
                     imagePadding = 8.0
                     baseForegroundColor = UIColor.labelColor

@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -95,7 +98,7 @@ fun AbletonImportWizard(
                 Separator()
 
                 Field {
-                    FieldLabel("Import source")
+                    FieldLabel(stringResource(Res.string.home_import_wizard_import_source))
                     FieldDescription(path)
                 }
 
@@ -117,6 +120,7 @@ fun AbletonImportWizard(
 
                 Spacer(Modifier.weight(1f))
 
+                val loadingMsg = stringResource(Res.string.home_import_wizard_sheet_loading_msg)
                 WizardActions(
                     onCancel = {
                         viewModel.customPalettePath.value = ""
@@ -124,7 +128,7 @@ fun AbletonImportWizard(
                         onCancel()
                     },
                     onStartConversion = {
-                        navigator.navigate(HomeNavRoute.LoadingScreen("Translating your Ableton Live-Set"))
+                        navigator.navigate(HomeNavRoute.LoadingScreen(loadingMsg))
 
                         coroutineScope.launch {
                             viewModel.startAbletonImport(path)
@@ -158,9 +162,9 @@ private fun WizardHeader(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            DialogTitle("Ableton Import Wizard")
+            DialogTitle(stringResource(Res.string.home_import_wizard_title))
 
-            DialogDescription("Choose an optional custom palette before converting your Live set into an Amethyst workspace.")
+            DialogDescription(stringResource(Res.string.home_import_wizard_description))
         }
 
         Button(
@@ -170,7 +174,7 @@ private fun WizardHeader(
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Close",
+                contentDescription = stringResource(Res.string.home_import_wizard_close_desc),
                 tint = Theme[colors][foreground],
             )
         }
@@ -184,7 +188,7 @@ private fun PaletteSelectionField(
     onSelectPalette: () -> Unit,
 ) {
     Field {
-        FieldLabel("Custom palette")
+        FieldLabel(stringResource(Res.string.home_import_wizard_custom_palette))
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -208,7 +212,7 @@ private fun PaletteSelectionField(
                     contentDescription = null,
                     tint = Theme[colors][foreground],
                 )
-                Text("Select")
+                Text(stringResource(Res.string.home_import_wizard_select))
             }
         }
     }
@@ -220,8 +224,8 @@ private fun PaletteSelectionSummary(
     palettePath: String,
 ) {
     if (palettePath.isBlank()) {
-        TypographyP("No custom palette selected")
-        FieldDescription("Optional. If omitted, the default Novation palette is used.")
+        TypographyP(stringResource(Res.string.home_import_wizard_no_palette))
+        FieldDescription(stringResource(Res.string.home_import_wizard_palette_desc))
     } else {
         TypographyMuted(palettePath)
     }
@@ -234,7 +238,7 @@ private fun ApolloProjSelectionField(
     onSelectApolloProj: () -> Unit,
 ) {
     Field {
-        FieldLabel("Apollo lights project (.approj)")
+        FieldLabel(stringResource(Res.string.home_import_wizard_apollo_project))
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -252,7 +256,7 @@ private fun ApolloProjSelectionField(
                 variant = ButtonVariant.Outline
             ) {
                 Icon(imageVector = Icons.Default.UploadFile, contentDescription = null, tint = Theme[colors][foreground])
-                Text("Select")
+                Text(stringResource(Res.string.home_import_wizard_select))
             }
         }
     }
@@ -261,8 +265,8 @@ private fun ApolloProjSelectionField(
 @Composable
 private fun ApolloProjSelectionSummary(apolloProjName: String, apolloProjPath: String) {
     if (apolloProjPath.isBlank()) {
-        TypographyP("No Apollo project selected")
-        FieldDescription("Optional. If set, lights chain will be sourced from the Apollo project instead of Ableton MIDI tracks.")
+        TypographyP(stringResource(Res.string.home_import_wizard_no_apollo))
+        FieldDescription(stringResource(Res.string.home_import_wizard_apollo_desc))
     } else {
         TypographyMuted(apolloProjPath)
     }
@@ -278,13 +282,13 @@ private fun WizardActions(
             onClick = onCancel,
             variant = ButtonVariant.Outline,
         ) {
-            Text("Cancel")
+            Text(stringResource(Res.string.home_import_wizard_cancel))
         }
 
         Button(
             onClick = onStartConversion,
         ) {
-            Text("Start Conversion")
+            Text(stringResource(Res.string.home_import_wizard_start_conversion))
         }
     }
 }

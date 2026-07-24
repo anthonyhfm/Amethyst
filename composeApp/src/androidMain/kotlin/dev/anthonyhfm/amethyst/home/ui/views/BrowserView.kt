@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,7 +24,7 @@ fun BrowserView() {
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("Browser") },
+                title = { Text(stringResource(Res.string.home_browser_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
@@ -29,7 +33,7 @@ fun BrowserView() {
         },
     ) { innerPadding ->
         HomePlaceholderView(
-            title = "Browser",
+            title = stringResource(Res.string.home_browser_title),
             modifier = Modifier.padding(innerPadding),
         )
     }

@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -144,7 +148,7 @@ internal fun NavigableChainContextMenu(
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (level != "main") {
                     ChainContextMenuItem(
-                        label = "Back",
+                        label = stringResource(Res.string.workspace_chain_contextmenu_back),
                         icon = Lucide.ChevronLeft,
                         dismissOnClick = false,
                         onClick = {

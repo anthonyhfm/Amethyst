@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -72,13 +74,13 @@ fun UpdateView(
             ) {
                 Image(
                     painter = painterResource(Res.drawable.amethyst_studio_logo),
-                    contentDescription = "Amethyst Logo",
+                    contentDescription = stringResource(Res.string.home_update_logo_desc),
                     modifier = Modifier.size(64.dp)
                 )
 
                 Spacer(Modifier.height(16.dp))
 
-                Text("Update available", style = Theme[typography][h3], color = Theme[colors][foreground])
+                Text(stringResource(Res.string.home_update_available_title), style = Theme[typography][h3], color = Theme[colors][foreground])
 
                 Spacer(Modifier.height(4.dp))
 
@@ -98,7 +100,7 @@ fun UpdateView(
                 } else if (downloadedFile != null) {
                     DialogFooter {
                         Button(onClick = { updater.installAndRestart(downloadedFile!!) }) {
-                            Text("Install & Restart")
+                            Text(stringResource(Res.string.home_update_install_restart))
                         }
                     }
                 } else {
@@ -108,7 +110,7 @@ fun UpdateView(
                             variant = ButtonVariant.Outline,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Later")
+                            Text(stringResource(Res.string.home_update_later))
                         }
 
                         Button(
@@ -127,7 +129,7 @@ fun UpdateView(
                                 }
                             }
                         ) {
-                            Text("Update Now")
+                            Text(stringResource(Res.string.home_update_now))
                         }
                     }
                 }

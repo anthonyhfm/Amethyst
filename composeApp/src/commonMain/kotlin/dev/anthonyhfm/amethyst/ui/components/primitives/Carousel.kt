@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -106,7 +110,7 @@ fun CarouselPrevious(
     ) {
         Icon(
             imageVector = Icons.Default.ChevronLeft,
-            contentDescription = "Previous",
+            contentDescription = stringResource(Res.string.ui_primitive_carousel_previous),
             modifier = Modifier.size(16.dp),
             tint = Theme[colors][foreground],
         )
@@ -133,7 +137,7 @@ fun CarouselNext(
     ) {
         Icon(
             imageVector = Icons.Default.ChevronRight,
-            contentDescription = "Next",
+            contentDescription = stringResource(Res.string.ui_primitive_carousel_next),
             modifier = Modifier.size(16.dp),
             tint = Theme[colors][foreground],
         )

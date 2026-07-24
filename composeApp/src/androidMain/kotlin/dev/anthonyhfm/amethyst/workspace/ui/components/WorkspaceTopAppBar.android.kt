@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -47,18 +51,22 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 
+import org.jetbrains.compose.resources.StringResource
+
 private data class WorkspaceModeEntry(
     val mode: WorkspaceMode,
-    val label: String,
+    val labelRes: StringResource,
     val icon: ImageVector,
-)
+) {
+    val label: String @Composable get() = stringResource(labelRes)
+}
 
 private val selectableModes = listOf(
-    WorkspaceModeEntry(PerformanceWorkspaceMode(), "Performance", Lucide.Play),
-    WorkspaceModeEntry(TimelineWorkspaceMode(), "Timeline", Lucide.ChartNoAxesGantt),
-    WorkspaceModeEntry(LightsChainWorkspaceMode(), "Lights", Lucide.Lightbulb),
-    WorkspaceModeEntry(SamplingChainWorkspaceMode(), "Sampling", Lucide.AudioLines),
-    WorkspaceModeEntry(LayoutWorkspaceMode(), "Layout", Lucide.LayoutGrid),
+    WorkspaceModeEntry(PerformanceWorkspaceMode(), Res.string.workspace_topappbar_mode_performance, Lucide.Play),
+    WorkspaceModeEntry(TimelineWorkspaceMode(), Res.string.workspace_topappbar_mode_timeline, Lucide.ChartNoAxesGantt),
+    WorkspaceModeEntry(LightsChainWorkspaceMode(), Res.string.workspace_topappbar_mode_lights, Lucide.Lightbulb),
+    WorkspaceModeEntry(SamplingChainWorkspaceMode(), Res.string.workspace_topappbar_mode_sampling, Lucide.AudioLines),
+    WorkspaceModeEntry(LayoutWorkspaceMode(), Res.string.workspace_topappbar_mode_layout, Lucide.LayoutGrid),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,7 +88,7 @@ actual fun WorkspaceTopAppBar(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Lucide.ChevronLeft,
-                        contentDescription = "Back to home",
+                        contentDescription = stringResource(Res.string.workspace_topappbar_back_to_home),
                     )
                 }
             } else {
@@ -109,7 +117,7 @@ actual fun WorkspaceTopAppBar(
 
                         Icon(
                             imageVector = Lucide.ChevronDown,
-                            contentDescription = "Switch mode",
+                            contentDescription = stringResource(Res.string.workspace_topappbar_switch_mode),
                             modifier = Modifier
                                 .padding(start = 8.dp)
                                 .size(18.dp),
@@ -148,7 +156,7 @@ actual fun WorkspaceTopAppBar(
         actions = {
             if (automappingState.isActive) {
                 Text(
-                    text = "AUTO!",
+                    text = stringResource(Res.string.workspace_topappbar_auto),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -156,7 +164,7 @@ actual fun WorkspaceTopAppBar(
             IconButton(onClick = { showSettingsDialog = true }) {
                 Icon(
                     imageVector = Lucide.Settings,
-                    contentDescription = "Open settings",
+                    contentDescription = stringResource(Res.string.workspace_topappbar_open_settings),
                 )
             }
         },

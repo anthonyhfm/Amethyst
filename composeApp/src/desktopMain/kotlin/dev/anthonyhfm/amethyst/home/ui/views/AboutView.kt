@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_studio_logo
 import androidx.compose.foundation.Image
@@ -49,13 +51,13 @@ fun AboutView() {
         ) {
             Image(
                 painter = painterResource(Res.drawable.amethyst_studio_logo),
-                contentDescription = "Amethyst Logo",
+                contentDescription = stringResource(Res.string.home_about_logo_desc),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.height(160.dp),
             )
 
             TypographyH2(
-                text = "Amethyst Studio",
+                text = stringResource(Res.string.home_about_title),
                 modifier = Modifier.padding(top = 8.dp),
             )
 
@@ -87,7 +89,7 @@ fun AboutView() {
 
                 Icon(
                     imageVector = AmethystIcons.Filled.Signature,
-                    contentDescription = "Signature",
+                    contentDescription = stringResource(Res.string.home_about_signature_desc),
                     modifier = Modifier
                         .height(64.dp)
                         .graphicsLayer { alpha = 0.99f }

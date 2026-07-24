@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.settings
 
+import amethyst.composeapp.generated.resources.*
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.home_settings_title
 import androidx.compose.foundation.layout.Arrangement
@@ -96,7 +97,7 @@ private fun SettingsHeader(
             ) {
                 Icon(
                     imageVector = Lucide.ArrowLeft,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(Res.string.settings_back_desc),
                     modifier = Modifier.size(18.dp),
                     tint = Theme[colors][foreground],
                 )
@@ -107,7 +108,7 @@ private fun SettingsHeader(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             TypographyH2(stringResource(Res.string.home_settings_title))
-            TypographyLead("Tune performance, audio, integrations, and experimental features for your setup.")
+            TypographyLead(stringResource(Res.string.settings_subtitle))
         }
     }
 }

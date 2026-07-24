@@ -1,5 +1,9 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -295,7 +299,7 @@ fun TimelineLane(
             ) {
                 ContextMenuContent {
                     ContextMenuItem(
-                        label = "Create MIDI Clip",
+                        label = stringResource(Res.string.timeline_lane_create_midi_clip),
                         icon = Lucide.Plus,
                         onClick = {
                             onCreateMidiClip(selectedRange.startMs, selectedRange.endMs)
