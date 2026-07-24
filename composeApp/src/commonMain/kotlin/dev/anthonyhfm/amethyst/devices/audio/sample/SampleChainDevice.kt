@@ -6,30 +6,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.twotone.AudioFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -39,17 +30,14 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composeunstyled.Icon
-import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
-import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
@@ -58,37 +46,21 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.data.applyAutomationCurve
 import dev.anthonyhfm.amethyst.timeline.data.samplesToUs
 import dev.anthonyhfm.amethyst.timeline.data.usToRoundedMs
-import dev.anthonyhfm.amethyst.ui.components.WaveformView
-import dev.anthonyhfm.amethyst.ui.components.primitives.Button
-import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.SimplerWaveformEditor
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
-import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.secondary
-import dev.anthonyhfm.amethyst.ui.theme.secondaryForeground
-import dev.anthonyhfm.amethyst.ui.theme.small
-import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitMode
-import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
-import io.github.vinceglb.filekit.name
-import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
-import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 private data class SampleEnvelopeDragState(
     val beforePoint: TimelineAutomationPoint,
@@ -111,7 +83,6 @@ private enum class SampleEnvelopeDragMode {
     Curve
 }
 
-private const val SampleEnvelopeHeightDp = 96
 private const val SampleEnvelopeDoubleTapTimeoutMs = 300L
 private const val SampleEnvelopeTapSlopPx = 10f
 private const val SampleEnvelopePointHitRadiusPx = 14f
@@ -131,8 +102,13 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         private const val VOLUME_MIN_DB = -24f
         private const val VOLUME_MAX_DB = 24f
         private const val VOLUME_RANGE_DB = VOLUME_MAX_DB - VOLUME_MIN_DB
-        private const val MAX_FADE_MS = 1000f
         private const val SIGN_EXTEND_24BIT = -0x1000000
+    }
+
+    private fun formatCleanTitle(fileName: String): String {
+        val name = fileName.substringAfterLast('/').substringAfterLast('\\')
+        if (name.isBlank()) return "Sample"
+        return "Sample ($name)"
     }
 
     @Composable
@@ -141,17 +117,23 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         val selections by SelectionManager.selections.collectAsState()
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
+        val titleText = if (deviceState.isLoaded && deviceState.fileName.isNotBlank()) {
+            formatCleanTitle(deviceState.fileName)
+        } else {
+            "Sample"
+        }
+
         ChainDeviceShell(
-            title = "Sample",
+            title = titleText,
             isSelected = isSelected,
             isDragging = isDragging.value,
-            modifier = Modifier.width(if (deviceState.isLoaded) 420.dp else 200.dp),
+            modifier = Modifier.width(if (deviceState.isLoaded) 480.dp else 220.dp),
             titleBarModifier = LocalTitleBarModifier.current
         ) {
             if (deviceState.isLoaded) {
                 AudioView()
             } else {
-                EmptyDeviceView()
+                SampleEmptyState(state = state)
             }
         }
     }
@@ -159,287 +141,102 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     @Composable
     private fun AudioView() {
         val deviceState by state.collectAsState()
-        var waveformWidthPx by remember { mutableStateOf(0) }
+        val activeDurationMs = (deviceState.totalDurationMs * (deviceState.endPosition - deviceState.startPosition)).coerceAtLeast(1f)
+
+        var beforeState by remember { mutableStateOf(deviceState) }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(4.dp)
         ) {
-            // File info: filename + duration
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp)
-                    .padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val shortName = deviceState.fileName
-                    .substringAfterLast('/')
-                    .substringAfterLast('\\')
-
-                Text(
-                    text = shortName,
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Text(
-                    text = formatDuration(deviceState.totalDurationMs),
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                )
-            }
-
-            // Clip editing and automation deliberately live in separate lanes. Keeping the
-            // automation pointer input out of this surface makes trim/fade handles reliable.
+            // Waveform Viewport Canvas Area
             Box(
                 modifier = Modifier
                     .padding(4.dp)
                     .fillMaxWidth()
                     .weight(1f)
-                    .heightIn(min = 120.dp)
-                    .onSizeChanged { waveformWidthPx = it.width }
+                    .heightIn(min = 180.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(Theme[colors][secondary])
                     .border(1.dp, Theme[colors][border], RoundedCornerShape(6.dp))
             ) {
-                val effectiveWidthPx = waveformWidthPx.takeIf { it > 0 }?.toFloat() ?: 430f
-                val zoomLevel = if (deviceState.totalDurationMs > 0) {
-                    effectiveWidthPx / deviceState.totalDurationMs.toFloat()
-                } else {
-                    1f
-                }
-
-                WaveformView(
+                SimplerWaveformEditor(
                     rawData = deviceState.rawData,
                     sampleRate = deviceState.sampleRate,
                     channels = deviceState.channels,
                     bitDepth = deviceState.bitDepth,
-                    timelineStartUs = 0L,
-                    startSample = 0L,
-                    endSample = run {
-                        val bps = (deviceState.bitDepth / 8) * deviceState.channels
-                        if (bps > 0) (deviceState.rawData?.size?.toLong() ?: 0L) / bps else 0L
-                    },
-                    renderWidthPx = waveformWidthPx.takeIf { it > 0 },
-                    zoomLevel = zoomLevel,
-                    fadeInMs = deviceState.fadeInMs,
-                    fadeOutMs = deviceState.fadeOutMs,
+                    totalDurationMs = deviceState.totalDurationMs,
                     startPosition = deviceState.startPosition,
                     endPosition = deviceState.endPosition,
+                    fadeInMs = deviceState.fadeInMs,
+                    fadeOutMs = deviceState.fadeOutMs,
                     onStartPositionChange = { newStart ->
-                        state.update { it.copy(startPosition = newStart.coerceIn(0f, it.endPosition - 0.01f)) }
-                    },
-                    onEndPositionChange = { newEnd ->
-                        state.update { it.copy(endPosition = newEnd.coerceIn(it.startPosition + 0.01f, 1f)) }
-                    },
-                    onFadeInChange = { newFadeIn ->
-                        state.update { it.copy(fadeInMs = newFadeIn.coerceIn(0f, MAX_FADE_MS)) }
-                    },
-                    onFadeOutChange = { newFadeOut ->
-                        state.update { it.copy(fadeOutMs = newFadeOut.coerceIn(0f, MAX_FADE_MS)) }
-                    },
-                    maxFadeMs = MAX_FADE_MS,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-            }
-
-            // Controls: Fade In | Fade Out | Volume  (Start/End via waveform handles)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                var beforeFadeIn = deviceState.fadeInMs
-                Dial(
-                    type = DialType.Continuous,
-                    title = "Fade In",
-                    text = "${deviceState.fadeInMs.roundToInt()} ms",
-                    value = deviceState.fadeInMs / MAX_FADE_MS,
-                    onStartValueChange = { beforeFadeIn = deviceState.fadeInMs },
-                    onValueChange = { value ->
-                        state.update {
-                            it.copy(fadeInMs = (value * MAX_FADE_MS).coerceIn(0f, MAX_FADE_MS))
-                        }
-                    },
-                    onFinishValueChange = {
-                        pushStateChange(
-                            before = state.value.copy(fadeInMs = beforeFadeIn),
-                            after = state.value
-                        )
-                    },
-                    onResolveTextValue = { text ->
-                        val ms = text.removeSuffix("ms").trim().toIntOrNull()
-                        ms?.let { v ->
-                            if (v in 0..MAX_FADE_MS.toInt()) {
-                                val before = state.value
-                                state.update { it.copy(fadeInMs = v.toFloat()) }
-                                pushStateChange(before, state.value)
-                            }
-                        }
-                    }
-                )
-
-                var beforeFadeOut = deviceState.fadeOutMs
-                Dial(
-                    type = DialType.Continuous,
-                    title = "Fade Out",
-                    text = "${deviceState.fadeOutMs.roundToInt()} ms",
-                    value = deviceState.fadeOutMs / MAX_FADE_MS,
-                    onStartValueChange = { beforeFadeOut = deviceState.fadeOutMs },
-                    onValueChange = { value ->
-                        state.update {
-                            it.copy(fadeOutMs = (value * MAX_FADE_MS).coerceIn(0f, MAX_FADE_MS))
-                        }
-                    },
-                    onFinishValueChange = {
-                        pushStateChange(
-                            before = state.value.copy(fadeOutMs = beforeFadeOut),
-                            after = state.value
-                        )
-                    },
-                    onResolveTextValue = { text ->
-                        val ms = text.removeSuffix("ms").trim().toIntOrNull()
-                        ms?.let { v ->
-                            if (v in 0..MAX_FADE_MS.toInt()) {
-                                val before = state.value
-                                state.update { it.copy(fadeOutMs = v.toFloat()) }
-                                pushStateChange(before, state.value)
-                            }
-                        }
-                    }
-                )
-
-                var beforeVolume = deviceState.volumeDb
-                Dial(
-                    type = DialType.Continuous,
-                    title = "Volume",
-                    text = "${if (deviceState.volumeDb >= 0) "+" else ""}${deviceState.volumeDb} dB",
-                    value = (deviceState.volumeDb - VOLUME_MIN_DB) / VOLUME_RANGE_DB,
-                    onStartValueChange = { beforeVolume = deviceState.volumeDb },
-                    onValueChange = { value ->
+                        val targetStart = newStart.coerceIn(0f, deviceState.endPosition - 0.001f)
+                        val newActiveDurMs = (deviceState.totalDurationMs * (deviceState.endPosition - targetStart)).coerceAtLeast(1f)
                         state.update {
                             it.copy(
-                                volumeDb = ((value * VOLUME_RANGE_DB) + VOLUME_MIN_DB).coerceIn(
-                                    VOLUME_MIN_DB,
-                                    VOLUME_MAX_DB
-                                )
+                                startPosition = targetStart,
+                                fadeInMs = it.fadeInMs.coerceAtMost(newActiveDurMs),
+                                fadeOutMs = it.fadeOutMs.coerceAtMost(newActiveDurMs)
                             )
                         }
                     },
-                    onFinishValueChange = {
-                        pushStateChange(
-                            before = state.value.copy(volumeDb = beforeVolume),
-                            after = state.value
-                        )
-                    },
-                    onResolveTextValue = { text ->
-                        val db = text.replace("dB", "").replace("+", "").trim().toFloatOrNull()
-                        db?.let { v ->
-                            if (v in VOLUME_MIN_DB..VOLUME_MAX_DB) {
-                                val before = state.value
-                                state.update { it.copy(volumeDb = v) }
-                                pushStateChange(before, state.value)
-                            }
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    @Composable
-    private fun EmptyDeviceView() {
-        val scope = rememberCoroutineScope()
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        ) {
-            Icon(
-                imageVector = Icons.TwoTone.AudioFile,
-                contentDescription = null,
-                tint = Theme[colors][mutedForeground],
-                modifier = Modifier.size(32.dp)
-            )
-
-            Text(
-                text = "Load a sample",
-                style = Theme[typography][small],
-                color = Theme[colors][mutedForeground],
-            )
-
-            Button(
-                onClick = {
-                    scope.launch {
-                        val file = FileKit.openFilePicker(
-                            mode = FileKitMode.Single,
-                            title = "Select Audio File",
-                            type = FileKitType.File(
-                                extensions = Echo.getSupportedFormats()
+                    onEndPositionChange = { newEnd ->
+                        val targetEnd = newEnd.coerceIn(deviceState.startPosition + 0.001f, 1f)
+                        val newActiveDurMs = (deviceState.totalDurationMs * (targetEnd - deviceState.startPosition)).coerceAtLeast(1f)
+                        state.update {
+                            it.copy(
+                                endPosition = targetEnd,
+                                fadeInMs = it.fadeInMs.coerceAtMost(newActiveDurMs),
+                                fadeOutMs = it.fadeOutMs.coerceAtMost(newActiveDurMs)
                             )
-                        )
-
-                        file?.let { selectedFile ->
-                            try {
-                                val audioSignal = Echo.decodeAudioData(
-                                    audioData = selectedFile.readBytes(),
-                                    fileName = selectedFile.name
-                                )
-
-                                audioSignal?.let { signal ->
-                                    val bytesPerSample = signal.bitDepth / 8
-                                    val frameSize = bytesPerSample * signal.channels
-                                    val totalFrames = (signal.rawData?.size ?: 0) / frameSize
-                                    val durationMs = ((totalFrames.toFloat() / signal.sampleRate) * 1000f).toLong()
-
-                                    state.update { currentState ->
-                                        currentState.copy(
-                                            fileName = selectedFile.name,
-                                            rawData = signal.rawData,
-                                            sampleRate = signal.sampleRate,
-                                            channels = signal.channels,
-                                            bitDepth = signal.bitDepth,
-                                            totalDurationMs = durationMs,
-                                            isLoaded = true
-                                        )
-                                    }
-                                } ?: run {
-                                    println("Failed to decode audio file: ${selectedFile.name}")
-                                }
-                            } catch (e: Exception) {
-                                println("Error loading audio file: ${e.message}")
-                            }
                         }
-                    }
-                },
-                variant = ButtonVariant.Secondary,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.FileOpen,
-                    contentDescription = null,
-                    tint = Theme[colors][secondaryForeground],
+                    },
+                    onStartPositionFinishChange = {
+                        pushStateChange(before = beforeState, after = state.value)
+                        beforeState = state.value
+                    },
+                    onEndPositionFinishChange = {
+                        pushStateChange(before = beforeState, after = state.value)
+                        beforeState = state.value
+                    },
+                    onFadeInChange = { newFadeIn ->
+                        state.update { it.copy(fadeInMs = newFadeIn.coerceIn(0f, activeDurationMs)) }
+                    },
+                    onFadeOutChange = { newFadeOut ->
+                        state.update { it.copy(fadeOutMs = newFadeOut.coerceIn(0f, activeDurationMs)) }
+                    },
+                    onFadeInFinishChange = {
+                        pushStateChange(before = beforeState, after = state.value)
+                        beforeState = state.value
+                    },
+                    onFadeOutFinishChange = {
+                        pushStateChange(before = beforeState, after = state.value)
+                        beforeState = state.value
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
-                Text("Open Sample")
             }
+
+            // 3. Compact Flat Controls Panel
+            SampleFlatControlsView(
+                state = state,
+                deviceState = deviceState,
+                volumeMinDb = VOLUME_MIN_DB,
+                volumeRangeDb = VOLUME_RANGE_DB,
+                volumeMaxDb = VOLUME_MAX_DB,
+                onPushStateChange = { before, after ->
+                    pushStateChange(before = before, after = after)
+                }
+            )
         }
     }
 
     override fun signalEnter(n: List<Signal>) {
         n.filterIsInstance<Signal.Midi>().forEach { midiSignal ->
             if (midiSignal.velocity != 0 && state.value.isLoaded) {
-                dev.anthonyhfm.amethyst.core.engine.echo.Echo.cancel(this)
+                Echo.cancel(this)
                 val deviceState = state.value
 
                 val processedData = applyAudioEffects(
@@ -583,11 +380,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         val totalSeconds = durationMs / 1000L
         val remainderMs = durationMs % 1000L
         return if (durationMs < 10_000L) {
-            // "X.XX s" — two decimal places via integer math
             val hundredths = (remainderMs / 10L).toString().padStart(2, '0')
             "$totalSeconds.$hundredths s"
         } else {
-            // "XX.X s" — one decimal place
             val tenths = remainderMs / 100L
             "$totalSeconds.$tenths s"
         }
