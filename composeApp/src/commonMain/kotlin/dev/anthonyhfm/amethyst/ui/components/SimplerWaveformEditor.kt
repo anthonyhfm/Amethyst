@@ -423,11 +423,6 @@ fun SimplerWaveformEditor(
                         end = Offset(playheadX, h),
                         strokeWidth = 2.dp.toPx(),
                     )
-                    drawCircle(
-                        color = Color(0xFFFFC857),
-                        radius = 4.dp.toPx(),
-                        center = Offset(playheadX, 4.dp.toPx()),
-                    )
                 }
 
             // Fade Calculations
