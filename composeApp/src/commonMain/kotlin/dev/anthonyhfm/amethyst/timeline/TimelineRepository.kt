@@ -143,28 +143,36 @@ object TimelineRepository {
 
     private fun startAudioEntry(entry: TrackAudioEntry, startAt: Long) {
         val automation = TimelineAutomationEvaluator.evaluate(entry.track, startAt)
-        val signal = entry.entry.buildPlaybackSignal(startAt, automation)
-        if (signal == null) {
-            println("PLAYBACK: startAudioEntry — buildPlaybackSignal returned null for ${entry.entry.fileName} (startAt=$startAt startTimeMs=${entry.entry.startTimeMs} clipStart=${entry.entry.clipStartSample} clipEnd=${entry.entry.clipEndSample} source=${entry.entry.source()?.let { "ok size=${it.rawData.size}" } ?: "NULL"})")
+        val request = entry.entry.buildPlaybackRequest(startAt, automation)
+        if (request == null) {
+            println("PLAYBACK: startAudioEntry — playback request unavailable for ${entry.entry.fileName}")
             return
         }
-        println("PLAYBACK: startAudioEntry — ${entry.entry.fileName} startAt=$startAt entryStart=${entry.entry.startTimeMs} clipStart=${entry.entry.clipStartSample} clipEnd=${entry.entry.clipEndSample} signalBytes=${signal.rawData?.size} durationMs=${signal.durationMs}")
-        val ids = Echo.playMultiple(listOf(signal))
-        entry.entry.receiveSourceId(ids.firstOrNull())
+        entry.entry.receiveSourceId(
+            Echo.playSource(
+                sourceId = request.sourceId,
+                startFrame = request.startFrame,
+                endFrameExclusive = request.endFrameExclusive,
+                gain = request.gain,
+                pan = request.pan,
+                origin = request.origin,
+            )
+        )
     }
 
     private fun startAudioEntriesBatch(entries: List<TrackAudioEntry>, startAt: Long) {
         if (entries.isEmpty()) return
         if (entries.size == 1) { startAudioEntry(entries[0], startAt); return }
 
-        // Build playback signals for all entries, then start them atomically.
         val automations = entries.map { TimelineAutomationEvaluator.evaluate(it.track, startAt) }
-        val signals = entries.mapIndexed { i, e -> e.entry.buildPlaybackSignal(startAt, automations[i]) }
-        val sourceIds = Echo.playMultiple(signals.filterNotNull())
+        val requests = entries.mapIndexed { i, e ->
+            e.entry.buildPlaybackRequest(startAt, automations[i])
+        }
+        val sourceIds = Echo.playSources(requests.filterNotNull())
 
         var sourceIdx = 0
         entries.forEachIndexed { i, e ->
-            if (signals[i] != null) {
+            if (requests[i] != null) {
                 e.entry.receiveSourceId(sourceIds.getOrNull(sourceIdx))
                 sourceIdx++
             }

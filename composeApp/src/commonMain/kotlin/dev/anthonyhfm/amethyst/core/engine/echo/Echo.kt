@@ -1,6 +1,16 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
+import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+
+data class AudioSourcePlayback(
+    val sourceId: String,
+    val startFrame: Long,
+    val endFrameExclusive: Long,
+    val gain: Float = 1f,
+    val pan: Float = 0f,
+    val origin: Any? = null,
+)
 
 /** Cross-platform output-only interface for the Echo audio engine. */
 expect object Echo {
@@ -14,7 +24,18 @@ expect object Echo {
     fun setPreferredBufferFrames(frames: Int)
     fun outputDevices(): List<String>
     fun setPreferredOutputDevice(name: String?)
+    fun setMasterGain(gain: Float)
+    fun attachAudioChain(chain: AudioChain)
     fun play(audioSignal: Signal.AudioSignal): String?
+    fun playSource(
+        sourceId: String,
+        startFrame: Long,
+        endFrameExclusive: Long,
+        gain: Float = 1f,
+        pan: Float = 0f,
+        origin: Any? = null,
+    ): String?
+    fun playSources(sources: List<AudioSourcePlayback>): List<String?>
     fun playMultiple(signals: List<Signal.AudioSignal>): List<String?>
     fun update(sourceId: String, gain: Float, pan: Float)
     fun stop(sourceId: String)

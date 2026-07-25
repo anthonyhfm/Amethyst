@@ -1,0 +1,560 @@
+mod ring;
+
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, mpsc};
+
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+use ring::SpscFloatRing;
+
+const DEFAULT_PERIOD_FRAMES: u32 = 128;
+const RING_PERIODS: usize = 4;
+
+#[derive(uniffi::Record, Clone, Debug, PartialEq, Eq)]
+pub struct PcmOutputDeviceInfo {
+    pub device_name: String,
+    pub sample_rate: u32,
+    pub channels: u32,
+    pub period_frames: u32,
+    pub ring_capacity_frames: u32,
+    pub sample_format: String,
+    pub available: bool,
+    pub error: Option<String>,
+}
+
+impl PcmOutputDeviceInfo {
+    fn unavailable(error: Option<String>) -> Self {
+        Self {
+            device_name: String::new(),
+            sample_rate: 0,
+            channels: 0,
+            period_frames: 0,
+            ring_capacity_frames: 0,
+            sample_format: String::new(),
+            available: false,
+            error,
+        }
+    }
+}
+
+#[derive(uniffi::Record, Clone, Debug, PartialEq, Eq)]
+pub struct PcmOutputTelemetry {
+    pub queued_frames: u64,
+    pub available_write_frames: u64,
+    pub written_frames: u64,
+    pub consumed_frames: u64,
+    pub underruns: u64,
+    pub stream_errors: u64,
+    pub running: bool,
+}
+
+struct CallbackTelemetry {
+    consumed_frames: AtomicU64,
+    underruns: AtomicU64,
+    stream_errors: AtomicU64,
+}
+
+impl CallbackTelemetry {
+    fn new() -> Self {
+        Self {
+            consumed_frames: AtomicU64::new(0),
+            underruns: AtomicU64::new(0),
+            stream_errors: AtomicU64::new(0),
+        }
+    }
+
+    fn record_callback(&self, consumed_samples: usize, requested_samples: usize, channels: usize) {
+        self.consumed_frames
+            .fetch_add((consumed_samples / channels) as u64, Ordering::Relaxed);
+        if consumed_samples < requested_samples {
+            self.underruns.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+enum ServiceCommand {
+    Start(mpsc::SyncSender<Result<(), String>>),
+    Pause(mpsc::SyncSender<Result<(), String>>),
+    Shutdown(Option<mpsc::SyncSender<()>>),
+}
+
+struct StartedOutput {
+    info: PcmOutputDeviceInfo,
+    ring: Arc<SpscFloatRing>,
+    callback_telemetry: Arc<CallbackTelemetry>,
+}
+
+#[derive(uniffi::Object)]
+pub struct PcmOutputService {
+    command_sender: Mutex<Option<mpsc::Sender<ServiceCommand>>>,
+    active_ring: Mutex<Option<Arc<SpscFloatRing>>>,
+    // Handles are passed to the direct JVM bridge. Retaining old rings makes a
+    // stale handle harmless during a coordinated output restart.
+    retired_rings: Mutex<Vec<Arc<SpscFloatRing>>>,
+    callback_telemetry: Mutex<Option<Arc<CallbackTelemetry>>>,
+    preferred_period_frames: AtomicU32,
+    preferred_output_device: Mutex<Option<String>>,
+    device_info: Mutex<PcmOutputDeviceInfo>,
+    running: AtomicBool,
+}
+
+#[uniffi::export]
+impl PcmOutputService {
+    #[uniffi::constructor]
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            command_sender: Mutex::new(None),
+            active_ring: Mutex::new(None),
+            retired_rings: Mutex::new(Vec::new()),
+            callback_telemetry: Mutex::new(None),
+            preferred_period_frames: AtomicU32::new(DEFAULT_PERIOD_FRAMES),
+            preferred_output_device: Mutex::new(None),
+            device_info: Mutex::new(PcmOutputDeviceInfo::unavailable(None)),
+            running: AtomicBool::new(false),
+        })
+    }
+
+    /// Opens and prepares the output stream without starting hardware playback.
+    ///
+    /// The producer should fill at least one period through the direct bridge
+    /// before calling `start`.
+    pub fn initialize(&self) -> PcmOutputDeviceInfo {
+        if self.command_sender.lock().expect("command mutex").is_some() {
+            return self.device_info();
+        }
+
+        let preferred_period_frames = self.preferred_period_frames.load(Ordering::Relaxed);
+        let preferred_output_device = self
+            .preferred_output_device
+            .lock()
+            .expect("device mutex")
+            .clone();
+        let (command_sender, command_receiver) = mpsc::channel();
+        let (startup_sender, startup_receiver) = mpsc::sync_channel(1);
+        if let Err(error) = std::thread::Builder::new()
+            .name("amethyst-pcm-output".to_owned())
+            .spawn(move || {
+                run_output_service(
+                    command_receiver,
+                    startup_sender,
+                    preferred_period_frames,
+                    preferred_output_device,
+                );
+            })
+        {
+            return self.set_error(format!("Cannot create PCM output service thread: {error}"));
+        }
+
+        match startup_receiver.recv() {
+            Ok(Ok(started)) => {
+                let mut active_ring = self.active_ring.lock().expect("ring mutex");
+                if let Some(previous) = active_ring.replace(Arc::clone(&started.ring)) {
+                    self.retired_rings
+                        .lock()
+                        .expect("retired ring mutex")
+                        .push(previous);
+                }
+                *self.callback_telemetry.lock().expect("telemetry mutex") =
+                    Some(started.callback_telemetry);
+                *self.command_sender.lock().expect("command mutex") = Some(command_sender);
+                *self.device_info.lock().expect("info mutex") = started.info.clone();
+                started.info
+            }
+            Ok(Err(error)) => self.set_error(error),
+            Err(_) => self.set_error("PCM output service terminated during startup".to_owned()),
+        }
+    }
+
+    pub fn start(&self) -> Option<String> {
+        let result = self.send_lifecycle_command(ServiceCommand::Start);
+        self.running.store(result.is_ok(), Ordering::Release);
+        result.err()
+    }
+
+    pub fn pause(&self) -> Option<String> {
+        let result = self.send_lifecycle_command(ServiceCommand::Pause);
+        if result.is_ok() {
+            self.running.store(false, Ordering::Release);
+        }
+        result.err()
+    }
+
+    pub fn shutdown(&self) {
+        self.running.store(false, Ordering::Release);
+        if let Some(sender) = self.command_sender.lock().expect("command mutex").take() {
+            let (completion_sender, completion_receiver) = mpsc::sync_channel(1);
+            if sender
+                .send(ServiceCommand::Shutdown(Some(completion_sender)))
+                .is_ok()
+            {
+                let _ = completion_receiver.recv();
+            }
+        }
+        let mut info = self.device_info.lock().expect("info mutex");
+        info.available = false;
+    }
+
+    pub fn device_info(&self) -> PcmOutputDeviceInfo {
+        self.device_info.lock().expect("info mutex").clone()
+    }
+
+    pub fn telemetry(&self) -> PcmOutputTelemetry {
+        let active_ring = self.active_ring.lock().expect("ring mutex");
+        let callback = self.callback_telemetry.lock().expect("telemetry mutex");
+        let queued_frames = active_ring
+            .as_ref()
+            .map(|ring| ring.available_read_frames() as u64)
+            .unwrap_or(0);
+        let available_write_frames = active_ring
+            .as_ref()
+            .map(|ring| ring.available_write_frames() as u64)
+            .unwrap_or(0);
+        let written_frames = active_ring
+            .as_ref()
+            .map(|ring| ring.written_frames())
+            .unwrap_or(0);
+        PcmOutputTelemetry {
+            queued_frames,
+            available_write_frames,
+            written_frames,
+            consumed_frames: callback
+                .as_ref()
+                .map(|value| value.consumed_frames.load(Ordering::Relaxed))
+                .unwrap_or(0),
+            underruns: callback
+                .as_ref()
+                .map(|value| value.underruns.load(Ordering::Relaxed))
+                .unwrap_or(0),
+            stream_errors: callback
+                .as_ref()
+                .map(|value| value.stream_errors.load(Ordering::Relaxed))
+                .unwrap_or(0),
+            running: self.running.load(Ordering::Acquire),
+        }
+    }
+
+    /// Returns an opaque handle for `amethyst_pcm_output_write_direct`.
+    ///
+    /// The service object must outlive all calls made with this handle.
+    pub fn ring_handle(&self) -> u64 {
+        self.active_ring
+            .lock()
+            .expect("ring mutex")
+            .as_ref()
+            .map(|ring| Arc::as_ptr(ring) as usize as u64)
+            .unwrap_or(0)
+    }
+
+    pub fn output_devices(&self) -> Vec<String> {
+        cpal::default_host()
+            .output_devices()
+            .map(|devices| devices.filter_map(|device| device.name().ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn set_preferred_period_frames(&self, frames: u32) {
+        self.preferred_period_frames
+            .store(frames.clamp(64, 2_048), Ordering::Relaxed);
+    }
+
+    pub fn set_preferred_output_device(&self, name: String) {
+        *self.preferred_output_device.lock().expect("device mutex") =
+            (!name.trim().is_empty()).then_some(name);
+    }
+}
+
+impl PcmOutputService {
+    fn send_lifecycle_command(
+        &self,
+        make_command: impl FnOnce(mpsc::SyncSender<Result<(), String>>) -> ServiceCommand,
+    ) -> Result<(), String> {
+        let sender = self.command_sender.lock().expect("command mutex").clone();
+        let sender = sender.ok_or_else(|| "PCM output is not initialized".to_owned())?;
+        let (result_sender, result_receiver) = mpsc::sync_channel(1);
+        sender
+            .send(make_command(result_sender))
+            .map_err(|_| "PCM output service is unavailable".to_owned())?;
+        result_receiver
+            .recv()
+            .map_err(|_| "PCM output service terminated".to_owned())?
+    }
+
+    fn set_error(&self, error: String) -> PcmOutputDeviceInfo {
+        let info = PcmOutputDeviceInfo::unavailable(Some(error));
+        *self.device_info.lock().expect("info mutex") = info.clone();
+        info
+    }
+}
+
+impl Drop for PcmOutputService {
+    fn drop(&mut self) {
+        if let Ok(sender) = self.command_sender.get_mut()
+            && let Some(sender) = sender.take()
+        {
+            let _ = sender.send(ServiceCommand::Shutdown(None));
+        }
+    }
+}
+
+fn run_output_service(
+    command_receiver: mpsc::Receiver<ServiceCommand>,
+    startup_sender: mpsc::SyncSender<Result<StartedOutput, String>>,
+    preferred_period_frames: u32,
+    preferred_output_device: Option<String>,
+) {
+    let (stream, started) = match build_stream(preferred_period_frames, preferred_output_device) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = startup_sender.send(Err(error));
+            return;
+        }
+    };
+    if startup_sender.send(Ok(started)).is_err() {
+        return;
+    }
+
+    while let Ok(command) = command_receiver.recv() {
+        match command {
+            ServiceCommand::Start(result_sender) => {
+                let result = stream
+                    .play()
+                    .map_err(|error| format!("Cannot start output stream: {error}"));
+                let _ = result_sender.send(result);
+            }
+            ServiceCommand::Pause(result_sender) => {
+                let result = stream
+                    .pause()
+                    .map_err(|error| format!("Cannot pause output stream: {error}"));
+                let _ = result_sender.send(result);
+            }
+            ServiceCommand::Shutdown(completion_sender) => {
+                drop(stream);
+                if let Some(completion_sender) = completion_sender {
+                    let _ = completion_sender.send(());
+                }
+                return;
+            }
+        }
+    }
+}
+
+fn build_stream(
+    preferred_period_frames: u32,
+    preferred_output_device: Option<String>,
+) -> Result<(cpal::Stream, StartedOutput), String> {
+    let host = cpal::default_host();
+    let device = match preferred_output_device {
+        Some(name) => host
+            .output_devices()
+            .map_err(|error| format!("Cannot enumerate output devices: {error}"))?
+            .find(|device| {
+                device
+                    .name()
+                    .map(|device_name| device_name == name)
+                    .unwrap_or(false)
+            })
+            .ok_or_else(|| format!("Configured output device is unavailable: {name}"))?,
+        None => host
+            .default_output_device()
+            .ok_or_else(|| "No default output device available".to_owned())?,
+    };
+    let device_name = device
+        .name()
+        .unwrap_or_else(|_| "Unknown output device".to_owned());
+    let supported_config = device
+        .default_output_config()
+        .map_err(|error| format!("Cannot get output config: {error}"))?;
+    let sample_rate = supported_config.sample_rate().0;
+    let channels = supported_config.channels() as usize;
+    if channels == 0 {
+        return Err("Output device reported zero channels".to_owned());
+    }
+    let (period_frames, fixed_period) = match supported_config.buffer_size() {
+        cpal::SupportedBufferSize::Range { min, max } => {
+            (preferred_period_frames.clamp(*min, *max), true)
+        }
+        cpal::SupportedBufferSize::Unknown => (preferred_period_frames, false),
+    };
+    let ring_capacity_frames = period_frames as usize * RING_PERIODS;
+    let ring = Arc::new(SpscFloatRing::new(ring_capacity_frames, channels));
+    let callback_telemetry = Arc::new(CallbackTelemetry::new());
+    let mut stream_config: cpal::StreamConfig = supported_config.clone().into();
+    if fixed_period {
+        stream_config.buffer_size = cpal::BufferSize::Fixed(period_frames);
+    }
+
+    let stream = match supported_config.sample_format() {
+        cpal::SampleFormat::F32 => {
+            let ring = Arc::clone(&ring);
+            let telemetry = Arc::clone(&callback_telemetry);
+            device.build_output_stream(
+                &stream_config,
+                move |output: &mut [f32], _| consume_f32(&ring, &telemetry, output),
+                stream_error_callback(Arc::clone(&callback_telemetry)),
+                None,
+            )
+        }
+        cpal::SampleFormat::I16 => {
+            let ring = Arc::clone(&ring);
+            let telemetry = Arc::clone(&callback_telemetry);
+            device.build_output_stream(
+                &stream_config,
+                move |output: &mut [i16], _| consume_i16(&ring, &telemetry, output),
+                stream_error_callback(Arc::clone(&callback_telemetry)),
+                None,
+            )
+        }
+        cpal::SampleFormat::U16 => {
+            let ring = Arc::clone(&ring);
+            let telemetry = Arc::clone(&callback_telemetry);
+            device.build_output_stream(
+                &stream_config,
+                move |output: &mut [u16], _| consume_u16(&ring, &telemetry, output),
+                stream_error_callback(Arc::clone(&callback_telemetry)),
+                None,
+            )
+        }
+        format => return Err(format!("Unsupported output sample format: {format:?}")),
+    }
+    .map_err(|error| format!("Cannot build output stream: {error}"))?;
+
+    let info = PcmOutputDeviceInfo {
+        device_name,
+        sample_rate,
+        channels: channels as u32,
+        period_frames,
+        ring_capacity_frames: ring_capacity_frames as u32,
+        sample_format: format!("{:?}", supported_config.sample_format()),
+        available: true,
+        error: None,
+    };
+    Ok((
+        stream,
+        StartedOutput {
+            info,
+            ring,
+            callback_telemetry,
+        },
+    ))
+}
+
+fn stream_error_callback(
+    telemetry: Arc<CallbackTelemetry>,
+) -> impl FnMut(cpal::StreamError) + Send + 'static {
+    move |_| {
+        telemetry.stream_errors.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+fn consume_f32(ring: &SpscFloatRing, telemetry: &CallbackTelemetry, output: &mut [f32]) {
+    let consumed = ring.read_f32(output);
+    output[consumed..].fill(0.0);
+    telemetry.record_callback(consumed, output.len(), ring.channels());
+}
+
+fn consume_i16(ring: &SpscFloatRing, telemetry: &CallbackTelemetry, output: &mut [i16]) {
+    let consumed = ring.read_i16(output);
+    output[consumed..].fill(0);
+    telemetry.record_callback(consumed, output.len(), ring.channels());
+}
+
+fn consume_u16(ring: &SpscFloatRing, telemetry: &CallbackTelemetry, output: &mut [u16]) {
+    let consumed = ring.read_u16(output);
+    output[consumed..].fill(32_768);
+    telemetry.record_callback(consumed, output.len(), ring.channels());
+}
+
+/// Direct producer entry point for the JVM bridge.
+///
+/// # Safety
+///
+/// `handle` must come from a live `PcmOutputService`, and `samples` must point
+/// to at least `sample_count` native-endian floats.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn amethyst_pcm_output_write_direct(
+    handle: u64,
+    samples: *const f32,
+    sample_count: u32,
+) -> u32 {
+    if handle == 0 || samples.is_null() || sample_count == 0 {
+        return 0;
+    }
+    // SAFETY: the caller owns the direct buffer for the duration of this call
+    // and keeps the service (which retains the ring) alive.
+    let ring = unsafe { &*(handle as usize as *const SpscFloatRing) };
+    let samples = unsafe { std::slice::from_raw_parts(samples, sample_count as usize) };
+    ring.write_interleaved(samples) as u32
+}
+
+/// Allocation-free queue-depth query for the real-time producer loop.
+///
+/// # Safety
+///
+/// `handle` must come from a live `PcmOutputService`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn amethyst_pcm_output_queued_frames(handle: u64) -> u64 {
+    if handle == 0 {
+        return 0;
+    }
+    // SAFETY: the service retains active and retired rings for the lifetime of
+    // every handle exposed to the JVM.
+    let ring = unsafe { &*(handle as usize as *const SpscFloatRing) };
+    ring.available_read_frames() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        CallbackTelemetry, SpscFloatRing, amethyst_pcm_output_queued_frames,
+        amethyst_pcm_output_write_direct, consume_f32, consume_i16, consume_u16,
+    };
+    use std::sync::Arc;
+
+    #[test]
+    fn callback_reads_pcm_and_zero_fills_underrun() {
+        let ring = SpscFloatRing::new(4, 2);
+        let telemetry = CallbackTelemetry::new();
+        ring.write_interleaved(&[0.25, -0.25]);
+        let mut output = [99.0; 4];
+
+        consume_f32(&ring, &telemetry, &mut output);
+
+        assert_eq!(output, [0.25, -0.25, 0.0, 0.0]);
+        assert_eq!(telemetry.consumed_frames.load(Ordering::Relaxed), 1);
+        assert_eq!(telemetry.underruns.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn integer_callbacks_use_format_correct_silence() {
+        let signed_ring = SpscFloatRing::new(1, 1);
+        let signed_telemetry = CallbackTelemetry::new();
+        let mut signed = [1; 2];
+        consume_i16(&signed_ring, &signed_telemetry, &mut signed);
+        assert_eq!(signed, [0, 0]);
+
+        let unsigned_ring = SpscFloatRing::new(1, 1);
+        let unsigned_telemetry = CallbackTelemetry::new();
+        let mut unsigned = [1; 2];
+        consume_u16(&unsigned_ring, &unsigned_telemetry, &mut unsigned);
+        assert_eq!(unsigned, [32_768, 32_768]);
+    }
+
+    #[test]
+    fn direct_bridge_writes_to_the_preallocated_ring() {
+        let ring = Arc::new(SpscFloatRing::new(2, 2));
+        let handle = Arc::as_ptr(&ring) as usize as u64;
+        let input = [0.1, 0.2, 0.3, 0.4];
+        // SAFETY: both the ring handle and input slice remain alive for the call.
+        let written =
+            unsafe { amethyst_pcm_output_write_direct(handle, input.as_ptr(), input.len() as u32) };
+        assert_eq!(written, 4);
+        // SAFETY: the ring remains alive for the query.
+        assert_eq!(unsafe { amethyst_pcm_output_queued_frames(handle) }, 2);
+
+        let mut output = [0.0; 4];
+        assert_eq!(ring.read_f32(&mut output), 4);
+        assert_eq!(output, input);
+    }
+
+    use std::sync::atomic::Ordering;
+}

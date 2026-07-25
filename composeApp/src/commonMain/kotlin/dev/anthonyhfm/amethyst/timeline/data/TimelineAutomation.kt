@@ -418,18 +418,16 @@ internal fun TimelineAutomationPoint.segmentValueAtProgress(
     progress: Float
 ): Float {
     val normalizedProgress = progress.coerceIn(0f, 1f)
-    val handle = curveHandle(
-        target = target,
-        endPoint = endPoint
-    )
+    val handleTime = curveHandleTime
+    val handleValue = curveHandleValue
 
     return when {
-        handle != null -> quadraticAutomationSegmentValueAtProgress(
+        handleTime != null && handleValue != null -> quadraticAutomationSegmentValueAtProgress(
             target = target,
             startValue = value,
             endValue = endPoint.value,
-            handleTime = handle.timeProgress,
-            handleValue = handle.value,
+            handleTime = handleTime,
+            handleValue = handleValue,
             progress = normalizedProgress
         )
 

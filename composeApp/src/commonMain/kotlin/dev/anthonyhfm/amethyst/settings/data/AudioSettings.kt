@@ -13,13 +13,14 @@ object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_ti
         titleRes = Res.string.settings_audio_master_volume_title,
         default = 1f,
         range = 0f..1f,
+        onUpdate = Echo::setMasterGain,
     )
 
     val renderBufferFrames: Setting.Select<Int> = select(
         key = "echoRenderBufferFrames",
         title = "Buffer Size",
-        default = 256,
-        options = listOf(128, 256, 512),
+        default = 128,
+        options = listOf(64, 128, 256),
         codec = SettingCodec.Int,
         label = { "$it frames" },
         onUpdate = Echo::setPreferredBufferFrames,

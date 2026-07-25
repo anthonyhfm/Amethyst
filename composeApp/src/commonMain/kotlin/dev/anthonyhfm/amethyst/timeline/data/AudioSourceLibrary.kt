@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.timeline.data
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * In-memory pool of [AudioSource] objects.
@@ -18,7 +19,7 @@ object AudioSourceLibrary {
     val sources: StateFlow<Map<String, AudioSource>> = _sources.asStateFlow()
 
     fun add(source: AudioSource) {
-        _sources.value = _sources.value + (source.id to source)
+        _sources.update { it + (source.id to source) }
     }
 
     fun get(id: String): AudioSource? = _sources.value[id]

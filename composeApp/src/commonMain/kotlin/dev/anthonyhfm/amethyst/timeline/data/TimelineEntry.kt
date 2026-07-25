@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.timeline.data
 
 import androidx.compose.ui.graphics.Color
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioSourcePlayback
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
@@ -68,11 +69,11 @@ data class AudioEntry(
     /** Total number of samples this clip spans in the source. */
     val clipSampleCount: Long get() = clipEndSample - clipStartSample
 
-    /**
-     * Builds the [Signal.AudioSignal] for batch-start (used by [TimelineRepository]).
-     * Seeks to exact sample position — no ms→sample conversion error.
-     */
-    internal fun buildPlaybackSignal(startAt: Long?, automation: TimelineTrackAutomationState): Signal.AudioSignal? {
+    /** Builds a zero-copy, sample-accurate playback request. */
+    internal fun buildPlaybackRequest(
+        startAt: Long?,
+        automation: TimelineTrackAutomationState,
+    ): AudioSourcePlayback? {
         val src = source() ?: return null
         val startAtUs = startAt?.let(::msToUs)
         val playheadOffsetUs = if (startAtUs != null && startAtUs > startTimeUs) {
@@ -80,24 +81,19 @@ data class AudioEntry(
         } else 0L
         val playheadOffsetSamples = usToSamples(playheadOffsetUs, sampleRate)
         val actualStartSample = (clipStartSample + playheadOffsetSamples).coerceIn(clipStartSample, clipEndSample)
-        val startByte = (actualStartSample * bytesPerSample).toInt().coerceIn(0, src.rawData.size)
-        val endByte = (clipEndSample * bytesPerSample).toInt().coerceIn(0, src.rawData.size)
-        if (startByte >= endByte) return null
-        val trimmedData = src.rawData.sliceArray(startByte until endByte)
-        val remainingDurationMs = usToRoundedMs(samplesToUs(clipEndSample - actualStartSample, sampleRate))
-        return Signal.AudioSignal(
-            rawData = trimmedData,
-            sampleRate = sampleRate,
-            channels = channels,
-            bitDepth = bitDepth,
-            durationMs = remainingDurationMs,
+        val endSample = clipEndSample.coerceAtMost(src.totalSamples)
+        if (actualStartSample >= endSample) return null
+        return AudioSourcePlayback(
+            sourceId = sourceId,
+            startFrame = actualStartSample,
+            endFrameExclusive = endSample,
             gain = automation.volume,
             pan = 0f,
             origin = "AudioEntry_$fileName"
         )
     }
 
-    /** Stores the source ID returned by [Echo.playMultiple]. */
+    /** Stores the transient playback ID returned by Echo. */
     internal fun receiveSourceId(id: String?) {
         audioSourceId = id
         if (id != null) {
@@ -109,36 +105,22 @@ data class AudioEntry(
 
     override fun start(startAt: Long?, automation: TimelineTrackAutomationState) {
         val actualStartTime = startAt ?: startTimeMs
-        val src = source()
-        if (src == null) {
+        if (source() == null) {
             println("No audio source in library for: $fileName (sourceId=$sourceId)")
             return
         }
-        val startAtUs = startAt?.let(::msToUs)
-        val playheadOffsetUs = if (startAtUs != null && startAtUs > startTimeUs) {
-            startAtUs - startTimeUs
-        } else 0L
-        val playheadOffsetSamples = usToSamples(playheadOffsetUs, sampleRate)
-        val actualStartSample = (clipStartSample + playheadOffsetSamples).coerceIn(clipStartSample, clipEndSample)
-        val startByte = (actualStartSample * bytesPerSample).toInt().coerceIn(0, src.rawData.size)
-        val endByte = (clipEndSample * bytesPerSample).toInt().coerceIn(0, src.rawData.size)
-        if (startByte >= endByte) {
-            println("No audio data for $fileName (startByte=$startByte >= endByte=$endByte)")
+        val request = buildPlaybackRequest(startAt, automation)
+        if (request == null) {
+            println("No audio data for $fileName")
             return
         }
-        val trimmedData = src.rawData.sliceArray(startByte until endByte)
-        val remainingDurationMs = usToRoundedMs(samplesToUs(clipEndSample - actualStartSample, sampleRate))
-        audioSourceId = Echo.play(
-            audioSignal = Signal.AudioSignal(
-                rawData = trimmedData,
-                sampleRate = sampleRate,
-                channels = channels,
-                bitDepth = bitDepth,
-                durationMs = remainingDurationMs,
-                gain = automation.volume,
-                pan = 0f,
-                origin = "AudioEntry_$fileName"
-            )
+        audioSourceId = Echo.playSource(
+            sourceId = request.sourceId,
+            startFrame = request.startFrame,
+            endFrameExclusive = request.endFrameExclusive,
+            gain = request.gain,
+            pan = request.pan,
+            origin = request.origin,
         )
         if (audioSourceId != null) {
             println("Started audio entry: $fileName at ${actualStartTime}ms (source: $audioSourceId)")

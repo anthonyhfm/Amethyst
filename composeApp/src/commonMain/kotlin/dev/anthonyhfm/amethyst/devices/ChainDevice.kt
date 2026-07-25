@@ -16,6 +16,41 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 
+enum class AudioChainDeviceRole {
+    Generator,
+    Effect,
+}
+
+data class AudioConfiguration(
+    val sampleRate: Int,
+    val channels: Int = 2,
+    val periodFrames: Int,
+    val maximumBlockFrames: Int = periodFrames,
+)
+
+class AudioRenderContext(
+    sampleRate: Int,
+    absoluteFrame: Long,
+    transportFrame: Long = absoluteFrame,
+) {
+    var sampleRate: Int = sampleRate
+        private set
+    var absoluteFrame: Long = absoluteFrame
+        private set
+    var transportFrame: Long = transportFrame
+        private set
+
+    internal fun configure(
+        sampleRate: Int,
+        absoluteFrame: Long,
+        transportFrame: Long,
+    ) {
+        this.sampleRate = sampleRate
+        this.absoluteFrame = absoluteFrame
+        this.transportFrame = transportFrame
+    }
+}
+
 abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalReceiver(), Selectable {
     override var selectionUUID: String = UUID.randomUUID()
 
@@ -46,7 +81,7 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
         if (current.isMuted != muted) {
             current.isMuted = muted
             state.update { current }
-            parentChain?.reroute()
+            parentChain?.onDeviceRuntimeStateChanged()
         }
     }
 
@@ -88,10 +123,26 @@ abstract class LEDChainDevice <State : @Serializable DeviceState> : GenericChain
 }
 
 abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericChainDevice<State>() {
+    open val audioRole: AudioChainDeviceRole = AudioChainDeviceRole.Effect
+    open val latencyFrames: Int = 0
+    open val tailFrames: Long = 0L
+
     @Composable
     abstract override fun Content()
 
-    abstract override fun signalEnter(n: List<Signal>)
+    open fun prepareAudio(configuration: AudioConfiguration) = Unit
+
+    open fun processAudio(
+        block: AudioProcessingBlock,
+        context: AudioRenderContext,
+    ) = Unit
+
+    open fun resetAudio() = Unit
+    open fun releaseAudio() = Unit
+
+    override fun signalEnter(n: List<Signal>) {
+        signalExit?.invoke(n)
+    }
 }
 
 /**
@@ -100,14 +151,23 @@ abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericCha
  * Processing is deliberately in-place so implementations can be promoted to the
  * native render path without changing their public contract.
  */
-data class AudioProcessingBlock(
+class AudioProcessingBlock(
     val samples: FloatArray,
-    val sampleRate: Int,
     val channels: Int,
-    val frameOffset: Long,
-)
+    val maximumFrames: Int,
+) {
+    var frameCount: Int = 0
+        internal set
+    var frameOffset: Long = 0L
+        internal set
 
-/** Marker contract for future real-time Echo processors (EQ, limiter, etc.). */
-interface EchoAudioProcessor {
-    fun processAudio(block: AudioProcessingBlock)
+    fun configure(frameCount: Int, frameOffset: Long) {
+        require(frameCount in 0..maximumFrames)
+        this.frameCount = frameCount
+        this.frameOffset = frameOffset
+    }
+
+    fun clear() {
+        samples.fill(0f, 0, frameCount * channels)
+    }
 }

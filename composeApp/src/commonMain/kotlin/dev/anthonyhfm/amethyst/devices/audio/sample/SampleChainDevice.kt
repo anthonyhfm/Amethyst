@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -34,18 +35,20 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
+import dev.anthonyhfm.amethyst.devices.AudioChainDeviceRole
+import dev.anthonyhfm.amethyst.devices.AudioConfiguration
+import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
+import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationPoint
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.data.applyAutomationCurve
-import dev.anthonyhfm.amethyst.timeline.data.samplesToUs
-import dev.anthonyhfm.amethyst.timeline.data.usToRoundedMs
 import dev.anthonyhfm.amethyst.ui.components.SimplerWaveformEditor
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -55,10 +58,11 @@ import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
+import kotlinx.atomicfu.atomic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
-import kotlin.math.pow
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
@@ -90,9 +94,33 @@ private const val SampleEnvelopeSegmentHitRadiusPx = 12f
 private const val SampleEnvelopeCurveDragSensitivityPx = 96f
 private const val SampleEnvelopeCurvePathSteps = 16
 
+private data class SampleRenderCache(
+    val state: SampleChainDeviceState,
+    val outputSampleRate: Int,
+    val rawData: ByteArray?,
+    val snapshot: SampleRenderSnapshot?,
+)
+
 class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     override val state = MutableStateFlow(SampleChainDeviceState())
     override val helpRef = "Sample"
+    override val audioRole = AudioChainDeviceRole.Generator
+
+    private val triggerQueue = SampleTriggerQueue()
+    private val voice = SampleVoiceRenderer()
+    private val publishedPlayheadFrame = atomic(-1L)
+    private val audioConfiguration = atomic<AudioConfiguration?>(null)
+    private val renderCache = atomic<SampleRenderCache?>(null)
+
+    /**
+     * Source-frame position consumed by the audio renderer, or `-1` while idle.
+     * UI code may poll this snapshot without touching real-time voice state.
+     */
+    val playheadFrame: Long
+        get() = publishedPlayheadFrame.value
+
+    val droppedTriggerCount: Long
+        get() = triggerQueue.droppedTriggers
 
     companion object : ChainDeviceFactory<SampleChainDeviceState> {
         override val stateClass = SampleChainDeviceState::class
@@ -102,7 +130,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         private const val VOLUME_MIN_DB = -24f
         private const val VOLUME_MAX_DB = 24f
         private const val VOLUME_RANGE_DB = VOLUME_MAX_DB - VOLUME_MIN_DB
-        private const val SIGN_EXTEND_24BIT = -0x1000000
+        private const val PLAYHEAD_REFRESH_MILLIS = 16L
     }
 
     private fun formatCleanTitle(fileName: String): String {
@@ -133,7 +161,10 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
             if (deviceState.isLoaded) {
                 AudioView()
             } else {
-                SampleEmptyState(state = state)
+                SampleEmptyState(
+                    state = state,
+                    onLoaded = ::primeAudioSnapshot,
+                )
             }
         }
     }
@@ -141,6 +172,22 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     @Composable
     private fun AudioView() {
         val deviceState by state.collectAsState()
+        val resolvedRawData = deviceState.resolvedRawData()
+        val livePlayheadFrame by produceState(initialValue = playheadFrame) {
+            while (true) {
+                value = playheadFrame
+                delay(PLAYHEAD_REFRESH_MILLIS)
+            }
+        }
+        val bytesPerFrame = (deviceState.bitDepth / 8) * deviceState.channels
+        val totalFrames = if (bytesPerFrame > 0) {
+            (resolvedRawData?.size ?: 0) / bytesPerFrame
+        } else {
+            0
+        }
+        val playheadPosition = livePlayheadFrame
+            .takeIf { it >= 0L && totalFrames > 0 }
+            ?.let { it.toFloat() / totalFrames.toFloat() }
         val activeDurationMs = (deviceState.totalDurationMs * (deviceState.endPosition - deviceState.startPosition)).coerceAtLeast(1f)
 
         var beforeState by remember { mutableStateOf(deviceState) }
@@ -162,7 +209,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                     .border(1.dp, Theme[colors][border], RoundedCornerShape(6.dp))
             ) {
                 SimplerWaveformEditor(
-                    rawData = deviceState.rawData,
+                    rawData = resolvedRawData,
                     sampleRate = deviceState.sampleRate,
                     channels = deviceState.channels,
                     bitDepth = deviceState.bitDepth,
@@ -171,6 +218,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
                     endPosition = deviceState.endPosition,
                     fadeInMs = deviceState.fadeInMs,
                     fadeOutMs = deviceState.fadeOutMs,
+                    playheadPosition = playheadPosition,
                     onStartPositionChange = { newStart ->
                         val targetStart = newStart.coerceIn(0f, deviceState.endPosition - 0.001f)
                         val newActiveDurMs = (deviceState.totalDurationMs * (deviceState.endPosition - targetStart)).coerceAtLeast(1f)
@@ -234,146 +282,95 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     }
 
     override fun signalEnter(n: List<Signal>) {
-        n.filterIsInstance<Signal.Midi>().forEach { midiSignal ->
-            if (midiSignal.velocity != 0 && state.value.isLoaded) {
-                Echo.cancel(this)
-                val deviceState = state.value
-
-                val processedData = applyAudioEffects(
-                    rawData = deviceState.rawData,
-                    sampleRate = deviceState.sampleRate,
-                    channels = deviceState.channels,
-                    bitDepth = deviceState.bitDepth,
-                    fadeInMs = deviceState.fadeInMs,
-                    fadeOutMs = deviceState.fadeOutMs,
-                    volumeDb = deviceState.volumeDb,
-                    startPosition = deviceState.startPosition,
-                    endPosition = deviceState.endPosition,
-                    volumeAutomationLane = deviceState.volumeAutomationLane
-                )
-
-                val audioSignal = Signal.AudioSignal(
-                    origin = this,
-                    rawData = processedData,
-                    sampleRate = deviceState.sampleRate,
-                    channels = deviceState.channels,
-                    bitDepth = deviceState.bitDepth
-                )
-
-                signalExit?.invoke(listOf(audioSignal))
-            } else if (midiSignal.velocity != 0 && !state.value.isLoaded) {
-                signalExit?.invoke(n)
+        var triggerCount = 0
+        n.forEach { signal ->
+            if (signal is Signal.Midi && signal.velocity != 0) {
+                triggerCount++
             }
+        }
+        if (triggerCount == 0) return
+
+        val deviceState = state.value
+        if (!deviceState.isLoaded) {
+            signalExit?.invoke(n)
+            return
+        }
+
+        val snapshot = renderSnapshot(deviceState) ?: return
+        repeat(triggerCount) {
+            triggerQueue.offer(snapshot)
         }
     }
 
-    private fun applyAudioEffects(
-        rawData: ByteArray?,
-        sampleRate: Int,
-        channels: Int,
-        bitDepth: Int,
-        fadeInMs: Float,
-        fadeOutMs: Float,
-        volumeDb: Float,
-        startPosition: Float,
-        endPosition: Float,
-        volumeAutomationLane: TimelineAutomationLane?
-    ): ByteArray? {
-        if (rawData == null || rawData.isEmpty()) return rawData
+    override fun prepareAudio(configuration: AudioConfiguration) {
+        audioConfiguration.value = configuration
+        renderCache.value = null
+        triggerQueue.clear()
+        voice.prepare(configuration)
+        publishedPlayheadFrame.value = -1L
+        primeAudioSnapshot()
+    }
 
-        val bytesPerSample = bitDepth / 8
-        val frameSize = bytesPerSample * channels
-        val totalFrames = rawData.size / frameSize
-
-        val startFrame = (totalFrames * startPosition).toInt().coerceIn(0, totalFrames)
-        val endFrame = (totalFrames * endPosition).toInt().coerceIn(startFrame, totalFrames)
-        val activeFrames = endFrame - startFrame
-
-        if (activeFrames <= 0) return ByteArray(0)
-
-        val outputData = ByteArray(activeFrames * frameSize)
-
-        val fadeInFrames = ((fadeInMs / 1000f) * sampleRate).toInt().coerceAtMost(activeFrames)
-        val fadeOutFrames = ((fadeOutMs / 1000f) * sampleRate).toInt().coerceAtMost(activeFrames)
-        val fadeOutStartFrame = activeFrames - fadeOutFrames
-
-        val volumeGain = 10.0.pow(volumeDb / 20.0).toFloat()
-        val normalizedVolumeAutomationLane = volumeAutomationLane
-            ?.normalized()
-            ?.takeIf { it.enabled && it.target == TimelineTrackAutomationTarget.VOLUME }
-
-        for (frame in 0 until activeFrames) {
-            var gain = volumeGain
-            val frameTimeMs = if (sampleRate > 0) {
-                ((frame.toDouble() / sampleRate.toDouble()) * 1000.0).roundToLong()
-            } else {
-                0L
-            }
-
-            gain *= normalizedVolumeAutomationLane?.valueAt(
-                timeMs = frameTimeMs,
-                defaultValue = TimelineTrackAutomationTarget.VOLUME.defaultValue
-            ) ?: TimelineTrackAutomationTarget.VOLUME.defaultValue
-
-            if (frame < fadeInFrames && fadeInFrames > 0) {
-                gain *= frame.toFloat() / fadeInFrames.toFloat()
-            }
-
-            if (frame >= fadeOutStartFrame && fadeOutFrames > 0) {
-                gain *= (activeFrames - frame).toFloat() / fadeOutFrames.toFloat()
-            }
-
-            for (ch in 0 until channels) {
-                val sourceOffset = (startFrame + frame) * frameSize + ch * bytesPerSample
-                val destOffset = frame * frameSize + ch * bytesPerSample
-
-                when (bitDepth) {
-                    8 -> {
-                        val sample = rawData[sourceOffset].toInt() and 0xFF
-                        val centered = sample - 128
-                        val amplified = (centered * gain).toInt().coerceIn(-128, 127)
-                        outputData[destOffset] = (amplified + 128).toByte()
-                    }
-
-                    16 -> {
-                        val lo = rawData[sourceOffset].toInt() and 0xFF
-                        val hi = rawData[sourceOffset + 1].toInt() shl 8
-                        val sample = (hi or lo).toShort().toInt()
-                        val amplified = (sample * gain).toInt().coerceIn(-32768, 32767)
-                        outputData[destOffset] = (amplified and 0xFF).toByte()
-                        outputData[destOffset + 1] = ((amplified shr 8) and 0xFF).toByte()
-                    }
-
-                    24 -> {
-                        val b0 = rawData[sourceOffset].toInt() and 0xFF
-                        val b1 = rawData[sourceOffset + 1].toInt() and 0xFF
-                        val b2 = rawData[sourceOffset + 2].toInt() and 0xFF
-                        var sample = b0 or (b1 shl 8) or (b2 shl 16)
-                        if ((sample and 0x800000) != 0) sample = sample or SIGN_EXTEND_24BIT
-                        val amplified = (sample * gain).toInt().coerceIn(-8388608, 8388607)
-                        outputData[destOffset] = (amplified and 0xFF).toByte()
-                        outputData[destOffset + 1] = ((amplified shr 8) and 0xFF).toByte()
-                        outputData[destOffset + 2] = ((amplified shr 16) and 0xFF).toByte()
-                    }
-
-                    32 -> {
-                        val b0 = rawData[sourceOffset].toInt() and 0xFF
-                        val b1 = rawData[sourceOffset + 1].toInt() and 0xFF
-                        val b2 = rawData[sourceOffset + 2].toInt() and 0xFF
-                        val b3 = rawData[sourceOffset + 3].toInt() and 0xFF
-                        val sample = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
-                        val amplified =
-                            (sample * gain).toLong().coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
-                        outputData[destOffset] = (amplified and 0xFF).toByte()
-                        outputData[destOffset + 1] = ((amplified shr 8) and 0xFF).toByte()
-                        outputData[destOffset + 2] = ((amplified shr 16) and 0xFF).toByte()
-                        outputData[destOffset + 3] = ((amplified shr 24) and 0xFF).toByte()
-                    }
-                }
-            }
+    override fun processAudio(
+        block: AudioProcessingBlock,
+        context: AudioRenderContext,
+    ) {
+        var pending = triggerQueue.poll()
+        while (pending != null) {
+            voice.trigger(pending)
+            pending = triggerQueue.poll()
         }
+        voice.render(block)
+        publishedPlayheadFrame.value = voice.sourceFrame
+    }
 
-        return outputData
+    override fun resetAudio() {
+        triggerQueue.clear()
+        voice.stop()
+        publishedPlayheadFrame.value = -1L
+    }
+
+    override fun releaseAudio() {
+        resetAudio()
+        audioConfiguration.value = null
+    }
+
+    override fun onStateRestored() {
+        renderCache.value = null
+        primeAudioSnapshot()
+    }
+
+    private fun primeAudioSnapshot() {
+        if (audioConfiguration.value != null) {
+            renderSnapshot(state.value)
+        }
+    }
+
+    private fun renderSnapshot(
+        deviceState: SampleChainDeviceState,
+    ): SampleRenderSnapshot? {
+        val outputSampleRate = audioConfiguration.value?.sampleRate
+            ?: deviceState.sampleRate
+        val resolvedRawData = deviceState.resolvedRawData()
+        val cached = renderCache.value
+        if (cached?.state == deviceState &&
+            cached.outputSampleRate == outputSampleRate &&
+            cached.rawData === resolvedRawData
+        ) {
+            return cached.snapshot
+        }
+        return SampleRenderSnapshot.from(
+            state = deviceState,
+            outputSampleRate = outputSampleRate,
+            rawData = resolvedRawData,
+        ).also {
+            renderCache.value = SampleRenderCache(
+                state = deviceState,
+                outputSampleRate = outputSampleRate,
+                rawData = resolvedRawData,
+                snapshot = it,
+            )
+        }
     }
 
     private fun formatDuration(durationMs: Long): String {
@@ -676,36 +673,45 @@ data class SampleChainDeviceState(
     val startPosition: Float = 0f,
     val endPosition: Float = 1f,
     @SerialName("volumeAutomationLane")
-    val volumeAutomationLane: TimelineAutomationLane? = null
+    val volumeAutomationLane: TimelineAutomationLane? = null,
+    val sourceId: String? = null,
 ) : DeviceState()
+
+fun SampleChainDeviceState.resolvedRawData(): ByteArray? =
+    sourceId
+        ?.takeIf(String::isNotBlank)
+        ?.let(AudioSourceLibrary::get)
+        ?.rawData
+        ?: rawData
 
 fun sampleChainStateFromAudioEntry(
     entry: AudioEntry,
     volumeAutomationLane: TimelineAutomationLane? = null
 ): SampleChainDeviceState? {
     val source = entry.source() ?: return null
-    val bytesPerFrame = entry.bytesPerSample
-    if (bytesPerFrame <= 0) return null
-
-    val startByte = (entry.clipStartSample * bytesPerFrame).toInt().coerceIn(0, source.rawData.size)
-    val endByte = (entry.clipEndSample * bytesPerFrame).toInt().coerceIn(startByte, source.rawData.size)
-    if (endByte <= startByte) return null
-
-    val clippedRawData = source.rawData.sliceArray(startByte until endByte)
-    val clipDurationMs = usToRoundedMs(samplesToUs(entry.clipSampleCount, entry.sampleRate))
+    if (source.totalSamples <= 0L || entry.clipEndSample <= entry.clipStartSample) return null
+    val startPosition = entry.clipStartSample.toDouble()
+        .div(source.totalSamples)
+        .toFloat()
+        .coerceIn(0f, 1f)
+    val endPosition = entry.clipEndSample.toDouble()
+        .div(source.totalSamples)
+        .toFloat()
+        .coerceIn(startPosition, 1f)
     val displayName = entry.name.ifBlank { entry.fileName }
 
     return SampleChainDeviceState(
         fileName = displayName,
-        rawData = clippedRawData,
+        rawData = null,
         sampleRate = entry.sampleRate,
         channels = entry.channels,
         bitDepth = entry.bitDepth,
-        totalDurationMs = clipDurationMs,
+        totalDurationMs = source.totalDurationMs,
         isLoaded = true,
-        startPosition = 0f,
-        endPosition = 1f,
-        volumeAutomationLane = volumeAutomationLane?.normalized()
+        startPosition = startPosition,
+        endPosition = endPosition,
+        volumeAutomationLane = volumeAutomationLane?.normalized(),
+        sourceId = source.id,
     )
 }
 

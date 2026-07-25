@@ -11,6 +11,10 @@ import com.composeunstyled.Icon
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.timeline.data.AudioSource
+import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.Empty
@@ -33,6 +37,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SampleEmptyState(
     state: MutableStateFlow<SampleChainDeviceState>,
+    onLoaded: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -63,22 +68,34 @@ fun SampleEmptyState(
                                 )
 
                                 audioSignal?.let { signal ->
+                                    val rawData = signal.rawData ?: return@let
                                     val bytesPerSample = signal.bitDepth / 8
                                     val frameSize = bytesPerSample * signal.channels
-                                    val totalFrames = (signal.rawData?.size ?: 0) / frameSize
+                                    val totalFrames = rawData.size / frameSize
                                     val durationMs = ((totalFrames.toFloat() / signal.sampleRate) * 1000f).toLong()
+                                    val source = AudioSource(
+                                        id = UUID.randomUUID(),
+                                        fileName = selectedFile.name,
+                                        rawData = rawData,
+                                        sampleRate = signal.sampleRate,
+                                        channels = signal.channels,
+                                        bitDepth = signal.bitDepth,
+                                    )
+                                    AudioSourceLibrary.add(source)
 
                                     state.update { currentState ->
                                         currentState.copy(
                                             fileName = selectedFile.name,
-                                            rawData = signal.rawData,
+                                            rawData = null,
                                             sampleRate = signal.sampleRate,
                                             channels = signal.channels,
                                             bitDepth = signal.bitDepth,
                                             totalDurationMs = durationMs,
-                                            isLoaded = true
+                                            isLoaded = true,
+                                            sourceId = source.id,
                                         )
                                     }
+                                    onLoaded()
                                 } ?: run {
                                     println("Failed to decode audio file: ${selectedFile.name}")
                                 }

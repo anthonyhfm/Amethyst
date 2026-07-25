@@ -81,6 +81,7 @@ fun SimplerWaveformEditor(
     onFadeOutChange: (Float) -> Unit,
     onFadeInFinishChange: (() -> Unit)? = null,
     onFadeOutFinishChange: (() -> Unit)? = null,
+    playheadPosition: Float? = null,
     modifier: Modifier = Modifier
 ) {
     val resolvedChannels = if (channels > 0) channels else 2
@@ -411,6 +412,23 @@ fun SimplerWaveformEditor(
                     drawPath(rightDimPath, darkSlateBg.copy(alpha = 0.65f))
                 }
             }
+
+            playheadPosition
+                ?.takeIf { it.isFinite() && it in viewStart..viewEnd }
+                ?.let { position ->
+                    val playheadX = fracToX(position)
+                    drawLine(
+                        color = Color(0xFFFFC857),
+                        start = Offset(playheadX, 0f),
+                        end = Offset(playheadX, h),
+                        strokeWidth = 2.dp.toPx(),
+                    )
+                    drawCircle(
+                        color = Color(0xFFFFC857),
+                        radius = 4.dp.toPx(),
+                        center = Offset(playheadX, 4.dp.toPx()),
+                    )
+                }
 
             // Fade Calculations
             val activeSpanMs = (totalDurationMs * (endPosition - startPosition)).coerceAtLeast(1f)

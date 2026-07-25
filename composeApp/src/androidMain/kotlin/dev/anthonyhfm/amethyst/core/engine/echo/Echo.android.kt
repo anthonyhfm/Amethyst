@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
+import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 
 /** Echo has intentionally no mobile backend yet. */
@@ -12,7 +13,11 @@ actual object Echo {
     actual fun setPreferredBufferFrames(frames: Int) = Unit
     actual fun outputDevices() = emptyList<String>()
     actual fun setPreferredOutputDevice(name: String?) = Unit
+    actual fun setMasterGain(gain: Float) = Unit
+    actual fun attachAudioChain(chain: AudioChain) = Unit
     actual fun play(audioSignal: Signal.AudioSignal): String? = null
+    actual fun playSource(sourceId: String, startFrame: Long, endFrameExclusive: Long, gain: Float, pan: Float, origin: Any?): String? = null
+    actual fun playSources(sources: List<AudioSourcePlayback>): List<String?> = List(sources.size) { null }
     actual fun playMultiple(signals: List<Signal.AudioSignal>): List<String?> = List(signals.size) { null }
     actual fun update(sourceId: String, gain: Float, pan: Float) = Unit
     actual fun stop(sourceId: String) = Unit

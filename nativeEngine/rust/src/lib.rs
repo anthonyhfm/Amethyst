@@ -1,12 +1,14 @@
 pub mod midi;
 pub mod echo;
+pub mod pcm_output;
 
 pub use midi::types::*;
 pub use midi::error::*;
 pub use midi::event::*;
 pub use midi::access::MidiAccess;
 pub use midi::connection::MidiConnection;
-pub use echo::{EchoAudioBuffer, EchoDecodeResult, EchoDeviceInfo, EchoEngine};
+pub use echo::{EchoAudioBuffer, EchoDecodeResult, EchoEngine};
+pub use pcm_output::{PcmOutputDeviceInfo, PcmOutputService, PcmOutputTelemetry};
 
 #[derive(uniffi::Record)]
 pub struct NativeEngineInfo {

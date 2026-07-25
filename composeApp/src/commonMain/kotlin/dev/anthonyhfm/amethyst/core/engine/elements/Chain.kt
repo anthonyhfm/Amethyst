@@ -9,8 +9,21 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
 
-class Chain : SignalReceiver() {
+open class Chain : SignalReceiver() {
     val devices: MutableState<List<GenericChainDevice<*>>> = mutableStateOf(emptyList())
+    internal var topologyChangedListener: (() -> Unit)? = null
+
+    protected open fun onDevicesChanged(
+        previous: List<GenericChainDevice<*>>,
+        current: List<GenericChainDevice<*>>,
+    ) = Unit
+
+    private fun replaceDevices(current: List<GenericChainDevice<*>>) {
+        val previous = devices.value
+        devices.value = current
+        onDevicesChanged(previous, current)
+        topologyChangedListener?.invoke()
+    }
 
     override fun signalEnter(n: List<Signal>) {
         SignalIndicatorManager.trigger(this@Chain, 0)
@@ -23,7 +36,7 @@ class Chain : SignalReceiver() {
         }
     }
 
-    fun reroute() {
+    open fun reroute() {
         val devList = devices.value
         if (devList.isEmpty()) {
             return
@@ -58,7 +71,7 @@ class Chain : SignalReceiver() {
         val current = devices.value.toMutableList()
         val insertIndex = atIndex?.coerceIn(0, current.size) ?: current.size
         current.add(insertIndex, device)
-        devices.value = current
+        replaceDevices(current)
         device.onAddedToChain(parentChain = this)
 
         if (fromUser) {
@@ -89,7 +102,7 @@ class Chain : SignalReceiver() {
 
                 ChainSyncCoordinator.onDeviceRemoved(this, deviceToRemove.selectionUUID)
             }
-            devices.value = devices.value.toMutableList().apply { removeAt(index) }
+            replaceDevices(devices.value.toMutableList().apply { removeAt(index) })
             deviceToRemove.onRemovedFromChain()
         }
         reroute()
@@ -110,7 +123,7 @@ class Chain : SignalReceiver() {
 
                 ChainSyncCoordinator.onDeviceRemoved(this, uuid)
             }
-            devices.value = devices.value.toMutableList().apply { removeAll { it.selectionUUID == uuid } }
+            replaceDevices(devices.value.toMutableList().apply { removeAll { it.selectionUUID == uuid } })
             deviceToRemove.onRemovedFromChain()
         } else {
             devices.value.forEach { device ->
@@ -119,6 +132,12 @@ class Chain : SignalReceiver() {
                 }
             }
         }
+        reroute()
+    }
+
+    internal fun onDeviceRuntimeStateChanged() {
+        onDevicesChanged(devices.value, devices.value)
+        topologyChangedListener?.invoke()
         reroute()
     }
 

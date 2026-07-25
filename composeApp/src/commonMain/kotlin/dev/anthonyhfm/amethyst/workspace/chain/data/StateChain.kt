@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace.chain.data
 
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
+import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.devices.DeviceRegistry
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
@@ -12,15 +13,18 @@ data class StateChain(
     val devices: List<@Polymorphic DeviceState> = emptyList(),
     val mutedDeviceIndices: List<Int> = emptyList()
 ) {
-    fun unpack(): Chain {
-        val chain = Chain()
+    fun unpack(): Chain = unpackInto(Chain())
+
+    fun unpackAudio(): AudioChain = unpackInto(AudioChain())
+
+    private fun <T : Chain> unpackInto(chain: T): T {
 
         devices.forEachIndexed { index, deviceState ->
             val device = unpackDevice(deviceState)
             if (index in mutedDeviceIndices || deviceState.isMuted) {
                 device.state.value.isMuted = true
             }
-            chain.add(device)
+            chain.add(device, fromUser = false)
         }
 
         chain.reroute()
@@ -53,4 +57,3 @@ data class StateChain(
         }
     }
 }
-

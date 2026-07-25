@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.IntSize
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
+import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -17,6 +18,9 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevic
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
+import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.sample.resolvedRawData
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
@@ -94,7 +98,7 @@ object WorkspaceRepository {
     var lightsChain: Chain = Chain()
         private set
 
-    var samplingChain: Chain = Chain()
+    var samplingChain: AudioChain = AudioChain()
         private set
 
     var bounds: Pair<IntOffset, IntSize> by mutableStateOf(IntOffset(0, 0) to IntSize(0, 0))
@@ -136,10 +140,7 @@ object WorkspaceRepository {
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
         }
-
-        samplingChain.signalExit = {
-            Echo.audioEnter(it.filterIsInstance<Signal.AudioSignal>())
-        }
+        Echo.attachAudioChain(samplingChain)
     }
 
     fun switchMode(mode: WorkspaceMode, undoable: Boolean = true) {
@@ -445,15 +446,12 @@ object WorkspaceRepository {
         )
 
         lightsChain = workspaceData.lights.unpack()
-        samplingChain = workspaceData.sampling.unpack()
+        samplingChain = workspaceData.sampling.unpackAudio()
 
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
         }
-
-        samplingChain.signalExit = {
-            Echo.audioEnter(it.filterIsInstance<Signal.AudioSignal>())
-        }
+        Echo.attachAudioChain(samplingChain)
 
         fun renderAnimationsInChain(chain: Chain): Int {
             var rendered = 0
@@ -500,6 +498,7 @@ object WorkspaceRepository {
         TimelineRepository.loadTracks(workspaceData.timelineData)
         AudioSourceLibrary.load(workspaceData.audioSources)
         migrateAudioEntries()
+        canonicalizeSampleSources(samplingChain)
 
         ViewportRepository.devices.value.forEach { device ->
             device.launchpadDevice?.connection?.input?.close()
@@ -594,7 +593,85 @@ object WorkspaceRepository {
         }
     }
 
+    /**
+     * Moves Sample-device PCM into the shared source library. Legacy states
+     * remain readable, while new workspace data stores each payload only once.
+     */
+    private fun canonicalizeSampleSources(chain: Chain) {
+        data class SourceFingerprint(
+            val sampleRate: Int,
+            val channels: Int,
+            val bitDepth: Int,
+            val byteCount: Int,
+            val contentHash: Int,
+        )
+
+        fun AudioSource.fingerprint() = SourceFingerprint(
+            sampleRate = sampleRate,
+            channels = channels,
+            bitDepth = bitDepth,
+            byteCount = rawData.size,
+            contentHash = rawData.contentHashCode(),
+        )
+
+        val sourceIndex = AudioSourceLibrary.all()
+            .groupByTo(mutableMapOf(), AudioSource::fingerprint)
+            .mapValuesTo(mutableMapOf()) { (_, sources) -> sources.toMutableList() }
+
+        fun visit(current: Chain) {
+            current.devices.value.forEach { device ->
+                when (device) {
+                    is SampleChainDevice -> {
+                        val state = device.state.value
+                        val bytes = state.resolvedRawData() ?: return@forEach
+                        val directSource = state.sourceId
+                            ?.let(AudioSourceLibrary::get)
+                            ?.takeIf {
+                                it.sampleRate == state.sampleRate &&
+                                    it.channels == state.channels &&
+                                    it.bitDepth == state.bitDepth
+                            }
+                        val fingerprint = SourceFingerprint(
+                            sampleRate = state.sampleRate,
+                            channels = state.channels,
+                            bitDepth = state.bitDepth,
+                            byteCount = bytes.size,
+                            contentHash = bytes.contentHashCode(),
+                        )
+                        val source = directSource
+                            ?: sourceIndex[fingerprint]
+                                ?.firstOrNull {
+                                    it.rawData === bytes || it.rawData.contentEquals(bytes)
+                                }
+                            ?: AudioSource(
+                                id = UUID.randomUUID(),
+                                fileName = state.fileName,
+                                rawData = bytes,
+                                sampleRate = state.sampleRate,
+                                channels = state.channels,
+                                bitDepth = state.bitDepth,
+                            ).also {
+                                AudioSourceLibrary.add(it)
+                                sourceIndex.getOrPut(fingerprint, ::mutableListOf) += it
+                            }
+                        if (state.sourceId != source.id || state.rawData != null) {
+                            device.state.value = state.copy(
+                                rawData = null,
+                                sourceId = source.id,
+                            )
+                            device.onStateRestored()
+                        }
+                    }
+
+                    is NestedChainDevice -> device.nestedChains().forEach(::visit)
+                }
+            }
+        }
+        visit(chain)
+    }
+
     private fun buildWorkspaceData(): SavableWorkspaceData {
+        canonicalizeSampleSources(samplingChain)
         return SavableWorkspaceData(
             path = workspaceMeta?.path,
             title = workspaceMeta?.title ?: "Untitled",
@@ -721,12 +798,13 @@ object WorkspaceRepository {
 
     fun clean() {
         Echo.reset()
+        AudioSourceLibrary.clear()
         TransmitChainDevice.clearReceiversForTesting()
         AutomappingManager.reset()
 
         // Reset chains
         lightsChain = Chain()
-        samplingChain = Chain()
+        samplingChain = AudioChain()
         
         // Re-setup signal exits
         setupChains()
