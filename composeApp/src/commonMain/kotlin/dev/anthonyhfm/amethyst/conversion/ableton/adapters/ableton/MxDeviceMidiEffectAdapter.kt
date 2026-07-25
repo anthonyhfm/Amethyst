@@ -159,8 +159,8 @@ class MxDeviceMidiEffectAdapter(
                 "908c82a8eca07a56eaa35c1b6c6f72be",
                 "5aa613617ae0b0e24cbe715dbe3960e2",
                 "f004d757e3910cc81b317a55e4dd6263",
-                "f2504fe314d81dcc9b57e2466a157033",
-                "d53dcb292a173ab7853183f3cab7620c"-> {
+                "d53dcb292a173ab7853183f3cab7620c",
+                "f2504fe314d81dcc9b57e2466a157033" -> {
                     return GenericMidiExtAdapter(device, offset).toDeviceStates()
                 }
 
@@ -199,6 +199,10 @@ class MxDeviceMidiEffectAdapter(
                 else -> {
                     val maxFile = PlatformFile(path)
                     val fileName = maxFile.nameWithoutExtension.lowercase()
+
+                    if (fileName.contains("midifire") || fileName.contains("genericmidi")) {
+                        return GenericMidiExtAdapter(device, offset).toDeviceStates()
+                    }
 
                     if (fileName.contains("resonator")) {
                         val paramCount = device.parameterList.parameterList.parameters.size

@@ -86,9 +86,20 @@ data class FileRef(
     internal fun resolvePathCandidates(projectPath: String): List<String> {
         val candidates = LinkedHashSet<String>()
 
-        buildRelativePath()?.let {
-            candidates += "$projectPath/$it"
+        if (name != null) {
+            val pathParts = relativePath.items
+                .mapNotNull { it.dir?.takeIf(String::isNotBlank) } +
+                listOf(name.value)
+
+            for (i in pathParts.indices) {
+                val subPath = pathParts.subList(i, pathParts.size).joinToString("/")
+                candidates += if (projectPath.isNotBlank()) "$projectPath/$subPath" else subPath
+            }
         }
+
+        relativePath.value
+            ?.takeIf { it.isNotBlank() }
+            ?.let { candidates += if (projectPath.isNotBlank()) "$projectPath/$it" else it }
 
         path?.value
             ?.takeIf { it.isNotBlank() }
@@ -113,19 +124,5 @@ data class FileRef(
         } else {
             candidates.firstOrNull(fileExists) ?: candidates.first()
         }
-    }
-
-    private fun buildRelativePath(): String? {
-        if (name != null) {
-            val pathParts = relativePath.items
-                .mapNotNull { it.dir?.takeIf(String::isNotBlank) } +
-                listOf(name.value)
-
-            if (pathParts.isNotEmpty()) {
-                return pathParts.joinToString("/")
-            }
-        }
-
-        return relativePath.value?.takeIf { it.isNotBlank() }
     }
 }

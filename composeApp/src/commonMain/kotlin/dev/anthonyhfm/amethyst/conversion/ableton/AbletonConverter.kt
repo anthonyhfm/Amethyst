@@ -33,9 +33,12 @@ import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.nameWithoutExtension
 import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.readString
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
@@ -95,8 +98,17 @@ object AbletonConverter : AmethystConverter {
     }
 
     @OptIn(ExperimentalXmlUtilApi::class)
-    override fun convertZipToWorkspace(file: PlatformFile): SavableWorkspaceData {
+    override fun convertZipToWorkspace(file: PlatformFile): SavableWorkspaceData =
+        convertZipToWorkspace(file, dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter)
+
+    @OptIn(ExperimentalXmlUtilApi::class)
+    fun convertZipToWorkspace(
+        file: PlatformFile,
+        reporter: dev.anthonyhfm.amethyst.core.loading.ProgressReporter? = dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter,
+    ): SavableWorkspaceData {
         isZip = true
+        val unzippingMsg = runCatching { runBlocking { getString(Res.string.home_loading_unzipping_archive) } }.getOrDefault("Extracting project archive...")
+        reporter?.update(0.05f, statusText = unzippingMsg, detailText = file.name)
 
         zipEntries.clear()
         val entries = Zip.getEntries(file).filter {
@@ -128,6 +140,9 @@ object AbletonConverter : AmethystConverter {
 
         val projectName = alsEntry.path.substringAfterLast("/").removeSuffix(".als")
 
+        val readingAlsMsg = runCatching { runBlocking { getString(Res.string.home_loading_reading_als) } }.getOrDefault("Reading Ableton Live-Set...")
+        reporter?.update(0.12f, statusText = readingAlsMsg, detailText = "$projectName.als")
+
         val decodedAlsBytes = Zip.decode(alsEntry.data)
         val sanitizedAlsString = sanitizeAlsXml(decodedAlsBytes.decodeToString())
 
@@ -137,7 +152,8 @@ object AbletonConverter : AmethystConverter {
 
         val abletonWorkspace = runLiveConversion(
             name = projectName,
-            abletonData = abletonData
+            abletonData = abletonData,
+            reporter = reporter
         )
 
         if (format == ZippedProjectFormat.ABLETON_APOLLO) {
@@ -153,6 +169,8 @@ object AbletonConverter : AmethystConverter {
 
             if (approjEntry != null) {
                 return try {
+                    val apolloLightMsg = runCatching { runBlocking { getString(Res.string.home_loading_apollo_light_chains) } }.getOrDefault("Loading Apollo light chains...")
+                    reporter?.update(0.92f, statusText = apolloLightMsg, detailText = approjEntry.path.substringAfterLast("/"))
                     val apolloWorkspace = ApolloConverter.convertBytesToWorkspace(approjEntry.data)
                     abletonWorkspace.copy(
                         lights = apolloWorkspace.lights,
@@ -177,14 +195,21 @@ object AbletonConverter : AmethystConverter {
     override fun convertToWorkspace(path: String, palettePath: String?): SavableWorkspaceData =
         convertToWorkspace(PlatformFile(path), palettePath)
 
-    fun convertToWorkspace(file: PlatformFile, palettePath: String?): SavableWorkspaceData {
+    fun convertToWorkspace(
+        file: PlatformFile,
+        palettePath: String?,
+        reporter: dev.anthonyhfm.amethyst.core.loading.ProgressReporter? = dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter,
+    ): SavableWorkspaceData {
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
         MxDeviceInstrumentAdapter.fileHashMap.clear()
         isZip = false
 
         this.file = file
 
-        val liveSetBytes = Zip.decode(runBlocking { AbletonConverter.file?.readBytes() ?: ByteArray(0) }) // Decompresses the .als GZIP format
+        val readingMsg = runCatching { runBlocking { getString(Res.string.home_loading_reading_als) } }.getOrDefault("Reading Ableton Live-Set...")
+        reporter?.update(0.08f, statusText = readingMsg, detailText = file.name)
+
+        val liveSetBytes = Zip.decode(runBlocking { AbletonConverter.file?.readBytes() ?: ByteArray(0) })
         val sanitizedAlsString = sanitizeAlsXml(liveSetBytes.decodeToString())
         val abletonData = xml.decodeFromString<Ableton>(sanitizedAlsString)
 
@@ -198,11 +223,21 @@ object AbletonConverter : AmethystConverter {
             }
         }
 
-        return runLiveConversion(AbletonConverter.file?.nameWithoutExtension ?: "Ableton Live-Set", abletonData)
+        return runLiveConversion(
+            name = AbletonConverter.file?.nameWithoutExtension ?: "Ableton Live-Set",
+            abletonData = abletonData,
+            reporter = reporter
+        )
     }
 
-    fun runLiveConversion(name: String, abletonData: Ableton): SavableWorkspaceData {
+    fun runLiveConversion(
+        name: String,
+        abletonData: Ableton,
+        reporter: dev.anthonyhfm.amethyst.core.loading.ProgressReporter? = dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter,
+    ): SavableWorkspaceData {
         println("Origin: ${abletonData.creator}")
+        val analyzingLayoutMsg = runCatching { runBlocking { getString(Res.string.home_loading_analyzing_layout) } }.getOrDefault("Analyzing project layout...")
+        reporter?.update(0.18f, statusText = analyzingLayoutMsg, detailText = name)
 
         val audioRenderer = OriginalSimplerPrerenderer()
 
@@ -219,25 +254,16 @@ object AbletonConverter : AmethystConverter {
             AutoPlayData(actions = emptyMap())
         }
 
-        when (layout) {
-            is AbletonLayout.Single -> {
-                audioMap = layout.audioTrack?.let { audioRenderer.decodeAll(listOf(it)) } ?: mapOf()
-            }
-
-            is AbletonLayout.Dual2Light -> {
-                val leftTracks = listOfNotNull(layout.audioLeft, layout.lightsLeft)
-                val rightTracks = listOfNotNull(layout.audioRight, layout.lightsRight)
-
-                audioMap = audioRenderer.decodeAll(leftTracks + rightTracks)
-            }
-
-            is AbletonLayout.Dual4Light -> {
-                val leftTracks = listOfNotNull(layout.audioLeft, layout.lightsLeft, layout.lightsLeftToRight)
-                val rightTracks = listOfNotNull(layout.audioRight, layout.lightsRight, layout.lightsRightToLeft)
-
-                audioMap = audioRenderer.decodeAll(leftTracks + rightTracks)
-            }
+        val audioTracks = when (layout) {
+            is AbletonLayout.Single -> listOfNotNull(layout.audioTrack)
+            is AbletonLayout.Dual2Light -> listOfNotNull(layout.audioLeft, layout.lightsLeft, layout.audioRight, layout.lightsRight)
+            is AbletonLayout.Dual4Light -> listOfNotNull(layout.audioLeft, layout.lightsLeft, layout.lightsLeftToRight, layout.audioRight, layout.lightsRight, layout.lightsRightToLeft)
         }
+
+        val decodingSamplesMsg = runCatching { runBlocking { getString(Res.string.home_loading_decoding_audio_samples) } }.getOrDefault("Decoding audio samples...")
+        reporter?.update(0.25f, statusText = decodingSamplesMsg, detailText = null)
+        val audioReporter = reporter?.subReporter(0.25f, 0.75f)
+        audioMap = audioRenderer.decodeAll(audioTracks, reporter = audioReporter)
 
         liveVersion = when {
             abletonData.minorVersion.startsWith("9") -> LiveVersion.LIVE_9
@@ -247,6 +273,9 @@ object AbletonConverter : AmethystConverter {
 
             else -> null
         }
+
+        val analyzingLightsMsg = runCatching { runBlocking { getString(Res.string.home_loading_analyzing_light_chains) } }.getOrDefault("Analyzing light chains...")
+        reporter?.update(0.78f, statusText = analyzingLightsMsg, detailText = null)
 
         if (layout is AbletonLayout.Dual2Light) {
             layout.lightsLeft?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, IntOffset.Zero) }
