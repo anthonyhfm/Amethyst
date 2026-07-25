@@ -206,17 +206,20 @@ class RecentViewModel(
         printStackTrace: Boolean = false,
         block: suspend () -> Unit,
     ) {
-        if (loadingText != null) {
-            navigator.navigate(HomeNavRoute.LoadingScreen(loadingText))
-        }
+        val initialText = loadingText ?: "Starte Ladevorgang..."
+        dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.startLoading(
+            initialTitle = "PROJEKT WIRD GELADEN",
+            initialStatus = initialText
+        )
+        navigator.navigate(HomeNavRoute.LoadingScreen(initialText))
 
         try {
             block()
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
             triggerEffect(RecentViewContract.Effect.OpenWorkspace)
         } catch (exception: Exception) {
-            if (loadingText != null) {
-                navigator.popBackStack()
-            }
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
+            navigator.popBackStack()
 
             if (printStackTrace) {
                 exception.printStackTrace()

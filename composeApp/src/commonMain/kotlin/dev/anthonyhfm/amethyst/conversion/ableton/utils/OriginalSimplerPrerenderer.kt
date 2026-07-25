@@ -11,6 +11,8 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.isRegularFile
 import io.github.vinceglb.filekit.readBytes
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -28,25 +30,35 @@ class OriginalSimplerPrerenderer {
         val totalFrames: Long
     )
 
-    fun decodeAll(tracksList: List<MidiTrack>): Map<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState> {
+    fun decodeAll(
+        tracksList: List<MidiTrack>,
+        reporter: dev.anthonyhfm.amethyst.core.loading.ProgressReporter? = null,
+    ): Map<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState> {
         val simplers = tracksList
             .flatMap { MidiChainReader.getAllDevicesOfType<OriginalSimpler>(it) }
             .map { OriginalSimplerAdapter.getSimplerData(it) }
 
-        if (simplers.isEmpty()) return emptyMap()
+        if (simplers.isEmpty()) {
+            reporter?.update(1.0f, "Keine Audio-Samples zum Rendern", detailText = null)
+            return emptyMap()
+        }
 
         val limitedIO = Dispatchers.Default.limitedParallelism(MAX_PARALLEL_AUDIO_DECODES)
         val gate = Semaphore(MAX_PARALLEL_AUDIO_DECODES)
 
         return runBlocking {
             val groupedByPath = simplers.groupBy { it.filePath }
-            println("OriginalSimplerPrerenderer: Decoding ${groupedByPath.size} Files")
+            val total = groupedByPath.size
+            var completedCount = 0
+            val lock = Any()
+
+            reporter?.update(0f, "Starte Audio-Rendern ($total Samples)", detailText = null)
 
             coroutineScope {
                 val perPathJobs = groupedByPath.map { (path, pathSimplers) ->
                     async(limitedIO) {
                         gate.withPermit {
-                            if (pathSimplers.size == 1) {
+                            val result = if (pathSimplers.size == 1) {
                                 val simpler = pathSimplers.first()
                                 val state = decodeSegment(
                                     filePath = path,
@@ -54,20 +66,39 @@ class OriginalSimplerPrerenderer {
                                     sampleEnd = simpler.sampleEnd
                                 ) ?: return@async path to emptyMap<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState>()
 
-                                return@async path to mapOf(simpler to state)
+                                path to mapOf(simpler to state)
+                            } else {
+                                val full = decodeFull(path) ?: return@async path to emptyMap<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState>()
+
+                                val states = pathSimplers.associateWith { simpler ->
+                                    sliceSegment(
+                                        filePath = path,
+                                        full = full,
+                                        sampleStart = simpler.sampleStart,
+                                        sampleEnd = simpler.sampleEnd
+                                    )
+                                }
+                                path to states
                             }
 
-                            val full = decodeFull(path) ?: return@async path to emptyMap<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState>()
-
-                            val states = pathSimplers.associateWith { simpler ->
-                                sliceSegment(
-                                    filePath = path,
-                                    full = full,
-                                    sampleStart = simpler.sampleStart,
-                                    sampleEnd = simpler.sampleEnd
-                                )
+                            val count: Int
+                            synchronized(lock) {
+                                completedCount++
+                                count = completedCount
                             }
-                            path to states
+
+                            val fileName = path.substringAfterLast("/").substringAfterLast("\\")
+                            val statusTextMsg = runCatching {
+                                runBlocking { getString(Res.string.home_loading_rendering_sample, count.toString(), total.toString()) }
+                            }.getOrDefault("Rendering audio sample $count of $total")
+
+                            reporter?.update(
+                                progress = count.toFloat() / total,
+                                statusText = statusTextMsg,
+                                detailText = fileName
+                            )
+
+                            result
                         }
                     }
                 }

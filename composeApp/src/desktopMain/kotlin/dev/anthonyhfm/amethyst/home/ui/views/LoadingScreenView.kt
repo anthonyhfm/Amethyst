@@ -1,68 +1,165 @@
 package dev.anthonyhfm.amethyst.home.ui.views
 
-import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
-import amethyst.composeapp.generated.resources.Res
-import amethyst.composeapp.generated.resources.amethyst_studio_logo
-import androidx.compose.foundation.Image
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.DialogDescription
-import dev.anthonyhfm.amethyst.ui.components.primitives.DialogTitle
-import dev.anthonyhfm.amethyst.ui.components.primitives.Spinner
-import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyMuted
-import dev.anthonyhfm.amethyst.ui.theme.border
-import dev.anthonyhfm.amethyst.ui.theme.card
-import dev.anthonyhfm.amethyst.ui.theme.colors
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import amethyst.composeapp.generated.resources.*
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyH4
+import dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager
+import dev.anthonyhfm.amethyst.home.ui.components.AmethystLoadingLogo
 
 @Composable
-fun LoadingScreenView(message: String) {
+fun LoadingScreenView(message: String? = null) {
+    val progressReportState by ProjectLoadingManager.loadingProgress.collectAsState()
+    val report = progressReportState
+
+    val rawProgress = report?.progress ?: 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = rawProgress.coerceIn(0f, 1f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "LoadingProgressAnim"
+    )
+
+    val displayPercentage = (animatedProgress * 100).toInt()
+
+    val defaultTitle = stringResource(Res.string.home_loading_default_title)
+    val defaultStatus = stringResource(Res.string.home_loading_default_status)
+
+    val displayTitle = report?.title?.ifBlank { null } ?: defaultTitle
+    val displayStatus = report?.statusText?.ifBlank { null } ?: message ?: defaultStatus
+    val displayDetail = report?.detailText
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
+            .background(Theme[colors][background]),
+        contentAlignment = Alignment.Center
     ) {
+
+        // Compact, Spacious Column Layout
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 420.dp)
-                .border(1.dp, Theme[colors][border], DefaultShape)
-                .background(Theme[colors][card], DefaultShape)
-                .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .padding(32.dp)
+                .fillMaxHeight()
         ) {
-            Image(
-                painter = painterResource(Res.drawable.amethyst_studio_logo),
-                contentDescription = stringResource(Res.string.home_loading_desc),
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(84.dp),
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Title from About Page (home_about_title), but smaller
+            TypographyH4(
+                text = stringResource(Res.string.home_about_title)
             )
 
-            Spinner(size = 28.dp)
+            Spacer(modifier = Modifier.height(28.dp))
 
-            DialogTitle(stringResource(Res.string.home_loading_title))
-            DialogDescription(message)
-            TypographyMuted(stringResource(Res.string.home_loading_subtitle))
+            // Compact Amethyst Logo (Width 150dp)
+            AmethystLoadingLogo(
+                progress = animatedProgress,
+                width = 150.dp
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Percentage Readout
+            Text(
+                text = "$displayPercentage%",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFFFAFAFA),
+                letterSpacing = (-0.5).sp
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Ultra-Thin Progress Bar
+            Box(
+                modifier = Modifier
+                    .width(280.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0xFF27272A))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(animatedProgress.coerceIn(0.02f, 1f))
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFF8B5CF6),
+                                    Color(0xFFC084FC)
+                                )
+                            )
+                        )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Dynamic Status & Detail Typography with 32.dp Edge Padding & Enforced Single Line Ellipsis
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+            ) {
+                Text(
+                    text = displayStatus,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFE4E4E7),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (!displayDetail.isNullOrBlank()) {
+                    Text(
+                        text = displayDetail,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Color(0xFF71717A),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }

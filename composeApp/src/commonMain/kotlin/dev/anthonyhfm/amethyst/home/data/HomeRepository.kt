@@ -16,9 +16,12 @@ import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.extension
+import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.path
 import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.write
+import amethyst.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -76,7 +79,22 @@ object HomeRepository {
     suspend fun loadWorkspaceData(file: PlatformFile): SavableWorkspaceData {
         return withContext(Dispatchers.Default) {
             val workspace = when (file.extension.lowercase()) {
-                "ame" -> decodeAmethystWorkspace(file)
+                "ame" -> {
+                    val decodingMsg = runCatching { getString(Res.string.home_loading_decoding_ame) }.getOrDefault("Decoding Amethyst project...")
+                    dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                        0.3f,
+                        statusText = decodingMsg,
+                        detailText = file.name
+                    )
+                    val decoded = decodeAmethystWorkspace(file)
+                    val loadingDevicesMsg = runCatching { getString(Res.string.home_loading_loading_devices) }.getOrDefault("Loading devices & chains...")
+                    dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                        0.9f,
+                        statusText = loadingDevicesMsg,
+                        detailText = decoded.title
+                    )
+                    decoded
+                }
                 "als" -> AbletonConverter.convertToWorkspace(file, palettePath = null)
                 "approj" -> ApolloConverter.convertFileToWorkspace(file)
                 "zip" -> when (Zip.determineFormat(file)) {
@@ -94,6 +112,12 @@ object HomeRepository {
             }
 
             workspace.path = file.path
+            val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                1.0f,
+                statusText = loadedMsg,
+                detailText = workspace.title
+            )
             workspace
         }
     }

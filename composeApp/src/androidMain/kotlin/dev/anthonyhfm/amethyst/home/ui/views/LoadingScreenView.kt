@@ -13,12 +13,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.colors
 
 @Composable
 fun LoadingScreenView(text: String) {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.scrim,
+        color = Theme[colors][background],
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),

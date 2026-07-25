@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="device_ableton_arpeggiator_description">This device\'s origin is the Ableton Converter. It is not interactable and only used for simulating Abletons Arpeggiator.</string>
+    <string name="device_ableton_arpeggiator_description">This device's origin is the Ableton Converter. It is not interactable and only used for simulating Abletons Arpeggiator.</string>
     <string name="device_ableton_arpeggiator_title">Arpeggiator</string>
-    <string name="device_ableton_pitcher_description">This device\'s origin is the Ableton Converter. It is not interactable and only used for simulating Abletons Pitcher.</string>
+    <string name="device_ableton_pitcher_description">This device's origin is the Ableton Converter. It is not interactable and only used for simulating Abletons Pitcher.</string>
     <string name="device_ableton_pitcher_title">Pitcher</string>
     <string name="device_adjust_brightness">Brightness</string>
     <string name="device_adjust_contrast">Contrast</string>
@@ -212,6 +212,22 @@
     <string name="home_loading_desc">Loading</string>
     <string name="home_loading_subtitle">This may take a moment for larger projects.</string>
     <string name="home_loading_title">Working on it</string>
+    <string name="home_loading_default_title">LOADING PROJECT</string>
+    <string name="home_loading_default_status">Preparing...</string>
+    <string name="home_loading_unzipping_archive">Extracting project archive...</string>
+    <string name="home_loading_reading_als">Reading Ableton Live-Set...</string>
+    <string name="home_loading_analyzing_layout">Analyzing project layout...</string>
+    <string name="home_loading_decoding_audio_samples">Decoding audio samples...</string>
+    <string name="home_loading_rendering_sample">Rendering audio sample %1$s of %2$s</string>
+    <string name="home_loading_analyzing_light_chains">Analyzing light chains...</string>
+    <string name="home_loading_apollo_light_chains">Loading Apollo light chains...</string>
+    <string name="home_loading_apollo_binary">Reading Apollo binary header...</string>
+    <string name="home_loading_apollo_converting">Converting Apollo tracks &amp; light effects...</string>
+    <string name="home_loading_apollo_ready">Apollo workspace ready!</string>
+    <string name="home_loading_decoding_ame">Decoding Amethyst project...</string>
+    <string name="home_loading_loading_devices">Loading devices &amp; chains...</string>
+    <string name="home_loading_project_loaded">Project loaded!</string>
+    <string name="home_loading_ableton_title">CONVERTING ABLETON LIVE-SET</string>
     <string name="home_nav_drawer_title">Studio Home</string>
     <string name="home_nav_tab_browser">Browser</string>
     <string name="home_nav_tab_projects">Projects</string>
@@ -231,7 +247,7 @@
     <string name="home_project_creation_new_desc">Set up the basics for a fresh workspace before jumping into the editor.</string>
     <string name="home_project_creation_new_title">Create a new Project</string>
     <string name="home_project_creation_save_changes">Save Changes</string>
-    <string name="home_project_creation_sheet_author_desc">Saved as your default. Leave blank for \"Unknown Author\".</string>
+    <string name="home_project_creation_sheet_author_desc">Saved as your default. Leave blank for "Unknown Author".</string>
     <string name="home_project_creation_sheet_author_label">Author</string>
     <string name="home_project_creation_sheet_author_placeholder">Your name</string>
     <string name="home_project_creation_sheet_cancel">Cancel</string>
@@ -653,7 +669,7 @@
     <string name="workspace_save_failed_title">Save Workspace Failed</string>
     <string name="workspace_save_untitled">Untitled</string>
     <string name="workspace_savechanges_description">You have unsaved changes. Do you want to save them before closing?</string>
-    <string name="workspace_savechanges_dont_save">Don\'t Save</string>
+    <string name="workspace_savechanges_dont_save">Don't Save</string>
     <string name="workspace_savechanges_keep_editing">Keep Editing</string>
     <string name="workspace_savechanges_save">Save</string>
     <string name="workspace_savechanges_title">Save Changes?</string>
@@ -693,8 +709,8 @@
     <string name="workspace_viewport_launchpad_actions_delete_dialog_cancel_ios">Cancel</string>
     <string name="workspace_viewport_launchpad_actions_delete_dialog_delete">Delete</string>
     <string name="workspace_viewport_launchpad_actions_delete_dialog_delete_ios">Delete</string>
-    <string name="workspace_viewport_launchpad_actions_delete_dialog_description">This will permanently remove \"%1$s\" from the layout.</string>
-    <string name="workspace_viewport_launchpad_actions_delete_dialog_description_ios">This will permanently remove \"%1$s\" from the layout.</string>
+    <string name="workspace_viewport_launchpad_actions_delete_dialog_description">This will permanently remove "%1$s" from the layout.</string>
+    <string name="workspace_viewport_launchpad_actions_delete_dialog_description_ios">This will permanently remove "%1$s" from the layout.</string>
     <string name="workspace_viewport_launchpad_actions_delete_dialog_title">Delete device?</string>
     <string name="workspace_viewport_launchpad_actions_delete_dialog_title_ios">Delete device?</string>
     <string name="workspace_viewport_launchpad_actions_delete_ios">Delete</string>

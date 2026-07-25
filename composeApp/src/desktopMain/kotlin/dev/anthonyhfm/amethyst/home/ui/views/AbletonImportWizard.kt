@@ -128,11 +128,21 @@ fun AbletonImportWizard(
                         onCancel()
                     },
                     onStartConversion = {
+                        dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.startLoading(
+                            initialTitle = "ABLETON LIVE-SET KONVERTIEREN",
+                            initialStatus = loadingMsg
+                        )
                         navigator.navigate(HomeNavRoute.LoadingScreen(loadingMsg))
 
                         coroutineScope.launch {
-                            viewModel.startAbletonImport(path)
-                            onOpenWorkspace()
+                            try {
+                                viewModel.startAbletonImport(path)
+                                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
+                                onOpenWorkspace()
+                            } catch (e: Exception) {
+                                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
+                                e.printStackTrace()
+                            }
                         }
                     },
                 )
