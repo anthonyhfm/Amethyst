@@ -97,15 +97,34 @@ object AbletonConverter : AmethystConverter {
         }
     }
 
+    private fun loadPalette(palettePath: String?) {
+        if (palettePath.isNullOrBlank()) {
+            palette = Palettes.novation
+        } else {
+            try {
+                val paletteFile = PlatformFile(palettePath)
+                runBlocking {
+                    val content = paletteFile.readString()
+                    palette = PaletteFileParser.parsePaletteFileContent(content)
+                }
+            } catch (e: Exception) {
+                println("Failed to load palette file ($palettePath): ${e.message}")
+                palette = Palettes.novation
+            }
+        }
+    }
+
     @OptIn(ExperimentalXmlUtilApi::class)
-    override fun convertZipToWorkspace(file: PlatformFile): SavableWorkspaceData =
-        convertZipToWorkspace(file, dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter)
+    override fun convertZipToWorkspace(file: PlatformFile, palettePath: String?): SavableWorkspaceData =
+        convertZipToWorkspace(file, palettePath, dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter)
 
     @OptIn(ExperimentalXmlUtilApi::class)
     fun convertZipToWorkspace(
         file: PlatformFile,
+        palettePath: String? = null,
         reporter: dev.anthonyhfm.amethyst.core.loading.ProgressReporter? = dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter,
     ): SavableWorkspaceData {
+        loadPalette(palettePath)
         isZip = true
         val unzippingMsg = runCatching { runBlocking { getString(Res.string.home_loading_unzipping_archive) } }.getOrDefault("Extracting project archive...")
         reporter?.update(0.05f, statusText = unzippingMsg, detailText = file.name)
@@ -213,15 +232,7 @@ object AbletonConverter : AmethystConverter {
         val sanitizedAlsString = sanitizeAlsXml(liveSetBytes.decodeToString())
         val abletonData = xml.decodeFromString<Ableton>(sanitizedAlsString)
 
-        if (palettePath == null) {
-            palette = Palettes.novation
-        } else {
-            val paletteFile = PlatformFile(palettePath)
-            runBlocking {
-                val content = paletteFile.readString()
-                palette = PaletteFileParser.parsePaletteFileContent(content)
-            }
-        }
+        loadPalette(palettePath)
 
         return runLiveConversion(
             name = AbletonConverter.file?.nameWithoutExtension ?: "Ableton Live-Set",

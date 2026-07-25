@@ -226,7 +226,7 @@ object HomeRepository {
             val workspace = when {
                 !apolloProjPath.isNullOrBlank() -> {
                     val abletonWorkspace = if (importedFile.extension.equals("zip", ignoreCase = true)) {
-                        AbletonConverter.convertZipToWorkspace(importedFile)
+                        AbletonConverter.convertZipToWorkspace(importedFile, palettePath = customPalettePath)
                     } else {
                         AbletonConverter.convertToWorkspace(importedFile, customPalettePath)
                     }
@@ -239,7 +239,7 @@ object HomeRepository {
                 }
 
                 importedFile.extension.equals("zip", ignoreCase = true) -> {
-                    AbletonConverter.convertZipToWorkspace(importedFile)
+                    AbletonConverter.convertZipToWorkspace(importedFile, palettePath = customPalettePath)
                 }
 
                 else -> {

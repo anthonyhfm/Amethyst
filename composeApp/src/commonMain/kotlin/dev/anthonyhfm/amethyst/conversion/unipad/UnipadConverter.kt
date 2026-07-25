@@ -21,7 +21,7 @@ import kotlinx.coroutines.runBlocking
 object UnipadConverter : AmethystConverter {
     val entries: MutableMap<String, ZipEntry> = mutableMapOf()
 
-    override fun convertZipToWorkspace(file: PlatformFile): SavableWorkspaceData {
+    override fun convertZipToWorkspace(file: PlatformFile, palettePath: String?): SavableWorkspaceData {
         println("Starting Zip Decoding")
 
         entries.clear()

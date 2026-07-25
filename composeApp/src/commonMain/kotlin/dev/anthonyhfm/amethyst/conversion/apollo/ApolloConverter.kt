@@ -21,7 +21,7 @@ object ApolloConverter : AmethystConverter {
         return convertBytesToWorkspace(bytes)
     }
 
-    override fun convertZipToWorkspace(file: PlatformFile): SavableWorkspaceData {
+    override fun convertZipToWorkspace(file: PlatformFile, palettePath: String?): SavableWorkspaceData {
         TODO("Not implemented yet")
     }
 

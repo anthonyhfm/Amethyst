@@ -20,5 +20,8 @@ interface AmethystConverter {
         palettePath: String? = ""
     ) : SavableWorkspaceData
 
-    fun convertZipToWorkspace(file: PlatformFile): SavableWorkspaceData
+    fun convertZipToWorkspace(
+        file: PlatformFile,
+        palettePath: String? = null
+    ): SavableWorkspaceData
 }
