@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.KASKOBI_MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.utils.MultiPluginHashes.MULTI_HASHES
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.dovitate.CycleLightsAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.dovitate.CycleSamplesAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.dovitate.LightspeedAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.dovitate.SupersonicAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.AutoPageAdapter
@@ -71,6 +72,10 @@ class MxDeviceInstrumentAdapter(
             when (hash) {
                 "a65f124fa2b4df604144ec3bb78df008" -> {
                     return SupersonicAdapter(device, offset).toDeviceStates()
+                }
+
+                "827910972f4410bd36c2a7eef029a2d7" -> {
+                    return CycleSamplesAdapter(device, offset).toDeviceStates()
                 }
 
                 else -> {
