@@ -226,12 +226,17 @@ fun MobileWorkspaceChainEditor(
                                                     ?.let { Color(it) }
                                                     ?: Color(0xFF7C3AED)
 
+                                                val deviceState by device.state.collectAsState()
                                                 Box(
-                                                    modifier = if (hasRemoteFocus) {
-                                                        Modifier.border(2.dp, remoteFocusColor, DefaultShape)
-                                                    } else {
-                                                        Modifier
-                                                    }
+                                                    modifier = Modifier
+                                                        .chainDeviceMuteEffect(deviceState.isMuted)
+                                                        .then(
+                                                            if (hasRemoteFocus) {
+                                                                Modifier.border(2.dp, remoteFocusColor, DefaultShape)
+                                                            } else {
+                                                                Modifier
+                                                            }
+                                                        )
                                                 ) {
                                                     when (device) {
                                                         is GroupChainDevice -> {

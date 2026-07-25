@@ -38,6 +38,8 @@ import com.composables.icons.lucide.CopyPlus
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Replace
 import com.composables.icons.lucide.Trash2
+import com.composables.icons.lucide.Volume2
+import com.composables.icons.lucide.VolumeX
 import com.mohamedrejeb.compose.dnd.DragAndDropContainer
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
@@ -233,12 +235,17 @@ fun WorkspaceChainEditor(
                                                     ?.let { Color(it) }
                                                     ?: Color(0xFF7C3AED)
 
+                                                val deviceState by device.state.collectAsState()
                                                 Box(
-                                                    modifier = if (hasRemoteFocus) {
-                                                        Modifier.border(2.dp, remoteFocusColor, DefaultShape)
-                                                    } else {
-                                                        Modifier
-                                                    }
+                                                    modifier = Modifier
+                                                        .chainDeviceMuteEffect(deviceState.isMuted)
+                                                        .then(
+                                                            if (hasRemoteFocus) {
+                                                                Modifier.border(2.dp, remoteFocusColor, DefaultShape)
+                                                            } else {
+                                                                Modifier
+                                                            }
+                                                        )
                                                 ) {
                                                     when (device) {
                                                         is GroupChainDevice -> {
@@ -348,6 +355,26 @@ fun ChainDeviceContextMenu(
         onDismissRequest = onDismiss,
         offset = offset
     ) {
+        if (device.isMuted) {
+            ChainContextMenuItem(
+                label = stringResource(Res.string.workspace_chain_chaineditor_unmute),
+                icon = Lucide.Volume2,
+                onClick = {
+                    device.setMuted(false)
+                    onDismiss()
+                }
+            )
+        } else {
+            ChainContextMenuItem(
+                label = stringResource(Res.string.workspace_chain_chaineditor_mute),
+                icon = Lucide.VolumeX,
+                onClick = {
+                    device.setMuted(true)
+                    onDismiss()
+                }
+            )
+        }
+
         ChainContextMenuItem(
             label = stringResource(Res.string.workspace_chain_chaineditor_copy),
             icon = Lucide.Copy,

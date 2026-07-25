@@ -549,8 +549,10 @@
     <string name="workspace_chain_chaineditor_delete">Delete</string>
     <string name="workspace_chain_chaineditor_duplicate">Duplicate</string>
     <string name="workspace_chain_chaineditor_get_help">Get Help</string>
+    <string name="workspace_chain_chaineditor_mute">Mute</string>
     <string name="workspace_chain_chaineditor_paste">Paste</string>
     <string name="workspace_chain_chaineditor_paste_replace">Paste Replace</string>
+    <string name="workspace_chain_chaineditor_unmute">Unmute</string>
     <string name="workspace_chain_contextmenu_back">Back</string>
     <string name="workspace_chain_devicepicker_adjust">Adjust</string>
     <string name="workspace_chain_devicepicker_blur">Blur</string>

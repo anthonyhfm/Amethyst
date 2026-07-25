@@ -15,29 +15,42 @@ class Chain : SignalReceiver() {
     override fun signalEnter(n: List<Signal>) {
         SignalIndicatorManager.trigger(this@Chain, 0)
 
-        if (devices.value.isEmpty()) {
+        val firstUnmuted = devices.value.firstOrNull { !it.state.value.isMuted }
+        if (firstUnmuted == null) {
             signalExit?.invoke(n)
         } else {
-            devices.value[0].signalEnter(n)
+            firstUnmuted.signalEnter(n)
         }
     }
 
     fun reroute() {
-        if (devices.value.isEmpty()) {
+        val devList = devices.value
+        if (devList.isEmpty()) {
             return
         }
 
-        for (i in 0 until devices.value.lastIndex) {
-            val current = devices.value[i]
-            val next = devices.value[i + 1]
-            current.signalExit = { signals ->
-                SignalIndicatorManager.trigger(this@Chain, i + 1)
-                next.signalEnter(signals)
+        for (i in devList.indices) {
+            val current = devList[i]
+            var nextUnmutedIndex = -1
+            for (j in (i + 1) until devList.size) {
+                if (!devList[j].state.value.isMuted) {
+                    nextUnmutedIndex = j
+                    break
+                }
             }
-        }
-        devices.value.last().signalExit = { signals ->
-            SignalIndicatorManager.trigger(this@Chain, devices.value.size)
-            signalExit?.invoke(signals)
+
+            if (nextUnmutedIndex != -1) {
+                val nextDevice = devList[nextUnmutedIndex]
+                current.signalExit = { signals ->
+                    SignalIndicatorManager.trigger(this@Chain, nextUnmutedIndex)
+                    nextDevice.signalEnter(signals)
+                }
+            } else {
+                current.signalExit = { signals ->
+                    SignalIndicatorManager.trigger(this@Chain, devList.size)
+                    signalExit?.invoke(signals)
+                }
+            }
         }
     }
 

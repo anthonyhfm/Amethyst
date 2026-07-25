@@ -13,6 +13,7 @@ import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 
 abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalReceiver(), Selectable {
@@ -22,15 +23,32 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     open val helpRef: String? = null
 
+    var parentChain: Chain? = null
+
+    val isMuted: Boolean
+        get() = state.value.isMuted
+
     var isDragging: MutableState<Boolean> = mutableStateOf(false)
 
     open fun onAddedToChain() = Unit
 
     open fun onAddedToChain(parentChain: Chain) {
+        this.parentChain = parentChain
         onAddedToChain()
     }
 
-    open fun onRemovedFromChain() = Unit
+    open fun onRemovedFromChain() {
+        this.parentChain = null
+    }
+
+    fun setMuted(muted: Boolean) {
+        val current = state.value
+        if (current.isMuted != muted) {
+            current.isMuted = muted
+            state.update { current }
+            parentChain?.reroute()
+        }
+    }
 
     open fun onStateRestored() = Unit
 

@@ -549,8 +549,10 @@
     <string name="workspace_chain_chaineditor_delete">Löschen</string>
     <string name="workspace_chain_chaineditor_duplicate">Duplizieren</string>
     <string name="workspace_chain_chaineditor_get_help">Hilfe erhalten</string>
+    <string name="workspace_chain_chaineditor_mute">Stummschalten</string>
     <string name="workspace_chain_chaineditor_paste">Einfügen</string>
     <string name="workspace_chain_chaineditor_paste_replace">Einfügen &amp;amp; Ersetzen</string>
+    <string name="workspace_chain_chaineditor_unmute">Stummschaltung aufheben</string>
     <string name="workspace_chain_contextmenu_back">Zurück</string>
     <string name="workspace_chain_devicepicker_adjust">Adjust</string>
     <string name="workspace_chain_devicepicker_blur">Blur</string>

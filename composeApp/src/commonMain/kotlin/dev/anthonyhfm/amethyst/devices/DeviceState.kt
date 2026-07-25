@@ -1,3 +1,10 @@
 package dev.anthonyhfm.amethyst.devices
 
-abstract class DeviceState
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+
+@Serializable
+abstract class DeviceState {
+    @Transient
+    open var isMuted: Boolean = false
+}

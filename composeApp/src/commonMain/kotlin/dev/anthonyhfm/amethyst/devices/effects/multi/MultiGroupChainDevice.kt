@@ -61,6 +61,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.chain.ui.AnimatedInsertedDevice
+import dev.anthonyhfm.amethyst.workspace.chain.ui.chainDeviceMuteEffect
 import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
@@ -340,12 +341,15 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
                                     LaunchedEffect(dragAndDropState.draggedItem) {
                                         device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
                                     }
-                                    AnimatedInsertedDevice(id = device.selectionUUID) {
-                                        when (device) {
-                                            is GroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
-                                            is MultiGroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
-                                            is ChokeChainDevice -> device.Content(dragAndDropState = dragAndDropState)
-                                            else -> device.Content()
+                                     val deviceState by device.state.collectAsState()
+                                     Box(modifier = Modifier.chainDeviceMuteEffect(deviceState.isMuted)) {
+                                        AnimatedInsertedDevice(id = device.selectionUUID) {
+                                            when (device) {
+                                                is GroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+                                                is MultiGroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+                                                is ChokeChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+                                                else -> device.Content()
+                                            }
                                         }
                                     }
                                 }

@@ -135,6 +135,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.ui.AnimatedInsertedDevice
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainDeviceContextMenu
+import dev.anthonyhfm.amethyst.workspace.chain.ui.chainDeviceMuteEffect
 import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
@@ -899,17 +900,20 @@ internal fun GroupEditorContentHost(
                                     }
                                 )
 
-                                AnimatedInsertedDevice(device.selectionUUID) {
-                                    when (device) {
-                                        is GroupChainDevice -> device.Content(
-                                            dragAndDropState = dragAndDropState
-                                        )
+                                val deviceState by device.state.collectAsState()
+                                Box(modifier = Modifier.chainDeviceMuteEffect(deviceState.isMuted)) {
+                                    AnimatedInsertedDevice(device.selectionUUID) {
+                                        when (device) {
+                                            is GroupChainDevice -> device.Content(
+                                                dragAndDropState = dragAndDropState
+                                            )
 
-                                        is MultiGroupChainDevice -> device.Content(
-                                            dragAndDropState = dragAndDropState
-                                        )
+                                            is MultiGroupChainDevice -> device.Content(
+                                                dragAndDropState = dragAndDropState
+                                            )
 
-                                        else -> device.Content()
+                                            else -> device.Content()
+                                        }
                                     }
                                 }
                             }

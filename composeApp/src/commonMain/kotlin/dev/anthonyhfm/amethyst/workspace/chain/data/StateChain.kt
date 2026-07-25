@@ -9,13 +9,18 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StateChain(
-    val devices: List<@Polymorphic DeviceState> = emptyList()
+    val devices: List<@Polymorphic DeviceState> = emptyList(),
+    val mutedDeviceIndices: List<Int> = emptyList()
 ) {
     fun unpack(): Chain {
         val chain = Chain()
 
-        devices.forEach { device ->
-            chain.add(unpackDevice(device))
+        devices.forEachIndexed { index, deviceState ->
+            val device = unpackDevice(deviceState)
+            if (index in mutedDeviceIndices || deviceState.isMuted) {
+                device.state.value.isMuted = true
+            }
+            chain.add(device)
         }
 
         chain.reroute()
@@ -25,14 +30,27 @@ data class StateChain(
 
     companion object {
         fun pack(chain: Chain): StateChain {
+            val devList = chain.devices.value
+            val mutedIndices = devList.mapIndexedNotNull { index, device ->
+                if (device.isMuted) index else null
+            }
             return StateChain(
-                devices = chain.devices.value.map { packDevice(it) }
+                devices = devList.map { packDevice(it) },
+                mutedDeviceIndices = mutedIndices
             )
         }
 
-        fun packDevice(device: GenericChainDevice<*>): DeviceState = DeviceRegistry.pack(device)
+        fun packDevice(device: GenericChainDevice<*>): DeviceState {
+            val state = DeviceRegistry.pack(device)
+            state.isMuted = device.isMuted
+            return state
+        }
 
-        fun unpackDevice(device: DeviceState): GenericChainDevice<*> = DeviceRegistry.unpack(device)
+        fun unpackDevice(deviceState: DeviceState): GenericChainDevice<*> {
+            val device = DeviceRegistry.unpack(deviceState)
+            device.state.value.isMuted = deviceState.isMuted
+            return device
+        }
     }
 }
 
