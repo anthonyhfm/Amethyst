@@ -227,6 +227,11 @@
     <string name="home_loading_decoding_ame">Decoding Amethyst project...</string>
     <string name="home_loading_loading_devices">Loading devices &amp; chains...</string>
     <string name="home_loading_project_loaded">Project loaded!</string>
+    <string name="home_loading_no_samples_to_render">No audio samples to render</string>
+    <string name="home_loading_starting_audio_rendering">Starting audio rendering (%1$s samples)...</string>
+    <string name="home_loading_unipad_title">CONVERTING UNIPACK</string>
+    <string name="home_loading_reading_unipad_info">Reading UniPack configuration...</string>
+    <string name="home_loading_decoding_unipad_audio">Decoding UniPack audio clips...</string>
     <string name="home_loading_ableton_title">CONVERTING ABLETON LIVE-SET</string>
     <string name="home_nav_drawer_title">Studio Home</string>
     <string name="home_nav_tab_browser">Browser</string>

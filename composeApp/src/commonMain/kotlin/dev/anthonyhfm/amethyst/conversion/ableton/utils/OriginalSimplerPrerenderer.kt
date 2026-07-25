@@ -41,7 +41,8 @@ class OriginalSimplerPrerenderer {
             .map { OriginalSimplerAdapter.getSimplerData(it) }
 
         if (simplers.isEmpty()) {
-            reporter?.update(1.0f, "Keine Audio-Samples zum Rendern", detailText = null)
+            val noSamplesMsg = runCatching { runBlocking { getString(Res.string.home_loading_no_samples_to_render) } }.getOrDefault("No audio samples to render")
+            reporter?.update(1.0f, noSamplesMsg, detailText = null)
             return emptyMap()
         }
 
@@ -54,7 +55,8 @@ class OriginalSimplerPrerenderer {
             var completedCount = 0
             val countMutex = Mutex()
 
-            reporter?.update(0f, "Starte Audio-Rendern ($total Samples)", detailText = null)
+            val startingMsg = runCatching { getString(Res.string.home_loading_starting_audio_rendering, total.toString()) }.getOrDefault("Starting audio rendering ($total samples)...")
+            reporter?.update(0f, startingMsg, detailText = null)
 
             coroutineScope {
                 val perPathJobs = groupedByPath.map { (path, pathSimplers) ->
@@ -88,16 +90,20 @@ class OriginalSimplerPrerenderer {
                                 completedCount
                             }
 
-                            val fileName = path.substringAfterLast("/").substringAfterLast("\\")
-                            val statusTextMsg = runCatching {
-                                getString(Res.string.home_loading_rendering_sample, count.toString(), total.toString())
-                            }.getOrDefault("Rendering audio sample $count of $total")
+                            // Throttle progress updates (e.g. max ~50 UI updates total across decoding) to avoid flooding UI recompositions
+                            val updateStep = (total / 50).coerceAtLeast(1)
+                            if (count == total || count == 1 || count % updateStep == 0) {
+                                val fileName = path.substringAfterLast("/").substringAfterLast("\\")
+                                val statusTextMsg = runCatching {
+                                    getString(Res.string.home_loading_rendering_sample, count.toString(), total.toString())
+                                }.getOrDefault("Rendering audio sample $count of $total")
 
-                            reporter?.update(
-                                progress = count.toFloat() / total,
-                                statusText = statusTextMsg,
-                                detailText = fileName
-                            )
+                                reporter?.update(
+                                    progress = count.toFloat() / total,
+                                    statusText = statusTextMsg,
+                                    detailText = fileName
+                                )
+                            }
 
                             result
                         }

@@ -226,6 +226,11 @@
     <string name="home_loading_decoding_ame">正在解码Amethyst工程...</string>
     <string name="home_loading_loading_devices">正在加载设备与链...</string>
     <string name="home_loading_project_loaded">工程加载完成！</string>
+    <string name="home_loading_no_samples_to_render">没有需要渲染的音频采样</string>
+    <string name="home_loading_starting_audio_rendering">开始音频渲染 (%1$s 个采样)...</string>
+    <string name="home_loading_unipad_title">转换 UNIPACK</string>
+    <string name="home_loading_reading_unipad_info">正在读取 UniPack 配置...</string>
+    <string name="home_loading_decoding_unipad_audio">正在解码 UniPack 音频剪辑...</string>
     <string name="home_loading_ableton_title">转换ABLETON LIVE-SET</string>
     <string name="home_nav_drawer_title">集成站主页</string>
     <string name="home_nav_tab_browser">工坊</string>
