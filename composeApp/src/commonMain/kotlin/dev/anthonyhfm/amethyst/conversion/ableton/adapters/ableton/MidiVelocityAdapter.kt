@@ -19,6 +19,6 @@ class MidiVelocityAdapter(
                 g = palette[velocity].second / 63f,
                 b = palette[velocity].third / 63f,
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 }

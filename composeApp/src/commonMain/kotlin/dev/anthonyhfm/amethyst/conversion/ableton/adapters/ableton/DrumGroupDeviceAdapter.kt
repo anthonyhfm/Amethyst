@@ -164,6 +164,6 @@ class DrumGroupDeviceAdapter(
                     )
                 }
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 }

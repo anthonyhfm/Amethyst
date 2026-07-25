@@ -16,6 +16,6 @@ class MidiPitcherAdapter(
             AbletonPitcherChainDeviceState(
                 pitch = device.pitch.manual.value
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 }

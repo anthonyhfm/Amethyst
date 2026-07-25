@@ -36,6 +36,6 @@ class MidiChordAdapter(
                     )
                 }
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 }

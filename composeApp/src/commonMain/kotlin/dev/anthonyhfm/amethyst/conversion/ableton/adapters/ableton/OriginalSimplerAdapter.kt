@@ -17,7 +17,7 @@ class OriginalSimplerAdapter(
                 fadeInMs = convertWeirdFuckingFloatValues(device.volumeAndPan.oneShotEnvelope.fadeInTime.manual.value).toFloat(),
                 fadeOutMs = convertWeirdFuckingFloatValues(device.volumeAndPan.oneShotEnvelope.fadeOutTime.manual.value).toFloat()
             ) ?: SampleChainDeviceState()
-        )
+        ).withMuteState(device.on.manual.value)
     }
 
     data class OriginalSimplerData(

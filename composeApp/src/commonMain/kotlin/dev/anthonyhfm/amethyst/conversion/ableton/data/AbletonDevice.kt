@@ -13,6 +13,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceInstrumen
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
@@ -52,6 +53,9 @@ interface AbletonDevice {
 data class OriginalSimpler(
     @SerialName("Id")
     val id: Int = 0,
+
+    @XmlElement
+    val on: AbletonOn = AbletonOn(),
 
     @XmlElement
     val player: Player,

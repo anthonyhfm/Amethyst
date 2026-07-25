@@ -34,6 +34,6 @@ class MidiArpeggiatorAdapter(
                 } else null,
                 gate = device.gate.manual.value
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 }

@@ -114,7 +114,7 @@ class RandomDeviceMultisamplingAdapter (
                         }
                     }
                 )
-            )
+            ).withMuteState(random.on.manual.value)
         }
 
         println("Random device does not have Chance 100% and Alt mode, skipping...; Values: chance=$randomChance, steps=$multiSteps, alt=$altModeEnabled")

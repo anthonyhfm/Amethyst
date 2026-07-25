@@ -285,6 +285,6 @@ class InstrumentGroupAdapter(
             GroupChainDeviceState(
                 groups = groups
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 }

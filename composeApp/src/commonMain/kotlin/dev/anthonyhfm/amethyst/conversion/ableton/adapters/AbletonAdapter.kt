@@ -35,6 +35,15 @@ abstract class AbletonAdapter {
 
     abstract fun toDeviceStates(): List<DeviceState>
 
+    /**
+     * Applies Ableton's device On/Off state as isMuted on all returned DeviceStates.
+     * In Ableton, On.Manual = false means the device is disabled/muted.
+     */
+    protected fun List<DeviceState>.withMuteState(isOn: Boolean): List<DeviceState> {
+        if (!isOn) forEach { it.isMuted = true }
+        return this
+    }
+
     companion object {
         fun resolveAdapter(
             device: AbletonDevice,

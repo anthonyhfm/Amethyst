@@ -39,7 +39,7 @@ class MidiNoteLengthAdapter(
                 },
                 gate = gate / 200.0f,
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 
     fun indexToSyncTiming(index: Int): String {

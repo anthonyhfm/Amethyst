@@ -40,7 +40,7 @@ class MidiEffectGroupAdapter(
         val branch2Name = branches.getOrNull(1)?.name?.effectiveName?.value
 
         if (branch1Name == "Magic" && branch2Name == "Rate Preview") {
-            return VelocityArpeggiatorAdapter(device).toDeviceStates()
+            return VelocityArpeggiatorAdapter(device).toDeviceStates().withMuteState(device.on.manual.value)
         }
 
         groups.addAll(
@@ -287,6 +287,6 @@ class MidiEffectGroupAdapter(
             GroupChainDeviceState(
                 groups = groups
             )
-        )
+        ).withMuteState(device.on.manual.value)
     }
 }

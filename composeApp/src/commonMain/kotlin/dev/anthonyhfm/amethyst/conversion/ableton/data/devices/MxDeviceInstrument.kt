@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import nl.adaptivity.xmlutil.serialization.XmlElement
@@ -9,6 +10,10 @@ import nl.adaptivity.xmlutil.serialization.XmlSerialName
 data class MxDeviceInstrument(
     @SerialName("Id")
     override val id: Int = 0,
+
+    @XmlElement
+    @XmlSerialName("On")
+    val on: AbletonOn = AbletonOn(),
 
     @XmlElement
     @XmlSerialName("PatchSlot")

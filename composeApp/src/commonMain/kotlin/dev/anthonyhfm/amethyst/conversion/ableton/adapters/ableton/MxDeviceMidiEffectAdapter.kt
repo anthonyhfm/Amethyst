@@ -37,6 +37,10 @@ class MxDeviceMidiEffectAdapter(
     val outputOffset: IntOffset = IntOffset.Zero
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
+        return resolveDeviceStates().withMuteState(device.on.manual.value)
+    }
+
+    private fun resolveDeviceStates(): List<DeviceState> {
         val blob = device.decodeBlob()
 
         val path = device.patchSlot.value.patchRef?.fileRef?.resolvePath() ?: return emptyList()
