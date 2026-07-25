@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.home
 
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.getString
 
 import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Zip
@@ -23,6 +23,8 @@ import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSUserDomainMask
 
+import dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager
+
 /**
  * Bridge object exposing HomeRepository operations to native Swift code.
  *
@@ -34,6 +36,21 @@ import platform.Foundation.NSUserDomainMask
 object HomeSwiftBridge {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    fun observeLoadingProgress(
+        onUpdate: (Float, String, String, String?) -> Unit,
+        onFinished: () -> Unit,
+    ) {
+        scope.launch {
+            ProjectLoadingManager.loadingProgress.collect { report ->
+                if (report != null) {
+                    onUpdate(report.progress, report.title, report.statusText, report.detailText)
+                } else {
+                    onFinished()
+                }
+            }
+        }
+    }
 
     // ── File management ────────────────────────────────────────────────────
 
@@ -102,7 +119,7 @@ object HomeSwiftBridge {
         scope.launch {
             runCatching { HomeRepository.createProject(name, author) }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
+                .onFailure { onError(it.message ?: getString(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -117,7 +134,7 @@ object HomeSwiftBridge {
                 HomeRepository.openWorkspace(workspace, rememberRecent = true)
             }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
+                .onFailure { onError(it.message ?: getString(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -129,7 +146,7 @@ object HomeSwiftBridge {
         scope.launch {
             runCatching { HomeRepository.openRecentWorkspace(project) }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
+                .onFailure { onError(it.message ?: getString(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -149,7 +166,7 @@ object HomeSwiftBridge {
                 )
             }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
+                .onFailure { onError(it.message ?: getString(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 
@@ -163,7 +180,7 @@ object HomeSwiftBridge {
         scope.launch {
             runCatching { HomeRepository.updateProject(path = path, name = name, author = author) }
                 .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: stringResource(Res.string.home_swift_bridge_unknown_error)) }
+                .onFailure { onError(it.message ?: getString(Res.string.home_swift_bridge_unknown_error)) }
         }
     }
 

@@ -33,14 +33,6 @@ private data class IosModeEntry(
     val iconName: String,
 )
 
-private val selectableModes = listOf(
-    IosModeEntry(PerformanceWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_performance_ios), "play.fill"),
-    IosModeEntry(TimelineWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_timeline_ios), "chart.bar.doc.horizontal"),
-    IosModeEntry(LightsChainWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_lights_ios), "lightbulb.fill"),
-    IosModeEntry(SamplingChainWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_sampling_ios), "waveform.path"),
-    IosModeEntry(LayoutWorkspaceMode(), stringResource(Res.string.workspace_topappbar_mode_layout_ios), "square.grid.3x3.fill"),
-)
-
 private fun modeMatches(
     current: WorkspaceMode,
     candidate: WorkspaceMode,
@@ -62,6 +54,27 @@ actual fun WorkspaceTopAppBar(
 ) {
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
+    val modePerformanceLabel = stringResource(Res.string.workspace_topappbar_mode_performance_ios)
+    val modeTimelineLabel = stringResource(Res.string.workspace_topappbar_mode_timeline_ios)
+    val modeLightsLabel = stringResource(Res.string.workspace_topappbar_mode_lights_ios)
+    val modeSamplingLabel = stringResource(Res.string.workspace_topappbar_mode_sampling_ios)
+    val modeLayoutLabel = stringResource(Res.string.workspace_topappbar_mode_layout_ios)
+    val backToHomeLabel = stringResource(Res.string.workspace_topappbar_back_to_home_ios)
+    val openSettingsLabel = stringResource(Res.string.workspace_topappbar_open_settings_ios)
+    val switchModeLabel = stringResource(Res.string.workspace_topappbar_switch_mode_ios)
+
+    val selectableModes = androidx.compose.runtime.remember(
+        modePerformanceLabel, modeTimelineLabel, modeLightsLabel, modeSamplingLabel, modeLayoutLabel
+    ) {
+        listOf(
+            IosModeEntry(PerformanceWorkspaceMode(), modePerformanceLabel, "play.fill"),
+            IosModeEntry(TimelineWorkspaceMode(), modeTimelineLabel, "chart.bar.doc.horizontal"),
+            IosModeEntry(LightsChainWorkspaceMode(), modeLightsLabel, "lightbulb.fill"),
+            IosModeEntry(SamplingChainWorkspaceMode(), modeSamplingLabel, "waveform.path"),
+            IosModeEntry(LayoutWorkspaceMode(), modeLayoutLabel, "square.grid.3x3.fill"),
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -78,6 +91,10 @@ actual fun WorkspaceTopAppBar(
                 containerView.rebuildWorkspaceTopAppBar(
                     mode = mode,
                     onBack = onBack,
+                    selectableModes = selectableModes,
+                    backToHomeLabel = backToHomeLabel,
+                    openSettingsLabel = openSettingsLabel,
+                    switchModeLabel = switchModeLabel,
                 )
             },
             properties = UIKitInteropProperties(
@@ -91,6 +108,10 @@ actual fun WorkspaceTopAppBar(
 private fun UIView.rebuildWorkspaceTopAppBar(
     mode: WorkspaceMode,
     onBack: () -> Unit,
+    selectableModes: List<IosModeEntry>,
+    backToHomeLabel: String,
+    openSettingsLabel: String,
+    switchModeLabel: String,
 ) {
     subviews.forEach { (it as UIView).removeFromSuperview() }
 
@@ -133,7 +154,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
         image = UIImage.systemImageNamed(if (mode.selectableMode) "chevron.left" else "xmark")
         baseForegroundColor = UIColor.labelColor
     }
-    leftButton.setAccessibilityLabel(if (mode.selectableMode) stringResource(Res.string.workspace_topappbar_back_to_home_ios) else "Close ${mode.displayName}")
+    leftButton.setAccessibilityLabel(if (mode.selectableMode) backToHomeLabel else "Close ${mode.displayName}")
     leftButton.addAction(
         UIAction.actionWithHandler {
             if (mode.selectableMode) {
@@ -149,7 +170,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
 
     stackView.addArrangedSubview(
         if (mode.selectableMode) {
-            modeMenuButton(mode)
+            modeMenuButton(mode, selectableModes, switchModeLabel)
         } else {
             modeTitleButton(mode.displayName)
         },
@@ -163,7 +184,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
         image = UIImage.systemImageNamed("gearshape")
         baseForegroundColor = UIColor.labelColor
     }
-    settingsButton.setAccessibilityLabel(stringResource(Res.string.workspace_topappbar_open_settings_ios))
+    settingsButton.setAccessibilityLabel(openSettingsLabel)
     settingsButton.addAction(
         UIAction.actionWithHandler {
             IosWorkspaceBridge.onShowSettings?.invoke()
@@ -175,7 +196,11 @@ private fun UIView.rebuildWorkspaceTopAppBar(
 }
 
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-private fun modeMenuButton(mode: WorkspaceMode): UIView {
+private fun modeMenuButton(
+    mode: WorkspaceMode,
+    selectableModes: List<IosModeEntry>,
+    switchModeLabel: String,
+): UIView {
     val selectedEntry = selectableModes.firstOrNull { modeMatches(mode, it.mode) }
     val menuButton = UIButton.buttonWithType(UIButtonTypeSystem)
     menuButton.configuration = liquidGlassButtonConfiguration().apply {
@@ -185,7 +210,7 @@ private fun modeMenuButton(mode: WorkspaceMode): UIView {
         baseForegroundColor = UIColor.labelColor
         contentInsets = NSDirectionalEdgeInsetsMake(8.0, 20.0, 8.0, 20.0)
     }
-    menuButton.setAccessibilityLabel(stringResource(Res.string.workspace_topappbar_switch_mode_ios))
+    menuButton.setAccessibilityLabel(switchModeLabel)
 
     val menuActions = selectableModes.map { entry ->
         UIAction.actionWithTitle(

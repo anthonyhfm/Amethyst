@@ -14,7 +14,9 @@ import io.github.vinceglb.filekit.readBytes
 import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
 class OriginalSimplerPrerenderer {
@@ -50,7 +52,7 @@ class OriginalSimplerPrerenderer {
             val groupedByPath = simplers.groupBy { it.filePath }
             val total = groupedByPath.size
             var completedCount = 0
-            val lock = Any()
+            val countMutex = Mutex()
 
             reporter?.update(0f, "Starte Audio-Rendern ($total Samples)", detailText = null)
 
@@ -81,15 +83,14 @@ class OriginalSimplerPrerenderer {
                                 path to states
                             }
 
-                            val count: Int
-                            synchronized(lock) {
+                            val count = countMutex.withLock {
                                 completedCount++
-                                count = completedCount
+                                completedCount
                             }
 
                             val fileName = path.substringAfterLast("/").substringAfterLast("\\")
                             val statusTextMsg = runCatching {
-                                runBlocking { getString(Res.string.home_loading_rendering_sample, count.toString(), total.toString()) }
+                                getString(Res.string.home_loading_rendering_sample, count.toString(), total.toString())
                             }.getOrDefault("Rendering audio sample $count of $total")
 
                             reporter?.update(

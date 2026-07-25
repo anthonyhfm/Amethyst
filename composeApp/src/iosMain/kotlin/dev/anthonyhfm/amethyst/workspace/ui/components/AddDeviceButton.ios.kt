@@ -19,11 +19,13 @@ actual fun AddDeviceButton(
     onClick: () -> Unit,
     modifier: Modifier,
 ) {
+    val buttonTitle = stringResource(Res.string.workspace_add_device_button_content_description)
+
     UIKitView(
         factory = {
             UIButton.buttonWithType(UIButtonTypeSystem).apply {
                 configuration = liquidGlassButtonConfiguration().apply {
-                    title = stringResource(Res.string.workspace_add_device_button_content_description)
+                    title = buttonTitle
                     image = UIImage.systemImageNamed("plus")
                     imagePadding = 8.0
                     baseForegroundColor = UIColor.labelColor

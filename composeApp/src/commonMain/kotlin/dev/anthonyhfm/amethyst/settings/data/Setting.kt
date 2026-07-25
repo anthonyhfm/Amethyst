@@ -16,6 +16,7 @@ sealed class Setting<T>(
     private val onUpdate: (T) -> Unit = {},
 ) {
     val title: String @Composable get() = titleRes?.let { stringResource(it) } ?: rawTitle
+    val displayTitle: String get() = rawTitle
 
     private val _flow: MutableStateFlow<T> = MutableStateFlow(
         SettingsRepository.platformSettings.getStringOrNull(key)

@@ -142,27 +142,12 @@ struct ProjectsTabView: View {
     }
 
     private var loadingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.45).ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(theme.primary)
-                    .scaleEffect(1.2)
-
-                Text(viewModel.loadingText)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(theme.foreground)
-            }
-            .padding(24)
-            .background(theme.card)
-            .clipShape(.rect(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(theme.border, lineWidth: 1)
-            )
-        }
+        LoadingScreenView(
+            progress: viewModel.loadingProgress,
+            title: viewModel.loadingTitle,
+            statusText: viewModel.loadingStatusText,
+            detailText: viewModel.loadingDetailText
+        )
     }
 
     // MARK: - Helpers

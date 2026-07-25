@@ -36,6 +36,13 @@ actual fun LaunchpadViewportElementActions(
     }
     val width = buttonCount * ActionButtonSize + (buttonCount - 1) * ActionButtonSpacing
 
+    val connectionLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_connection_ios)
+    val styleTitleLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_style_dialog_title_ios)
+    val rotateLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_rotate_ios)
+    val deleteLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_delete_ios)
+    val deleteTitleLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_title_ios)
+    val cancelLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_cancel_ios)
+
     UIKitView(
         factory = {
             UIToolbar().apply {
@@ -49,9 +56,15 @@ actual fun LaunchpadViewportElementActions(
         update = { toolbar ->
             toolbar.rebuildLaunchpadActions(
                 element = element,
+                connectionLabel = connectionLabel,
+                styleTitleLabel = styleTitleLabel,
+                rotateLabel = rotateLabel,
+                deleteLabel = deleteLabel,
+                deleteTitleLabel = deleteTitleLabel,
+                cancelLabel = cancelLabel,
                 onShowStyle = { styleDialogState.visible = true },
                 onShowDelete = {
-                    toolbar.presentDeleteAlert(element)
+                    toolbar.presentDeleteAlert(element, deleteTitleLabel, cancelLabel, deleteLabel)
                 },
             )
         },
@@ -63,7 +76,7 @@ actual fun LaunchpadViewportElementActions(
     Dialog(state = styleDialogState) {
         DialogContent {
             DialogHeader {
-                DialogTitle(stringResource(Res.string.workspace_viewport_launchpad_actions_style_dialog_title_ios))
+                DialogTitle(styleTitleLabel)
             }
             element.StyleConfigContent(onDismiss = { styleDialogState.visible = false })
         }
@@ -73,6 +86,12 @@ actual fun LaunchpadViewportElementActions(
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 private fun UIToolbar.rebuildLaunchpadActions(
     element: LaunchpadViewportElement,
+    connectionLabel: String,
+    styleTitleLabel: String,
+    rotateLabel: String,
+    deleteLabel: String,
+    deleteTitleLabel: String,
+    cancelLabel: String,
     onShowStyle: () -> Unit,
     onShowDelete: () -> Unit,
 ) {
@@ -80,7 +99,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
         add(
             actionItem(
                 systemImageName = "cable.connector",
-                accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_connection_ios),
+                accessibilityLabel = connectionLabel,
                 tintColor = UIColor.labelColor,
                 onClick = {
                     element.onEvent?.invoke(WorkspaceContract.Event.OnClickDeviceConfigure(element.selectionUUID))
@@ -92,7 +111,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
             add(
                 actionItem(
                     systemImageName = "paintpalette",
-                    accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_style_dialog_title_ios),
+                    accessibilityLabel = styleTitleLabel,
                     tintColor = UIColor.labelColor,
                     onClick = onShowStyle,
                 ),
@@ -102,7 +121,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
         add(
             actionItem(
                 systemImageName = "rotate.right",
-                accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_rotate_ios),
+                accessibilityLabel = rotateLabel,
                 tintColor = UIColor.labelColor,
                 onClick = {
                     element.rotationDegrees.floatValue += 90f
@@ -114,7 +133,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
         add(
             actionItem(
                 systemImageName = "trash",
-                accessibilityLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_delete_ios),
+                accessibilityLabel = deleteLabel,
                 tintColor = UIColor.systemRedColor,
                 onClick = onShowDelete,
             ),
@@ -125,25 +144,30 @@ private fun UIToolbar.rebuildLaunchpadActions(
 }
 
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-private fun UIView.presentDeleteAlert(element: LaunchpadViewportElement) {
+private fun UIView.presentDeleteAlert(
+    element: LaunchpadViewportElement,
+    deleteTitleLabel: String,
+    cancelLabel: String,
+    deleteLabel: String,
+) {
     val presenter = nearestViewController() ?: return
     if (presenter.presentedViewController is UIAlertController) return
 
     val alertController = UIAlertController.alertControllerWithTitle(
-        title = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_title_ios),
+        title = deleteTitleLabel,
         message = "This will permanently remove \"${element.name}\" from the layout.",
         preferredStyle = UIAlertControllerStyleAlert,
     )
     alertController.addAction(
         UIAlertAction.actionWithTitle(
-            title = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_cancel_ios),
+            title = cancelLabel,
             style = UIAlertActionStyleCancel,
             handler = null,
         ),
     )
     alertController.addAction(
         UIAlertAction.actionWithTitle(
-            title = stringResource(Res.string.workspace_viewport_launchpad_actions_delete_dialog_delete_ios),
+            title = deleteLabel,
             style = UIAlertActionStyleDestructive,
         ) {
             element.onEvent?.invoke(WorkspaceContract.Event.OnDeleteDevice(element.selectionUUID))

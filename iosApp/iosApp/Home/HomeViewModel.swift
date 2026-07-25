@@ -35,7 +35,10 @@ final class HomeViewModel {
     // Published state
     var recentProjects: [RecentWorkspace] = []
     var isLoading = false
-    var loadingText = ""
+    var loadingProgress: Double = 0.0
+    var loadingTitle: String? = nil
+    var loadingStatusText: String = "Preparing..."
+    var loadingDetailText: String? = nil
     var errorMessage: String? = nil
     var activeSheet: HomeSheet? = nil
     var isWorkspaceOpen = false
@@ -48,6 +51,23 @@ final class HomeViewModel {
 
     init() {
         loadRecents()
+        startObservingLoadingProgress()
+    }
+
+    private func startObservingLoadingProgress() {
+        HomeSwiftBridge.shared.observeLoadingProgress(
+            onUpdate: { [weak self] progress, title, statusText, detailText in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    let p = Double(truncating: progress as NSNumber)
+                    self.loadingProgress = p
+                    self.loadingTitle = title
+                    self.loadingStatusText = statusText
+                    self.loadingDetailText = detailText
+                }
+            },
+            onFinished: {}
+        )
     }
 
     func loadRecents() {
@@ -194,7 +214,10 @@ final class HomeViewModel {
     }
 
     private func startLoading(_ text: String) {
-        loadingText = text
+        loadingProgress = 0.0
+        loadingTitle = nil
+        loadingStatusText = text
+        loadingDetailText = nil
         isLoading   = true
     }
 

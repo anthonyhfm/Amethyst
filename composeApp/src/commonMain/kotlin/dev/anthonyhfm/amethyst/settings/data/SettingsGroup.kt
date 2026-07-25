@@ -9,6 +9,7 @@ abstract class SettingsGroup(
     val titleRes: StringResource? = null,
 ) {
     val title: String @Composable get() = titleRes?.let { stringResource(it) } ?: rawTitle
+    val displayTitle: String get() = rawTitle
 
     private val _settings = mutableListOf<Setting<*>>()
     val settings: List<Setting<*>> = _settings

@@ -22,8 +22,8 @@ struct SettingsTabView: View {
     var body: some View {
         NavigationStack {
             Form {
-                ForEach(groups, id: \.title) { group in
-                    Section(header: Text(group.title)) {
+                ForEach(groups, id: \.displayTitle) { group in
+                    Section(header: Text(group.displayTitle)) {
                         let settingsList = group.settings as? [Setting<AnyObject>] ?? []
                         ForEach(settingsList, id: \.key) { setting in
                             SettingRowView(setting: setting, theme: theme)
@@ -66,7 +66,7 @@ struct SettingRowView: View {
             } else if let textFieldSetting = setting as? SettingTextField {
                 SettingTextFieldRow(setting: textFieldSetting, theme: theme)
             } else {
-                Text(setting.title)
+                Text(setting.displayTitle)
                     .foregroundStyle(.secondary)
             }
         }
@@ -88,7 +88,7 @@ struct SettingToggleRow: View {
     }
 
     var body: some View {
-        Toggle(setting.title, isOn: Binding(
+        Toggle(setting.displayTitle, isOn: Binding(
             get: { isOn },
             set: { newValue in
                 isOn = newValue
@@ -112,7 +112,7 @@ struct SettingSliderRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(setting.title)
+            Text(setting.displayTitle)
                 .foregroundStyle(theme.foreground)
             HStack(spacing: 12) {
                 let rangeStart = (setting.range.start as? KotlinFloat)?.floatValue ?? 0.0
@@ -158,7 +158,7 @@ struct SettingSelectRow: View {
     }
 
     var body: some View {
-        Picker(setting.title, selection: Binding(
+        Picker(setting.displayTitle, selection: Binding(
             get: { selectedIndex },
             set: { newIndex in
                 selectedIndex = newIndex
@@ -191,10 +191,10 @@ struct SettingTextFieldRow: View {
 
     var body: some View {
         HStack {
-            Text(setting.title)
+            Text(setting.displayTitle)
                 .foregroundStyle(theme.foreground)
             Spacer()
-            TextField(setting.title, text: Binding(
+            TextField(setting.displayTitle, text: Binding(
                 get: { text },
                 set: { newValue in
                     text = newValue
