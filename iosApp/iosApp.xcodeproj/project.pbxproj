@@ -7,55 +7,152 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		058557BB273AAA24004C7B11 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 058557BA273AAA24004C7B11 /* Assets.xcassets */; };
-		058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */; };
-		2152FB042600AC8F00CF470E /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2152FB032600AC8F00CF470E /* iOSApp.swift */; };
-		7555FF83242A565900829871 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7555FF82242A565900829871 /* ContentView.swift */; };
-		9264E1782EB3D8730031C7A3 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 9264E1772EB3D8730031C7A3 /* ZIPFoundation */; };
-		92A5E1DD2FDF195F005B2E7F /* Sentry-Dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = 92A5E1DC2FDF195F005B2E7F /* Sentry-Dynamic */; };
-		AA00000100000000000AA001 /* AmethystTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000AA000 /* AmethystTheme.swift */; };
+		058557BB273AAA24004C7B11 = {
+			isa = PBXBuildFile;
+			fileRef = 058557BA273AAA24004C7B11;
+		};
+		058557D9273AAEEB004C7B11 = {
+			isa = PBXBuildFile;
+			fileRef = 058557D8273AAEEB004C7B11;
+		};
+		2152FB042600AC8F00CF470E = {
+			isa = PBXBuildFile;
+			fileRef = 2152FB032600AC8F00CF470E;
+		};
+		7555FF83242A565900829871 = {
+			isa = PBXBuildFile;
+			fileRef = 7555FF82242A565900829871;
+		};
+		9264E1782EB3D8730031C7A3 = {
+			isa = PBXBuildFile;
+			productRef = 9264E1772EB3D8730031C7A3;
+		};
+		92A5E1DD2FDF195F005B2E7F = {
+			isa = PBXBuildFile;
+			productRef = 92A5E1DC2FDF195F005B2E7F;
+		};
+		AA00000100000000000AA001 = {
+			isa = PBXBuildFile;
+			fileRef = AA00000100000000000AA000;
+		};
+		B519EBF2F079DBCFEB5F0D52 = {
+			isa = PBXBuildFile;
+			productRef = 98D1F1D58881B34CF322F1CC;
+		};
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		058557BA273AAA24004C7B11 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		2152FB032600AC8F00CF470E /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
-		7555FF7B242A565900829871 /* Amethyst.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Amethyst.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		7555FF82242A565900829871 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		7555FF8C242A565B00829871 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		9237F2762EF4824000BBFCF3 /* iosApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iosApp.entitlements; sourceTree = "<group>"; };
-		AA00000100000000000AA000 /* AmethystTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmethystTheme.swift; sourceTree = "<group>"; };
-		AB3632DC29227652001CCB65 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		058557BA273AAA24004C7B11 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		058557D8273AAEEB004C7B11 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = "Preview Assets.xcassets";
+			sourceTree = "<group>";
+		};
+		2152FB032600AC8F00CF470E = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = iOSApp.swift;
+			sourceTree = "<group>";
+		};
+		7555FF7B242A565900829871 = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = Amethyst.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		7555FF82242A565900829871 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ContentView.swift;
+			sourceTree = "<group>";
+		};
+		7555FF8C242A565B00829871 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = Info.plist;
+			sourceTree = "<group>";
+		};
+		9237F2762EF4824000BBFCF3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = iosApp.entitlements;
+			sourceTree = "<group>";
+		};
+		AA00000100000000000AA000 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = AmethystTheme.swift;
+			sourceTree = "<group>";
+		};
+		AB3632DC29227652001CCB65 = {
+			isa = PBXFileReference;
+			fileEncoding = 4;
+			lastKnownFileType = text.xcconfig;
+			path = Config.xcconfig;
+			sourceTree = "<group>";
+		};
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		9264E1792EB3D9A00031C7A3 /* Utils */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Utils; sourceTree = "<group>"; };
-		AA00000100000000000AA002 /* Home */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Home; sourceTree = "<group>"; };
-		AA00000100000000000AA003 /* Settings */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Settings; sourceTree = "<group>"; };
+		9264E1792EB3D9A00031C7A3 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		AA00000100000000000AA002 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		AA00000100000000000AA003 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		B92378962B6B1156000C7307 /* Frameworks */ = {
+		B92378962B6B1156000C7307 = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9264E1782EB3D8730031C7A3 /* ZIPFoundation in Frameworks */,
-				92A5E1DD2FDF195F005B2E7F /* Sentry-Dynamic in Frameworks */,
+				9264E1782EB3D8730031C7A3,
+				92A5E1DD2FDF195F005B2E7F,
+				B519EBF2F079DBCFEB5F0D52,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		058557D7273AAEEB004C7B11 /* Preview Content */ = {
+		058557D7273AAEEB004C7B11 = {
 			isa = PBXGroup;
 			children = (
-				058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */,
+				058557D8273AAEEB004C7B11,
 			);
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		42799AB246E5F90AF97AA0EF /* Frameworks */ = {
+		42799AB246E5F90AF97AA0EF = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -65,42 +162,42 @@
 		7555FF72242A565900829871 = {
 			isa = PBXGroup;
 			children = (
-				AB1DB47929225F7C00F7AF9C /* Configuration */,
-				7555FF7D242A565900829871 /* iosApp */,
-				7555FF7C242A565900829871 /* Products */,
-				42799AB246E5F90AF97AA0EF /* Frameworks */,
+				AB1DB47929225F7C00F7AF9C,
+				7555FF7D242A565900829871,
+				7555FF7C242A565900829871,
+				42799AB246E5F90AF97AA0EF,
 			);
 			sourceTree = "<group>";
 		};
-		7555FF7C242A565900829871 /* Products */ = {
+		7555FF7C242A565900829871 = {
 			isa = PBXGroup;
 			children = (
-				7555FF7B242A565900829871 /* Amethyst.app */,
+				7555FF7B242A565900829871,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		7555FF7D242A565900829871 /* iosApp */ = {
+		7555FF7D242A565900829871 = {
 			isa = PBXGroup;
 			children = (
-				9237F2762EF4824000BBFCF3 /* iosApp.entitlements */,
-				9264E1792EB3D9A00031C7A3 /* Utils */,
-				AA00000100000000000AA002 /* Home */,
-				AA00000100000000000AA003 /* Settings */,
-				058557BA273AAA24004C7B11 /* Assets.xcassets */,
-				AA00000100000000000AA000 /* AmethystTheme.swift */,
-				7555FF82242A565900829871 /* ContentView.swift */,
-				7555FF8C242A565B00829871 /* Info.plist */,
-				2152FB032600AC8F00CF470E /* iOSApp.swift */,
-				058557D7273AAEEB004C7B11 /* Preview Content */,
+				9237F2762EF4824000BBFCF3,
+				9264E1792EB3D9A00031C7A3,
+				AA00000100000000000AA002,
+				AA00000100000000000AA003,
+				058557BA273AAA24004C7B11,
+				AA00000100000000000AA000,
+				7555FF82242A565900829871,
+				7555FF8C242A565B00829871,
+				2152FB032600AC8F00CF470E,
+				058557D7273AAEEB004C7B11,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
 		};
-		AB1DB47929225F7C00F7AF9C /* Configuration */ = {
+		AB1DB47929225F7C00F7AF9C = {
 			isa = PBXGroup;
 			children = (
-				AB3632DC29227652001CCB65 /* Config.xcconfig */,
+				AB3632DC29227652001CCB65,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -108,37 +205,38 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		7555FF7A242A565900829871 /* iosApp */ = {
+		7555FF7A242A565900829871 = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 7555FFA5242A565B00829871 /* Build configuration list for PBXNativeTarget "iosApp" */;
+			buildConfigurationList = 7555FFA5242A565B00829871;
 			buildPhases = (
-				92B8EA712F24EB5200CAFFC3 /* Embed and Sign Kotlin Framework */,
-				7555FF77242A565900829871 /* Sources */,
-				B92378962B6B1156000C7307 /* Frameworks */,
-				7555FF79242A565900829871 /* Resources */,
+				92B8EA712F24EB5200CAFFC3,
+				7555FF77242A565900829871,
+				B92378962B6B1156000C7307,
+				7555FF79242A565900829871,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				9264E1792EB3D9A00031C7A3 /* Utils */,
-				AA00000100000000000AA002 /* Home */,
-				AA00000100000000000AA003 /* Settings */,
+				9264E1792EB3D9A00031C7A3,
+				AA00000100000000000AA002,
+				AA00000100000000000AA003,
 			);
 			name = iosApp;
 			packageProductDependencies = (
-				9264E1772EB3D8730031C7A3 /* ZIPFoundation */,
-				92A5E1DC2FDF195F005B2E7F /* Sentry-Dynamic */,
+				9264E1772EB3D8730031C7A3,
+				92A5E1DC2FDF195F005B2E7F,
+				98D1F1D58881B34CF322F1CC,
 			);
 			productName = iosApp;
-			productReference = 7555FF7B242A565900829871 /* Amethyst.app */;
+			productReference = 7555FF7B242A565900829871;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		7555FF73242A565900829871 /* Project object */ = {
+		7555FF73242A565900829871 = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
@@ -151,7 +249,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 7555FF76242A565900829871 /* Build configuration list for PBXProject "iosApp" */;
+			buildConfigurationList = 7555FF76242A565900829871;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -161,32 +259,33 @@
 			);
 			mainGroup = 7555FF72242A565900829871;
 			packageReferences = (
-				9264E1762EB3D8730031C7A3 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
-				92A5E1D92FDF195F005B2E7F /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+				9264E1762EB3D8730031C7A3,
+				92A5E1D92FDF195F005B2E7F,
+				69C99C4D8A9277F807A51895,
 			);
-			productRefGroup = 7555FF7C242A565900829871 /* Products */;
+			productRefGroup = 7555FF7C242A565900829871;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				7555FF7A242A565900829871 /* iosApp */,
+				7555FF7A242A565900829871,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		7555FF79242A565900829871 /* Resources */ = {
+		7555FF79242A565900829871 = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */,
-				058557BB273AAA24004C7B11 /* Assets.xcassets in Resources */,
+				058557D9273AAEEB004C7B11,
+				058557BB273AAA24004C7B11,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		92B8EA712F24EB5200CAFFC3 /* Embed and Sign Kotlin Framework */ = {
+		92B8EA712F24EB5200CAFFC3 = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -208,22 +307,22 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		7555FF77242A565900829871 /* Sources */ = {
+		7555FF77242A565900829871 = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2152FB042600AC8F00CF470E /* iOSApp.swift in Sources */,
-				7555FF83242A565900829871 /* ContentView.swift in Sources */,
-				AA00000100000000000AA001 /* AmethystTheme.swift in Sources */,
+				2152FB042600AC8F00CF470E,
+				7555FF83242A565900829871,
+				AA00000100000000000AA001,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		7555FFA3242A565B00829871 /* Debug */ = {
+		7555FFA3242A565B00829871 = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AB3632DC29227652001CCB65 /* Config.xcconfig */;
+			baseConfigurationReference = AB3632DC29227652001CCB65;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -284,9 +383,9 @@
 			};
 			name = Debug;
 		};
-		7555FFA4242A565B00829871 /* Release */ = {
+		7555FFA4242A565B00829871 = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AB3632DC29227652001CCB65 /* Config.xcconfig */;
+			baseConfigurationReference = AB3632DC29227652001CCB65;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -341,7 +440,7 @@
 			};
 			name = Release;
 		};
-		7555FFA6242A565B00829871 /* Debug */ = {
+		7555FFA6242A565B00829871 = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -375,7 +474,7 @@
 			};
 			name = Debug;
 		};
-		7555FFA7242A565B00829871 /* Release */ = {
+		7555FFA7242A565B00829871 = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -412,28 +511,35 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		7555FF76242A565900829871 /* Build configuration list for PBXProject "iosApp" */ = {
+		7555FF76242A565900829871 = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				7555FFA3242A565B00829871 /* Debug */,
-				7555FFA4242A565B00829871 /* Release */,
+				7555FFA3242A565B00829871,
+				7555FFA4242A565B00829871,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		7555FFA5242A565B00829871 /* Build configuration list for PBXNativeTarget "iosApp" */ = {
+		7555FFA5242A565B00829871 = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				7555FFA6242A565B00829871 /* Debug */,
-				7555FFA7242A565B00829871 /* Release */,
+				7555FFA6242A565B00829871,
+				7555FFA7242A565B00829871,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		69C99C4D8A9277F807A51895 = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = KotlinMultiplatformLinkedPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
-		9264E1762EB3D8730031C7A3 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+		9264E1762EB3D8730031C7A3 = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
 			requirement = {
@@ -441,7 +547,7 @@
 				minimumVersion = 0.9.20;
 			};
 		};
-		92A5E1D92FDF195F005B2E7F /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+		92A5E1D92FDF195F005B2E7F = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
 			requirement = {
@@ -452,17 +558,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		9264E1772EB3D8730031C7A3 /* ZIPFoundation */ = {
+		9264E1772EB3D8730031C7A3 = {
 			isa = XCSwiftPackageProductDependency;
-			package = 9264E1762EB3D8730031C7A3 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			package = 9264E1762EB3D8730031C7A3;
 			productName = ZIPFoundation;
 		};
-		92A5E1DC2FDF195F005B2E7F /* Sentry-Dynamic */ = {
+		92A5E1DC2FDF195F005B2E7F = {
 			isa = XCSwiftPackageProductDependency;
-			package = 92A5E1D92FDF195F005B2E7F /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			package = 92A5E1D92FDF195F005B2E7F;
 			productName = "Sentry-Dynamic";
+		};
+		98D1F1D58881B34CF322F1CC = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KotlinMultiplatformLinkedPackage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = 7555FF73242A565900829871 /* Project object */;
+	rootObject = 7555FF73242A565900829871;
 }

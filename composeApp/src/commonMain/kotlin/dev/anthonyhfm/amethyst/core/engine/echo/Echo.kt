@@ -19,7 +19,7 @@ expect object Echo {
     fun isFormatSupported(fileName: String): Boolean
     fun getSupportedFormats(): List<String>
 
-    /** Opens the platform output. Mobile stubs return false. */
+    /** Opens the platform output using the configured low-latency buffer size. */
     fun initialize(): Boolean
     fun setPreferredBufferFrames(frames: Int)
     fun outputDevices(): List<String>

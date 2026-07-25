@@ -8,11 +8,13 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    kotlin("plugin.serialization") version "2.4.0"
+    kotlin("plugin.serialization") version "2.4.20-Beta2"
     id("org.jetbrains.kotlinx.atomicfu") version "0.29.0"
     alias(libs.plugins.sentryKmp)
     alias(libs.plugins.nucleus)
 }
+
+group = "dev.anthonyhfm.amethyst"
 
 kotlin {
     androidTarget {
@@ -33,6 +35,23 @@ kotlin {
             binaryOption("bundleId", iosFrameworkBundleId)
             isStatic = true
         }
+    }
+
+    swiftPMDependencies {
+        discoverClangModulesImplicitly = false
+        iosMinimumDeploymentTarget.set("15.3")
+
+        swiftPackage(
+            url = url("https://github.com/HealsCodes/vorbis-swift.git"),
+            version = exact("1.3.7"),
+            products = listOf(
+                product(
+                    "LibVorbis",
+                    platforms = setOf(iOS()),
+                ),
+            ),
+            importedClangModules = listOf("LibVorbis"),
+        )
     }
 
     jvm("desktop") {
@@ -115,6 +134,10 @@ kotlin {
             implementation(libs.nucleus.decorated.window)
         }
     }
+}
+
+compose.resources {
+    packageOfResClass = "amethyst.composeapp.generated.resources"
 }
 
 android {

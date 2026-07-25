@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.gobleyCargo)
     alias(libs.plugins.gobleyUniffi)
-    kotlin("plugin.atomicfu") version "2.4.0"
+    kotlin("plugin.atomicfu") version "2.4.20-Beta2"
 }
 
 kotlin {

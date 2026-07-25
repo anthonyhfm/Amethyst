@@ -26,3 +26,4 @@ specs/
 docs/
 skills-lock.json
 *_ml.png
+.swiftpm-locks
