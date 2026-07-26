@@ -122,7 +122,6 @@ class LightsChainWorkspaceMode(
                 }
 
                 WorkspaceChainEditor(
-                    devices = WorkspaceRepository.lightsChain.devices.value,
                     scrollState = scrollState,
                 )
             }

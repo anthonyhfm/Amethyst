@@ -30,11 +30,8 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMo
 
 @Composable
 fun WorkspaceChainEditor(
-    devices: List<GenericChainDevice<*>>,
     scrollState: ScrollAreaState = rememberScrollAreaState(),
     modifier: Modifier = Modifier,
-    isFullScreen: Boolean = false,
-    onEvent: ((WorkspaceContract.Event) -> Unit)? = null
 ) {
     val dragAndDropState = rememberDragAndDropState<GenericChainDevice<*>>()
     val currentMode by WorkspaceRepository.mode.collectAsState()
@@ -56,13 +53,7 @@ fun WorkspaceChainEditor(
         ScrollArea(
             modifier = Modifier
                 .clip(DefaultShape)
-                .then(
-                    if (isFullScreen) {
-                        Modifier.weight(1f)
-                    } else {
-                        Modifier.height(280.dp)
-                    }
-                )
+                .height(280.dp)
                 .fillMaxWidth()
                 .padding(bottom = 10.dp),
             orientation = ScrollBarOrientation.Horizontal,

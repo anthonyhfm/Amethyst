@@ -114,7 +114,6 @@ class SamplingChainWorkspaceMode(
                 }
 
                 WorkspaceChainEditor(
-                    devices = WorkspaceRepository.samplingChain.devices.value,
                     scrollState = scrollState,
                 )
             }
