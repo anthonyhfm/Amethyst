@@ -44,7 +44,6 @@ import dev.anthonyhfm.amethyst.ui.theme.cardForeground
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
@@ -76,7 +75,6 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
 
     @Composable
     fun ModeContent(modifier: Modifier) {
-        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
         val state by state.collectAsState()
 
         Row(
@@ -170,7 +168,6 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
                         showRemoteCursors = true,
                         contentPadding = 24.dp
                     ),
-                    onEvent = { viewModel.onEvent(it) }
                 )
 
                 KeyframesPreviewControls()

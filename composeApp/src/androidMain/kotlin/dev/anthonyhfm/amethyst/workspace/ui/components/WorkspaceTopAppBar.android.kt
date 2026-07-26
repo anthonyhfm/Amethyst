@@ -41,7 +41,6 @@ import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.X
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.settings.SettingsDialog
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
@@ -74,7 +73,6 @@ private val selectableModes = listOf(
 actual fun WorkspaceTopAppBar(
     onBack: () -> Unit,
     mode: WorkspaceMode,
-    onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val automappingState by AutomappingManager.state.collectAsState()
     var showSettingsDialog by remember { mutableStateOf(false) }

@@ -87,7 +87,6 @@ import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import kotlinx.coroutines.launch
@@ -96,7 +95,6 @@ import kotlinx.coroutines.launch
 actual fun WorkspaceTopAppBar(
     onBack: () -> Unit,
     mode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode,
-    onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val automappingState by AutomappingManager.state.collectAsState()
     val liveCollaborationEnabled by ExperimentalSettings.liveCollaboration.flow.collectAsState()

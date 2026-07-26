@@ -21,7 +21,6 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEdito
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GraphSplitHandle
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.PlaybackOptions
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CompositionAutomationEditor
-import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportPanBoundsPolicy
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
@@ -32,7 +31,6 @@ fun CompositionLayout(
     editor: CompositionGraphEditor,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
     val deviceState by device.state.collectAsState()
     val splitRatio = deviceState.splitRatio
     val automationFocus by editor.automationFocus.collectAsState()
@@ -71,7 +69,6 @@ fun CompositionLayout(
                     showRemoteCursors = true,
                     contentPadding = 48.dp
                 ),
-                onEvent = { viewModel.onEvent(it) }
             )
 
             PlaybackOptions(device = device)

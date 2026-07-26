@@ -33,7 +33,6 @@ import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.components.AddDeviceButton
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
@@ -73,8 +72,6 @@ class LayoutWorkspaceMode(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
-
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -96,7 +93,6 @@ class LayoutWorkspaceMode(
                     showRemoteCursors = true,
                     contentPadding = 80.dp
                 ),
-                onEvent = { viewModel.onEvent(it) }
             )
 
             AnimatedVisibility(
@@ -110,7 +106,7 @@ class LayoutWorkspaceMode(
             ) {
                 AddDeviceButton(
                     onClick = {
-                        viewModel.onEvent(WorkspaceContract.Event.OpenVirtualDevicePicker)
+                        WorkspaceRepository.openDevicePicker()
                     }
                 )
             }

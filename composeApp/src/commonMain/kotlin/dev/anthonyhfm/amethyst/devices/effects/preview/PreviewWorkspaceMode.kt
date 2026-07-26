@@ -27,7 +27,6 @@ import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -61,8 +60,6 @@ class PreviewWorkspaceMode(
 
     @androidx.compose.runtime.Composable
     override fun Content(modifier: Modifier) {
-        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
-
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -79,7 +76,6 @@ class PreviewWorkspaceMode(
                     panBoundsPolicy = ViewportPanBoundsPolicy.ClampToContent(),
                     contentPadding = 80.dp
                 ),
-                onEvent = { viewModel.onEvent(it) }
             )
 
             AnimatedVisibility(
@@ -93,7 +89,7 @@ class PreviewWorkspaceMode(
             ) {
                 AddDeviceButton(
                     onClick = {
-                        viewModel.onEvent(WorkspaceContract.Event.OpenVirtualDevicePicker)
+                        WorkspaceRepository.openDevicePicker()
                     }
                 )
             }

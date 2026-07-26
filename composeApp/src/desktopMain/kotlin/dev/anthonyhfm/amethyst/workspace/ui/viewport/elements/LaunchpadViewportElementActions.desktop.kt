@@ -45,7 +45,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.DialogContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.DialogHeader
 import dev.anthonyhfm.amethyst.ui.components.primitives.DialogTitle
 import dev.anthonyhfm.amethyst.ui.components.primitives.FullShape
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 private val actionTrayBackground = Color(0xFF282C34)
 private val actionTrayBorder = Color(0xFF3E4451)
@@ -71,7 +72,7 @@ actual fun LaunchpadViewportElementActions(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LaunchpadActionButton(
-            onClick = { element.onEvent?.invoke(WorkspaceContract.Event.OnClickDeviceConfigure(element.selectionUUID)) },
+            onClick = { WorkspaceRepository.openDeviceConfigurator(element.selectionUUID) },
             icon = Lucide.Cable,
             contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_connection),
             backgroundHoverColor = actionButtonBgHover,
@@ -132,7 +133,8 @@ actual fun LaunchpadViewportElementActions(
             AlertDialogAction(
                 onClick = {
                     deleteDialogState.visible = false
-                    element.onEvent?.invoke(WorkspaceContract.Event.OnDeleteDevice(element.selectionUUID))
+                    SelectionManager.clear()
+                    WorkspaceRepository.removeVirtualDevice(element.selectionUUID)
                 },
                 variant = ButtonVariant.Destructive,
             ) {

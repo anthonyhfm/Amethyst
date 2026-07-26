@@ -68,6 +68,8 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -86,9 +88,8 @@ private enum class LaunchpadCategory(
 }
 
 @Composable
-fun InsertLaunchpadDialog(
-    onEvent: (WorkspaceContract.Event) -> Unit,
-) {
+fun InsertLaunchpadDialog() {
+    val coroutineScope = rememberCoroutineScope()
     val dialogState = rememberDialogState(initiallyVisible = true)
     val options = remember {
         listOf(
@@ -144,7 +145,7 @@ fun InsertLaunchpadDialog(
         modifier = Modifier
             .width(640.dp),
         onDismiss = {
-            onEvent(WorkspaceContract.Event.DismissVirtualDevicePicker)
+            WorkspaceRepository.closeDevicePicker()
         },
     ) {
         AlertDialogHeader {
@@ -216,7 +217,7 @@ fun InsertLaunchpadDialog(
         ) {
             AlertDialogCancel(
                 onClick = {
-                    onEvent(WorkspaceContract.Event.DismissVirtualDevicePicker)
+                    WorkspaceRepository.closeDevicePicker()
                 },
             ) {
                 Text("Cancel")
@@ -226,7 +227,20 @@ fun InsertLaunchpadDialog(
 
             Button(
                 onClick = {
-                    onEvent(WorkspaceContract.Event.AddDeviceToViewport(selectedOption.device))
+                    val device = when (selectedOption.device) {
+                        is ViewportLaunchpadPro -> ViewportLaunchpadPro()
+                        is ViewportLaunchpadIdealised -> ViewportLaunchpadIdealised()
+                        is ViewportLaunchpadMk2 -> ViewportLaunchpadMk2()
+                        is ViewportLaunchpadProMk3 -> ViewportLaunchpadProMk3()
+                        is ViewportLaunchpadX -> ViewportLaunchpadX()
+                        is ViewportMystrix -> ViewportMystrix()
+                        is ViewportMidiFighter64 -> ViewportMidiFighter64()
+                        else -> return@Button
+                    }
+                    WorkspaceRepository.closeDevicePicker()
+                    coroutineScope.launch {
+                        WorkspaceRepository.addVirtualDevice(device)
+                    }
                 },
                 size = ButtonSize.Small,
             ) {

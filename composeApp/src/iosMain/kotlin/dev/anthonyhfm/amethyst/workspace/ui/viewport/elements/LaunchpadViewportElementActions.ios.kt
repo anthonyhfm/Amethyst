@@ -18,7 +18,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Dialog
 import dev.anthonyhfm.amethyst.ui.components.primitives.DialogContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.DialogHeader
 import dev.anthonyhfm.amethyst.ui.components.primitives.DialogTitle
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import platform.UIKit.*
 
 private const val ActionButtonSize = 44.0
@@ -102,7 +103,7 @@ private fun UIToolbar.rebuildLaunchpadActions(
                 accessibilityLabel = connectionLabel,
                 tintColor = UIColor.labelColor,
                 onClick = {
-                    element.onEvent?.invoke(WorkspaceContract.Event.OnClickDeviceConfigure(element.selectionUUID))
+                    WorkspaceRepository.openDeviceConfigurator(element.selectionUUID)
                 },
             ),
         )
@@ -170,7 +171,8 @@ private fun UIView.presentDeleteAlert(
             title = deleteLabel,
             style = UIAlertActionStyleDestructive,
         ) {
-            element.onEvent?.invoke(WorkspaceContract.Event.OnDeleteDevice(element.selectionUUID))
+            SelectionManager.clear()
+            WorkspaceRepository.removeVirtualDevice(element.selectionUUID)
         },
     )
     presenter.presentViewController(alertController, animated = true, completion = null)

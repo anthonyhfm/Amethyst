@@ -132,6 +132,30 @@ object WorkspaceRepository {
     private val _gridType = MutableStateFlow<GridUtils.GridType>(GridUtils.GridType.Flexible.Medium)
     val gridType: StateFlow<GridUtils.GridType> = _gridType.asStateFlow()
 
+    private val _showDeviceConfigurator = MutableStateFlow<String?>(null)
+    val showDeviceConfigurator: StateFlow<String?> = _showDeviceConfigurator.asStateFlow()
+
+    private val _showDevicePicker = MutableStateFlow(false)
+    val showDevicePicker: StateFlow<Boolean> = _showDevicePicker.asStateFlow()
+
+    fun openDeviceConfigurator(uuid: String) {
+        if (_mode.value is LayoutWorkspaceMode) {
+            _showDeviceConfigurator.update { uuid }
+        }
+    }
+
+    fun closeDeviceConfigurator() {
+        _showDeviceConfigurator.update { null }
+    }
+
+    fun openDevicePicker() {
+        _showDevicePicker.update { true }
+    }
+
+    fun closeDevicePicker() {
+        _showDevicePicker.update { false }
+    }
+
     init {
         setupChains()
     }

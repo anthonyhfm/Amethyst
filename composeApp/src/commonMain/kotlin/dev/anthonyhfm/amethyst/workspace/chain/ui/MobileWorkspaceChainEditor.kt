@@ -62,7 +62,6 @@ import dev.anthonyhfm.amethyst.ui.theme.chainBorder
 import dev.anthonyhfm.amethyst.ui.theme.chainCanvas
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -73,7 +72,6 @@ fun MobileWorkspaceChainEditor(
     devices: List<GenericChainDevice<*>>,
     scrollState: ScrollAreaState = rememberScrollAreaState(),
     modifier: Modifier = Modifier,
-    onEvent: ((WorkspaceContract.Event) -> Unit)? = null
 ) {
     val dragAndDropState = rememberDragAndDropState<GenericChainDevice<*>>()
     val currentMode by WorkspaceRepository.mode.collectAsState()

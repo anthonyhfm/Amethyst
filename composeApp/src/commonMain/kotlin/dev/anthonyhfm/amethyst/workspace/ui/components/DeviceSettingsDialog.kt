@@ -35,12 +35,12 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.FieldDescription
 import dev.anthonyhfm.amethyst.ui.components.primitives.FieldLabel
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 
 @Composable
 fun DeviceSettingsDialog(
     uuid: String,
-    onEvent: (WorkspaceContract.Event) -> Unit,
 ) {
     val device = Heaven.devices.find { it.selectionUUID == uuid }
     val detectedDevices by AmethystMidiManager.detectedDevices.collectAsState()
@@ -60,7 +60,7 @@ fun DeviceSettingsDialog(
         state = dialogState,
         modifier = Modifier.width(350.dp),
         onDismiss = {
-            onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+            WorkspaceRepository.closeDeviceConfigurator()
         },
     ) {
         AlertDialogHeader {
@@ -93,13 +93,10 @@ fun DeviceSettingsDialog(
             if (platform is Platform.Android || platform is Platform.iOS) {
                 AlertDialogAction(
                     onClick = {
-                        onEvent(
-                            WorkspaceContract.Event.OnChangeDeviceConfig(
-                                uuid = uuid,
-                                deviceId = selectedDevice?.id
-                            )
-                        )
-                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                        if (WorkspaceRepository.mode.value is LayoutWorkspaceMode) {
+                            AmethystMidiManager().changeDeviceConfig(uuid, selectedDevice?.id)
+                        }
+                        WorkspaceRepository.closeDeviceConfigurator()
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -108,7 +105,7 @@ fun DeviceSettingsDialog(
 
                 AlertDialogCancel(
                     onClick = {
-                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                        WorkspaceRepository.closeDeviceConfigurator()
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -117,7 +114,7 @@ fun DeviceSettingsDialog(
             } else {
                 AlertDialogCancel(
                     onClick = {
-                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                        WorkspaceRepository.closeDeviceConfigurator()
                     },
                 ) {
                     Text(stringResource(Res.string.workspace_device_settings_cancel))
@@ -127,13 +124,10 @@ fun DeviceSettingsDialog(
 
                 AlertDialogAction(
                     onClick = {
-                        onEvent(
-                            WorkspaceContract.Event.OnChangeDeviceConfig(
-                                uuid = uuid,
-                                deviceId = selectedDevice?.id
-                            )
-                        )
-                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                        if (WorkspaceRepository.mode.value is LayoutWorkspaceMode) {
+                            AmethystMidiManager().changeDeviceConfig(uuid, selectedDevice?.id)
+                        }
+                        WorkspaceRepository.closeDeviceConfigurator()
                     },
                 ) {
                     Text(stringResource(Res.string.workspace_device_settings_save))

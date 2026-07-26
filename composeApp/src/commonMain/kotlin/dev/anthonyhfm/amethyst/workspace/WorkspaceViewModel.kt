@@ -41,10 +41,6 @@ class WorkspaceViewModel(
     init {
         viewModelScope.launch {
             ViewportRepository.devices.collect { devices ->
-                devices.forEach { device ->
-                    device.onEvent = { onEvent(it) }
-                }
-
                 if (devices.isNotEmpty()) {
                     amethystMidiManager.startAutoDetectLoop()
                 } else {
@@ -106,93 +102,6 @@ class WorkspaceViewModel(
                 .collect { focusedElementId ->
                     CollaborationPresence.sendFocusedElement(focusedElementId)
                 }
-        }
-    }
-
-    fun onEvent(event: WorkspaceContract.Event) {
-        when (event) {
-            is WorkspaceContract.Event.OpenVirtualDevicePicker -> {
-                state.update {
-                    it.copy(showDevicePicker = true)
-                }
-            }
-
-            is WorkspaceContract.Event.DismissVirtualDevicePicker -> {
-                state.update {
-                    it.copy(showDevicePicker = false)
-                }
-            }
-
-            is WorkspaceContract.Event.AddDeviceToViewport -> {
-                val device = when (event.device) {
-                    is ViewportLaunchpadPro -> ViewportLaunchpadPro()
-                    is ViewportLaunchpadIdealised -> ViewportLaunchpadIdealised()
-                    is ViewportLaunchpadMk2 -> ViewportLaunchpadMk2()
-                    is ViewportLaunchpadProMk3 -> ViewportLaunchpadProMk3()
-                    is ViewportLaunchpadX -> ViewportLaunchpadX()
-                    is ViewportMystrix -> ViewportMystrix()
-                    is ViewportMidiFighter64 -> ViewportMidiFighter64()
-
-                    else -> return
-                }
-
-                device.onEvent = { onEvent(it) }
-
-                state.update {
-                    it.copy(showDevicePicker = false)
-                }
-
-                viewModelScope.launch {
-                    WorkspaceRepository.addVirtualDevice(device)
-                }
-            }
-
-            is WorkspaceContract.Event.ChangeViewportElementPosition -> {
-                if (state.value.mode !is LayoutWorkspaceMode) return
-
-                val elements = ViewportRepository.devices.value
-                if (event.index in elements.indices) {
-                    val element = elements[event.index]
-                    viewModelScope.launch {
-                        WorkspaceRepository.moveVirtualDevice(element.launchpadId, event.offset)
-                    }
-                }
-            }
-
-            is WorkspaceContract.Event.OnViewportElementMoveFinished -> {
-                WorkspaceRepository.updateWorkspaceBounds()
-            }
-
-            is WorkspaceContract.Event.OnClickDeviceConfigure -> {
-                if (state.value.mode is LayoutWorkspaceMode) {
-                    state.update {
-                        it.copy(
-                            showDeviceConfigurator = event.uuid
-                        )
-                    }
-                }
-            }
-
-            is WorkspaceContract.Event.OnDismissDeviceConfigure -> {
-                state.update {
-                    it.copy(
-                        showDeviceConfigurator = null
-                    )
-                }
-            }
-
-            is WorkspaceContract.Event.OnChangeDeviceConfig -> {
-                if (state.value.mode is LayoutWorkspaceMode) {
-                    amethystMidiManager.changeDeviceConfig(event)
-                }
-            }
-
-            is WorkspaceContract.Event.OnDeleteDevice -> {
-                SelectionManager.clear()
-                viewModelScope.launch {
-                    WorkspaceRepository.removeVirtualDeviceById(event.uuid)
-                }
-            }
         }
     }
 

@@ -24,7 +24,6 @@ import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.isMobilePhone
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import dev.anthonyhfm.amethyst.workspace.chain.ui.MobileWorkspaceChainEditor
 import dev.anthonyhfm.amethyst.workspace.chain.ui.WorkspaceChainEditor
 import dev.anthonyhfm.amethyst.ui.components.primitives.rememberScrollAreaState
@@ -48,7 +47,6 @@ class SamplingChainWorkspaceMode(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
         val scrollState = rememberScrollAreaState()
         var macrosVisible by remember { mutableStateOf(false) }
 
@@ -91,7 +89,6 @@ class SamplingChainWorkspaceMode(
                             showRemoteCursors = true,
                             contentPadding = 24.dp
                         ),
-                        onEvent = { viewModel.onEvent(it) }
                     )
 
                     if (macrosVisible) {

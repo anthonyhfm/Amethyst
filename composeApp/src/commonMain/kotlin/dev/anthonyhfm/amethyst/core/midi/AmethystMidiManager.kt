@@ -232,14 +232,13 @@ class AmethystMidiManager {
         }
     }
 
-    fun changeDeviceConfig(event: WorkspaceContract.Event.OnChangeDeviceConfig) {
-        val element = Heaven.devices.find { it.selectionUUID == event.uuid } ?: return
+    fun changeDeviceConfig(uuid: String, deviceId: String?) {
+        val element = Heaven.devices.find { it.selectionUUID == uuid } ?: return
 
         elementCollectorJobs[element.selectionUUID]?.cancel()
         elementCollectorJobs.remove(element.selectionUUID)
         element.launchpadDevice = null
 
-        val deviceId = event.deviceId
         if (deviceId == null) {
             element.savedInputPortId = null
             element.savedInputPortName = null

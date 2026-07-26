@@ -22,7 +22,6 @@ import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.ui.launchpad.LaunchpadPreviewState
 import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
 import dev.anthonyhfm.amethyst.workspace.AutoPlayState
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportElement
@@ -66,7 +65,6 @@ abstract class LaunchpadViewportElement(
         }
     }
 
-    var onEvent: ((WorkspaceContract.Event) -> Unit)? = null
     var onCapturePad: ((Triple<Boolean, Int, Int>) -> Unit)? = null
 
     @Composable

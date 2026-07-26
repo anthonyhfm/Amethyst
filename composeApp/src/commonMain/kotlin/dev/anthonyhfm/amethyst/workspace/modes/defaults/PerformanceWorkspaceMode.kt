@@ -23,7 +23,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
-import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.components.AutoPlayButtons
 import dev.anthonyhfm.amethyst.workspace.ui.components.MobileAutoPlayButtons
@@ -55,8 +54,6 @@ class PerformanceWorkspaceMode(
 
     @Composable
     private fun DesktopLayout(modifier: Modifier = Modifier) {
-        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
-
         Box(
             modifier = modifier
                 .padding(horizontal = 12.dp)
@@ -80,7 +77,6 @@ class PerformanceWorkspaceMode(
                     showRemoteCursors = true,
                     contentPadding = 80.dp
                 ),
-                onEvent = { viewModel.onEvent(it) }
             )
 
             Box(
@@ -94,8 +90,6 @@ class PerformanceWorkspaceMode(
 
     @Composable
     private fun MobileLayout(modifier: Modifier = Modifier) {
-        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
-
         Column {
             WorkspaceViewport(
                 modifier = Modifier
@@ -117,7 +111,6 @@ class PerformanceWorkspaceMode(
                     showRemoteCursors = true,
                     contentPadding = 16.dp
                 ),
-                onEvent = { viewModel.onEvent(it) }
             )
 
             MobileAutoPlayButtons()

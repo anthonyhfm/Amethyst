@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
@@ -38,8 +37,6 @@ import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.AutoPlayButtons
 import dev.anthonyhfm.amethyst.workspace.ui.components.ActivityToastOverlay
@@ -81,11 +78,12 @@ import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceBottomSheet
 
 @Composable
 fun Workspace(onBack: () -> Unit = {}) {
-    val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
-
-    val state by viewModel.state.collectAsState()
+    val mode by WorkspaceRepository.mode.collectAsState()
     val activityToasts by CollaborationPresence.activityToasts.collectAsState()
     var showExitSheet by remember { mutableStateOf(false) }
+
+    val showDeviceConfigurator by WorkspaceRepository.showDeviceConfigurator.collectAsState()
+    val showDevicePicker by WorkspaceRepository.showDevicePicker.collectAsState()
 
     Scaffold(
         modifier = Modifier
@@ -96,16 +94,13 @@ fun Workspace(onBack: () -> Unit = {}) {
 
         topBar = {
             WorkspaceTopAppBar(
-                mode = state.mode,
+                mode = mode,
                 onBack = {
                     if (WorkspaceRepository.hasUnsavedChanges()) {
                         showExitSheet = true
                     } else {
                         onBack()
                     }
-                },
-                onEvent = {
-                    viewModel.onEvent(it)
                 },
             )
         }
@@ -127,19 +122,14 @@ fun Workspace(onBack: () -> Unit = {}) {
             )
         }
 
-        if (state.showDeviceConfigurator != null) {
+        if (showDeviceConfigurator != null) {
             DeviceSettingsDialog(
-                uuid = state.showDeviceConfigurator!!,
-                onEvent = { viewModel.onEvent(it) }
+                uuid = showDeviceConfigurator!!
             )
         }
 
-        if (state.showDevicePicker) {
-            InsertLaunchpadDialog(
-                onEvent = {
-                    viewModel.onEvent(it)
-                }
-            )
+        if (showDevicePicker) {
+            InsertLaunchpadDialog()
         }
 
         Box(
@@ -160,7 +150,7 @@ fun Workspace(onBack: () -> Unit = {}) {
                     .padding(paddingValues)
                     .clipToBounds()
             ) {
-                state.mode.Content(Modifier.fillMaxSize())
+                mode.Content(Modifier.fillMaxSize())
             }
         }
     }

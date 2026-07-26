@@ -28,7 +28,6 @@ import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Event
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
@@ -44,8 +43,6 @@ class CoordinateFilterWorkspaceMode : WorkspaceMode() {
 
     @androidx.compose.runtime.Composable
     override fun Content(modifier: Modifier) {
-        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
-
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -65,7 +62,6 @@ class CoordinateFilterWorkspaceMode : WorkspaceMode() {
                     showRemoteCursors = true,
                     contentPadding = 80.dp
                 ),
-                onEvent = { viewModel.onEvent(it) }
             )
 
             AnimatedVisibility(
@@ -79,7 +75,7 @@ class CoordinateFilterWorkspaceMode : WorkspaceMode() {
             ) {
                 AddDeviceButton(
                     onClick = {
-                        viewModel.onEvent(WorkspaceContract.Event.OpenVirtualDevicePicker)
+                        WorkspaceRepository.openDevicePicker()
                     }
                 )
             }

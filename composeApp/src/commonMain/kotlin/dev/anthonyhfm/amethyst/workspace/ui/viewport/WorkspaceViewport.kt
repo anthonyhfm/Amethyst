@@ -30,7 +30,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,8 +84,8 @@ fun WorkspaceViewport(
     viewportState: ViewportState = rememberViewportState(viewportKey),
     elements: List<ViewportElement> = ViewportRepository.devices.collectAsState().value,
     config: ViewportConfig = ViewportConfig(),
-    onEvent: (WorkspaceContract.Event) -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current.density
     val gridSize = (40 * density).toInt()
     val gridColor = Color(0xFF5C6370).copy(alpha = 0.38f)
@@ -387,18 +389,20 @@ fun WorkspaceViewport(
                                                     draggingOffset.y - (gridMoveY * gridSize)
                                                 )
 
-                                                onEvent(
-                                                    WorkspaceContract.Event.ChangeViewportElementPosition(
-                                                        index = index,
-                                                        offset = Offset(newX.toFloat(), newY.toFloat())
-                                                    )
-                                                )
+                                                if (WorkspaceRepository.mode.value is LayoutWorkspaceMode) {
+                                                    coroutineScope.launch {
+                                                        WorkspaceRepository.moveVirtualDevice(
+                                                            (element as LaunchpadViewportElement).launchpadId,
+                                                            Offset(newX.toFloat(), newY.toFloat())
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     },
                                     onDragEnd = {
                                         draggingOffset = Offset.Zero
-                                        onEvent(WorkspaceContract.Event.OnViewportElementMoveFinished(element.selectionUUID))
+                                        WorkspaceRepository.updateWorkspaceBounds()
                                     },
                                     onDragCancel = {
                                         draggingOffset = Offset.Zero

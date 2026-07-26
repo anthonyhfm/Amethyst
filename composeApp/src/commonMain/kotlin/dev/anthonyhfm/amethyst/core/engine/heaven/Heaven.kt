@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.util.mainDispatcherOrDefault
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.core.util.StopWatch
 import dev.anthonyhfm.amethyst.core.util.platform
 import kotlinx.atomicfu.atomic
@@ -66,10 +67,7 @@ object Heaven {
     }
 
     @Volatile var devices: List<LaunchpadViewportElement> = emptyList()
-        set(value) {
-            field = value
-            wake()
-        }
+        private set
 
     private val signalQueue = Channel<List<Signal.LED>>(UNLIMITED)
     private val jobQueue = Channel<ScheduledJob>(UNLIMITED)
@@ -97,6 +95,15 @@ object Heaven {
     private val renderScope = CoroutineScope(
         mainDispatcherOrDefault(owner = "Heaven", parallelism = 1) + SupervisorJob()
     )
+
+    init {
+        renderScope.launch {
+            ViewportRepository.devices.collect { newDevices ->
+                devices = newDevices
+                wake()
+            }
+        }
+    }
 
     private fun msToTicks(ms: Double): Long = (ms / 1000 * stopWatch.frequency).toLong()
 
