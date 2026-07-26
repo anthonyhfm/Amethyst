@@ -16,6 +16,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.PageSwitcherA
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator1Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator3Adapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator4Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.nev.WormholeAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DelayAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
@@ -118,12 +119,17 @@ class MxDeviceMidiEffectAdapter(
 
                 "220a5d8ae9bd63f21c8292c03774ef90",
                 "32b6bec96552a6e40f6743787a20b9df",
+                "1848f6da9155cc90ecd5e22d4b43c217",
                 "feecaed62c2637a73325446a1ed1e25e" -> {
                     AbletonConverter.special = ProjectSpecials(
                         kaskobiWeirdAssPageSwitch = true
                     )
 
                     return PageSwitcherAdapter(offset).toDeviceStates()
+                }
+
+                "8bf54c465707076e50119269289e23be" -> {
+                    return Resonator4Adapter(blob, device).toDeviceStates()
                 }
 
                 "6257e885f06b1c1fb6258b1066497244" -> { // Resonator 3.0.0
@@ -196,7 +202,8 @@ class MxDeviceMidiEffectAdapter(
                     return GridFilterAdapter(blob, offset).toDeviceStates()
                 }
 
-                "c328c055ae8daf2d9a4e2c0346bcc2ee" -> {
+                "c328c055ae8daf2d9a4e2c0346bcc2ee",
+                "f6c14612b30196941ee3f19b056b62b2" -> {
                     return AutoPageAdapter(blob, device).toDeviceStates()
                 }
 
@@ -211,6 +218,10 @@ class MxDeviceMidiEffectAdapter(
                     if (fileName.contains("resonator")) {
                         val paramCount = device.parameterList.parameterList.parameters.size
                         if (paramCount >= 34) {
+                            val isRes4 = hash == "8bf54c465707076e50119269289e23be" || blob.contains("\"TimeMode1ms4\"")
+                            if (isRes4) {
+                                return Resonator4Adapter(blob, device).toDeviceStates()
+                            }
                             val is301 = blob.contains("\"Up\"") || blob.contains("\"Down\"") || blob.contains("\"Left\"")
                             return Resonator3Adapter(is301, blob, device).toDeviceStates()
                         } else if (paramCount >= 18) {

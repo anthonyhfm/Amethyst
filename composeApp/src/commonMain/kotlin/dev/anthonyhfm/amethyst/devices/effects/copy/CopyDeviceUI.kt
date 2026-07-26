@@ -63,6 +63,13 @@ fun copyModeLabel(mode: CopyChainDeviceState.CopyMode): String = when (mode) {
     CopyChainDeviceState.CopyMode.RANDOM_LOOP -> "Random Loop"
 }
 
+fun isolationLabel(mode: CopyChainDeviceState.IsolationType): String = when (mode) {
+    CopyChainDeviceState.IsolationType.NONE -> "None"
+    CopyChainDeviceState.IsolationType.EDGELESS -> "Edgeless"
+    CopyChainDeviceState.IsolationType.FULL -> "Full"
+}
+
+@Suppress("DEPRECATION")
 fun gridModeLabel(mode: CopyChainDeviceState.GridMode): String = when (mode) {
     CopyChainDeviceState.GridMode.NONE -> "None"
     CopyChainDeviceState.GridMode.EDGELESS -> "Edgeless"

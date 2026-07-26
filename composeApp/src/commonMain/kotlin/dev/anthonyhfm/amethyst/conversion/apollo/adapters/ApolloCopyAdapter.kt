@@ -19,11 +19,11 @@ class ApolloCopyAdapter(
                 4 -> CopyChainDeviceState.CopyMode.RANDOM_LOOP
                 else -> CopyChainDeviceState.CopyMode.STATIC
             },
-            gridMode = when (model.gridMode) {
-                0 -> CopyChainDeviceState.GridMode.NONE
-                1 -> CopyChainDeviceState.GridMode.EDGELESS
-                2 -> CopyChainDeviceState.GridMode.FULL
-                else -> CopyChainDeviceState.GridMode.NONE
+            isolate = when (model.gridMode) {
+                0 -> CopyChainDeviceState.IsolationType.NONE
+                1 -> CopyChainDeviceState.IsolationType.EDGELESS
+                2 -> CopyChainDeviceState.IsolationType.FULL
+                else -> CopyChainDeviceState.IsolationType.NONE
             },
             wrap = model.wrap,
             timing = model.time.toTiming(),
@@ -32,7 +32,6 @@ class ApolloCopyAdapter(
             bilateral = model.bilateral,
             reverse = model.reverse,
             infinite = model.infinite,
-            isolate = CopyChainDeviceState.IsolationType.NONE,
             offsets = model.offsets.mapIndexed { index, it ->
                 CopyChainDeviceState.Offset(
                     x = it.x,

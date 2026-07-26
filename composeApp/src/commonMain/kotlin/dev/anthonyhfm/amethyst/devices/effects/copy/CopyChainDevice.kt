@@ -79,24 +79,23 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
                         CopySelectField(
                             label = "Isolation",
-                            options = CopyChainDeviceState.GridMode.entries,
-                            selectedOption = deviceState.gridMode,
+                            options = CopyChainDeviceState.IsolationType.entries,
+                            selectedOption = deviceState.effectiveIsolate,
                             onOptionSelected = { mode ->
                                 pushStateChange(
                                     before = deviceState,
-                                    after = deviceState.copy(gridMode = mode)
+                                    after = deviceState.copy(isolate = mode)
                                 )
-                                state.update { it.copy(gridMode = mode) }
+                                state.update { it.copy(isolate = mode) }
                             },
-                            optionToString = ::gridModeLabel,
+                            optionToString = ::isolationLabel,
                             modifier = Modifier.weight(1f)
                         )
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         ToggleOption(
                             label = "Wrap",
@@ -124,36 +123,36 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                                 state.update { it.copy(infinite = infinite) }
                             }
                         )
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        CopyTimeControls(
+                            timing = deviceState.timing,
+                            onTimingChanged = { timing ->
+                                val before = state.value
+                                state.update { it.copy(timing = timing) }
+                                pushStateChange(before, state.value)
+                            },
+                            gate = deviceState.gate,
+                            onGateChanged = { gate ->
+                                val before = state.value
+                                state.update { it.copy(gate = gate) }
+                                pushStateChange(before, state.value)
+                            },
+                            pinch = deviceState.pinch,
+                            onPinchChanged = { pinch ->
+                                val before = state.value
+                                state.update { it.copy(pinch = pinch) }
+                                pushStateChange(before, state.value)
+                            },
+                            bilateral = deviceState.bilateral,
+                            onToggleBilateral = {
+                                val before = state.value
+                                state.update { it.copy(bilateral = !it.bilateral) }
+                                pushStateChange(before, state.value)
+                            }
+                        )
                     }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    CopyTimeControls(
-                        timing = deviceState.timing,
-                        onTimingChanged = { timing ->
-                            val before = state.value
-                            state.update { it.copy(timing = timing) }
-                            pushStateChange(before, state.value)
-                        },
-                        gate = deviceState.gate,
-                        onGateChanged = { gate ->
-                            val before = state.value
-                            state.update { it.copy(gate = gate) }
-                            pushStateChange(before, state.value)
-                        },
-                        pinch = deviceState.pinch,
-                        onPinchChanged = { pinch ->
-                            val before = state.value
-                            state.update { it.copy(pinch = pinch) }
-                            pushStateChange(before, state.value)
-                        },
-                        bilateral = deviceState.bilateral,
-                        onToggleBilateral = {
-                            val before = state.value
-                            state.update { it.copy(bilateral = !it.bilateral) }
-                            pushStateChange(before, state.value)
-                        }
-                    )
                 }
 
                 Separator(orientation = SeparatorOrientation.Vertical)
@@ -203,7 +202,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
     private fun transformSignal(signal: Signal.LED, targetX: Int, targetY: Int): Signal.LED? {
         val state = state.value
-        val boundsMode = state.gridMode.toBoundsMode()
+        val boundsMode = state.effectiveIsolate.toBoundsMode()
 
         val wrapBoundsMode = if (boundsMode != CopyBoundsMode.NONE) boundsMode else CopyBoundsMode.FULL
         val wrapBounds = if (state.wrap) {
@@ -214,8 +213,6 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
         val isolateBounds = if (!state.wrap && boundsMode != CopyBoundsMode.NONE) {
             resolveCopyCoordinateBounds(signal.origin, boundsMode)
-        } else if (state.isolate != CopyChainDeviceState.IsolationType.NONE) {
-            resolveCopyCoordinateBounds(signal.origin, state.isolate.toBoundsMode())
         } else {
             null
         }
@@ -231,8 +228,11 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
         val state = state.value
-        if (state.isolate != CopyChainDeviceState.IsolationType.NONE) {
-            Heaven.cancelJobsForOwner(this)
+        n.forEach { signal ->
+            if (signal.color != Color.Black && state.effectiveIsolate != CopyChainDeviceState.IsolationType.NONE) {
+                val identifier = signal.x * 10 + signal.y
+                Heaven.cancelJobsForOwner(this, identifier)
+            }
         }
 
         when (state.mode) {

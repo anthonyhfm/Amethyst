@@ -38,16 +38,17 @@ internal data class CopyCoordinateBounds(
     }
 }
 
-internal fun CopyChainDeviceState.GridMode.toBoundsMode(): CopyBoundsMode = when (this) {
-    CopyChainDeviceState.GridMode.NONE -> CopyBoundsMode.NONE
-    CopyChainDeviceState.GridMode.EDGELESS -> CopyBoundsMode.EDGELESS
-    CopyChainDeviceState.GridMode.FULL -> CopyBoundsMode.FULL
-}
-
 internal fun CopyChainDeviceState.IsolationType.toBoundsMode(): CopyBoundsMode = when (this) {
     CopyChainDeviceState.IsolationType.NONE -> CopyBoundsMode.NONE
     CopyChainDeviceState.IsolationType.EDGELESS -> CopyBoundsMode.EDGELESS
     CopyChainDeviceState.IsolationType.FULL -> CopyBoundsMode.FULL
+}
+
+@Suppress("DEPRECATION")
+internal fun CopyChainDeviceState.GridMode.toBoundsMode(): CopyBoundsMode = when (this) {
+    CopyChainDeviceState.GridMode.NONE -> CopyBoundsMode.NONE
+    CopyChainDeviceState.GridMode.EDGELESS -> CopyBoundsMode.EDGELESS
+    CopyChainDeviceState.GridMode.FULL -> CopyBoundsMode.FULL
 }
 
 internal fun copyBoundsForLayout(

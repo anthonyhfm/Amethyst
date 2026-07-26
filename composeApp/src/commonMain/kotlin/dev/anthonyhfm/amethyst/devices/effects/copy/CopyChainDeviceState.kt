@@ -18,6 +18,17 @@ data class CopyChainDeviceState(
     val isolate: IsolationType = IsolationType.NONE,
     val offsets: List<Offset> = emptyList(),
 ) : DeviceState() {
+    val effectiveIsolate: IsolationType
+        get() = if (isolate != IsolationType.NONE) {
+            isolate
+        } else {
+            when (gridMode) {
+                GridMode.FULL -> IsolationType.FULL
+                GridMode.EDGELESS -> IsolationType.EDGELESS
+                GridMode.NONE -> IsolationType.NONE
+            }
+        }
+
     enum class IsolationType {
         NONE,
         EDGELESS,
@@ -33,6 +44,7 @@ data class CopyChainDeviceState(
         RANDOM_LOOP
     }
 
+    @Deprecated("Use IsolationType instead. Retained for backwards compatibility with legacy Amethyst 0.5.3 projects.")
     enum class GridMode {
         NONE,
         EDGELESS,
