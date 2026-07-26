@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
@@ -40,6 +42,7 @@ import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.secondaryForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.isMobilePhone
 
 enum class ButtonVariant {
     Default,
@@ -70,6 +73,11 @@ enum class ButtonSize(
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
         gap = 8.dp,
     ),
+    Mobile(
+        height = 48.dp,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+        gap = 8.dp,
+    ),
     Icon(
         height = 36.dp,
         contentPadding = PaddingValues(0.dp),
@@ -88,12 +96,13 @@ fun Button(
     modifier: Modifier = Modifier,
     variant: ButtonVariant = ButtonVariant.Default,
     size: ButtonSize = ButtonSize.Default,
+    shape: Shape? = null,
     enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val resolvedShape = shape ?: if (isMobilePhone()) CircleShape else DefaultShape
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val shape = DefaultShape
 
     val bg: Color
     val bgHover: Color
@@ -158,7 +167,7 @@ fun Button(
     UnstyledButton(
         onClick = onClick,
         enabled = enabled,
-        shape = shape,
+        shape = resolvedShape,
         interactionSource = interactionSource,
         indication = null,
         contentPadding = size.contentPadding,
@@ -167,7 +176,7 @@ fun Button(
         modifier = modifier
             .then(sizeModifier)
             .alpha(if (enabled) 1f else 0.5f)
-            .clip(shape)
+            .clip(resolvedShape)
             .background(if (hovered) bgHover else bg),
         content = {
             ProvideTextStyle(textStyle) {

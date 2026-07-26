@@ -672,7 +672,7 @@
     <string name="workspace_preview_display_name">Preview</string>
     <string name="workspace_repository_unknown_author">Unknown Author</string>
     <string name="workspace_repository_untitled">Untitled</string>
-    <string name="workspace_save_failed_message">Unable to save workspace:\n</string>
+    <string name="workspace_save_failed_message">Unable to save workspace:n</string>
     <string name="workspace_save_failed_title">Save Workspace Failed</string>
     <string name="workspace_save_untitled">Untitled</string>
     <string name="workspace_savechanges_description">You have unsaved changes. Do you want to save them before closing?</string>
@@ -728,4 +728,9 @@
     <string name="workspace_viewport_launchpad_actions_style_dialog_title_ios">Style</string>
     <string name="workspace_viewport_launchpad_actions_style_ios">Style</string>
     <string name="workspace_window_untitled_project">Untitled Project</string>
+    <string name="workspace_exit_sheet_title">Unsaved Changes</string>
+    <string name="workspace_exit_sheet_description">Do you want to save your progress before returning to home?</string>
+    <string name="workspace_exit_sheet_save">Save Workspace</string>
+    <string name="workspace_exit_sheet_dont_save">Don't Save</string>
+    <string name="workspace_exit_sheet_cancel">Cancel</string>
 </resources>

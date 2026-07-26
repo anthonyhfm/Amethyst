@@ -38,6 +38,7 @@ import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
+import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract.Event
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.AutoPlayButtons
@@ -76,12 +77,15 @@ import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.chainCanvas
 
+import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceBottomSheet
+
 @Composable
 fun Workspace(onBack: () -> Unit = {}) {
     val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
 
     val state by viewModel.state.collectAsState()
     val activityToasts by CollaborationPresence.activityToasts.collectAsState()
+    var showExitSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier
@@ -93,13 +97,36 @@ fun Workspace(onBack: () -> Unit = {}) {
         topBar = {
             WorkspaceTopAppBar(
                 mode = state.mode,
-                onBack = onBack,
+                onBack = {
+                    if (WorkspaceRepository.hasUnsavedChanges()) {
+                        showExitSheet = true
+                    } else {
+                        onBack()
+                    }
+                },
                 onEvent = {
                     viewModel.onEvent(it)
                 },
             )
         }
     ) { paddingValues ->
+        if (showExitSheet) {
+            ExitWorkspaceBottomSheet(
+                onSaveAndExit = {
+                    showExitSheet = false
+                    WorkspaceRepository.saveWorkspace()
+                    onBack()
+                },
+                onDiscardAndExit = {
+                    showExitSheet = false
+                    onBack()
+                },
+                onCancel = {
+                    showExitSheet = false
+                }
+            )
+        }
+
         if (state.showDeviceConfigurator != null) {
             DeviceSettingsDialog(
                 uuid = state.showDeviceConfigurator!!,

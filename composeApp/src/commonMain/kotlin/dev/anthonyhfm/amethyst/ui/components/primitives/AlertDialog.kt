@@ -20,6 +20,10 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
+
 @Composable
 fun AlertDialog(
     state: DialogState,
@@ -27,15 +31,28 @@ fun AlertDialog(
     onDismiss: () -> Unit = { state.visible = false },
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Dialog(
-        state = state,
-        onDismiss = onDismiss,
-    ) {
-        DialogContent(
-            modifier = modifier,
-            showCloseButton = false,
+    if (platform is Platform.Android || platform is Platform.iOS) {
+        Drawer(
+            state = state,
+            onDismiss = onDismiss,
         ) {
-            content()
+            DrawerContent(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                content()
+            }
+        }
+    } else {
+        Dialog(
+            state = state,
+            onDismiss = onDismiss,
+        ) {
+            DialogContent(
+                modifier = modifier,
+                showCloseButton = false,
+            ) {
+                content()
+            }
         }
     }
 }
@@ -81,13 +98,29 @@ fun AlertDialogDescription(
 @Composable
 fun AlertDialogFooter(
     modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    Row(
-        modifier = modifier.padding(top = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.End),
-        content = content,
-    )
+    if (platform is Platform.Android || platform is Platform.iOS) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            content()
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            content()
+        }
+    }
 }
 
 @Composable
@@ -95,7 +128,7 @@ fun AlertDialogAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     variant: ButtonVariant = ButtonVariant.Default,
-    size: ButtonSize = ButtonSize.Small,
+    size: ButtonSize = if (platform is Platform.Android || platform is Platform.iOS) ButtonSize.Mobile else ButtonSize.Small,
     content: @Composable RowScope.() -> Unit,
 ) {
     Button(
@@ -111,7 +144,7 @@ fun AlertDialogAction(
 fun AlertDialogCancel(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: ButtonSize = ButtonSize.Small,
+    size: ButtonSize = if (platform is Platform.Android || platform is Platform.iOS) ButtonSize.Mobile else ButtonSize.Small,
     content: @Composable RowScope.() -> Unit,
 ) {
     Button(

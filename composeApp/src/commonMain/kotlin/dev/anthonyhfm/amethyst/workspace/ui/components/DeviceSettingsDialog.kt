@@ -33,6 +33,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Combobox
 import dev.anthonyhfm.amethyst.ui.components.primitives.Field
 import dev.anthonyhfm.amethyst.ui.components.primitives.FieldDescription
 import dev.anthonyhfm.amethyst.ui.components.primitives.FieldLabel
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 
 @Composable
@@ -88,28 +90,54 @@ fun DeviceSettingsDialog(
         }
 
         AlertDialogFooter {
-            AlertDialogCancel(
-                onClick = {
-                    onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
-                },
-            ) {
-                Text(stringResource(Res.string.workspace_device_settings_cancel))
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            AlertDialogAction(
-                onClick = {
-                    onEvent(
-                        WorkspaceContract.Event.OnChangeDeviceConfig(
-                            uuid = uuid,
-                            deviceId = selectedDevice?.id
+            if (platform is Platform.Android || platform is Platform.iOS) {
+                AlertDialogAction(
+                    onClick = {
+                        onEvent(
+                            WorkspaceContract.Event.OnChangeDeviceConfig(
+                                uuid = uuid,
+                                deviceId = selectedDevice?.id
+                            )
                         )
-                    )
-                    onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
-                },
-            ) {
-                Text(stringResource(Res.string.workspace_device_settings_save))
+                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(Res.string.workspace_device_settings_save))
+                }
+
+                AlertDialogCancel(
+                    onClick = {
+                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(Res.string.workspace_device_settings_cancel))
+                }
+            } else {
+                AlertDialogCancel(
+                    onClick = {
+                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                    },
+                ) {
+                    Text(stringResource(Res.string.workspace_device_settings_cancel))
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                AlertDialogAction(
+                    onClick = {
+                        onEvent(
+                            WorkspaceContract.Event.OnChangeDeviceConfig(
+                                uuid = uuid,
+                                deviceId = selectedDevice?.id
+                            )
+                        )
+                        onEvent(WorkspaceContract.Event.OnDismissDeviceConfigure)
+                    },
+                ) {
+                    Text(stringResource(Res.string.workspace_device_settings_save))
+                }
             }
         }
     }

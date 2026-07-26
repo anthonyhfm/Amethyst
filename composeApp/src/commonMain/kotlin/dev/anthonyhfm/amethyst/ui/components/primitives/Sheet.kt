@@ -27,6 +27,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
@@ -171,6 +174,12 @@ fun SheetContent(
         SheetSide.Top, SheetSide.Bottom -> Modifier.fillMaxWidth()
     }
 
+    val insetsModifier = if (side == SheetSide.Bottom) {
+        Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+    } else {
+        Modifier
+    }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = panelAlignment,
@@ -181,13 +190,14 @@ fun SheetContent(
             contentColor = Theme[colors][foreground],
             enter = enter,
             exit = exit,
-            modifier = sizeModifier.then(borderModifier).then(modifier),
+            modifier = sizeModifier.then(borderModifier).then(insetsModifier).then(modifier),
         ) {
             ProvideTextStyle(Theme[typography][p].copy(color = Theme[colors][foreground])) {
                 Box {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .then(if (side == SheetSide.Bottom) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else Modifier)
                             .padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {

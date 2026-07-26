@@ -38,6 +38,8 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.p
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
@@ -132,22 +134,44 @@ fun AutoPlaySettingsDialog(
         }
 
         AlertDialogFooter {
-            AlertDialogCancel(onClick = onDismiss) {
-                Text(stringResource(Res.string.workspace_autoplay_settings_cancel))
-            }
+            if (platform is Platform.Android || platform is Platform.iOS) {
+                AlertDialogAction(
+                    onClick = {
+                        WorkspaceRepository.updateAutoPlaySettings(
+                            showButtonPresses = showButtonPresses,
+                            showLights = showLights,
+                        )
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(Res.string.workspace_autoplay_settings_save))
+                }
 
-            Spacer(Modifier.weight(1f))
+                AlertDialogCancel(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(Res.string.workspace_autoplay_settings_cancel))
+                }
+            } else {
+                AlertDialogCancel(onClick = onDismiss) {
+                    Text(stringResource(Res.string.workspace_autoplay_settings_cancel))
+                }
 
-            AlertDialogAction(
-                onClick = {
-                    WorkspaceRepository.updateAutoPlaySettings(
-                        showButtonPresses = showButtonPresses,
-                        showLights = showLights,
-                    )
-                    onDismiss()
-                },
-            ) {
-                Text(stringResource(Res.string.workspace_autoplay_settings_save))
+                Spacer(Modifier.weight(1f))
+
+                AlertDialogAction(
+                    onClick = {
+                        WorkspaceRepository.updateAutoPlaySettings(
+                            showButtonPresses = showButtonPresses,
+                            showLights = showLights,
+                        )
+                        onDismiss()
+                    },
+                ) {
+                    Text(stringResource(Res.string.workspace_autoplay_settings_save))
+                }
             }
         }
     }

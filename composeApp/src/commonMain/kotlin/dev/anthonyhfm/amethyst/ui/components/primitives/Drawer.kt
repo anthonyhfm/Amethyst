@@ -37,6 +37,12 @@ import dev.anthonyhfm.amethyst.ui.theme.p
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 
+import androidx.compose.ui.graphics.Color
+
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+
 private val DrawerShape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)
 
 @Composable
@@ -50,7 +56,7 @@ fun Drawer(
         onDismiss = onDismiss,
     ) {
         UnstyledScrim(
-            scrimColor = Theme[colors][foreground].copy(alpha = 0.5f),
+            scrimColor = Color.Black.copy(alpha = 0.6f),
             enter = fadeIn(),
             exit = fadeOut(),
         )
@@ -67,7 +73,11 @@ fun Drawer(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 ProvideTextStyle(Theme[typography][p].copy(color = Theme[colors][foreground])) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .windowInsetsPadding(WindowInsets.navigationBars),
+                    ) {
                         // Handle indicator
                         Box(
                             modifier = Modifier
