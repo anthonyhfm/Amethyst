@@ -97,58 +97,72 @@ struct ContentView: View {
     }
 
     var body: some View {
-        Group {
-            if viewModel.isWorkspaceOpen {
-                WorkspaceView(darkMode: colorScheme == .dark) {
-                    viewModel.workspaceClosed()
+        ZStack {
+            Group {
+                if viewModel.isWorkspaceOpen {
+                    WorkspaceView(darkMode: colorScheme == .dark) {
+                        viewModel.workspaceClosed()
+                    }
+                    .ignoresSafeArea()
+                    .onAppear {
+                        IosWorkspaceBridge.shared.onShowSettings = {
+                            showSettingsSheet = true
+                        }
+                        IosWorkspaceBridge.shared.createLiquidGlassEffect = {
+                            if #available(iOS 26.0, *) {
+                                let effect = UIGlassEffect(style: .regular)
+                                effect.isInteractive = true
+                                return effect
+                            } else {
+                                return UIBlurEffect(style: .systemThinMaterial)
+                            }
+                        }
+                        if #available(iOS 26.0, *) {
+                            IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = {
+                                let effect = UIGlassContainerEffect()
+                                effect.spacing = 10
+                                return effect
+                            }
+                        } else {
+                            IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = nil
+                        }
+                        IosWorkspaceBridge.shared.createLiquidGlassButtonConfiguration = {
+                            if #available(iOS 26.0, *) {
+                                var configuration = UIButton.Configuration.glass()
+                                configuration.cornerStyle = .capsule
+                                configuration.indicator = .none
+                                return configuration._bridgeToObjectiveC()
+                            } else {
+                                var configuration = UIButton.Configuration.bordered()
+                                configuration.cornerStyle = .capsule
+                                return configuration._bridgeToObjectiveC()
+                            }
+                        }
+                    }
+                    .onDisappear {
+                        IosWorkspaceBridge.shared.onOrientationChanged = nil
+                        IosWorkspaceBridge.shared.onShowSettings = nil
+                    }
+                    .sheet(isPresented: $showSettingsSheet) {
+                        SettingsTabView(viewModel: settingsViewModel, showsCloseButton: true)
+                    }
+                } else {
+                    homeTabView
                 }
+            }
+
+            if viewModel.isLoading {
+                LoadingScreenView(
+                    progress: viewModel.loadingProgress,
+                    title: viewModel.loadingTitle,
+                    statusText: viewModel.loadingStatusText,
+                    detailText: viewModel.loadingDetailText
+                )
                 .ignoresSafeArea()
-                .onAppear {
-                    IosWorkspaceBridge.shared.onShowSettings = {
-                        showSettingsSheet = true
-                    }
-                    IosWorkspaceBridge.shared.createLiquidGlassEffect = {
-                        if #available(iOS 26.0, *) {
-                            let effect = UIGlassEffect(style: .regular)
-                            effect.isInteractive = true
-                            return effect
-                        } else {
-                            return UIBlurEffect(style: .systemThinMaterial)
-                        }
-                    }
-                    if #available(iOS 26.0, *) {
-                        IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = {
-                            let effect = UIGlassContainerEffect()
-                            effect.spacing = 10
-                            return effect
-                        }
-                    } else {
-                        IosWorkspaceBridge.shared.createLiquidGlassContainerEffect = nil
-                    }
-                    IosWorkspaceBridge.shared.createLiquidGlassButtonConfiguration = {
-                        if #available(iOS 26.0, *) {
-                            var configuration = UIButton.Configuration.glass()
-                            configuration.cornerStyle = .capsule
-                            configuration.indicator = .none
-                            return configuration._bridgeToObjectiveC()
-                        } else {
-                            var configuration = UIButton.Configuration.bordered()
-                            configuration.cornerStyle = .capsule
-                            return configuration._bridgeToObjectiveC()
-                        }
-                    }
-                }
-                .onDisappear {
-                    IosWorkspaceBridge.shared.onOrientationChanged = nil
-                    IosWorkspaceBridge.shared.onShowSettings = nil
-                }
-                .sheet(isPresented: $showSettingsSheet) {
-                    SettingsTabView(viewModel: settingsViewModel, showsCloseButton: true)
-                }
-            } else {
-                homeTabView
+                .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: viewModel.isLoading)
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
         }

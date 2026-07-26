@@ -29,12 +29,6 @@ struct ProjectsTabView: View {
                     recentList
                 }
             }
-            // Loading overlay
-            .overlay {
-                if viewModel.isLoading {
-                    loadingOverlay
-                }
-            }
             .navigationTitle("Recent Projects")
             .navigationBarTitleDisplayMode(.large)
             .background(theme.background)
@@ -139,15 +133,6 @@ struct ProjectsTabView: View {
             }
             .buttonStyle(.bordered)
         }
-    }
-
-    private var loadingOverlay: some View {
-        LoadingScreenView(
-            progress: viewModel.loadingProgress,
-            title: viewModel.loadingTitle,
-            statusText: viewModel.loadingStatusText,
-            detailText: viewModel.loadingDetailText
-        )
     }
 
     // MARK: - Helpers

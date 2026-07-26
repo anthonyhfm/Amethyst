@@ -8,18 +8,25 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.WorkspaceViewModel
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.components.AutoPlayButtons
+import dev.anthonyhfm.amethyst.workspace.ui.components.MobileAutoPlayButtons
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportPanBoundsPolicy
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
@@ -39,6 +46,15 @@ class PerformanceWorkspaceMode(
 
     @Composable
     override fun Content(modifier: Modifier) {
+        when (platform) {
+            is Platform.Desktop -> DesktopLayout(modifier)
+
+            else -> MobileLayout(modifier)
+        }
+    }
+
+    @Composable
+    private fun DesktopLayout(modifier: Modifier = Modifier) {
         val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
 
         Box(
@@ -67,14 +83,44 @@ class PerformanceWorkspaceMode(
                 onEvent = { viewModel.onEvent(it) }
             )
 
-            AnimatedVisibility(
-                visible = true,
-                enter = slideInVertically { it },
-                exit = slideOutVertically { it },
-                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
             ) {
                 AutoPlayButtons()
             }
+        }
+    }
+
+    @Composable
+    private fun MobileLayout(modifier: Modifier = Modifier) {
+        val viewModel: WorkspaceViewModel = viewModel { WorkspaceViewModel() }
+
+        Column {
+            WorkspaceViewport(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(32.dp)),
+                viewportKey = "workspace-performance",
+                config = ViewportConfig(
+                    minZoom = 0.5f,
+                    maxZoom = 2f,
+                    enablePanning = true,
+                    enableZoom = true,
+                    draggableObjects = false,
+                    panBoundsPolicy = ViewportPanBoundsPolicy.ClampToContent(
+                        allowedOutOfBoundsFraction = 0.5f,
+                    ),
+                    showGrid = false,
+                    showOrigin = false,
+                    showActions = false,
+                    showRemoteCursors = true,
+                    contentPadding = 16.dp
+                ),
+                onEvent = { viewModel.onEvent(it) }
+            )
+
+            MobileAutoPlayButtons()
         }
     }
 }

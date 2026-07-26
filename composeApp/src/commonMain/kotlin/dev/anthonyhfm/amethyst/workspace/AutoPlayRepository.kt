@@ -289,4 +289,22 @@ object AutoPlayRepository {
             startAutoPlay()
         }
     }
+
+    fun seekTo(fraction: Float) {
+        val autoplay = WorkspaceRepository.workspaceMeta?.autoPlay ?: return
+        if (autoplay.actions.isEmpty()) return
+
+        totalDuration = autoplay.actions.keys.maxOrNull() ?: 0.0
+        if (totalDuration <= 0) return
+
+        val targetMs = (fraction.coerceIn(0f, 1f) * totalDuration)
+        playbackOffset = targetMs
+        _progress.value = fraction.coerceIn(0f, 1f)
+
+        val currentState = _state.value
+        if (currentState == AutoPlayState.PLAYING) {
+            _state.value = AutoPlayState.PAUSED
+            startAutoPlay()
+        }
+    }
 }

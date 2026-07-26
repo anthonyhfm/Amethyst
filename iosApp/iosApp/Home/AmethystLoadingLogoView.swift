@@ -47,11 +47,14 @@ private struct SVGPathParser {
 
 // MARK: - Animated Logo View
 
-struct AmethystLoadingLogoView: View {
-    let progress: Double
+struct AmethystLoadingLogoView: View, Animatable {
+    var progress: Double
     var width: CGFloat = 150
 
-    @State private var animatedProgress: Double = 0.0
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
 
     private static let viewportWidth: CGFloat = 623.0
     private static let viewportHeight: CGFloat = 482.0
@@ -66,6 +69,7 @@ struct AmethystLoadingLogoView: View {
 
     var body: some View {
         let height = width / (Self.viewportWidth / Self.viewportHeight)
+        let currentProgress = max(0.0, min(1.0, progress))
 
         TimelineView(.animation) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
@@ -91,8 +95,8 @@ struct AmethystLoadingLogoView: View {
                 context.stroke(scaledPath, with: .color(Color(red: 39/255, green: 39/255, blue: 42/255)), lineWidth: 1.5 * scale)
 
                 // 2. Liquid Wave Fill
-                if animatedProgress > 0.001 {
-                    let liquidHeight = scaledHeight * animatedProgress
+                if currentProgress > 0.001 {
+                    let liquidHeight = scaledHeight * currentProgress
                     let liquidTopY = (scaledHeight - liquidHeight) + dy
                     let waveAmp = 1.5 * scale
 
@@ -148,14 +152,6 @@ struct AmethystLoadingLogoView: View {
                 }
             }
             .frame(width: width, height: height)
-        }
-        .onAppear {
-            animatedProgress = progress
-        }
-        .onChange(of: progress) { _, newValue in
-            withAnimation(.easeOut(duration: 0.35)) {
-                animatedProgress = newValue
-            }
         }
     }
 }

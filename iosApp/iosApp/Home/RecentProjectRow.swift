@@ -15,34 +15,51 @@ struct RecentProjectRow: View {
     let onEdit: () -> Void
     let onRemove: () -> Void
 
+    @Environment(\.amethystTheme) private var theme
+
     private var folderPath: String {
         abbreviatePath(project.path)
     }
 
     var body: some View {
         Button(action: onOpen) {
-            HStack(alignment: .center, spacing: 12) {
-                // File-type icon
-                Image(systemName: fileIcon(for: project.path))
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28)
+            HStack(alignment: .center, spacing: 14) {
+                // Styled Icon Badge conforming strictly to AmethystTheme tokens
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(theme.secondary)
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: fileIcon(for: project.path))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(theme.secondaryForeground)
+                }
 
                 // Title + path
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(project.title)
-                        .font(.body)
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(theme.foreground)
                         .lineLimit(1)
 
                     Text(folderPath)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(theme.mutedForeground)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
+
+                Spacer()
+
+                // Subtle interaction chevron indicator
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(theme.mutedForeground.opacity(0.5))
             }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .listRowBackground(theme.muted)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive, action: onRemove) {
                 Label("Remove", systemImage: "trash")
@@ -50,7 +67,7 @@ struct RecentProjectRow: View {
             Button(action: onEdit) {
                 Label("Edit", systemImage: "pencil")
             }
-            .tint(.blue)
+            .tint(theme.primary)
         }
         .contextMenu {
             Button(action: onOpen) {
