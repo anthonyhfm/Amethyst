@@ -124,7 +124,6 @@ class LightsChainWorkspaceMode(
                 WorkspaceChainEditor(
                     devices = WorkspaceRepository.lightsChain.devices.value,
                     scrollState = scrollState,
-                    onEvent = { viewModel.onEvent(it) }
                 )
             }
         }

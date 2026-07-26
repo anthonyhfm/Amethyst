@@ -55,6 +55,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 
 class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChainDevice {
     override val state = MutableStateFlow(ChokeChainDeviceState())
@@ -203,191 +204,13 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
 
     @Composable
     private fun GroupContent(dragAndDropState: DragAndDropState<GenericChainDevice<*>>) {
-        val state by state.collectAsState()
-        val devices by state.chain.devices
-
-        key(devices) {
-            if (devices.isEmpty()) {
-                ExpandingChainDevicePicker(
-                    destinationChain = state.chain,
-                    slotIndex = 0,
-                    dragAndDropState = dragAndDropState,
-                    expanded = true,
-                    expandedWidth = 100.dp,
-                    onAddComponent = {
-                        state.chain.add(it)
-                    },
-                    onDropDevice = { device, (originalIndex, originalUUID), originChain ->
-                        if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
-
-                        val targetChain = state.chain
-                        val insertionIndex = 0
-                        val finalIndex = if (originChain === targetChain) {
-                            if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                        } else insertionIndex
-                        val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
-
-                        targetChain.add(
-                            device,
-                            safeIndex,
-                            fromUser = false
-                        )
-
-                        UndoManager.addAction(
-                            UndoableAction.MovedChainDevice(
-                                chainBefore = originChain,
-                                chainAfter = targetChain,
-                                device = device,
-                                fromIndex = originalIndex,
-                                toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
-                            )
-                        )
-                    }
-                )
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxHeight(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ExpandingChainDevicePicker(
-                        destinationChain = state.chain,
-                        slotIndex = 0,
-                        dragAndDropState = dragAndDropState,
-                        onAddComponent = {
-                            state.chain.add(it, 0)
-                        },
-                        onDropDevice = { device, (originalIndex, originalUUID), originChain ->
-                            if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
-                            DeviceInsertionAnimator.register(device.selectionUUID)
-                            val targetChain = state.chain
-                            val insertionIndex = 0
-                            val finalIndex = if (originChain === targetChain) {
-                                if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                            } else insertionIndex
-                            val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
-
-                            targetChain.add(
-                                device,
-                                safeIndex,
-                                fromUser = false
-                            )
-
-                            UndoManager.addAction(
-                                UndoableAction.MovedChainDevice(
-                                    chainBefore = originChain,
-                                    chainAfter = targetChain,
-                                    device = device,
-                                    fromIndex = originalIndex,
-                                    toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
-                                )
-                            )
-                        }
-                    )
-
-                    devices.forEachIndexed { index, device ->
-                        DraggableItem(
-                            state = dragAndDropState,
-                            key = device.selectionUUID,
-                            data = device,
-                            useDragAnchor = true, // Enable drag anchor mode
-                        ) {
-                            TitleBarModifierProvider(
-                                Modifier
-                                    .clickable {
-                                        val chainDeviceSelectable = Selectable.ChainDevice(
-                                            parent = state.chain,
-                                            device = device
-                                        )
-
-                                        when {
-                                            ModifierKeysState.isShiftPressed -> {
-                                                SelectionManager.selectRangeInChain(
-                                                    targetDevice = chainDeviceSelectable,
-                                                    devicesInChain = devices
-                                                )
-                                            }
-
-                                            ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
-                                                SelectionManager.select(
-                                                    chainDeviceSelectable,
-                                                    single = false
-                                                )
-                                            }
-
-                                            else -> {
-                                                SelectionManager.select(chainDeviceSelectable)
-                                            }
-                                        }
-                                    }
-                                    .dragAnchor() // Add drag anchor to title bar
-                            ) {
-                                LaunchedEffect(dragAndDropState.draggedItem) {
-                                    device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
-                                }
-
-                                 val deviceState by device.state.collectAsState()
-                                 Box(modifier = Modifier.chainDeviceMuteEffect(deviceState.isMuted)) {
-                                    AnimatedInsertedDevice(id = device.selectionUUID) {
-                                        when (device) {
-                                            is GroupChainDevice -> device.Content(
-                                                dragAndDropState = dragAndDropState
-                                            )
-
-                                            is MultiGroupChainDevice -> device.Content(
-                                                dragAndDropState = dragAndDropState
-                                            )
-
-                                            is ChokeChainDevice -> device.Content(
-                                                dragAndDropState = dragAndDropState
-                                            )
-
-                                            else -> device.Content()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        ExpandingChainDevicePicker(
-                            destinationChain = state.chain,
-                            slotIndex = index + 1,
-                            dragAndDropState = dragAndDropState,
-                            expanded = index == devices.lastIndex,
-                            onAddComponent = {
-                                state.chain.add(it, index + 1)
-                            },
-                            onDropDevice = { device, (originalIndex, originalUUID), originChain ->
-                                if (originalUUID == selectionUUID) return@ExpandingChainDevicePicker
-                                DeviceInsertionAnimator.register(device.selectionUUID)
-                                val targetChain = state.chain
-                                val insertionIndex = index + 1
-                                val finalIndex = if (originChain === targetChain) {
-                                    if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
-                                } else insertionIndex
-                                val safeIndex = finalIndex.coerceIn(0, targetChain.devices.value.size)
-
-                                targetChain.add(
-                                    device,
-                                    safeIndex,
-                                    fromUser = false
-                                )
-
-                                UndoManager.addAction(
-                                    UndoableAction.MovedChainDevice(
-                                        chainBefore = originChain,
-                                        chainAfter = targetChain,
-                                        device = device,
-                                        fromIndex = originalIndex,
-                                        toIndex = targetChain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID },
-                                    )
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-        }
+        ChainView(
+            chain = state.value.chain,
+            dragAndDropState = dragAndDropState,
+            parentSelectionUUID = selectionUUID,
+            showContextMenu = false,
+            showRemoteFocus = false,
+        )
     }
 
     override fun signalEnter(n: List<Signal>) {

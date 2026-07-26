@@ -133,17 +133,13 @@ import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
-import dev.anthonyhfm.amethyst.workspace.chain.ui.AnimatedInsertedDevice
-import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainDeviceContextMenu
-import dev.anthonyhfm.amethyst.workspace.chain.ui.chainDeviceMuteEffect
 import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
-import dev.anthonyhfm.amethyst.workspace.chain.ui.ExpandingChainDevicePicker
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
-import dev.anthonyhfm.amethyst.workspace.chain.ui.TitleBarModifierProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 
 internal data class GroupEditorActions(
     val onAddGroup: (Int?) -> Unit,
@@ -811,138 +807,13 @@ internal fun GroupEditorContentHost(
                 )
             }
     ) {
-        key(devices) {
-            if (devices.isEmpty()) {
-                ExpandingChainDevicePicker(
-                    destinationChain = chain,
-                    slotIndex = 0,
-                    dragAndDropState = dragAndDropState,
-                    expanded = true,
-                    expandedWidth = 100.dp,
-                    onAddComponent = {
-                        chain.add(it)
-                    },
-                    onDropDevice = { device, (originalIndex, originalUUID), originChain ->
-                        dropChainDeviceIntoGroup(
-                            parentSelectionUUID = parentSelectionUUID,
-                            targetChain = chain,
-                            insertionIndex = 0,
-                            device = device,
-                            originalIndex = originalIndex,
-                            originalUUID = originalUUID,
-                            originChain = originChain,
-                            animateInsertion = false,
-                        )
-                    }
-                )
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxHeight(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ExpandingChainDevicePicker(
-                        destinationChain = chain,
-                        slotIndex = 0,
-                        dragAndDropState = dragAndDropState,
-                        onAddComponent = {
-                            chain.add(it, 0)
-                        },
-                        onDropDevice = { device, (originalIndex, originalUUID), originChain ->
-                            dropChainDeviceIntoGroup(
-                                parentSelectionUUID = parentSelectionUUID,
-                                targetChain = chain,
-                                insertionIndex = 0,
-                                device = device,
-                                originalIndex = originalIndex,
-                                originalUUID = originalUUID,
-                                originChain = originChain,
-                            )
-                        }
-                    )
-
-                    devices.forEachIndexed { index, device ->
-                        DraggableItem(
-                            state = dragAndDropState,
-                            key = device.selectionUUID,
-                            data = device,
-                            useDragAnchor = true,
-                        ) {
-                            var showRightClickMenu by remember { mutableStateOf(false) }
-                            var rightClickMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
-
-                            TitleBarModifierProvider(
-                                Modifier
-                                    .clickable {
-                                        handleNestedChainDeviceSelection(
-                                            targetChain = chain,
-                                            device = device,
-                                            devices = devices,
-                                        )
-                                    }
-                                    .rightClickable {
-                                        rightClickMenuOffset = DpOffset((it.x / density).dp, (it.y / density).dp)
-                                        showRightClickMenu = true
-                                    }
-                                    .dragAnchor()
-                            ) {
-                                LaunchedEffect(dragAndDropState.draggedItem) {
-                                    showRightClickMenu = false
-                                    device.isDragging.value = device.selectionUUID == dragAndDropState.draggedItem?.key
-                                }
-
-                                ChainDeviceContextMenu(
-                                    chain = chain,
-                                    device = device,
-                                    visible = showRightClickMenu,
-                                    offset = rightClickMenuOffset,
-                                    onDismiss = {
-                                        showRightClickMenu = false
-                                    }
-                                )
-
-                                val deviceState by device.state.collectAsState()
-                                Box(modifier = Modifier.chainDeviceMuteEffect(deviceState.isMuted)) {
-                                    AnimatedInsertedDevice(device.selectionUUID) {
-                                        when (device) {
-                                            is GroupChainDevice -> device.Content(
-                                                dragAndDropState = dragAndDropState
-                                            )
-
-                                            is MultiGroupChainDevice -> device.Content(
-                                                dragAndDropState = dragAndDropState
-                                            )
-
-                                            else -> device.Content()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        ExpandingChainDevicePicker(
-                            destinationChain = chain,
-                            slotIndex = index + 1,
-                            dragAndDropState = dragAndDropState,
-                            expanded = index == devices.lastIndex,
-                            onAddComponent = {
-                                chain.add(it, index + 1)
-                            },
-                            onDropDevice = { device, (originalIndex, originalUUID), originChain ->
-                                dropChainDeviceIntoGroup(
-                                    parentSelectionUUID = parentSelectionUUID,
-                                    targetChain = chain,
-                                    insertionIndex = index + 1,
-                                    device = device,
-                                    originalIndex = originalIndex,
-                                    originalUUID = originalUUID,
-                                    originChain = originChain,
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-        }
+        ChainView(
+            chain = group.chain,
+            dragAndDropState = dragAndDropState,
+            parentSelectionUUID = parentSelectionUUID,
+            showContextMenu = true,
+            showRemoteFocus = false,
+        )
     }
 }
 

@@ -193,14 +193,6 @@ class WorkspaceViewModel(
                     WorkspaceRepository.removeVirtualDeviceById(event.uuid)
                 }
             }
-
-            is WorkspaceContract.Event.AddChainDevice -> {
-                if (state.value.mode is LightsChainWorkspaceMode) {
-                    WorkspaceRepository.lightsChain.add(event.device, event.atIndex)
-                } else if (state.value.mode is SamplingChainWorkspaceMode) {
-                    WorkspaceRepository.samplingChain.add(event.device, event.atIndex)
-                }
-            }
         }
     }
 
