@@ -28,7 +28,6 @@ import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineEditorTool
 import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceMenuCommandSurface
 import dev.anthonyhfm.amethyst.workspace.WorkspacePrimaryMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository

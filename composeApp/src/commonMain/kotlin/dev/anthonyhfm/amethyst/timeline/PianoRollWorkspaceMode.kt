@@ -29,16 +29,13 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
@@ -51,7 +48,6 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.ColorControls
-import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPinchControl
 import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineActiveEditorContext
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
@@ -75,8 +71,6 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.TabsContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.TabsList
 import dev.anthonyhfm.amethyst.ui.components.primitives.TabsTrigger
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
-import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -91,9 +85,7 @@ import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import com.composables.icons.lucide.Music
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.StateFlow
@@ -105,7 +97,6 @@ import kotlinx.coroutines.Dispatchers
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
 import dev.anthonyhfm.amethyst.timeline.data.isGradient
 import dev.anthonyhfm.amethyst.timeline.ui.NoteGradientEditorBar

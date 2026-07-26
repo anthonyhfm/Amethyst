@@ -1,9 +1,5 @@
 package dev.anthonyhfm.amethyst.workspace.modes.defaults
 
-import amethyst.composeapp.generated.resources.Res
-import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,13 +21,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
-import dev.anthonyhfm.amethyst.core.util.Platform
-import dev.anthonyhfm.amethyst.core.util.platform
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.components.AddDeviceButton

@@ -9,7 +9,6 @@ import dev.anthonyhfm.amethyst.core.midi.devices.*
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.rotateMidiCoordinate

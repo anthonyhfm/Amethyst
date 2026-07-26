@@ -58,6 +58,18 @@ import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
 import kotlin.concurrent.Volatile
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.midi.AmethystMidiManager
+import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
+import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 object WorkspaceRepository {
     private fun Throwable.isRecoverablePlatformInitFailure(): Boolean {
@@ -156,8 +168,55 @@ object WorkspaceRepository {
         _showDevicePicker.update { false }
     }
 
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val midiManager = AmethystMidiManager()
+
     init {
         setupChains()
+        setupMidiAutoDetect()
+        setupModeTransitionObserver()
+        setupCollaborationPresence()
+    }
+
+    private fun setupMidiAutoDetect() {
+        repositoryScope.launch {
+            ViewportRepository.devices.collect { devices ->
+                if (devices.isNotEmpty()) {
+                    midiManager.startAutoDetectLoop()
+                } else {
+                    midiManager.stopAutoDetectLoop()
+                }
+            }
+        }
+    }
+
+    private fun setupModeTransitionObserver() {
+        repositoryScope.launch {
+            mode.collect { newMode ->
+                when (newMode) {
+                    is KeyframesWorkspaceMode -> {
+                        Heaven.clear()
+                        newMode.wake()
+                    }
+                    is CoordinateFilterWorkspaceMode -> {
+                        Heaven.clear()
+                        newMode.wake()
+                    }
+                    else -> { /* cleanup is handled in replaceMode */ }
+                }
+            }
+        }
+    }
+
+    private fun setupCollaborationPresence() {
+        repositoryScope.launch {
+            SelectionManager.selections
+                .map { selections -> selections.firstOrNull()?.selectionUUID }
+                .distinctUntilChanged()
+                .collect { focusedElementId ->
+                    CollaborationPresence.sendFocusedElement(focusedElementId)
+                }
+        }
     }
 
     private fun setupChains() {
@@ -194,6 +253,24 @@ object WorkspaceRepository {
     private fun replaceMode(mode: WorkspaceMode) {
         val current = _mode.value
         if (current == mode) return
+
+        if (current is CoordinateFilterWorkspaceMode) {
+            Heaven.clear()
+            current.close()
+        }
+
+        if (current is KeyframesWorkspaceMode) {
+            Heaven.clear()
+            current.close()
+        }
+
+        if (current is LayoutWorkspaceMode) {
+            updateWorkspaceBounds()
+            if (SelectionManager.selections.value.any { it is Selectable.VirtualViewportDevice }) {
+                SelectionManager.clear()
+            }
+        }
+
         current.onDeactivate()
         _mode.update { mode }
         mode.onActivate()

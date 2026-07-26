@@ -24,7 +24,6 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollAreaState
 import dev.anthonyhfm.amethyst.ui.components.primitives.rememberScrollAreaState
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollBarOrientation
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 

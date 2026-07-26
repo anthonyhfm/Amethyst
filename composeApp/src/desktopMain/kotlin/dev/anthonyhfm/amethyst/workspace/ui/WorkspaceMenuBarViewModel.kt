@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.workspace.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceContract
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenHelper
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenResult
