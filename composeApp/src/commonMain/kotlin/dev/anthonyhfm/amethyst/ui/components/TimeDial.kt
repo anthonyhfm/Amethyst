@@ -25,42 +25,77 @@ fun TimeDial(
     onFinishValueChange: (timing: Timing, msValue: Long) -> Unit = { _, _ -> },
     enabled: Boolean = true,
     text: String? = null,
+    flat: Boolean = false,
 ) {
     val millisecondMode by remember { derivedStateOf { timing is Timing.Duration } }
     val bpm by WorkspaceRepository.bpm.collectAsState()
 
     if (millisecondMode) {
-        Dial(
-            type = DialType.Continuous,
-            value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / 1000,
-            onStartValueChange = {
-                onStartValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
-            },
-            onValueChange = {
-                onSelectTiming(
-                    Timing.Duration((it * 1000).roundToInt().milliseconds),
-                    (it * 1000).roundToInt().milliseconds.inWholeMilliseconds
-                )
-            },
-            onFinishValueChange = {
-                onFinishValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
-            },
-            title = title,
-            text = text ?: "${timing.duration.inWholeMilliseconds.toInt()} ms",
-            onResolveTextValue = {
-                val timing = it.asTiming()
+        if (flat) {
+            FlatDial(
+                type = DialType.Continuous,
+                value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / 1000,
+                onStartValueChange = {
+                    onStartValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                },
+                onValueChange = {
+                    onSelectTiming(
+                        Timing.Duration((it * 1000).roundToInt().milliseconds),
+                        (it * 1000).roundToInt().milliseconds.inWholeMilliseconds
+                    )
+                },
+                onFinishValueChange = {
+                    onFinishValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                },
+                title = title,
+                text = text ?: "${timing.duration.inWholeMilliseconds.toInt()} ms",
+                onResolveTextValue = {
+                    val timing = it.asTiming()
 
-                timing?.let { t ->
-                    if (t.toMsValue(bpm) <= 1000) {
-                        onSelectTiming(
-                            t,
-                            t.toMsValue(bpm)
-                        )
+                    timing?.let { t ->
+                        if (t.toMsValue(bpm) <= 1000) {
+                            onSelectTiming(
+                                t,
+                                t.toMsValue(bpm)
+                            )
+                        }
                     }
-                }
-            },
-            enabled = enabled
-        )
+                },
+                enabled = enabled
+            )
+        } else {
+            Dial(
+                type = DialType.Continuous,
+                value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / 1000,
+                onStartValueChange = {
+                    onStartValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                },
+                onValueChange = {
+                    onSelectTiming(
+                        Timing.Duration((it * 1000).roundToInt().milliseconds),
+                        (it * 1000).roundToInt().milliseconds.inWholeMilliseconds
+                    )
+                },
+                onFinishValueChange = {
+                    onFinishValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                },
+                title = title,
+                text = text ?: "${timing.duration.inWholeMilliseconds.toInt()} ms",
+                onResolveTextValue = {
+                    val timing = it.asTiming()
+
+                    timing?.let { t ->
+                        if (t.toMsValue(bpm) <= 1000) {
+                            onSelectTiming(
+                                t,
+                                t.toMsValue(bpm)
+                            )
+                        }
+                    }
+                },
+                enabled = enabled
+            )
+        }
     } else {
         var lastRythmTiming by remember {
             mutableStateOf(
@@ -72,42 +107,81 @@ fun TimeDial(
             lastRythmTiming = currentRythmTiming
         }
 
-        Dial(
-            type = DialType.Steps(Timing.Rythm.RythmTiming.entries),
-            text = if (timing is Timing.Rythm) {
-                text ?: timing.timing.text
-            } else {
-                lastRythmTiming.text
-            },
-            value = currentRythmTiming ?: lastRythmTiming,
-            title = title,
-            onStartValueChange = {
-                val startTiming = Timing.Rythm(it)
-                onStartValueChange(startTiming, startTiming.toMsValue(bpm))
-            },
-            onValueChange = {
-                val newTiming = Timing.Rythm(it)
-                onSelectTiming(
-                    newTiming,
-                    newTiming.toMsValue(bpm)
-                )
-            },
-            onFinishValueChange = {
-                val finishTiming = Timing.Rythm(it)
-                onFinishValueChange(finishTiming, finishTiming.toMsValue(bpm))
-            },
-            onResolveTextValue = {
-                val parsed = it.asTiming()
-
-                parsed?.let { t ->
+        if (flat) {
+            FlatDial(
+                type = DialType.Steps(Timing.Rythm.RythmTiming.entries),
+                text = if (timing is Timing.Rythm) {
+                    text ?: timing.timing.text
+                } else {
+                    lastRythmTiming.text
+                },
+                value = currentRythmTiming ?: lastRythmTiming,
+                title = title,
+                onStartValueChange = {
+                    val startTiming = Timing.Rythm(it)
+                    onStartValueChange(startTiming, startTiming.toMsValue(bpm))
+                },
+                onValueChange = {
+                    val newTiming = Timing.Rythm(it)
                     onSelectTiming(
-                        t,
-                        t.toMsValue(bpm)
+                        newTiming,
+                        newTiming.toMsValue(bpm)
                     )
-                }
-            },
-            enabled = enabled
-        )
+                },
+                onFinishValueChange = {
+                    val finishTiming = Timing.Rythm(it)
+                    onFinishValueChange(finishTiming, finishTiming.toMsValue(bpm))
+                },
+                onResolveTextValue = {
+                    val parsed = it.asTiming()
+
+                    parsed?.let { t ->
+                        onSelectTiming(
+                            t,
+                            t.toMsValue(bpm)
+                        )
+                    }
+                },
+                enabled = enabled
+            )
+        } else {
+            Dial(
+                type = DialType.Steps(Timing.Rythm.RythmTiming.entries),
+                text = if (timing is Timing.Rythm) {
+                    text ?: timing.timing.text
+                } else {
+                    lastRythmTiming.text
+                },
+                value = currentRythmTiming ?: lastRythmTiming,
+                title = title,
+                onStartValueChange = {
+                    val startTiming = Timing.Rythm(it)
+                    onStartValueChange(startTiming, startTiming.toMsValue(bpm))
+                },
+                onValueChange = {
+                    val newTiming = Timing.Rythm(it)
+                    onSelectTiming(
+                        newTiming,
+                        newTiming.toMsValue(bpm)
+                    )
+                },
+                onFinishValueChange = {
+                    val finishTiming = Timing.Rythm(it)
+                    onFinishValueChange(finishTiming, finishTiming.toMsValue(bpm))
+                },
+                onResolveTextValue = {
+                    val parsed = it.asTiming()
+
+                    parsed?.let { t ->
+                        onSelectTiming(
+                            t,
+                            t.toMsValue(bpm)
+                        )
+                    }
+                },
+                enabled = enabled
+            )
+        }
     }
 }
 

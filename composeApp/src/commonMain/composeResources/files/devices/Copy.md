@@ -14,6 +14,7 @@ The way the device operates depends on the selected mode:
 * **Static** – Duplicates the incoming signal and sends it to all configured offsets immediately at the same time.
 * **Animate** – Creates a sequence where the signal is copied to each offset step-by-step according to the Timing and Gate settings.
 * **Interpolate** – Animates the signal seamlessly across offsets by generating intermediate interpolated frames based on angles.
+* **Hold Interpol.** – Operates like Interpolate, but only runs as long as the trigger button is held down. Releasing the button cancels playback and clears active interpolated signals.
 * **Random Single** – Randomly picks one offset (or the original position) and translates the signal only to that specific location.
 * **Random Loop** – Randomly jumps between the different offsets in a continuous loop sequence based on the specified timing.
 

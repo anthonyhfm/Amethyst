@@ -51,6 +51,7 @@
     <string name="device_copy_infinite_label">无限</string>
     <string name="device_copy_mode_animate">动画</string>
     <string name="device_copy_mode_interpolate">插值</string>
+    <string name="device_copy_mode_hold_interpolate">按住插值</string>
     <string name="device_copy_mode_label">模式</string>
     <string name="device_copy_mode_random_loop">随机循环</string>
     <string name="device_copy_mode_random_single">随机单次</string>

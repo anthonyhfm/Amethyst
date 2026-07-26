@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.anthonyhfm.amethyst.core.util.Timing
+import dev.anthonyhfm.amethyst.ui.components.FlatDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.TimeDial
@@ -17,7 +18,8 @@ fun TimingControls(
     onTimingChanged: (Timing) -> Unit,
     gate: Float,
     onGateChanged: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    flat: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -30,30 +32,56 @@ fun TimingControls(
             timing = timing,
             onSelectTiming = { timing, _ ->
                 onTimingChanged(timing)
-            }
+            },
+            flat = flat,
         )
 
-        Dial(
-            type = DialType.Continuous,
-            title = "Gate",
-            text = "${(gate * 200).toInt()}%",
-            value = gate,
-            onValueChange = { value ->
-                onGateChanged(value)
-            },
-            onResolveTextValue = {
-                val gateText = it.removeSuffix("%").trim().toIntOrNull()
-
-                gateText?.let { gate ->
-                    if (gate in 0..200) {
-                        onGateChanged(gate / 200f)
-                    }
-                }
-            },
-            modifier = Modifier
-                .rightClickable {
-                    onGateChanged(0.5f)
+        if (flat) {
+            FlatDial(
+                type = DialType.Continuous,
+                title = "Gate",
+                text = "${(gate * 200).toInt()}%",
+                value = gate,
+                onValueChange = { value ->
+                    onGateChanged(value)
                 },
-        )
+                onResolveTextValue = {
+                    val gateText = it.removeSuffix("%").trim().toIntOrNull()
+
+                    gateText?.let { gate ->
+                        if (gate in 0..200) {
+                            onGateChanged(gate / 200f)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .rightClickable {
+                        onGateChanged(0.5f)
+                    },
+            )
+        } else {
+            Dial(
+                type = DialType.Continuous,
+                title = "Gate",
+                text = "${(gate * 200).toInt()}%",
+                value = gate,
+                onValueChange = { value ->
+                    onGateChanged(value)
+                },
+                onResolveTextValue = {
+                    val gateText = it.removeSuffix("%").trim().toIntOrNull()
+
+                    gateText?.let { gate ->
+                        if (gate in 0..200) {
+                            onGateChanged(gate / 200f)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .rightClickable {
+                        onGateChanged(0.5f)
+                    },
+            )
+        }
     }
 }

@@ -50,6 +50,7 @@ fun TimeDial(
     onFinishValueChange: (timing: Timing, msValue: Long) -> Unit = { _, _ -> },
     enabled: Boolean = true,
     text: String? = null,
+    flat: Boolean = false,
 ) = dev.anthonyhfm.amethyst.ui.components.TimeDial(
     title = title,
     timing = timing,
@@ -58,4 +59,5 @@ fun TimeDial(
     onFinishValueChange = onFinishValueChange,
     enabled = enabled,
     text = text,
+    flat = flat,
 )

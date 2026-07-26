@@ -1,78 +1,34 @@
 package dev.anthonyhfm.amethyst.devices.effects.copy
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.times
-import com.composeunstyled.Icon
-import com.composeunstyled.Text
-import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
-import dev.anthonyhfm.amethyst.core.util.Timing
-import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.LEDChainDevice
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.Chokeable
-import dev.anthonyhfm.amethyst.ui.components.toMsValue
-import dev.anthonyhfm.amethyst.ui.components.primitives.Button
-import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
-import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
-import dev.anthonyhfm.amethyst.ui.components.primitives.Select
-import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
-import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
-import dev.anthonyhfm.amethyst.ui.components.DialType
-import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import dev.anthonyhfm.amethyst.ui.theme.border
-import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.ui.theme.foreground
-import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
-import dev.anthonyhfm.amethyst.ui.theme.secondary
-import dev.anthonyhfm.amethyst.ui.theme.secondaryForeground
-import dev.anthonyhfm.amethyst.ui.theme.small
-import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PinchGraph
-import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.TimingControls
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.serialization.Serializable
-import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
 class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(CopyChainDeviceState())
@@ -91,7 +47,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
             isSelected = isSelected,
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(leftPanelWidth + 52.dp + (deviceState.offsets.size * 130.dp) + 1.dp),
+                .width(leftPanelWidth + 52.dp + (130.dp * deviceState.offsets.size) + 1.dp),
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
             Row {
@@ -122,7 +78,7 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                         )
 
                         CopySelectField(
-                            label = "Grid Mode",
+                            label = "Isolation",
                             options = CopyChainDeviceState.GridMode.entries,
                             selectedOption = deviceState.gridMode,
                             onOptionSelected = { mode ->
@@ -170,50 +126,41 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        TimingControls(
-                            modifier = Modifier.weight(1f),
-                            timing = deviceState.timing,
-                            onTimingChanged = { timing ->
-                                val before = state.value
-                                state.update { it.copy(timing = timing) }
-                                pushStateChange(before, state.value)
-                            },
-                            gate = deviceState.gate,
-                            onGateChanged = { gate ->
-                                val before = state.value
-                                state.update { it.copy(gate = gate) }
-                                pushStateChange(before, state.value)
-                            }
-                        )
+                    Spacer(modifier = Modifier.weight(1f))
 
-                        PinchGraph(
-                            pinch = deviceState.pinch,
-                            onPinchChange = { pinch ->
-                                val before = state.value
-                                state.update { it.copy(pinch = pinch) }
-                                pushStateChange(before, state.value)
-                            },
-                            bilateral = deviceState.bilateral,
-                            onToggleBilateral = {
-                                val before = state.value
-                                state.update { it.copy(bilateral = !it.bilateral) }
-                                pushStateChange(before, state.value)
-                            },
-                            modifier = Modifier.size(52.dp)
-                        )
-                    }
+                    CopyTimeControls(
+                        timing = deviceState.timing,
+                        onTimingChanged = { timing ->
+                            val before = state.value
+                            state.update { it.copy(timing = timing) }
+                            pushStateChange(before, state.value)
+                        },
+                        gate = deviceState.gate,
+                        onGateChanged = { gate ->
+                            val before = state.value
+                            state.update { it.copy(gate = gate) }
+                            pushStateChange(before, state.value)
+                        },
+                        pinch = deviceState.pinch,
+                        onPinchChanged = { pinch ->
+                            val before = state.value
+                            state.update { it.copy(pinch = pinch) }
+                            pushStateChange(before, state.value)
+                        },
+                        bilateral = deviceState.bilateral,
+                        onToggleBilateral = {
+                            val before = state.value
+                            state.update { it.copy(bilateral = !it.bilateral) }
+                            pushStateChange(before, state.value)
+                        }
+                    )
                 }
 
                 Separator(orientation = SeparatorOrientation.Vertical)
 
                 Row {
                     deviceState.offsets.forEachIndexed { index, offset ->
-                        Offset(
+                        CopyOffsetCard(
                             index = index,
                             offset = offset,
                             deviceState = deviceState,
@@ -221,6 +168,14 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                                 val before = state.value
                                 val after = before.copy(
                                     offsets = before.offsets.mapIndexed { i, o -> if (i == index) newOffset else o }
+                                )
+                                pushStateChange(before, after)
+                                state.update { after }
+                            },
+                            onRemoveOffset = {
+                                val before = state.value
+                                val after = before.copy(
+                                    offsets = before.offsets.filterIndexed { i, _ -> i != index }
                                 )
                                 pushStateChange(before, after)
                                 state.update { after }
@@ -241,297 +196,6 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         }
     }
 
-    @Composable
-    private fun <T> CopySelectField(
-        label: String,
-        options: List<T>,
-        selectedOption: T,
-        onOptionSelected: (T) -> Unit,
-        modifier: Modifier = Modifier,
-        optionToString: (T) -> String = { it.toString() },
-    ) {
-        Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = label,
-                style = Theme[typography][small],
-                color = Theme[colors][mutedForeground],
-            )
-
-            Select(
-                value = optionToString(selectedOption),
-                onValueChange = {},
-                modifier = Modifier.fillMaxWidth(),
-                shape = SmallShape,
-                triggerHeight = 24.dp,
-                triggerContentPadding = PaddingValues(horizontal = 8.dp),
-            ) {
-                options.forEach { option ->
-                    SelectItem(
-                        text = optionToString(option),
-                        selected = option == selectedOption,
-                        onClick = { onOptionSelected(option) },
-                    )
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun ToggleOption(
-        label: String,
-        checked: Boolean,
-        onCheckedChange: (Boolean) -> Unit,
-        modifier: Modifier = Modifier,
-    ) {
-        Row(
-            modifier = modifier,
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Checkbox(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-            )
-            Text(
-                text = label,
-                style = Theme[typography][small],
-                color = Theme[colors][foreground],
-            )
-        }
-    }
-
-    @Composable
-    private fun IconActionButton(
-        icon: ImageVector,
-        contentDescription: String,
-        onClick: () -> Unit,
-        modifier: Modifier = Modifier,
-        variant: ButtonVariant = ButtonVariant.Secondary,
-    ) {
-        val tint = when (variant) {
-            ButtonVariant.Secondary -> Theme[colors][secondaryForeground]
-            else -> Theme[colors][foreground]
-        }
-
-        Button(
-            onClick = onClick,
-            modifier = modifier,
-            variant = variant,
-            size = ButtonSize.Icon,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = tint,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-    }
-
-    private fun copyModeLabel(mode: CopyChainDeviceState.CopyMode): String = when (mode) {
-        CopyChainDeviceState.CopyMode.STATIC -> "Static"
-        CopyChainDeviceState.CopyMode.ANIMATE -> "Animate"
-        CopyChainDeviceState.CopyMode.INTERPOLATE -> "Interpolate"
-        CopyChainDeviceState.CopyMode.RANDOM_SINGLE -> "Random Single"
-        CopyChainDeviceState.CopyMode.RANDOM_LOOP -> "Random Loop"
-    }
-
-    private fun gridModeLabel(mode: CopyChainDeviceState.GridMode): String = when (mode) {
-        CopyChainDeviceState.GridMode.NONE -> "None"
-        CopyChainDeviceState.GridMode.EDGELESS -> "Edgeless"
-        CopyChainDeviceState.GridMode.FULL -> "Full"
-    }
-
-    @Composable
-    fun AddOffsetButton(
-        onClick: () -> Unit
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(52.dp),
-
-            contentAlignment = Alignment.Center
-        ) {
-            IconActionButton(
-                icon = Icons.Default.Add,
-                contentDescription = "Add Offset",
-                onClick = onClick,
-                variant = ButtonVariant.Outline,
-            )
-        }
-    }
-
-    @Composable
-    fun Offset(
-        index: Int,
-        offset: CopyChainDeviceState.Offset,
-        deviceState: CopyChainDeviceState,
-        onChangeOffset: (CopyChainDeviceState.Offset) -> Unit
-    ) {
-        Column(
-            modifier = Modifier
-                .width(130.dp)
-                .fillMaxHeight()
-                .padding(start = 4.dp)
-                .padding(vertical = 2.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(color = Theme[colors][secondary])
-                .border(1.dp, Theme[colors][border], RoundedCornerShape(6.dp))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Offset",
-                    textAlign = TextAlign.Center,
-                    style = Theme[typography][small],
-                    color = Theme[colors][foreground],
-                )
-
-                IconActionButton(
-                    icon = Icons.Default.Remove,
-                    contentDescription = "Remove Offset",
-                    onClick = {
-                        val before = state.value
-                        val after = before.copy(
-                            offsets = before.offsets.filterIndexed { i, _ -> i != index }
-                        )
-                        pushStateChange(before, after)
-                        state.update { after }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 4.dp),
-                    variant = ButtonVariant.Ghost,
-                )
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceAround,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .rightClickable {
-                        onChangeOffset(offset.copy(isAbsolute = !offset.isAbsolute))
-                    }
-            ) {
-                Text(
-                    text = if (offset.isAbsolute) "AbsX: ${offset.absoluteX}" else "X: ${offset.x}",
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                )
-
-                Text(
-                    text = if (offset.isAbsolute) "AbsY: ${offset.absoluteY}" else "Y: ${offset.y}",
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                )
-            }
-
-            Box(
-                modifier = Modifier,
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                ) {
-                    IconActionButton(
-                        icon = Icons.Default.ArrowUpward,
-                        contentDescription = "Move up",
-                        onClick = {
-                            if (offset.isAbsolute) {
-                                onChangeOffset(offset.copy(absoluteY = offset.absoluteY + 1))
-                            } else {
-                                onChangeOffset(offset.copy(y = offset.y + 1))
-                            }
-                        },
-                    )
-
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                    ) {
-                        IconActionButton(
-                            icon = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Move left",
-                            onClick = {
-                                if (offset.isAbsolute) {
-                                    onChangeOffset(offset.copy(absoluteX = offset.absoluteX - 1))
-                                } else {
-                                    onChangeOffset(offset.copy(x = offset.x - 1))
-                                }
-                            },
-                        )
-
-                        IconActionButton(
-                            icon = Icons.Default.ArrowDownward,
-                            contentDescription = "Move down",
-                            onClick = {
-                                if (offset.isAbsolute) {
-                                    onChangeOffset(offset.copy(absoluteY = offset.absoluteY - 1))
-                                } else {
-                                    onChangeOffset(offset.copy(y = offset.y - 1))
-                                }
-                            },
-                        )
-
-                        IconActionButton(
-                            icon = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Move right",
-                            onClick = {
-                                if (offset.isAbsolute) {
-                                    onChangeOffset(offset.copy(absoluteX = offset.absoluteX + 1))
-                                } else {
-                                    onChangeOffset(offset.copy(x = offset.x + 1))
-                                }
-                            },
-                        )
-                    }
-                }
-            }
-
-            if (deviceState.mode == CopyChainDeviceState.CopyMode.INTERPOLATE) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Dial(
-                        type = DialType.Continuous,
-                        text = "${offset.angle}°",
-                        value = offset.angle.toFloat() / 360f,
-                        onValueChange = { value ->
-                            onChangeOffset(offset.copy(angle = (value * 360f).toInt()))
-                        },
-                        onResolveTextValue = { text ->
-                            val angleText = text.removeSuffix("°").trim().toIntOrNull()
-                            angleText?.let { angle ->
-                                onChangeOffset(offset.copy(angle = angle))
-                            }
-                        },
-                        modifier = Modifier
-                            .rightClickable {
-                                onChangeOffset(offset.copy(angle = 0))
-                            }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-        }
-    }
-
     private fun transformSignal(signal: Signal.LED, offset: CopyChainDeviceState.Offset): Signal.LED? {
         val (targetX, targetY) = resolveCopyTarget(signal, offset)
         return transformSignal(signal, targetX, targetY)
@@ -539,12 +203,22 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
     private fun transformSignal(signal: Signal.LED, targetX: Int, targetY: Int): Signal.LED? {
         val state = state.value
+        val boundsMode = state.gridMode.toBoundsMode()
+
+        val wrapBoundsMode = if (boundsMode != CopyBoundsMode.NONE) boundsMode else CopyBoundsMode.FULL
         val wrapBounds = if (state.wrap) {
-            resolveCopyCoordinateBounds(signal.origin, state.gridMode.toBoundsMode())
+            resolveCopyCoordinateBounds(signal.origin, wrapBoundsMode)
         } else {
             null
         }
-        val isolateBounds = resolveCopyCoordinateBounds(signal.origin, state.isolate.toBoundsMode())
+
+        val isolateBounds = if (!state.wrap && boundsMode != CopyBoundsMode.NONE) {
+            resolveCopyCoordinateBounds(signal.origin, boundsMode)
+        } else if (state.isolate != CopyChainDeviceState.IsolationType.NONE) {
+            resolveCopyCoordinateBounds(signal.origin, state.isolate.toBoundsMode())
+        } else {
+            null
+        }
 
         return applyCopyCoordinatePolicy(
             signal = signal,
@@ -577,6 +251,24 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
             CopyChainDeviceState.CopyMode.INTERPOLATE -> {
                 val animation = renderInterpolatedAnimation(n)
                 startPlayback(n, animation)
+            }
+
+            CopyChainDeviceState.CopyMode.HOLD_INTERPOLATE -> {
+                n.forEach { signal ->
+                    val identifier = signal.x * 10 + signal.y
+                    if (signal.color != Color.Black) {
+                        Heaven.cancelJobsForOwner(this, identifier)
+                        val animation = renderInterpolatedAnimation(listOf(signal))
+                        startPlayback(listOf(signal), animation)
+                    } else {
+                        Heaven.cancelJobsForOwner(this, identifier)
+                        val offAnimation = renderInterpolatedAnimation(listOf(signal))
+                        val offSignals = offAnimation.flatMap { it.second }.distinctBy { it.x to it.y }
+                        if (offSignals.isNotEmpty()) {
+                            signalExit?.invoke(offSignals)
+                        }
+                    }
+                }
             }
 
             CopyChainDeviceState.CopyMode.RANDOM_SINGLE -> {
@@ -679,14 +371,6 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
         val raw = buildList {
             if (state.reverse) {
-                // Reverse: Offsets reversed, but we also need to include the "0,0" (origin) relative to the LAST offset?
-                // Actually Apollo's reverse just reverses the order of signals.
-                // If offsets are [O1, O2], normal is [Origin, O1, O2].
-                // Reversed would be [Origin, O2, O1] or [O2, O1, Origin]?
-                // Let's check Apollo: "if (Reverse) validOffsets.Reverse();"
-                // validOffsets starts with s.Index (Origin), then adds offsets.
-                // So if validOffsets = [Origin, O1, O2], Reverse gives [O2, O1, Origin].
-
                 val validOffsets = mutableListOf(CopyChainDeviceState.Offset(0, 0))
                 state.offsets.forEach { validOffsets.add(it) }
                 validOffsets.reverse()
@@ -748,55 +432,9 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
         heldSignals.clear()
     }
 
-
     companion object : ChainDeviceFactory<CopyChainDeviceState> {
         override val stateClass = CopyChainDeviceState::class
         override val serializer = CopyChainDeviceState.serializer()
         override fun create() = CopyChainDevice()
     }
-}
-
-@Serializable
-data class CopyChainDeviceState(
-    val mode: CopyMode = CopyMode.STATIC,
-    val gridMode: GridMode = GridMode.NONE,
-    val wrap: Boolean = false,
-    val timing: Timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_4),
-    val gate: Float = 0.5f, // Apollo 100% = 0.5f
-    val pinch: Float = 0f,
-    val bilateral: Boolean = false,
-    val reverse: Boolean = false,
-    val infinite: Boolean = false,
-    val isolate: IsolationType = IsolationType.NONE,
-    val offsets: List<Offset> = emptyList(),
-) : DeviceState() {
-    enum class IsolationType {
-        NONE,
-        EDGELESS,
-        FULL
-    }
-
-    enum class CopyMode {
-        STATIC,
-        ANIMATE,
-        INTERPOLATE,
-        RANDOM_SINGLE,
-        RANDOM_LOOP
-    }
-
-    enum class GridMode {
-        NONE,
-        EDGELESS,
-        FULL,
-    }
-
-    @Serializable
-    data class Offset(
-        val x: Int,
-        val y: Int,
-        val isAbsolute: Boolean = false,
-        val absoluteX: Int = 0,
-        val absoluteY: Int = 0,
-        val angle: Int = 0
-    )
 }

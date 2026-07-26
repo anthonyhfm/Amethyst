@@ -51,6 +51,7 @@
     <string name="device_copy_infinite_label">Endlos</string>
     <string name="device_copy_mode_animate">Animate</string>
     <string name="device_copy_mode_interpolate">Interpolate</string>
+    <string name="device_copy_mode_hold_interpolate">Hold Interpol.</string>
     <string name="device_copy_mode_label">Modus</string>
     <string name="device_copy_mode_random_loop">Random Loop</string>
     <string name="device_copy_mode_random_single">Random Single</string>

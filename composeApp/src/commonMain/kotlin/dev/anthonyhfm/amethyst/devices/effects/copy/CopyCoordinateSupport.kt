@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.devices.effects.copy
 
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
+import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -74,11 +75,19 @@ internal fun copyBoundsForLayout(
 }
 
 internal fun resolveCopyCoordinateBounds(origin: Any?, mode: CopyBoundsMode): CopyCoordinateBounds? {
-    val device = origin as? LaunchpadViewportElement ?: return null
+    if (mode == CopyBoundsMode.NONE) return null
+
+    val device = (origin as? LaunchpadViewportElement)
+        ?: ViewportRepository.devices.value.firstOrNull()
+
+    val deviceStartX = device?.position?.value?.x?.toInt() ?: 0
+    val deviceStartY = device?.position?.value?.y?.toInt() ?: 0
+    val layout = device?.layout ?: LaunchpadLayout.LAYOUT_10X10
+
     return copyBoundsForLayout(
-        deviceStartX = device.position.value.x.toInt(),
-        deviceStartY = device.position.value.y.toInt(),
-        layout = device.layout,
+        deviceStartX = deviceStartX,
+        deviceStartY = deviceStartY,
+        layout = layout,
         mode = mode,
     )
 }
