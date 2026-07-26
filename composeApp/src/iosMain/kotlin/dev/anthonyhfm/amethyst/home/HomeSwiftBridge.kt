@@ -5,25 +5,25 @@ import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
 import dev.anthonyhfm.amethyst.core.util.FileHelper
+import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.determineFormat
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.utils.toByteArray
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSData
-import platform.Foundation.NSFileManager
-import platform.Foundation.NSSearchPathForDirectoriesInDomains
-import platform.Foundation.NSDocumentDirectory
-import platform.Foundation.NSUserDomainMask
 
 import dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager
+import io.github.vinceglb.filekit.path
 
 /**
  * Bridge object exposing HomeRepository operations to native Swift code.
@@ -55,31 +55,13 @@ object HomeSwiftBridge {
     // ── File management ────────────────────────────────────────────────────
 
     /**
-     * Writes [data] to <Documents>/Amethyst/[filename], indexes the result
-     * in [FileHelper], and returns the absolute path of the stored file.
-     *
-     * Call from Swift after reading the picked file's data (with security-
-     * scoped access already started and stopped).
+     * Writes [data] to persistent app storage, indexes the result
+     * in [FileHelper], and returns the path of the stored file.
      */
     fun indexFile(data: NSData, filename: String): String {
-        val documentsPath = documentsDirectory() ?: return ""
-        val amethystDir = "$documentsPath/Amethyst"
-
-        NSFileManager.defaultManager.createDirectoryAtPath(
-            path = amethystDir,
-            withIntermediateDirectories = true,
-            attributes = null,
-            error = null,
-        )
-
-        val filePath = "$amethystDir/$filename"
-        NSFileManager.defaultManager.createFileAtPath(
-            path = filePath,
-            contents = data,
-            attributes = null,
-        )
-        FileHelper.indexedFiles[filePath] = PlatformFile(filePath)
-        return filePath
+        val bytes = data.toByteArray()
+        val file = runBlocking { MobileFileStorage.copyBytesToPersistentStorage(bytes, filename) }
+        return file.path
     }
 
     fun clearIndexedFile(path: String) {
@@ -187,14 +169,5 @@ object HomeSwiftBridge {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private fun resolveFile(path: String): PlatformFile =
-        FileHelper.indexedFiles[path] ?: PlatformFile(path)
-
-    private fun documentsDirectory(): String? {
-        val paths = NSSearchPathForDirectoriesInDomains(
-            NSDocumentDirectory,
-            NSUserDomainMask,
-            true,
-        )
-        return paths.firstOrNull() as? String
-    }
+        MobileFileStorage.resolvePath(path)
 }

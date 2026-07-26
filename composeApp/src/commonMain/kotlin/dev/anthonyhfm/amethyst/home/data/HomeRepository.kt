@@ -6,7 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
-import dev.anthonyhfm.amethyst.core.util.FileHelper
+import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.determineFormat
@@ -141,7 +141,8 @@ object HomeRepository {
     }
 
     suspend fun openRecentWorkspace(project: RecentWorkspace) {
-        val workspace = loadWorkspaceData(PlatformFile(project.path))
+        val file = MobileFileStorage.resolvePath(project.path)
+        val workspace = loadWorkspaceData(file)
         openWorkspace(
             workspace = workspace,
             rememberRecent = true,
@@ -152,7 +153,7 @@ object HomeRepository {
     suspend fun loadProjectDetails(path: String): HomeProjectDetails? {
         return withContext(Dispatchers.Default) {
             runCatching {
-                val workspace = decodeAmethystWorkspace(PlatformFile(path))
+                val workspace = decodeAmethystWorkspace(MobileFileStorage.resolvePath(path))
                 HomeProjectDetails(
                     name = workspace.title,
                     author = workspace.author,
@@ -190,7 +191,7 @@ object HomeRepository {
         author: String,
     ) {
         withContext(Dispatchers.Default) {
-            val file = PlatformFile(path)
+            val file = MobileFileStorage.resolvePath(path)
             val existingWorkspace = decodeAmethystWorkspace(file)
             val updatedWorkspace = existingWorkspace.copy(
                 title = name.trim(),
@@ -261,11 +262,7 @@ object HomeRepository {
     }
 
     private fun resolveImportedFile(path: String): PlatformFile {
-        return if (platform is Platform.Android || platform is Platform.iOS) {
-            FileHelper.indexedFiles[path] ?: PlatformFile(path)
-        } else {
-            PlatformFile(path)
-        }
+        return MobileFileStorage.resolvePath(path)
     }
 
     private fun normalizeAuthor(author: String): String {

@@ -171,6 +171,9 @@ struct ContentView: View {
                 UIApplication.shared.isIdleTimerDisabled = true
             }
         }
+        .onOpenURL { url in
+            viewModel.openFile(url: url)
+        }
     }
 
     // MARK: - Home tab bar

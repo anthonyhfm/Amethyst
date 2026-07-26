@@ -8,6 +8,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import dev.anthonyhfm.amethyst.core.util.BaseViewModel
+import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
 import dev.anthonyhfm.amethyst.core.util.determineFormat
@@ -40,19 +41,21 @@ class ProjectsViewModel(
 
                     if (file == null) return@launch
 
-                    when (file.extension.lowercase()) {
+                    val persistentFile = MobileFileStorage.copyToPersistentStorage(file)
+
+                    when (persistentFile.extension.lowercase()) {
                         "ame" -> {
                             runWorkspaceLoad(
                                 loadingText = getString(Res.string.home_projects_loading_project_msg),
                                 errorMessage = getString(Res.string.home_projects_invalid_project_msg),
                             ) {
-                                val workspace = HomeRepository.loadWorkspaceData(file)
-                                HomeRepository.openWorkspace(workspace)
+                                val workspace = HomeRepository.loadWorkspaceData(persistentFile)
+                                HomeRepository.openWorkspace(workspace, rememberRecent = true)
                             }
                         }
 
                         "als" -> {
-                            navigator.navigate(HomeNavRoute.AbletonImportWizard(file.absolutePath()))
+                            navigator.navigate(HomeNavRoute.AbletonImportWizard(persistentFile.absolutePath()))
                         }
 
                         "approj" -> {
@@ -61,17 +64,17 @@ class ProjectsViewModel(
                                 errorMessage = getString(Res.string.home_projects_failed_apollo_msg),
                                 printStackTrace = true,
                             ) {
-                                val workspace = HomeRepository.loadWorkspaceData(file)
-                                HomeRepository.openWorkspace(workspace)
+                                val workspace = HomeRepository.loadWorkspaceData(persistentFile)
+                                HomeRepository.openWorkspace(workspace, rememberRecent = true)
                             }
                         }
 
                         "zip" -> {
-                            val format = Zip.determineFormat(file)
+                            val format = Zip.determineFormat(persistentFile)
 
                             when (format) {
                                 ZippedProjectFormat.ABLETON -> {
-                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(file.path))
+                                    navigator.navigate(HomeNavRoute.AbletonImportWizard(persistentFile.path))
                                 }
 
                                 ZippedProjectFormat.ABLETON_APOLLO -> {
@@ -80,8 +83,8 @@ class ProjectsViewModel(
                                         errorMessage = getString(Res.string.home_projects_failed_ableton_apollo_msg),
                                         printStackTrace = true,
                                     ) {
-                                        val workspace = HomeRepository.loadWorkspaceData(file)
-                                        HomeRepository.openWorkspace(workspace)
+                                        val workspace = HomeRepository.loadWorkspaceData(persistentFile)
+                                        HomeRepository.openWorkspace(workspace, rememberRecent = true)
                                     }
                                 }
 
@@ -90,8 +93,8 @@ class ProjectsViewModel(
                                         loadingText = getString(Res.string.home_projects_translating_unipad_msg),
                                         errorMessage = getString(Res.string.home_projects_failed_unipad_msg),
                                     ) {
-                                        val workspace = HomeRepository.loadWorkspaceData(file)
-                                        HomeRepository.openWorkspace(workspace)
+                                        val workspace = HomeRepository.loadWorkspaceData(persistentFile)
+                                        HomeRepository.openWorkspace(workspace, rememberRecent = true)
                                     }
                                 }
                             }
