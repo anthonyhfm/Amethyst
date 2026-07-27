@@ -23,6 +23,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.midi.AndroidMidiAccessProvider
 import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
+import dev.anthonyhfm.amethyst.nativeengine.AndroidNativeContext
 import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
 import dev.anthonyhfm.amethyst.settings.data.AudioSettings
 import dev.anthonyhfm.amethyst.ui.theme.ComposeAmethystTheme
@@ -38,10 +39,8 @@ class MainActivity : ComponentActivity() {
 
         initializeSentry()
 
-        try {
-            System.loadLibrary("c++_shared")
-        } catch (_: UnsatisfiedLinkError) {
-            // Ignored if c++_shared is statically linked or unavailable
+        check(AndroidNativeContext.initialize(applicationContext)) {
+            "Cannot initialize the native Android context"
         }
 
         FileKit.init(this)

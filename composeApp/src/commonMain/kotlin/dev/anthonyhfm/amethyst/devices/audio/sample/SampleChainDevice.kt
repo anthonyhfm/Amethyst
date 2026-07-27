@@ -107,7 +107,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     override val audioRole = AudioChainDeviceRole.Generator
 
     private val triggerQueue = SampleTriggerQueue()
-    private val voice = SampleVoiceRenderer()
+    private val voicePool = SampleVoicePool()
     private val publishedPlayheadFrame = atomic(-1L)
     private val audioConfiguration = atomic<AudioConfiguration?>(null)
     private val renderCache = atomic<SampleRenderCache?>(null)
@@ -306,7 +306,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         audioConfiguration.value = configuration
         renderCache.value = null
         triggerQueue.clear()
-        voice.prepare(configuration)
+        voicePool.prepare(configuration)
         publishedPlayheadFrame.value = -1L
         primeAudioSnapshot()
     }
@@ -317,16 +317,16 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     ) {
         var pending = triggerQueue.poll()
         while (pending != null) {
-            voice.trigger(pending)
+            voicePool.trigger(pending)
             pending = triggerQueue.poll()
         }
-        voice.render(block)
-        publishedPlayheadFrame.value = voice.sourceFrame
+        voicePool.render(block)
+        publishedPlayheadFrame.value = voicePool.sourceFrame
     }
 
     override fun resetAudio() {
         triggerQueue.clear()
-        voice.stop()
+        voicePool.stop()
         publishedPlayheadFrame.value = -1L
     }
 
@@ -359,11 +359,12 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         ) {
             return cached.snapshot
         }
-        return SampleRenderSnapshot.from(
+        val snapshot = SampleRenderSnapshot.from(
             state = deviceState,
-            outputSampleRate = outputSampleRate,
             rawData = resolvedRawData,
-        ).also {
+        )
+        snapshot?.let(voicePool::prepareSnapshot)
+        return snapshot.also {
             renderCache.value = SampleRenderCache(
                 state = deviceState,
                 outputSampleRate = outputSampleRate,

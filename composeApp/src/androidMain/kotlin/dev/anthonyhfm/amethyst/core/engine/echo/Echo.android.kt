@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
 import android.os.Process
+import android.util.Log
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -19,6 +20,8 @@ import java.util.concurrent.locks.LockSupport
 import kotlin.math.max
 
 actual object Echo {
+    private const val TAG = "EchoAudio"
+
     private val decoder = NativeEchoDecoder()
     private val formats = listOf("wav", "mp3", "flac", "ogg", "aiff", "aif", "aifc")
     private val renderRunning = AtomicBoolean(false)
@@ -49,7 +52,16 @@ actual object Echo {
             preferredPeriodFrames = preferredBufferFrames,
             preferredOutputDevice = preferredOutputDevice,
         )
-        if (!info.available || info.channels.toInt() != OUTPUT_CHANNELS) {
+        if (!info.available) {
+            Log.e(TAG, "PCM output initialization failed: ${info.error ?: "unknown error"}")
+            nextOutput.close()
+            return false
+        }
+        if (info.channels.toInt() != OUTPUT_CHANNELS) {
+            Log.e(
+                TAG,
+                "PCM output has ${info.channels} channels; $OUTPUT_CHANNELS are required",
+            )
             nextOutput.close()
             return false
         }
@@ -79,7 +91,9 @@ actual object Echo {
             renderBuffer = renderBuffer,
             periodFrames = periodFrames,
         )
-        if (nextOutput.start() != null) {
+        val startError = nextOutput.start()
+        if (startError != null) {
+            Log.e(TAG, "PCM output failed to start: $startError")
             nextPlayback.release()
             nextOutput.close()
             return false
@@ -135,11 +149,16 @@ actual object Echo {
 
     @Synchronized
     actual fun attachAudioChain(chain: AudioChain) {
-        if (playback.renderer.chain === chain) return
-        val shouldRestart = initialized
+        if (playback.renderer.chain === chain) {
+            if (!initialized && !backgrounded.get()) initialize()
+            return
+        }
         stopOutput()
         playback = AudioPlaybackEngine(chain)
-        if (shouldRestart) initialize()
+        // Workspace sample devices enqueue their triggers directly on the live
+        // AudioChain. Unlike timeline voices, that path never calls play(), so
+        // the renderer must already be running when the first pad is pressed.
+        if (!backgrounded.get()) initialize()
     }
 
     actual suspend fun decodeAudioFile(

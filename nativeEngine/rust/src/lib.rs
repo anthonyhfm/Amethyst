@@ -1,6 +1,8 @@
 pub mod midi;
 pub mod echo;
 pub mod pcm_output;
+#[cfg(target_os = "android")]
+mod android_context;
 
 pub use midi::types::*;
 pub use midi::error::*;

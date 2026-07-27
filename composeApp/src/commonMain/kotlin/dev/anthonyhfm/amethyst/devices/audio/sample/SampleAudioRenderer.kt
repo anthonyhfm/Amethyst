@@ -26,7 +26,6 @@ internal class SampleRenderSnapshot private constructor(
     val fadeOutFrames: Int,
     val volumeGain: Float,
     val volumeAutomationLane: TimelineAutomationLane?,
-    val resampler: PolyphaseSincResampler?,
 ) {
     val activeFrames: Long
         get() = endFrame - startFrame
@@ -34,7 +33,6 @@ internal class SampleRenderSnapshot private constructor(
     companion object {
         fun from(
             state: SampleChainDeviceState,
-            outputSampleRate: Int,
             rawData: ByteArray? = state.resolvedRawData(),
         ): SampleRenderSnapshot? {
             rawData ?: return null
@@ -43,7 +41,6 @@ internal class SampleRenderSnapshot private constructor(
             if (
                 rawData.isEmpty() ||
                 state.sampleRate <= 0 ||
-                outputSampleRate <= 0 ||
                 state.channels !in 1..2 ||
                 state.bitDepth !in ByteArrayPcmAudioSource.SUPPORTED_BIT_DEPTHS ||
                 bytesPerFrame <= 0 ||
@@ -86,15 +83,6 @@ internal class SampleRenderSnapshot private constructor(
                         it.enabled &&
                             it.target == TimelineTrackAutomationTarget.VOLUME
                     },
-                resampler = if (source.sampleRate == outputSampleRate) {
-                    null
-                } else {
-                    PolyphaseSincResampler(
-                        sourceRate = source.sampleRate,
-                        outputRate = outputSampleRate,
-                        channels = source.channels,
-                    )
-                },
             )
         }
     }
@@ -165,8 +153,9 @@ internal class SampleTriggerQueue(
 }
 
 /**
- * Monophonic sample voice. The voice state is retained for the lifetime of the
- * device and is reset on retrigger rather than allocated by the render thread.
+ * Preallocated sample voice. The voice state is retained for the lifetime of
+ * the device and is reset on retrigger rather than allocated by the render
+ * thread.
  */
 internal class SampleVoiceRenderer {
     private var configuration = AudioConfiguration(
@@ -176,6 +165,9 @@ internal class SampleVoiceRenderer {
     )
     private var snapshot: SampleRenderSnapshot? = null
     private var sourcePosition = 0.0
+    private var resampler: PolyphaseSincResampler? = null
+    private var preparedSourceRate = 0
+    private var preparedSourceChannels = 0
     private val resampledFrame = FloatArray(2)
     private var transitionFramesRemaining = 0
     private var transitionFramesTotal = 0
@@ -189,7 +181,7 @@ internal class SampleVoiceRenderer {
 
     val sourceFrame: Long
         get() = snapshot?.let {
-            floor(it.resampler?.sourcePosition ?: sourcePosition).toLong().coerceIn(
+            floor(resampler?.sourcePosition ?: sourcePosition).toLong().coerceIn(
                 it.startFrame,
                 it.endFrame,
             )
@@ -197,10 +189,44 @@ internal class SampleVoiceRenderer {
 
     fun prepare(configuration: AudioConfiguration) {
         this.configuration = configuration
+        resampler = null
+        preparedSourceRate = 0
+        preparedSourceChannels = 0
         stop()
     }
 
+    /**
+     * Allocates a resampler, when necessary, on the control thread before a
+     * trigger is published to the realtime audio thread.
+     */
+    fun prepareSnapshot(snapshot: SampleRenderSnapshot) {
+        val source = snapshot.source
+        if (
+            preparedSourceRate == source.sampleRate &&
+            preparedSourceChannels == source.channels
+        ) {
+            return
+        }
+        resampler = if (source.sampleRate == configuration.sampleRate) {
+            null
+        } else {
+            PolyphaseSincResampler(
+                sourceRate = source.sampleRate,
+                outputRate = configuration.sampleRate,
+                channels = source.channels,
+            )
+        }
+        preparedSourceRate = source.sampleRate
+        preparedSourceChannels = source.channels
+    }
+
     fun trigger(snapshot: SampleRenderSnapshot) {
+        check(
+            preparedSourceRate == snapshot.source.sampleRate &&
+                preparedSourceChannels == snapshot.source.channels
+        ) {
+            "Sample voice must be prepared before triggering"
+        }
         transitionLeft = lastLeft
         transitionRight = lastRight
         transitionFramesTotal = (
@@ -209,14 +235,14 @@ internal class SampleVoiceRenderer {
         transitionFramesRemaining = transitionFramesTotal
         this.snapshot = snapshot
         sourcePosition = snapshot.startFrame.toDouble()
-        snapshot.resampler?.reset(snapshot.startFrame.toDouble())
+        resampler?.reset(snapshot.startFrame.toDouble())
     }
 
     fun render(block: AudioProcessingBlock) {
         val activeSnapshot = snapshot ?: return
         var frame = 0
         while (frame < block.frameCount && snapshot != null) {
-            val currentSourcePosition = activeSnapshot.resampler?.sourcePosition
+            val currentSourcePosition = resampler?.sourcePosition
                 ?: sourcePosition
             if (currentSourcePosition >= activeSnapshot.endFrame) {
                 stop()
@@ -262,7 +288,7 @@ internal class SampleVoiceRenderer {
             lastLeft = renderedLeft
             lastRight = renderedRight
             if (transitionFramesRemaining > 0) transitionFramesRemaining--
-            activeSnapshot.resampler?.advance()
+            resampler?.advance()
                 ?: run { sourcePosition += 1.0 }
             frame++
         }
@@ -280,8 +306,8 @@ internal class SampleVoiceRenderer {
     }
 
     private fun readSourceFrame(snapshot: SampleRenderSnapshot) {
-        val resampler = snapshot.resampler
-        if (resampler == null) {
+        val activeResampler = resampler
+        if (activeResampler == null) {
             resampledFrame[0] = snapshot.source.sample(sourcePosition.toLong(), 0)
             resampledFrame[1] = if (snapshot.source.channels == 1) {
                 resampledFrame[0]
@@ -290,7 +316,7 @@ internal class SampleVoiceRenderer {
             }
             return
         }
-        resampler.readFrame(
+        activeResampler.readFrame(
             source = snapshot.source,
             destination = resampledFrame,
             lowerBoundFrame = snapshot.startFrame,
@@ -336,5 +362,69 @@ internal class SampleVoiceRenderer {
 
     private companion object {
         private const val RETRIGGER_TRANSITION_SECONDS = 0.00133f
+    }
+}
+
+/**
+ * Fixed-size polyphonic voice pool. No voices or PCM buffers are allocated by
+ * the realtime render thread. When all voices are busy, the oldest round-robin
+ * slot is stolen with the renderer's short click-free transition.
+ */
+internal class SampleVoicePool(
+    maximumVoices: Int = DEFAULT_MAXIMUM_VOICES,
+) {
+    private val voices = Array(maximumVoices) { SampleVoiceRenderer() }
+    private var nextVoiceIndex = 0
+    private var latestVoiceIndex = -1
+
+    init {
+        require(maximumVoices > 0)
+    }
+
+    val sourceFrame: Long
+        get() = voices.getOrNull(latestVoiceIndex)?.sourceFrame ?: -1L
+
+    fun prepare(configuration: AudioConfiguration) {
+        voices.forEach { it.prepare(configuration) }
+        nextVoiceIndex = 0
+        latestVoiceIndex = -1
+    }
+
+    fun prepareSnapshot(snapshot: SampleRenderSnapshot) {
+        voices.forEach { it.prepareSnapshot(snapshot) }
+    }
+
+    fun trigger(snapshot: SampleRenderSnapshot) {
+        var selectedIndex = -1
+        var offset = 0
+        while (offset < voices.size) {
+            val index = (nextVoiceIndex + offset) % voices.size
+            if (!voices[index].isActive) {
+                selectedIndex = index
+                break
+            }
+            offset++
+        }
+        if (selectedIndex < 0) selectedIndex = nextVoiceIndex
+
+        voices[selectedIndex].trigger(snapshot)
+        latestVoiceIndex = selectedIndex
+        nextVoiceIndex = (selectedIndex + 1) % voices.size
+    }
+
+    fun render(block: AudioProcessingBlock) {
+        voices.forEach { voice ->
+            if (voice.isActive) voice.render(block)
+        }
+    }
+
+    fun stop() {
+        voices.forEach(SampleVoiceRenderer::stop)
+        nextVoiceIndex = 0
+        latestVoiceIndex = -1
+    }
+
+    private companion object {
+        const val DEFAULT_MAXIMUM_VOICES = 16
     }
 }

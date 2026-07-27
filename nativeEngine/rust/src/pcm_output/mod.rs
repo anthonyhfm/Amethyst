@@ -8,6 +8,9 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ring::SpscFloatRing;
 
 const DEFAULT_PERIOD_FRAMES: u32 = 128;
+#[cfg(target_os = "android")]
+const RING_PERIODS: usize = 2;
+#[cfg(not(target_os = "android"))]
 const RING_PERIODS: usize = 4;
 
 #[derive(uniffi::Record, Clone, Debug, PartialEq, Eq)]
@@ -248,7 +251,7 @@ impl PcmOutputService {
     pub fn output_devices(&self) -> Vec<String> {
         cpal::default_host()
             .output_devices()
-            .map(|devices| devices.filter_map(|device| device.name().ok()).collect())
+            .map(|devices| devices.map(|device| device.to_string()).collect())
             .unwrap_or_default()
     }
 
@@ -347,24 +350,17 @@ fn build_stream(
         Some(name) => host
             .output_devices()
             .map_err(|error| format!("Cannot enumerate output devices: {error}"))?
-            .find(|device| {
-                device
-                    .name()
-                    .map(|device_name| device_name == name)
-                    .unwrap_or(false)
-            })
+            .find(|device| device.to_string() == name)
             .ok_or_else(|| format!("Configured output device is unavailable: {name}"))?,
         None => host
             .default_output_device()
             .ok_or_else(|| "No default output device available".to_owned())?,
     };
-    let device_name = device
-        .name()
-        .unwrap_or_else(|_| "Unknown output device".to_owned());
+    let device_name = device.to_string();
     let supported_config = device
         .default_output_config()
         .map_err(|error| format!("Cannot get output config: {error}"))?;
-    let sample_rate = supported_config.sample_rate().0;
+    let sample_rate = supported_config.sample_rate();
     let channels = supported_config.channels() as usize;
     if channels == 0 {
         return Err("Output device reported zero channels".to_owned());
@@ -373,7 +369,12 @@ fn build_stream(
         cpal::SupportedBufferSize::Range { min, max } => {
             (preferred_period_frames.clamp(*min, *max), true)
         }
-        cpal::SupportedBufferSize::Unknown => (preferred_period_frames, false),
+        // AAudio discovers its native burst size only after opening the stream.
+        // Supplying the requested callback size is nevertheless required for
+        // CPAL's realtime backend to keep the hardware capacity small.
+        cpal::SupportedBufferSize::Unknown => {
+            (preferred_period_frames, cfg!(target_os = "android"))
+        }
     };
     let ring_capacity_frames = period_frames as usize * RING_PERIODS;
     let ring = Arc::new(SpscFloatRing::new(ring_capacity_frames, channels));
@@ -388,7 +389,7 @@ fn build_stream(
             let ring = Arc::clone(&ring);
             let telemetry = Arc::clone(&callback_telemetry);
             device.build_output_stream(
-                &stream_config,
+                stream_config,
                 move |output: &mut [f32], _| consume_f32(&ring, &telemetry, output),
                 stream_error_callback(Arc::clone(&callback_telemetry)),
                 None,
@@ -398,7 +399,7 @@ fn build_stream(
             let ring = Arc::clone(&ring);
             let telemetry = Arc::clone(&callback_telemetry);
             device.build_output_stream(
-                &stream_config,
+                stream_config,
                 move |output: &mut [i16], _| consume_i16(&ring, &telemetry, output),
                 stream_error_callback(Arc::clone(&callback_telemetry)),
                 None,
@@ -408,7 +409,7 @@ fn build_stream(
             let ring = Arc::clone(&ring);
             let telemetry = Arc::clone(&callback_telemetry);
             device.build_output_stream(
-                &stream_config,
+                stream_config,
                 move |output: &mut [u16], _| consume_u16(&ring, &telemetry, output),
                 stream_error_callback(Arc::clone(&callback_telemetry)),
                 None,
@@ -440,7 +441,7 @@ fn build_stream(
 
 fn stream_error_callback(
     telemetry: Arc<CallbackTelemetry>,
-) -> impl FnMut(cpal::StreamError) + Send + 'static {
+) -> impl FnMut(cpal::Error) + Send + 'static {
     move |_| {
         telemetry.stream_errors.fetch_add(1, Ordering::Relaxed);
     }

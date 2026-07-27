@@ -33,17 +33,27 @@ class ProjectsViewModel(
             is ProjectsViewContract.Event.OnClickOpenProject -> {
                 viewModelScope.launch {
                     val file = FileKit.openFilePicker(
-                        type = FileKitType.File(
-                            extensions = listOf("ame", "als", "zip", "approj")
-                        ),
+                        // Android's MimeTypeMap does not know Amethyst's custom
+                        // ".ame" extension. Mixing it with ".zip" therefore
+                        // makes the system picker filter for ZIP files only and
+                        // greys out valid Amethyst projects.
+                        type = FileKitType.File(),
                         title = getString(Res.string.home_projects_dialog_file_picker_title),
                     )
 
                     if (file == null) return@launch
 
                     val persistentFile = MobileFileStorage.copyToPersistentStorage(file)
+                    val extension = persistentFile.extension.lowercase()
+                    if (extension !in SUPPORTED_PROJECT_EXTENSIONS) {
+                        snackbarHostState.showSnackbar(
+                            message = getString(Res.string.home_projects_invalid_project_msg),
+                            withDismissAction = true,
+                        )
+                        return@launch
+                    }
 
-                    when (persistentFile.extension.lowercase()) {
+                    when (extension) {
                         "ame" -> {
                             runWorkspaceLoad(
                                 loadingText = getString(Res.string.home_projects_loading_project_msg),
@@ -163,6 +173,10 @@ class ProjectsViewModel(
                 withDismissAction = true,
             )
         }
+    }
+
+    private companion object {
+        val SUPPORTED_PROJECT_EXTENSIONS = setOf("ame", "als", "zip", "approj")
     }
 }
 
