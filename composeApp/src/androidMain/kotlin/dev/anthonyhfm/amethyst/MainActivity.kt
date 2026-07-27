@@ -17,10 +17,14 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ProcessLifecycleOwner
+import dev.anthonyhfm.amethyst.core.engine.echo.AndroidAudioLifecycleObserver
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.midi.AndroidMidiAccessProvider
 import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
+import dev.anthonyhfm.amethyst.settings.data.AudioSettings
 import dev.anthonyhfm.amethyst.ui.theme.ComposeAmethystTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.init
@@ -37,6 +41,9 @@ class MainActivity : ComponentActivity() {
         FileKit.init(this)
         AndroidMidiAccessProvider.initialize(applicationContext)
         requestBluetoothMidiPermissionIfNeeded()
+
+        Echo.setPreferredBufferFrames(AudioSettings.renderBufferFrames.value)
+        ProcessLifecycleOwner.get().lifecycle.addObserver(AndroidAudioLifecycleObserver)
 
         handleFileIntent(intent)
 

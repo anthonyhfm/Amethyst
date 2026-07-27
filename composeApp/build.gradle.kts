@@ -16,6 +16,12 @@ plugins {
 
 group = "dev.anthonyhfm.amethyst"
 
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlinx:atomicfu:0.29.0")
+    }
+}
+
 kotlin {
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
@@ -67,6 +73,9 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.lifecycle.process)
+
+            implementation(projects.nativeEngine)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
