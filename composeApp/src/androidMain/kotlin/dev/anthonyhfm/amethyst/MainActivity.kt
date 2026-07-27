@@ -38,6 +38,12 @@ class MainActivity : ComponentActivity() {
 
         initializeSentry()
 
+        try {
+            System.loadLibrary("c++_shared")
+        } catch (_: UnsatisfiedLinkError) {
+            // Ignored if c++_shared is statically linked or unavailable
+        }
+
         FileKit.init(this)
         AndroidMidiAccessProvider.initialize(applicationContext)
         requestBluetoothMidiPermissionIfNeeded()

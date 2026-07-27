@@ -152,10 +152,15 @@ fun AbletonImportWizardSheet(
             Spacer(modifier = Modifier.weight(1f))
 
             val loadingMsg = stringResource(Res.string.home_import_wizard_sheet_loading_msg)
+            val loadingTitle = stringResource(Res.string.home_loading_default_title)
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     coroutineScope.launch {
+                        dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.startLoading(
+                            initialTitle = loadingTitle,
+                            initialStatus = loadingMsg,
+                        )
                         navigator.navigate(
                             dev.anthonyhfm.amethyst.home.nav.HomeNavRoute.LoadingScreen(
                                 loadingMsg
@@ -163,8 +168,10 @@ fun AbletonImportWizardSheet(
                         )
                         try {
                             viewModel.startAbletonImport(path)
+                            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
                             onOpenWorkspace()
                         } catch (e: Exception) {
+                            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
                             e.printStackTrace()
                             navigator.popBackStack()
                         }

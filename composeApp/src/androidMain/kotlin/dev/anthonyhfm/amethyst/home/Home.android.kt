@@ -73,9 +73,15 @@ actual fun Home(
                 )
             }
 
-            dialog<HomeNavRoute.LoadingScreen> {
+            dialog<HomeNavRoute.LoadingScreen>(
+                dialogProperties = DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                    usePlatformDefaultWidth = false,
+                ),
+            ) {
                 val route = it.toRoute<HomeNavRoute.LoadingScreen>()
-                LoadingScreenView(text = route.text)
+                LoadingScreenView(message = route.text)
             }
         }
     }

@@ -135,14 +135,21 @@ class ProjectsViewModel(
         printStackTrace: Boolean = false,
         block: suspend () -> Unit,
     ) {
+        val initialText = loadingText ?: getString(Res.string.home_loading_default_status)
+        dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.startLoading(
+            initialTitle = getString(Res.string.home_loading_default_title),
+            initialStatus = initialText,
+        )
         if (loadingText != null) {
             navigator.navigate(HomeNavRoute.LoadingScreen(loadingText))
         }
 
         try {
             block()
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
             triggerEffect(ProjectsViewContract.Effect.OpenWorkspace)
         } catch (exception: Exception) {
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
             if (loadingText != null) {
                 navigator.popBackStack()
             }

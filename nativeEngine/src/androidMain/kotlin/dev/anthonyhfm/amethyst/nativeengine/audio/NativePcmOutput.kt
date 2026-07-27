@@ -113,6 +113,10 @@ class NativePcmOutput : AutoCloseable {
 
 private object PcmOutputDirectBridge : Library {
     init {
+        try {
+            System.loadLibrary("c++_shared")
+        } catch (_: UnsatisfiedLinkError) {
+        }
         Native.register(
             PcmOutputDirectBridge::class.java,
             System.getProperty("uniffi.component.amethyst_native_engine.libraryOverride")
