@@ -32,7 +32,7 @@ fun SelectionCursor(
     if (selectedTimeMs == null) return
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
-    val cursorContainerWidth = 10.dp
+    val cursorContainerWidth = 6.dp
     // SelectionCursor is placed directly in the lane Box (no content-offset wrapper),
     // so we use screen-space X via timeMsToScreenX.
     val cursorXPositionPx by remember(selectedTimeMs, viewport.zoomX, viewport.scrollX) {
@@ -47,26 +47,19 @@ fun SelectionCursor(
             .zIndex(1.5f)
             .drawBehind {
                 val centerX = size.width / 2f
-                val topMarkerWidth = 8.dp.toPx()
-                val topMarkerHeight = 12.dp.toPx()
-                val markerTop = 4.dp.toPx()
+                val topMarkerWidth = 6.dp.toPx()
+                val topMarkerHeight = 8.dp.toPx()
+                val markerTop = 3.dp.toPx()
 
-                drawLine(
-                    color = timelinePalette.selectionCursor.copy(alpha = 0.18f),
-                    start = Offset(centerX, 0f),
-                    end = Offset(centerX, size.height),
-                    strokeWidth = 8.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
                 drawLine(
                     color = timelinePalette.selectionCursor,
                     start = Offset(centerX, 0f),
                     end = Offset(centerX, size.height),
-                    strokeWidth = timelineDimensions.selectionCursorWidth.toPx(),
+                    strokeWidth = timelineDimensions.selectionCursorWidth.toPx().coerceAtLeast(1f),
                     cap = StrokeCap.Round
                 )
                 drawRoundRect(
-                    color = timelinePalette.selectionCursor.copy(alpha = 0.32f),
+                    color = timelinePalette.selectionCursor,
                     topLeft = Offset(centerX - topMarkerWidth / 2f, markerTop),
                     size = Size(topMarkerWidth, topMarkerHeight),
                     cornerRadius = CornerRadius(topMarkerWidth / 2f, topMarkerWidth / 2f)

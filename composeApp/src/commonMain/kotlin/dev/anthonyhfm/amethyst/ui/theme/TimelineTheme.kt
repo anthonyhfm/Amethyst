@@ -32,7 +32,6 @@ val timelineSelectionFill = ThemeToken<Color>("timeline_selection_fill")
 val timelineSelectionStroke = ThemeToken<Color>("timeline_selection_stroke")
 val timelineSelectionCursor = ThemeToken<Color>("timeline_selection_cursor")
 val timelinePlayhead = ThemeToken<Color>("timeline_playhead")
-val timelinePlayheadGlow = ThemeToken<Color>("timeline_playhead_glow")
 val timelineAudioClipSurface = ThemeToken<Color>("timeline_audio_clip_surface")
 val timelineAudioClipHeader = ThemeToken<Color>("timeline_audio_clip_header")
 val timelineAudioClipBorder = ThemeToken<Color>("timeline_audio_clip_border")
@@ -64,91 +63,92 @@ val timelinePlayheadWidth = ThemeToken<Dp>("timeline_playhead_width")
 val timelineSelectionCursorWidth = ThemeToken<Dp>("timeline_selection_cursor_width")
 val timelineSelectionCornerRadius = ThemeToken<Dp>("timeline_selection_corner_radius")
 
-internal val lightTimelineColorMap = mapOf(
-    timelineCanvas to Color(0xFFF3F5F8),
-    timelineShellBorder to Color(0xFFD0D8E4),
-    timelineRulerSurface to Color(0xFFE6EAF0),
-    timelineRulerHighlight to Color(0xFFF9FBFE),
-    timelineRulerAccent to Color(0xFFDCE4EF),
-    timelineRulerText to Color(0xFF4B5563),
-    timelineTickMinor to Color(0xFF95A1B2),
-    timelineTickMajor to Color(0xFF5B6778),
-    timelineGridMinor to Color(0xFFD6DDE7),
-    timelineGridMajor to Color(0xFFBCC6D3),
-    timelineLaneSurface to Color(0xFFF7F9FC),
-    timelineLaneSurfaceRaised to Color(0xFFFFFFFF),
-    timelineTrackHeaderSurface to Color(0xFFECEFF4),
-    timelineTrackHeaderSurfaceSelected to Color(0xFFD9E6FF),
-    timelineTrackHeaderContent to Color(0xFF111827),
-    timelineTrackHeaderContentSelected to Color(0xFF0B1220),
-    timelineTrackHeaderBorder to Color(0xFFD2D9E4),
-    timelineSelectionFill to Color(0x332563EB),
-    timelineSelectionStroke to Color(0xFF2563EB),
-    timelineSelectionCursor to Color(0xFF1D4ED8),
-    timelinePlayhead to Color(0xFF10B981),
-    timelinePlayheadGlow to Color(0x9910B981),
-    timelineAudioClipSurface to Color(0xFF5D74E6),
-    timelineAudioClipHeader to Color(0xFFB5C4FF),
-    timelineAudioClipBorder to Color(0xFF8EA4FF),
-    timelineAudioClipContent to Color(0xFFF8FAFF),
-    timelineLightsClipSurface to Color(0xFFC48A1E),
-    timelineLightsClipHeader to Color(0xFFF0D089),
-    timelineLightsClipBorder to Color(0xFFDDAE4D),
-    timelineLightsClipContent to Color(0xFF231A09),
-    timelineMidiClipSurface to Color(0xFFC55D91),
-    timelineMidiClipHeader to Color(0xFFF1B1D1),
-    timelineMidiClipBorder to Color(0xFFD987B0),
-    timelineMidiClipContent to Color(0xFFFFF7FB),
-    timelineClipSelectedSurface to Color(0xFF3B82F6),
-    timelineClipSelectedHeader to Color(0xFFD7E7FF),
-    timelineClipSelectedBorder to Color(0xFF93C5FD),
-    timelineClipSelectedContent to Color(0xFF08111F),
-    timelineAutomationLaneSurface to Color(0xFFEAF0F7),
-    timelineAutomationLaneAccent to Color(0xFF2563EB),
-)
+private fun blend(base: Color, overlay: Color, amount: Float): Color {
+    val fraction = amount.coerceIn(0f, 1f)
+    return Color(
+        red = base.red + (overlay.red - base.red) * fraction,
+        green = base.green + (overlay.green - base.green) * fraction,
+        blue = base.blue + (overlay.blue - base.blue) * fraction,
+        alpha = base.alpha + (overlay.alpha - base.alpha) * fraction,
+    )
+}
 
-internal val darkTimelineColorMap = mapOf(
-    timelineCanvas to Color(0xFF0C1014),
-    timelineShellBorder to Color(0xFF222B35),
-    timelineRulerSurface to Color(0xFF10151A),
-    timelineRulerHighlight to Color(0xFF172029),
-    timelineRulerAccent to Color(0xFF151C24),
-    timelineRulerText to Color(0xFFB5BFCC),
-    timelineTickMinor to Color(0xFF4B5563),
-    timelineTickMajor to Color(0xFF8692A2),
-    timelineGridMinor to Color(0xFF1A2029),
-    timelineGridMajor to Color(0xFF28303B),
-    timelineLaneSurface to Color(0xFF12171C),
-    timelineLaneSurfaceRaised to Color(0xFF171D23),
-    timelineTrackHeaderSurface to Color(0xFF151A20),
-    timelineTrackHeaderSurfaceSelected to Color(0xFF1E2630),
-    timelineTrackHeaderContent to Color(0xFFE5E7EB),
-    timelineTrackHeaderContentSelected to Color(0xFFF8FAFC),
-    timelineTrackHeaderBorder to Color(0xFF27303B),
-    timelineSelectionFill to Color(0x335A9BFF),
-    timelineSelectionStroke to Color(0xFF6CA5FF),
-    timelineSelectionCursor to Color(0xFF9CC2FF),
-    timelinePlayhead to Color(0xFF7EF7AC),
-    timelinePlayheadGlow to Color(0xAA7EF7AC),
-    timelineAudioClipSurface to Color(0xFF4259D8),
-    timelineAudioClipHeader to Color(0xFF9EB2FF),
-    timelineAudioClipBorder to Color(0xFF7E96FF),
-    timelineAudioClipContent to Color(0xFFF5F8FF),
-    timelineLightsClipSurface to Color(0xFF8C6820),
-    timelineLightsClipHeader to Color(0xFFE7C26E),
-    timelineLightsClipBorder to Color(0xFFC79636),
-    timelineLightsClipContent to Color(0xFFFFF7E6),
-    timelineMidiClipSurface to Color(0xFF9A4D74),
-    timelineMidiClipHeader to Color(0xFFE39AC2),
-    timelineMidiClipBorder to Color(0xFFC971A0),
-    timelineMidiClipContent to Color(0xFFFFF5FA),
-    timelineClipSelectedSurface to Color(0xFF5B8DFF),
-    timelineClipSelectedHeader to Color(0xFFE4EEFF),
-    timelineClipSelectedBorder to Color(0xFFB5CCFF),
-    timelineClipSelectedContent to Color(0xFF08101F),
-    timelineAutomationLaneSurface to Color(0xFF10161C),
-    timelineAutomationLaneAccent to Color(0xFF6CA5FF),
-)
+private fun contrastingText(background: Color, palette: AmethystColorPalette): Color {
+    val luminance = (background.red * 0.2126f) +
+        (background.green * 0.7152f) +
+        (background.blue * 0.0722f)
+    return if (luminance > 0.45f) palette.background else palette.foreground
+}
+
+private fun clipColorSet(
+    accent: Color,
+    palette: AmethystColorPalette,
+): List<Color> {
+    val surface = blend(palette.background, accent, 0.72f)
+    val header = blend(surface, accent, 0.38f)
+    return listOf(
+        surface,
+        header,
+        blend(surface, accent, 0.68f),
+        contrastingText(surface, palette),
+    )
+}
+
+/**
+ * Keeps the timeline-specific semantic names while deriving every value from
+ * the app-wide Amethyst palette. Clip roles use the global chart colors as
+ * controlled accents rather than introducing another color system.
+ */
+internal fun timelineColorMap(palette: AmethystColorPalette): Map<ThemeToken<Color>, Color> {
+    val audio = clipColorSet(palette.chart1, palette)
+    val lights = clipColorSet(palette.chart2, palette)
+    val midi = clipColorSet(palette.chart4, palette)
+    val laneSurface = blend(palette.background, palette.secondary, 0.28f)
+    val raisedSurface = blend(palette.card, palette.secondary, 0.18f)
+    val selectedHeader = blend(palette.muted, palette.accent, 0.72f)
+
+    return mapOf(
+        timelineCanvas to palette.background,
+        timelineShellBorder to palette.border,
+        timelineRulerSurface to palette.secondary,
+        timelineRulerHighlight to palette.card,
+        timelineRulerAccent to palette.accent,
+        timelineRulerText to palette.mutedForeground,
+        timelineTickMinor to palette.border.copy(alpha = 0.72f),
+        timelineTickMajor to palette.mutedForeground,
+        timelineGridMinor to palette.border.copy(alpha = 0.48f),
+        timelineGridMajor to palette.border.copy(alpha = 0.82f),
+        timelineLaneSurface to laneSurface,
+        timelineLaneSurfaceRaised to raisedSurface,
+        timelineTrackHeaderSurface to palette.muted,
+        timelineTrackHeaderSurfaceSelected to selectedHeader,
+        timelineTrackHeaderContent to palette.foreground,
+        timelineTrackHeaderContentSelected to palette.accentForeground,
+        timelineTrackHeaderBorder to palette.border,
+        timelineSelectionFill to palette.primary.copy(alpha = 0.22f),
+        timelineSelectionStroke to palette.primary,
+        timelineSelectionCursor to palette.primary,
+        timelinePlayhead to palette.chart2,
+        timelineAudioClipSurface to audio[0],
+        timelineAudioClipHeader to audio[1],
+        timelineAudioClipBorder to audio[2],
+        timelineAudioClipContent to audio[3],
+        timelineLightsClipSurface to lights[0],
+        timelineLightsClipHeader to lights[1],
+        timelineLightsClipBorder to lights[2],
+        timelineLightsClipContent to lights[3],
+        timelineMidiClipSurface to midi[0],
+        timelineMidiClipHeader to midi[1],
+        timelineMidiClipBorder to midi[2],
+        timelineMidiClipContent to midi[3],
+        timelineClipSelectedSurface to palette.primary,
+        timelineClipSelectedHeader to blend(palette.primary, palette.primaryForeground, 0.48f),
+        timelineClipSelectedBorder to palette.ring,
+        timelineClipSelectedContent to palette.primaryForeground,
+        timelineAutomationLaneSurface to blend(palette.background, palette.secondary, 0.42f),
+        timelineAutomationLaneAccent to palette.primary,
+    )
+}
 
 internal val timelineDimensionMap = mapOf(
     timelineTrackHeaderWidth to 200.dp,
@@ -160,7 +160,7 @@ internal val timelineDimensionMap = mapOf(
     timelineClipHeaderHeight to 20.dp,
     timelineResizeHandleWidth to 6.dp,
     timelinePlayheadWidth to 2.dp,
-    timelineSelectionCursorWidth to 3.dp,
+    timelineSelectionCursorWidth to 2.dp,
     timelineSelectionCornerRadius to 2.dp,
 )
 
@@ -186,7 +186,6 @@ data class TimelinePalette(
     val selectionStroke: Color,
     val selectionCursor: Color,
     val playhead: Color,
-    val playheadGlow: Color,
     val automationLaneSurface: Color,
     val automationLaneAccent: Color,
 )
@@ -248,7 +247,6 @@ object TimelineTheme {
             selectionStroke = Theme[timelineColorTokens][timelineSelectionStroke],
             selectionCursor = Theme[timelineColorTokens][timelineSelectionCursor],
             playhead = Theme[timelineColorTokens][timelinePlayhead],
-            playheadGlow = Theme[timelineColorTokens][timelinePlayheadGlow],
             automationLaneSurface = Theme[timelineColorTokens][timelineAutomationLaneSurface],
             automationLaneAccent = Theme[timelineColorTokens][timelineAutomationLaneAccent],
         )

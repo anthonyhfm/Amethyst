@@ -90,7 +90,7 @@ fun AmethystTheme(darkMode: Boolean = true, content: @Composable () -> Unit) {
             name = if (darkMode) "AmethystDark" else "AmethystLight"
             properties[colors] = palette.toTokenMap()
             properties[chainColorTokens] = if (darkMode) darkChainColorMap else lightChainColorMap
-            properties[timelineColorTokens] = if (darkMode) darkTimelineColorMap else lightTimelineColorMap
+            properties[timelineColorTokens] = timelineColorMap(palette)
             properties[timelineDimensionTokens] = timelineDimensionMap
             properties[typography] = mapOf(
                 h1 to typ.h1,

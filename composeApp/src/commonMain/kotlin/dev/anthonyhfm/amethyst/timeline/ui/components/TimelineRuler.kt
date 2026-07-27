@@ -232,18 +232,10 @@ fun TimelineRuler(
 
         val playheadX = viewport.timeMsToScreenX(playheadPositionMs.toDouble())
         if (playheadX in -20f..(viewportWidthPx + 20f)) {
-            val glowWidth = 12.dp.toPx()
-            val markerWidth = 11.dp.toPx()
-            val markerHeight = 10.dp.toPx()
+            val markerWidth = 9.dp.toPx()
+            val markerHeight = 8.dp.toPx()
             val markerTop = 4.dp.toPx()
 
-            drawLine(
-                color = timelinePalette.playheadGlow.copy(alpha = 0.22f),
-                start = Offset(playheadX, 0f),
-                end = Offset(playheadX, size.height),
-                strokeWidth = glowWidth,
-                cap = StrokeCap.Round
-            )
             drawRoundRect(
                 color = timelinePalette.playhead,
                 topLeft = Offset(playheadX - markerWidth / 2f, markerTop),
@@ -261,7 +253,7 @@ fun TimelineRuler(
                 color = timelinePalette.playhead,
                 start = Offset(playheadX, markerTop + markerHeight),
                 end = Offset(playheadX, size.height),
-                strokeWidth = timelineDimensions.playheadWidth.toPx() + 1.dp.toPx(),
+                strokeWidth = timelineDimensions.playheadWidth.toPx().coerceAtLeast(1f),
                 cap = StrokeCap.Round
             )
         }

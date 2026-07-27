@@ -49,6 +49,7 @@ import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.destructive
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.muted
 import dev.anthonyhfm.amethyst.ui.theme.primary
@@ -472,6 +473,7 @@ internal fun PianoKeysColumn(
     val palette = TimelineTheme.palette
     val blackKeyColor = Theme[colors][muted]
     val whiteKeyColor = Theme[colors][foreground]
+    val pressedKeyColor = Theme[colors][destructive]
     val density = LocalDensity.current
 
     Box(
@@ -495,7 +497,7 @@ internal fun PianoKeysColumn(
                 val isPressed = pressedPitches.contains(pitch)
 
                 val keyColor = when {
-                    isPressed -> Color(0xFFFF0000)
+                    isPressed -> pressedKeyColor
                     isBlackKey -> blackKeyColor
                     else -> whiteKeyColor
                 }

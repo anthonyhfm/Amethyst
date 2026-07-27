@@ -89,6 +89,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Tooltip
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.ui.theme.p
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.roundToInt
@@ -656,11 +658,12 @@ fun TrackInfo(
     }
 }
 
+@Composable
 internal fun Color.contrastForeground(): Color =
     if (((red * 0.2126f) + (green * 0.7152f) + (blue * 0.0722f)) > 0.45f) {
-        Color(0xFF0F172A)
+        TimelineTheme.palette.canvas
     } else {
-        Color.White.copy(alpha = 0.96f)
+        Theme[colors][foreground].copy(alpha = 0.96f)
     }
 
 @Composable

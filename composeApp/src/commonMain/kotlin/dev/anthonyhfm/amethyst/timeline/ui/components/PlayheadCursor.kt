@@ -25,7 +25,7 @@ fun PlayheadCursor(
 ) {
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
-    val cursorContainerWidth = 18.dp
+    val cursorContainerWidth = 8.dp
     val centerLineWidth = timelineDimensions.playheadWidth
 
     Box(
@@ -39,32 +39,16 @@ fun PlayheadCursor(
             .zIndex(3f)
             .drawBehind {
                 val centerX = size.width / 2f
-                val glowWidth = 12.dp.toPx()
-                val haloWidth = 4.dp.toPx()
-                val capWidth = 12.dp.toPx()
-                val capHeight = 18.dp.toPx()
+                val capWidth = 8.dp.toPx()
+                val capHeight = 12.dp.toPx()
                 val capTop = 8.dp.toPx()
                 val capLeft = centerX - capWidth / 2f
 
                 drawLine(
-                    color = timelinePalette.playheadGlow.copy(alpha = 0.2f),
-                    start = Offset(centerX, 0f),
-                    end = Offset(centerX, size.height),
-                    strokeWidth = glowWidth,
-                    cap = StrokeCap.Round
-                )
-                drawLine(
-                    color = timelinePalette.playhead.copy(alpha = 0.3f),
-                    start = Offset(centerX, 0f),
-                    end = Offset(centerX, size.height),
-                    strokeWidth = haloWidth,
-                    cap = StrokeCap.Round
-                )
-                drawLine(
                     color = timelinePalette.playhead,
                     start = Offset(centerX, 0f),
                     end = Offset(centerX, size.height),
-                    strokeWidth = centerLineWidth.toPx(),
+                    strokeWidth = centerLineWidth.toPx().coerceAtLeast(1f),
                     cap = StrokeCap.Round
                 )
                 drawRoundRect(
