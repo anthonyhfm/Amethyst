@@ -4,10 +4,8 @@ import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.core.util.Palettes
-import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.core.util.UUID
-import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
@@ -15,7 +13,6 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
-import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
@@ -309,32 +306,6 @@ object MidiFileImporter {
                 }
             }
 
-            val speedFactor = if (platform is Platform.iOS) 0.98 else 0.96
-            if (speedFactor != 1.0 && frames.isNotEmpty()) {
-                val durMs = frames.map { f ->
-                    when (val t = f.timing) {
-                        is Timing.Duration -> t.duration.inWholeMilliseconds
-                        is Timing.Rythm -> {
-                            val fraction = t.timing.factor * 4.0
-                            (fraction * (60000.0 / bpm)).roundToLong()
-                        }
-                    }
-                }
-                val cum = LongArray(durMs.size + 1)
-                for (i in durMs.indices) cum[i + 1] = cum[i] + durMs[i]
-
-                val scaledCum = LongArray(cum.size) { i ->
-                    (cum[i] * speedFactor).roundToLong()
-                }
-
-                for (i in durMs.indices) {
-                    val newMs = (scaledCum[i + 1] - scaledCum[i]).coerceAtLeast(0L)
-                    frames[i] = frames[i].copy(
-                        timing = Timing.Duration(newMs.toInt().milliseconds),
-                        _internalUuid = UUID.randomUUID()
-                    )
-                }
-            }
         }
 
         var renderedAnimation: List<Pair<Int, List<Signal>>> = emptyList()

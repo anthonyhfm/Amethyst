@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.core.midi.devices
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
-import kotlinx.coroutines.launch
 
 class LaunchpadDeviceProMk3(
     connection: AmethystMidiDeviceConnection,
@@ -44,12 +43,6 @@ class LaunchpadDeviceProMk3(
 
             add(247.toByte())
         }.toByteArray()
-    }
-
-    private fun sendMidi(data: ByteArray) {
-        outscope.launch {
-            midiOutput.send(data)
-        }
     }
 
     companion object {

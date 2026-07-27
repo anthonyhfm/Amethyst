@@ -8,20 +8,28 @@ import dev.anthonyhfm.amethyst.core.midi.AmethystMidiOutput
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 
 abstract class LaunchpadDevice(
     open val connection: AmethystMidiDeviceConnection
 ) {
     val screen: Screen = Screen()
 
-    // SysEx updates must retain their order. Individual device implementations
-    // launch one coroutine per update, so a serial dispatcher is required to
-    // prevent concurrent writes to the same physical MIDI port.
     protected val outscope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
+    private val sendChannel = Channel<ByteArray>(Channel.UNLIMITED)
 
     init {
         screen.screenExit = { updates, colors ->
             sendUpdate(updates, colors)
+        }
+
+        outscope.launch {
+            for (data in sendChannel) {
+                runCatching {
+                    midiOutput.send(data)
+                }
+            }
         }
     }
 
@@ -35,6 +43,10 @@ abstract class LaunchpadDevice(
 
     open fun handleMidiInput(inputData: ByteArray): MidiInputData? {
         return dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData(inputData)
+    }
+
+    protected fun sendMidi(data: ByteArray) {
+        sendChannel.trySend(data)
     }
 }
 

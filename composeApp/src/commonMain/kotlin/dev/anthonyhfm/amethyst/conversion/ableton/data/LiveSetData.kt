@@ -186,7 +186,7 @@ data class MidiClip(
     val id: Int? = null,
 
     @XmlSerialName("Time")
-    val time: Float,
+    val time: Double,
 
     @XmlElement
     @XmlSerialName("Name")
@@ -213,7 +213,7 @@ data class MidiClip(
     @Serializable
     data class CurrentTimeStamp(
         @XmlSerialName("Value")
-        val value: Float
+        val value: Double
     )
 
     @Serializable
@@ -251,10 +251,10 @@ data class MidiClip(
                     @Serializable
                     data class MidiNoteEvent(
                         @XmlSerialName("Time")
-                        val time: Float,
+                        val time: Double,
 
                         @XmlSerialName("Duration")
-                        val duration: Float,
+                        val duration: Double,
 
                         @XmlSerialName("Velocity")
                         val velocity: Float,

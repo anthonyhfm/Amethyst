@@ -15,24 +15,29 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 import kotlin.math.max
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+import kotlin.math.roundToLong
 
 data class ScheduledJob(
     val id: String,
-    val targetTime: Long,
+    val targetTimeNanos: Long,
+    val sequence: Long,
     val job: () -> Unit,
     val owner: Any? = null,
     val identifier: Any? = null,
     val ownerGeneration: Long? = null,
-    val identifierGeneration: Long? = null
+    val identifierGeneration: Long? = null,
+    val globalGeneration: Int,
 )
 
 object Heaven {
+    private sealed interface SchedulerCommand {
+        data class Add(val scheduledJob: ScheduledJob) : SchedulerCommand
+        data class Cancel(val filter: (ScheduledJob) -> Boolean) : SchedulerCommand
+        data object Clear : SchedulerCommand
+    }
+
     private data class JobOwnerKey(
         val owner: Any,
         val identifier: Any?
@@ -70,24 +75,19 @@ object Heaven {
         private set
 
     private val signalQueue = Channel<List<Signal.LED>>(UNLIMITED)
-    private val jobQueue = Channel<ScheduledJob>(UNLIMITED)
-    private val queuedJobsCount = atomic(0)
-
-    private val jobsMutex = Mutex()
-    private val jobsList = mutableListOf<Pair<Long, MutableList<ScheduledJob>>>()
+    private val schedulerCommands = Channel<SchedulerCommand>(UNLIMITED)
+    private val pendingJobsCount = atomic(0)
+    private val globalGeneration = atomic(0)
+    private val schedulerMutationLock = SynchronizedObject()
     private val ownerGenerationLock = SynchronizedObject()
     private val ownerGenerations = mutableMapOf<JobOwnerKey, Long>()
+    private val rendererWakeLock = SynchronizedObject()
 
     @Volatile
-    private var prev: Long = 0L
+    private var lastRenderNanos: Long = -1L
 
     @Volatile
-    private var lastRender: Long = -1L
-
-    @Volatile
-    private var renderAt: Long = -1L
-
-    private val deviceMutex = Mutex()
+    private var renderAtNanos: Long = -1L
 
     var fps: Int = loadInitialFps()
 
@@ -95,17 +95,25 @@ object Heaven {
     private val renderScope = CoroutineScope(
         mainDispatcherOrDefault(owner = "Heaven", parallelism = 1) + SupervisorJob()
     )
+    private val schedulerScope = CoroutineScope(
+        Dispatchers.Default.limitedParallelism(1) + SupervisorJob()
+    )
 
     init {
+        schedulerScope.launch {
+            runScheduler()
+        }
+
         renderScope.launch {
             ViewportRepository.devices.collect { newDevices ->
                 devices = newDevices
-                wake()
+                wakeRenderer()
             }
         }
     }
 
-    private fun msToTicks(ms: Double): Long = (ms / 1000 * stopWatch.frequency).toLong()
+    private fun msToNanos(ms: Double): Long =
+        (ms * StopWatch.NANOS_PER_MILLISECOND).roundToLong()
 
     private fun snapshotJobGenerations(owner: Any?, identifier: Any?): Pair<Long?, Long?> {
         if (owner == null) return null to null
@@ -127,6 +135,10 @@ object Heaven {
     }
 
     private fun isJobCurrent(job: ScheduledJob): Boolean {
+        if (job.globalGeneration != globalGeneration.value) {
+            return false
+        }
+
         val owner = job.owner ?: return true
 
         return synchronized(ownerGenerationLock) {
@@ -148,57 +160,65 @@ object Heaven {
     }
 
     fun midiEnter(signals: List<Signal.LED>) {
-        renderScope.launch {
-            signalQueue.send(signals)
-            cancel()
-        }
-        wake()
+        signalQueue.trySend(signals)
+        wakeRenderer()
     }
 
-    private val jobIdCounter = atomic(0)
+    private val jobIdCounter = atomic(0L)
 
-    @OptIn(ExperimentalTime::class)
     fun schedule(delayInMs: Double, owner: Any? = null, identifier: Any? = null, job: () -> Unit): String {
-        val jobId = "job_${jobIdCounter.incrementAndGet()}_${Clock.System.now().toEpochMilliseconds()}"
-        val nowTicks = stopWatch.elapsedTicks()
-        if (!isAwake) {
-            prev = nowTicks
-        }
-        val targetTime = nowTicks + msToTicks(delayInMs)
-        val (ownerGeneration, identifierGeneration) = snapshotJobGenerations(owner, identifier)
-        val scheduledJob = ScheduledJob(
-            id = jobId,
-            targetTime = targetTime,
-            job = job,
+        return scheduleAt(
+            targetTimeNanos = timeNanos + msToNanos(delayInMs),
             owner = owner,
             identifier = identifier,
-            ownerGeneration = ownerGeneration,
-            identifierGeneration = identifierGeneration
+            job = job,
         )
+    }
 
-        queuedJobsCount.incrementAndGet()
-        renderScope.launch {
-            jobQueue.send(scheduledJob)
-            cancel()
+    fun scheduleAt(
+        targetTimeNanos: Long,
+        owner: Any? = null,
+        identifier: Any? = null,
+        job: () -> Unit,
+    ): String {
+        val sequence = jobIdCounter.incrementAndGet()
+        val jobId = "job_$sequence"
+        synchronized(schedulerMutationLock) {
+            val (ownerGeneration, identifierGeneration) = snapshotJobGenerations(owner, identifier)
+            val scheduledJob = ScheduledJob(
+                id = jobId,
+                targetTimeNanos = targetTimeNanos,
+                sequence = sequence,
+                job = job,
+                owner = owner,
+                identifier = identifier,
+                ownerGeneration = ownerGeneration,
+                identifierGeneration = identifierGeneration,
+                globalGeneration = globalGeneration.value,
+            )
+
+            pendingJobsCount.incrementAndGet()
+            if (schedulerCommands.trySend(SchedulerCommand.Add(scheduledJob)).isFailure) {
+                pendingJobsCount.decrementAndGet()
+                error("Heaven scheduler is unavailable")
+            }
         }
-        wake()
         return jobId
     }
 
     fun cancelJobs(filter: (ScheduledJob) -> Boolean) {
-        renderScope.launch {
-            jobsMutex.withLock {
-                jobsList.forEach { (_, jobs) ->
-                    jobs.removeAll(filter)
-                }
-                jobsList.removeAll { it.second.isEmpty() }
-            }
-        }
+        schedulerCommands.trySend(SchedulerCommand.Cancel(filter))
     }
 
     fun cancelJobsForOwner(owner: Any, identifier: Any? = null) {
-        invalidateJobGeneration(owner, identifier)
-        cancelJobs { it.owner === owner && (identifier == null || it.identifier == identifier) }
+        synchronized(schedulerMutationLock) {
+            invalidateJobGeneration(owner, identifier)
+            schedulerCommands.trySend(
+                SchedulerCommand.Cancel {
+                    it.owner === owner && (identifier == null || it.identifier == identifier)
+                }
+            )
+        }
     }
 
     fun cancelJob(jobId: String) {
@@ -206,140 +226,142 @@ object Heaven {
     }
 
     @Volatile private var renderJob: Job? = null
-    private val isAwake: Boolean get() = renderJob?.isActive == true
+    private val isRendererAwake: Boolean get() = renderJob?.isActive == true
+
+    val timeNanos: Long
+        get() = stopWatch.elapsedNanos()
 
     val time: Double
-        get() {
-            if (!isAwake) prev = stopWatch.elapsedTicks() - 1
-            return prev * 1000.0 / stopWatch.frequency
-        }
+        get() = timeNanos / StopWatch.NANOS_PER_MILLISECOND.toDouble()
 
-    private fun wake() {
-        if (isAwake) return
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun wakeRenderer() {
+        synchronized(rendererWakeLock) {
+            if (isRendererAwake) return
 
-        prev = stopWatch.elapsedTicks() - 1
+            renderJob = renderScope.launch {
+                try {
+                    while (true) {
+                        val changed = processSignals()
+                        val nowNanos = timeNanos
 
-        renderJob = renderScope.launch {
-            try {
-                while (true) {
-                    val hasNewJobs = processJobQueue()
+                        if (changed && renderAtNanos < 0) {
+                            renderAtNanos = max(
+                                nowNanos + msToNanos(250.0 / fps),
+                                lastRenderNanos + msToNanos(1000.0 / fps)
+                            )
+                        }
 
-                    val hasWork = renderAt >= 0 || hasNewJobs ||
-                            jobsList.isNotEmpty() || !signalQueue.isEmpty
+                        if (renderAtNanos >= 0 && nowNanos >= renderAtNanos) {
+                            Screen.draw()
+                            lastRenderNanos = nowNanos
+                            renderAtNanos = -1L
+                        }
 
-                    if (!hasWork) {
-                        delay(10)
-                        if (renderAt < 0 && jobsList.isEmpty() &&
-                            jobQueue.isEmpty && signalQueue.isEmpty) {
+                        if (renderAtNanos < 0 && signalQueue.isEmpty) {
                             break
                         }
+
+                        val remainingNanos = renderAtNanos - timeNanos
+                        if (remainingNanos > StopWatch.NANOS_PER_MILLISECOND) {
+                            delay((remainingNanos / StopWatch.NANOS_PER_MILLISECOND).coerceAtLeast(1L))
+                        } else {
+                            yield()
+                        }
                     }
-
-                    prev = stopWatch.elapsedTicks()
-
-                    executeReadyJobs(prev)
-
-                    val changed = processSignals()
-
-                    if (changed && renderAt < 0) {
-                        renderAt = max(
-                            prev + msToTicks(250.0 / fps),
-                            lastRender + msToTicks(1000.0 / fps)
-                        )
-                    } else if (renderAt in 0..<prev) {
-                        Screen.draw()
-                        lastRender = prev
-                        renderAt = -1L
+                } catch (e: Exception) {
+                    println("RenderJob Exception: ${e.message}")
+                    e.printStackTrace()
+                } finally {
+                    val shouldWake = synchronized(rendererWakeLock) {
+                        renderJob = null
+                        !signalQueue.isEmpty
                     }
-
-                    yield()
+                    if (shouldWake) {
+                        wakeRenderer()
+                    }
                 }
-
-                if (lastRender < prev) {
-                    Screen.draw()
-                }
-            } catch (e: Exception) {
-                println("RenderJob Exception: ${e.message}")
-                e.printStackTrace()
             }
-
-            cancel()
         }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private suspend fun processJobQueue(): Boolean {
-        var processed = false
+    private fun handleSchedulerCommand(
+        command: SchedulerCommand,
+        jobs: ScheduledJobQueue,
+    ) {
+        when (command) {
+            is SchedulerCommand.Add -> {
+                if (!isJobCurrent(command.scheduledJob)) {
+                    pendingJobsCount.decrementAndGet()
+                    return
+                }
 
-        while (!jobQueue.isEmpty) {
-            val scheduledJob = jobQueue.tryReceive().getOrNull() ?: break
-            queuedJobsCount.decrementAndGet()
-            processed = true
+                jobs.add(command.scheduledJob)
+            }
+            is SchedulerCommand.Cancel -> {
+                repeat(jobs.removeAll(command.filter)) {
+                    pendingJobsCount.decrementAndGet()
+                }
+            }
+            SchedulerCommand.Clear -> {
+                repeat(jobs.clear()) {
+                    pendingJobsCount.decrementAndGet()
+                }
+            }
+        }
+    }
 
-            if (!isJobCurrent(scheduledJob)) {
+    private suspend fun drainSchedulerCommands(jobs: ScheduledJobQueue) {
+        while (true) {
+            val command = schedulerCommands.tryReceive().getOrNull() ?: return
+            handleSchedulerCommand(command, jobs)
+        }
+    }
+
+    private suspend fun runScheduler() {
+        val jobs = ScheduledJobQueue()
+
+        while (currentCoroutineContext().isActive) {
+            drainSchedulerCommands(jobs)
+
+            val nowNanos = timeNanos
+            while (jobs.peek()?.targetTimeNanos?.let { it <= nowNanos } == true) {
+                val scheduledJob = jobs.removeFirst()
+                pendingJobsCount.decrementAndGet()
+
+                if (!isJobCurrent(scheduledJob)) {
+                    continue
+                }
+
+                try {
+                    scheduledJob.job.invoke()
+                } catch (e: Exception) {
+                    println("Error executing job ${scheduledJob.id}: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+
+            if (jobs.isEmpty()) {
+                handleSchedulerCommand(schedulerCommands.receive(), jobs)
                 continue
             }
 
-            jobsMutex.withLock {
-                val insertIndex = findInsertPosition(scheduledJob.targetTime)
-
-                if (insertIndex < jobsList.size && jobsList[insertIndex].first == scheduledJob.targetTime) {
-                    jobsList[insertIndex].second.add(scheduledJob)
-                } else {
-                    jobsList.add(insertIndex, scheduledJob.targetTime to mutableListOf(scheduledJob))
+            val remainingNanos = jobs.peek()!!.targetTimeNanos - timeNanos
+            if (remainingNanos > FINAL_DEADLINE_WINDOW_NANOS) {
+                val waitMillis = (
+                    (remainingNanos - FINAL_DEADLINE_WINDOW_NANOS) /
+                        StopWatch.NANOS_PER_MILLISECOND
+                    ).coerceAtLeast(1L)
+                val command = withTimeoutOrNull(waitMillis) {
+                    schedulerCommands.receive()
                 }
-            }
-        }
-
-        return processed
-    }
-
-    private fun findInsertPosition(targetTime: Long): Int {
-        var low = 0
-        var high = jobsList.size
-
-        while (low < high) {
-            val mid = (low + high) / 2
-            if (jobsList[mid].first < targetTime) {
-                low = mid + 1
-            } else {
-                high = mid
-            }
-        }
-
-        return low
-    }
-
-    private suspend fun executeReadyJobs(currentTime: Long) {
-        val jobsToExecute = jobsMutex.withLock {
-            val result = mutableListOf<ScheduledJob>()
-            var splitIndex = 0
-
-            for (i in jobsList.indices) {
-                if (jobsList[i].first <= currentTime) {
-                    result.addAll(jobsList[i].second)
-                    splitIndex++
-                } else {
-                    break
+                if (command != null) {
+                    handleSchedulerCommand(command, jobs)
                 }
-            }
-
-            if (splitIndex > 0) {
-                jobsList.subList(0, splitIndex).clear()
-            }
-
-            result
-        }
-
-        jobsToExecute.forEach { scheduledJob ->
-            if (!isJobCurrent(scheduledJob)) {
-                return@forEach
-            }
-
-            try {
-                scheduledJob.job.invoke()
-            } catch (e: Exception) {
-                println("Error executing job ${scheduledJob.id}: ${e.message}")
+            } else if (remainingNanos > 0L) {
+                while (timeNanos < jobs.peek()!!.targetTimeNanos) {
+                    // Bounded to the final millisecond to avoid coroutine wake-up jitter.
+                }
             }
         }
     }
@@ -354,24 +376,22 @@ object Heaven {
             data class MidiCall(val device: LaunchpadViewportElement, val signal: Signal.LED)
             val midiCalls = mutableListOf<MidiCall>()
 
-            deviceMutex.withLock {
-                val currentDevices = devices
+            val currentDevices = devices
 
-                signals.forEach { signal ->
-                    currentDevices.forEach { device ->
-                        if (isSignalInDevice(signal, device)) {
-                            val localX = signal.x - device.position.value.x.toInt()
-                            val localY = signal.y - device.position.value.y.toInt()
-                            val posX = localX + device.layout.offsetX
-                            val posY = (device.layout.rows - 1 - localY) + device.layout.offsetY
+            signals.forEach { signal ->
+                currentDevices.forEach { device ->
+                    if (isSignalInDevice(signal, device)) {
+                        val localX = signal.x - device.position.value.x.toInt()
+                        val localY = signal.y - device.position.value.y.toInt()
+                        val posX = localX + device.layout.offsetX
+                        val posY = (device.layout.rows - 1 - localY) + device.layout.offsetY
 
-                            midiCalls.add(MidiCall(
-                                device,
-                                signal.copy(x = posX, y = posY)
-                            ))
+                        midiCalls.add(MidiCall(
+                            device,
+                            signal.copy(x = posX, y = posY)
+                        ))
 
-                            changed = true
-                        }
+                        changed = true
                     }
                 }
             }
@@ -393,57 +413,41 @@ object Heaven {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun clear() {
-        renderScope.launch {
-            deviceMutex.withLock {
-                devices.forEach { it.screen.clear() }
+        synchronized(schedulerMutationLock) {
+            globalGeneration.incrementAndGet()
+            synchronized(ownerGenerationLock) {
+                ownerGenerations.clear()
             }
+            schedulerCommands.trySend(SchedulerCommand.Clear)
+        }
+
+        renderScope.launch {
+            devices.forEach { it.screen.clear() }
 
             while (!signalQueue.isEmpty) {
                 signalQueue.tryReceive()
             }
-            while (!jobQueue.isEmpty) {
-                if (jobQueue.tryReceive().getOrNull() != null) {
-                    queuedJobsCount.decrementAndGet()
-                }
-            }
 
-            jobsMutex.withLock {
-                jobsList.clear()
-            }
-
-            synchronized(ownerGenerationLock) {
-                ownerGenerations.clear()
-            }
-
-            queuedJobsCount.value = 0
-
-            prev = 0L
-            lastRender = -1L
-            renderAt = -1L
-
-            cancel()
+            lastRenderNanos = -1L
+            renderAtNanos = -1L
         }
     }
 
     fun shutdown() {
+        schedulerScope.cancel()
         renderScope.cancel()
     }
 
-    internal suspend fun pendingJobCountForTesting(): Int {
-        val scheduledJobs = jobsMutex.withLock {
-            jobsList.fold(0) { total, (_, jobs) -> total + jobs.size }
-        }
+    internal fun pendingJobCountForTesting(): Int = pendingJobsCount.value
 
-        return queuedJobsCount.value + scheduledJobs
-    }
-
+    @OptIn(ExperimentalCoroutinesApi::class)
     internal suspend fun waitUntilIdleForTesting(timeoutMs: Long = 2_000L) {
         withTimeout(timeoutMs) {
             while (true) {
                 if (pendingJobCountForTesting() == 0 &&
                     signalQueue.isEmpty &&
-                    jobQueue.isEmpty &&
-                    !isAwake) {
+                    schedulerCommands.isEmpty &&
+                    !isRendererAwake) {
                     return@withTimeout
                 }
 
@@ -456,4 +460,6 @@ object Heaven {
         clear()
         waitUntilIdleForTesting()
     }
+
+    private const val FINAL_DEADLINE_WINDOW_NANOS = 1_000_000L
 }

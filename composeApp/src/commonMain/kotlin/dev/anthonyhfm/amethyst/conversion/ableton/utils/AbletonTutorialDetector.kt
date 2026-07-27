@@ -11,11 +11,10 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDe
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import kotlin.math.roundToInt
-import kotlin.math.roundToLong
 
 object AbletonTutorialDetector {
-
-    private const val TICKS_PER_BEAT = 96.0
+    internal fun beatsToMilliseconds(beats: Double, bpm: Double): Double =
+        beats * (60_000.0 / bpm)
 
     fun getAutoPlayData(layout: AbletonLayout, tracks: List<MidiTrack>): AutoPlayData {
         println("=== TutorialDetector: START ===")
@@ -126,7 +125,7 @@ object AbletonTutorialDetector {
 
     fun getTutorialForTrack(track: MidiTrack, offset: IntOffset): Map<Double, List<AutoPlayData.Action>> {
         val tutorialStartBeats = findTutorialClips(track)
-            .minOfOrNull { it.currentStart.value.toDouble() }
+            .minOfOrNull { it.currentStart.value }
             ?: return emptyMap()
 
         return getTutorialForTrack(track, offset, tutorialStartBeats)
@@ -138,8 +137,8 @@ object AbletonTutorialDetector {
         tutorialStartBeats: Double
     ): Map<Double, List<AutoPlayData.Action>> {
         data class NoteEvent(
-            val startTicks: Long,
-            val endTicks: Long,
+            val startBeats: Double,
+            val endBeats: Double,
             val padIndex: Int
         )
 
@@ -164,9 +163,7 @@ object AbletonTutorialDetector {
             return emptyMap()
         }
 
-        val msPerBeat = 60000.0 / bpm
-        val msPerTick = msPerBeat / TICKS_PER_BEAT
-
+        val msPerBeat = beatsToMilliseconds(beats = 1.0, bpm = bpm)
         clips.forEach { clip ->
             val clipStartBeats = clip.currentStart.value
             val clipEndBeats = clip.currentEnd.value
@@ -193,14 +190,11 @@ object AbletonTutorialDetector {
                     val timelineStartBeats = clipStartBeats + timeBeats - tutorialStartBeats
                     val timelineEndBeats = timelineStartBeats + durationBeats
 
-                    val startTicks = (timelineStartBeats * TICKS_PER_BEAT).roundToLong()
-                    val endTicks = (timelineEndBeats * TICKS_PER_BEAT).roundToLong()
-
-                    if (endTicks < startTicks) return@forEach
+                    if (timelineEndBeats < timelineStartBeats) return@forEach
 
                     notes += NoteEvent(
-                        startTicks = startTicks,
-                        endTicks = endTicks,
+                        startBeats = timelineStartBeats,
+                        endBeats = timelineEndBeats,
                         padIndex = padIndex
                     )
                 }
@@ -229,14 +223,14 @@ object AbletonTutorialDetector {
         }
 
         notes
-            .sortedBy { it.startTicks }
+            .sortedBy { it.startBeats }
             .forEach { note ->
-                val startMs = note.startTicks * msPerTick
-                val endMs = note.endTicks * msPerTick
+                val startMs = note.startBeats * msPerBeat
+                val endMs = note.endBeats * msPerBeat
 
                 addAction(startMs, note.padIndex, down = true)
 
-                if (note.endTicks > note.startTicks) {
+                if (note.endBeats > note.startBeats) {
                     addAction(endMs, note.padIndex, down = false)
                 }
             }
@@ -275,7 +269,7 @@ object AbletonTutorialDetector {
     private fun findTutorialStartBeats(tracks: List<MidiTrack>): Double =
         tracks
             .flatMap(::findTutorialClips)
-            .minOfOrNull { it.currentStart.value.toDouble() }
+            .minOfOrNull { it.currentStart.value }
             ?: 0.0
 
     private fun findTutorialClips(track: MidiTrack): List<MidiClip> {
@@ -366,7 +360,7 @@ object AbletonTutorialDetector {
         val bpm = AbletonConverter.bpm
         if (bpm <= 0.0) return emptyMap()
 
-        val msPerBeat = 60000.0 / bpm
+        val msPerBeat = beatsToMilliseconds(beats = 1.0, bpm = bpm)
         val result = mutableMapOf<Double, MutableList<AutoPlayData.Action>>()
 
         val offset = IntOffset.Zero
@@ -420,4 +414,3 @@ object AbletonTutorialDetector {
         return result
     }
 }
-

@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
+import kotlin.concurrent.Volatile
+import kotlin.math.roundToLong
 
 enum class AutoPlayState {
     STOPPED,
@@ -33,8 +35,8 @@ object AutoPlayRepository {
     var totalDuration: Double = 0.0
         private set
 
-    private var playbackStartTime: Double = 0.0
-    private var playbackOffset: Double = 0.0
+    @Volatile private var playbackStartNanos: Long = 0L
+    @Volatile private var playbackOffset: Double = 0.0
 
     private var learningIndex = 0
     private var sortedActionTimes = listOf<Double>()
@@ -43,11 +45,20 @@ object AutoPlayRepository {
     private val repoScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var progressJob: Job? = null
 
+    private fun millisecondsToNanos(milliseconds: Double): Long =
+        (milliseconds * 1_000_000.0).roundToLong()
+
+    private fun currentPlaybackPosition(): Double =
+        playbackOffset + (
+            (Heaven.timeNanos - playbackStartNanos).coerceAtLeast(0L) /
+                1_000_000.0
+            )
+
     private fun startProgressTracking() {
         progressJob?.cancel()
         progressJob = repoScope.launch {
             while (isActive) {
-                val currentPos = (Heaven.time - playbackStartTime) + playbackOffset
+                val currentPos = currentPlaybackPosition()
                 _progress.value = if (totalDuration > 0) {
                     (currentPos / totalDuration).toFloat().coerceIn(0f, 1f)
                 } else 0f
@@ -74,8 +85,6 @@ object AutoPlayRepository {
         }
 
         Heaven.cancelJobsForOwner(this)
-
-        playbackStartTime = Heaven.time
         
         if (_state.value != AutoPlayState.PAUSED && !fromLearning) {
             playbackOffset = 0.0
@@ -83,59 +92,68 @@ object AutoPlayRepository {
         
         // Always ensure totalDuration is up to date
         totalDuration = autoplay.actions.keys.maxOrNull() ?: 0.0
+        val scheduledActions = autoplay.actions.entries
+            .asSequence()
+            .map { entry -> entry.key - playbackOffset to entry.value }
+            .filter { (adjustedDelay, _) -> adjustedDelay >= -0.001 }
+            .sortedBy { (adjustedDelay, _) -> adjustedDelay }
+            .toList()
 
         _state.value = AutoPlayState.PLAYING
+        playbackStartNanos = Heaven.timeNanos
         startProgressTracking()
 
-        // Automatically stop when the last action has played (+ a small buffer to ensure last keys are turned off)
-        Heaven.schedule(totalDuration - playbackOffset + 50.0, this) {
-            stopAutoPlay()
-        }
+        scheduledActions.forEach { (adjustedDelay, actions) ->
+            val deadlineNanos = playbackStartNanos +
+                millisecondsToNanos(adjustedDelay.coerceAtLeast(0.0))
+            Heaven.scheduleAt(deadlineNanos, this) {
+                WorkspaceRepository.samplingChain.signalEnter(
+                    actions.map {
+                        Signal.Midi(
+                            origin = this,
+                            x = it.x,
+                            y = it.y,
+                            velocity = if (it.down) 127 else 0,
+                        )
+                    }
+                )
 
-        autoplay.actions.entries.forEach { entry ->
-            val adjustedDelay = entry.key - playbackOffset
-            // Use a small epsilon to handle potential floating point precision issues
-            if (adjustedDelay >= -0.001) {
-                Heaven.schedule(adjustedDelay.coerceAtLeast(0.0), this) {
-                    WorkspaceRepository.samplingChain.signalEnter(
-                        entry.value.map {
-                            Signal.Midi(
+                if (settings?.autoPlayShowLights == true) {
+                    WorkspaceRepository.lightsChain.signalEnter(
+                        actions.map {
+                            Signal.LED(
                                 origin = this,
                                 x = it.x,
                                 y = it.y,
-                                velocity = if (it.down) 127 else 0,
+                                color = if (it.down) Color.White else Color.Black,
                             )
                         }
                     )
+                }
 
-                    if (settings?.autoPlayShowLights == true) {
-                        WorkspaceRepository.lightsChain.signalEnter(
-                            entry.value.map {
-                                Signal.LED(
-                                    origin = this,
-                                    x = it.x,
-                                    y = it.y,
-                                    color = if (it.down) Color.White else Color.Black,
-                                )
-                            }
-                        )
-                    }
-
-                    if (settings?.autoPlayShowButtonPresses == true) {
-                        Heaven.midiEnter(
-                            entry.value.map {
-                                Signal.LED(
-                                    origin = this,
-                                    x = it.x,
-                                    y = it.y,
-                                    color = if (it.down) Color.White else Color.Black,
-                                    layer = 100
-                                )
-                            }
-                        )
-                    }
+                if (settings?.autoPlayShowButtonPresses == true) {
+                    Heaven.midiEnter(
+                        actions.map {
+                            Signal.LED(
+                                origin = this,
+                                x = it.x,
+                                y = it.y,
+                                color = if (it.down) Color.White else Color.Black,
+                                layer = 100
+                            )
+                        }
+                    )
                 }
             }
+        }
+
+        // Schedule this after all actions so equal deadlines retain action-before-stop ordering.
+        val remainingDuration = (totalDuration - playbackOffset).coerceAtLeast(0.0)
+        Heaven.scheduleAt(
+            targetTimeNanos = playbackStartNanos + millisecondsToNanos(remainingDuration + 50.0),
+            owner = this,
+        ) {
+            stopAutoPlay()
         }
     }
 
@@ -143,7 +161,7 @@ object AutoPlayRepository {
         if (_state.value != AutoPlayState.PLAYING) return
         
         // Calculate how far into the playback we are
-        playbackOffset += (Heaven.time - playbackStartTime)
+        playbackOffset = currentPlaybackPosition()
         Heaven.cancelJobsForOwner(this)
         progressJob?.cancel()
         progressJob = null
@@ -158,7 +176,7 @@ object AutoPlayRepository {
         _progress.value = 0f
         _state.value = AutoPlayState.STOPPED
         playbackOffset = 0.0
-        playbackStartTime = 0.0
+        playbackStartNanos = 0L
         learningIndex = 0
         sortedActionTimes = emptyList()
         totalDuration = 0.0
@@ -171,7 +189,7 @@ object AutoPlayRepository {
         val autoplay = WorkspaceRepository.workspaceMeta?.autoPlay ?: return
         
         val currentPos = if (_state.value == AutoPlayState.PLAYING) {
-            (Heaven.time - playbackStartTime) + playbackOffset
+            currentPlaybackPosition()
         } else {
             playbackOffset
         }
