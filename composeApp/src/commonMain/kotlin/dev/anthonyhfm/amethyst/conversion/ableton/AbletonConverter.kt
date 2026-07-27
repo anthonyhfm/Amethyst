@@ -17,7 +17,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonTutorialDetector
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.Dual2LightLayoutScanner
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.OriginalSimplerPrerenderer
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Palettes
@@ -26,7 +25,6 @@ import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
-import dev.anthonyhfm.amethyst.settings.data.SettingsRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
@@ -51,8 +49,6 @@ import nl.adaptivity.xmlutil.serialization.structure.XmlDescriptor
 object AbletonConverter : AmethystConverter {
     var file: PlatformFile? = null
         private set
-
-    var special = ProjectSpecials()
 
     var bpm: Double = 120.0
         internal set
@@ -258,6 +254,14 @@ object AbletonConverter : AmethystConverter {
         bpm = abletonData.liveSet.masterTrack.deviceChain.mixer.tempo.manual.value
         projectLayout = layout
 
+        liveVersion = when {
+            abletonData.minorVersion.startsWith("9") -> LiveVersion.LIVE_9
+            abletonData.minorVersion.startsWith("10") -> LiveVersion.LIVE_10
+            abletonData.minorVersion.startsWith("11") -> LiveVersion.LIVE_11
+            abletonData.minorVersion.startsWith("12") -> LiveVersion.LIVE_12
+            else -> null
+        }
+
         val autoPlayData: AutoPlayData = AbletonTutorialDetector.getAutoPlayData(layout, abletonData.liveSet.tracks.midiTracks)
 
         val audioTracks = when (layout) {
@@ -270,15 +274,6 @@ object AbletonConverter : AmethystConverter {
         reporter?.update(0.25f, statusText = decodingSamplesMsg, detailText = null)
         val audioReporter = reporter?.subReporter(0.25f, 0.75f)
         audioMap = audioRenderer.decodeAll(audioTracks, reporter = audioReporter)
-
-        liveVersion = when {
-            abletonData.minorVersion.startsWith("9") -> LiveVersion.LIVE_9
-            abletonData.minorVersion.startsWith("10") -> LiveVersion.LIVE_10
-            abletonData.minorVersion.startsWith("11") -> LiveVersion.LIVE_11
-            abletonData.minorVersion.startsWith("12") -> LiveVersion.LIVE_12
-
-            else -> null
-        }
 
         val analyzingLightsMsg = runCatching { runBlocking { getString(Res.string.home_loading_analyzing_light_chains) } }.getOrDefault("Analyzing light chains...")
         reporter?.update(0.78f, statusText = analyzingLightsMsg, detailText = null)

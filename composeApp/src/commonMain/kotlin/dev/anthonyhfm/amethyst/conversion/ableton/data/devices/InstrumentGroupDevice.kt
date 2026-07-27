@@ -49,10 +49,25 @@ data class InstrumentGroupDevice(
     @XmlElement
     @XmlSerialName("MacroControls.7")
     val macro7: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.8")
+    val macro8: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.16")
+    val macro16: Macro? = null,
 
     @Transient
-    val macros: List<Macro> = listOfNotNull(macro0, macro1, macro2, macro3, macro4, macro5, macro6, macro7)
+    val macros: List<Macro> = listOfNotNull(macro0, macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8, macro16)
 ) : AbletonDevice {
+    fun getPageMacro(liveVersion: dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion?): Macro? {
+        return when (liveVersion) {
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_11,
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_12 -> macro16 ?: macro8 ?: macro0
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_9,
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_10 -> macro8 ?: macro16 ?: macro0
+            else -> macro16 ?: macro8 ?: macro0
+        }
+    }
     @Serializable
     data class Macro(
         @XmlElement
@@ -64,7 +79,10 @@ data class InstrumentGroupDevice(
     @Serializable
     data class ChainSelector(
         @XmlElement
-        val keyMidi: ChainSelector.KeyMidi? = null
+        val keyMidi: ChainSelector.KeyMidi? = null,
+        @XmlElement
+        @XmlSerialName("AutomationTarget")
+        val automationTarget: AutomationTarget? = null
     ) {
         /**
          * This data model does NOT exist. It is a placeholder to detect if a element is existing in the ChainSelector element

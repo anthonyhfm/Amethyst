@@ -32,7 +32,7 @@ class MidiEffectGroupAdapter(
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<MidiEffectGroupDevice.Branches.MidiEffectBranch> = device.branches.branches
 
-        val hasChains = device.chainSelector.keyMidi != null
+        val hasChains = device.chainSelector.keyMidi != null || branches.size > 1 || branches.any { it.branchSelectorRange.min.value != 0 || it.branchSelectorRange.max.value != 127 }
 
         val groups = mutableListOf<Group>()
 
@@ -69,7 +69,7 @@ class MidiEffectGroupAdapter(
                             val minKey = branch.zoneSettings.keyRange.min.value
                             val maxKey = branch.zoneSettings.keyRange.max.value
 
-                            if (hasChains || (AbletonConverter.special.kaskobiWeirdAssPageSwitch && chainDepth == 0)) {
+                            if (hasChains) {
                                 if (maxMacro - minMacro == 0) {
                                     add(
                                         MacroFilterChainDeviceState(
@@ -250,10 +250,10 @@ class MidiEffectGroupAdapter(
                                         )
                                     }
 
-                                    for (i in 0..7) { // Page 1-8
+                                    for (i in 0..7) { // Page 9-16
                                         add(
                                             Group(
-                                                name = "Page ${8 + 1}",
+                                                name = "Page ${9 + i}",
                                                 stateChain = StateChain(
                                                     devices = listOf(
                                                         CoordinateFilterChainDeviceState(

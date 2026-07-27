@@ -6,13 +6,12 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 class WormholeLiteAdapter(
     private val device: MxDeviceMidiEffect,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val data: WormholeLiteData = Json.decodeFromString(device.decodeBlob())
+        val data: WormholeLiteData = jsonDecoder.decodeFromString(device.decodeBlob())
 
         return listOf(
             MacroControlChainDeviceState(

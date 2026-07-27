@@ -26,7 +26,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.InfinityAdap
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.IrisAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.TwistAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.ProjectSpecials
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -126,10 +125,6 @@ class MxDeviceMidiEffectAdapter(
                 "32b6bec96552a6e40f6743787a20b9df",
                 "1848f6da9155cc90ecd5e22d4b43c217",
                 "feecaed62c2637a73325446a1ed1e25e" -> {
-                    AbletonConverter.special = ProjectSpecials(
-                        kaskobiWeirdAssPageSwitch = true
-                    )
-
                     return PageSwitcherAdapter(offset).toDeviceStates()
                 }
 
