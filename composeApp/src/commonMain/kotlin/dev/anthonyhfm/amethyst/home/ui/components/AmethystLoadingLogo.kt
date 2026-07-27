@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
 
@@ -41,7 +42,7 @@ fun AmethystLoadingLogo(
     val infiniteTransition = rememberInfiniteTransition(label = "WaveAnimation")
     val wavePhase by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
+        targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(2800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart

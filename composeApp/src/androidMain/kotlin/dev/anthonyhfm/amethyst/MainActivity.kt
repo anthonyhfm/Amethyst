@@ -32,8 +32,34 @@ import io.github.vinceglb.filekit.dialogs.init
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
+
+        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
+            val splashView = splashScreenViewProvider.view
+            val iconView = splashScreenViewProvider.iconView
+
+            val scaleX = android.animation.ObjectAnimator.ofFloat(iconView, android.view.View.SCALE_X, 1.0f, 1.75f)
+            val scaleY = android.animation.ObjectAnimator.ofFloat(iconView, android.view.View.SCALE_Y, 1.0f, 1.75f)
+            val fadeOut = android.animation.ObjectAnimator.ofFloat(splashView, android.view.View.ALPHA, 1.0f, 0.0f)
+
+            val exitAnimatorSet = android.animation.AnimatorSet().apply {
+                playTogether(scaleX, scaleY, fadeOut)
+                duration = 500L
+                interpolator = android.view.animation.DecelerateInterpolator(1.5f)
+                startDelay = 100L
+                addListener(object : android.animation.AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: android.animation.Animator) {
+                        splashScreenViewProvider.remove()
+                    }
+                })
+            }
+            exitAnimatorSet.start()
+        }
+
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 

@@ -91,6 +91,7 @@ struct ContentView: View {
     @State private var viewModel = HomeViewModel()
     @State private var settingsViewModel = SettingsViewModel()
     @State private var showSettingsSheet = false
+    @State private var showSplashScreen = true
 
     private var theme: AmethystTheme {
         AmethystTheme(darkMode: colorScheme == .dark)
@@ -158,6 +159,14 @@ struct ContentView: View {
                     statusText: viewModel.loadingStatusText,
                     detailText: viewModel.loadingDetailText
                 )
+                .ignoresSafeArea()
+                .transition(.opacity)
+            }
+
+            if showSplashScreen {
+                SplashScreenView {
+                    showSplashScreen = false
+                }
                 .ignoresSafeArea()
                 .transition(.opacity)
             }

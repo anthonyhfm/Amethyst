@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_splash_logo">
+    
+    <!-- Stroke Drawing Phase (0ms - 500ms) -->
+    <target
+        android:name="circle_stroke"
+        android:animation="@animator/splash_stroke_circle" />
+    <target
+        android:name="pill1_stroke"
+        android:animation="@animator/splash_stroke_pill1" />
+    <target
+        android:name="pill2_stroke"
+        android:animation="@animator/splash_stroke_pill2" />
+
+    <!-- Fill Fade-In Phase (450ms - 700ms) -->
+    <target
+        android:name="circle_fill"
+        android:animation="@animator/splash_fill_fade_in" />
+    <target
+        android:name="pill1_fill"
+        android:animation="@animator/splash_fill_fade_in" />
+    <target
+        android:name="pill2_fill"
+        android:animation="@animator/splash_fill_fade_in" />
+
+    <!-- Stroke Fade-Out Phase (450ms - 700ms) -->
+    <target
+        android:name="circle_stroke"
+        android:animation="@animator/splash_stroke_fade_out" />
+    <target
+        android:name="pill1_stroke"
+        android:animation="@animator/splash_stroke_fade_out" />
+    <target
+        android:name="pill2_stroke"
+        android:animation="@animator/splash_stroke_fade_out" />
+</animated-vector>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <group
+        android:pivotX="276.5"
+        android:pivotY="169"
+        android:scaleX="0.65"
+        android:scaleY="0.65"
+        android:translateX="-132.5"
+        android:translateY="-25">
+        
+        <!-- Layer 1: Filled Gradient Shapes -->
+        <path
+            android:name="circle_fill"
+            android:fillAlpha="0"
+            android:pathData="M187.078 258.909C203.931 258.909 217.593 245.247 217.593 228.394C217.593 211.541 203.931 197.878 187.078 197.878C170.225 197.878 156.562 211.541 156.562 228.394C156.562 245.247 170.225 258.909 187.078 258.909Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:startX="212.71"
+                    android:startY="294.925"
+                    android:endX="325.616"
+                    android:endY="100.849"
+                    android:type="linear">
+                    <item android:color="#B100EC" android:offset="0.0"/>
+                    <item android:color="#F061F5" android:offset="0.526"/>
+                    <item android:color="#FF0000" android:offset="1.0"/>
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path
+            android:name="pill1_fill"
+            android:fillAlpha="0"
+            android:pathData="M248.039 89.2269L209.463 144.319C199.796 158.125 203.151 177.152 216.957 186.819C230.762 196.485 249.79 193.13 259.456 179.325L298.032 124.232C307.699 110.427 304.344 91.3996 290.538 81.7331C276.733 72.0665 257.706 75.4216 248.039 89.2269Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:startX="212.71"
+                    android:startY="294.925"
+                    android:endX="325.616"
+                    android:endY="100.849"
+                    android:type="linear">
+                    <item android:color="#B100EC" android:offset="0.0"/>
+                    <item android:color="#F061F5" android:offset="0.526"/>
+                    <item android:color="#FF0000" android:offset="1.0"/>
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path
+            android:name="pill2_fill"
+            android:fillAlpha="0"
+            android:pathData="M387.137 210.833L348.561 155.741C338.895 141.935 319.867 138.58 306.062 148.247C292.257 157.913 288.901 176.941 298.568 190.746L337.144 245.839C346.811 259.644 365.838 262.999 379.644 253.333C393.449 243.666 396.804 224.638 387.137 210.833Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:startX="212.71"
+                    android:startY="294.925"
+                    android:endX="325.616"
+                    android:endY="100.849"
+                    android:type="linear">
+                    <item android:color="#B100EC" android:offset="0.0"/>
+                    <item android:color="#F061F5" android:offset="0.526"/>
+                    <item android:color="#FF0000" android:offset="1.0"/>
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Layer 2: Stroke Paths -->
+        <path
+            android:name="circle_stroke"
+            android:pathData="M187.265,204.121 C200.778,204.121 211.731,215.075 211.731,228.587 C211.731,242.099 200.778,253.053 187.265,253.053 C173.753,253.053 162.8,242.099 162.8,228.587 C162.8,215.075 173.753,204.121 187.265,204.121 Z"
+            android:strokeWidth="6"
+            android:strokeColor="#A855F7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:trimPathEnd="0"
+            android:strokeAlpha="1" />
+        <path
+            android:name="pill1_stroke"
+            android:pathData="M214.529,148.09 L253.044,93.0863 C260.794,82.0181 276.049,79.328 287.118,87.0781 C298.186,94.8283 300.876,110.084 293.126,121.152 L254.612,176.156 C246.862,187.225 231.606,189.915 220.538,182.165 C209.469,174.414 206.779,159.159 214.529,148.09 Z"
+            android:strokeWidth="6"
+            android:strokeColor="#A855F7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:trimPathEnd="0"
+            android:strokeAlpha="1" />
+        <path
+            android:name="pill2_stroke"
+            android:pathData="M343.573,159.493 L382.087,214.497 C389.837,225.566 387.147,240.821 376.079,248.572 C365.01,256.322 349.755,253.632 342.005,242.563 L303.49,187.559 C295.74,176.491 298.43,161.235 309.499,153.485 C320.567,145.735 335.823,148.425 343.573,159.493 Z"
+            android:strokeWidth="6"
+            android:strokeColor="#A855F7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:trimPathEnd="0"
+            android:strokeAlpha="1" />
+    </group>
+</vector>
