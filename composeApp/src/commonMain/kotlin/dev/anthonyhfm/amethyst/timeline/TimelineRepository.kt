@@ -485,7 +485,12 @@ object TimelineRepository {
     }
 
     fun stop() {
-        pause()
+        _isPlaying.value = false
+        stopPlayback()
+        activeEntries.forEach { it.entry.stop() }
+        activeEntries.clear()
+        activeMidiEntries.forEach { it.entry.stop() }
+        activeMidiEntries.clear()
         _playheadPositionMs.value = 0L
         lastPlayheadMs = 0L
         nextStartIndex = 0

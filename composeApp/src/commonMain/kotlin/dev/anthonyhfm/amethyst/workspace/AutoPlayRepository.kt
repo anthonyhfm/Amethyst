@@ -160,6 +160,8 @@ object AutoPlayRepository {
         playbackOffset = 0.0
         playbackStartTime = 0.0
         learningIndex = 0
+        sortedActionTimes = emptyList()
+        totalDuration = 0.0
         previousLearningActions = emptyList()
     }
 

@@ -526,7 +526,10 @@ object WorkspaceRepository {
     }
 
     fun loadWorkspace(workspaceData: SavableWorkspaceData, fromRemote: Boolean = false) {
+        AutoPlayRepository.stopAutoPlay()
+        TimelineRepository.stop()
         Echo.reset()
+        Heaven.clear()
 
         if (fromRemote) {
             isApplyingRemoteBpmUpdate = true
@@ -898,7 +901,13 @@ object WorkspaceRepository {
     }
 
     fun clean() {
+        AutoPlayRepository.stopAutoPlay()
+        TimelineRepository.stop()
+        TimelineRepository.loadTracks(emptyList())
+        UndoManager.clear()
+        SelectionManager.clear()
         Echo.reset()
+        Heaven.clear()
         AudioSourceLibrary.clear()
         TransmitChainDevice.clearReceiversForTesting()
         AutomappingManager.reset()
