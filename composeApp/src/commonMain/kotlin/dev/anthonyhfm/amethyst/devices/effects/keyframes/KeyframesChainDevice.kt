@@ -16,6 +16,8 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
+import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
+import dev.anthonyhfm.amethyst.conversion.unipad.UnipadOwnershipTracker
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
@@ -784,26 +786,32 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun startPlayback(triggerSignal: Signal.LED) {
-        val state = state.value
-        val repeats = state.repeats
-        val animation = state.renderedAnimation
+        val stateSnapshot = state.value
+        val repeats = stateSnapshot.repeats
+        val animation = stateSnapshot.renderedAnimation
         val totalDuration = animation.lastOrNull()?.first ?: 0
-        val identifier = if (state.playbackMode == PlaybackMode.Poly) triggerSignal.x * 10 + triggerSignal.y else null
+        val identifier = if (stateSnapshot.playbackMode == PlaybackMode.Poly) triggerSignal.x * 10 + triggerSignal.y else null
 
         for (r in 0 until repeats) {
             val offset = r * totalDuration
             animation.forEach { (time, signals) ->
                 Heaven.schedule(offset + time.toDouble(), owner = this, identifier = identifier) {
+                    val s = state.value
                     val transformed = transformSignals(signals, triggerSignal)
-                    signalExit?.invoke(transformed)
+                    val outgoing = if (s.useOwnershipTracking && s.ownershipId.isNotEmpty()) {
+                        filterOwnershipSignals(transformed, s.ownershipId)
+                    } else {
+                        transformed
+                    }
+                    if (outgoing.isNotEmpty()) signalExit?.invoke(outgoing)
                 }
             }
         }
     }
 
     private fun startLoopPlayback(triggerSignal: Signal.LED, identifier: Int) {
-        val state = state.value
-        val animation = state.renderedAnimation
+        val stateSnapshot = state.value
+        val animation = stateSnapshot.renderedAnimation
         val totalDuration = (animation.lastOrNull()?.first ?: 0).toDouble()
         if (totalDuration <= 0) return
 
@@ -812,8 +820,14 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
             animation.forEach { (time, signals) ->
                 Heaven.schedule(loopOffset + time, owner = this, identifier = identifier) {
+                    val s = state.value
                     val transformed = transformSignals(signals, triggerSignal)
-                    signalExit?.invoke(transformed)
+                    val outgoing = if (s.useOwnershipTracking && s.ownershipId.isNotEmpty()) {
+                        filterOwnershipSignals(transformed, s.ownershipId)
+                    } else {
+                        transformed
+                    }
+                    if (outgoing.isNotEmpty()) signalExit?.invoke(outgoing)
                     
                     // If this is the last frame of the animation, schedule the next loop
                     if (time.toDouble() == totalDuration && heldSignals.contains(identifier)) {
@@ -876,6 +890,30 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 }
             } else signal
         }
+    }
+
+    private fun filterOwnershipSignals(
+        signals: List<Signal>,
+        ownerUUID: String
+    ): List<Signal> {
+        val out = mutableListOf<Signal>()
+        for (sig in signals) {
+            if (sig !is Signal.LED) {
+                out.add(sig)
+                continue
+            }
+            if (sig.color.isLit()) {
+                // On → claim ownership (last-writer-wins, like Unipad btnLed[x][y] = ...)
+                UnipadOwnershipTracker.claimOwnership(sig.x, sig.y, ownerUUID)
+                out.add(sig)
+            } else {
+                // Off → only forward if we're still the owner (stale Off → drop, like Unipad)
+                if (UnipadOwnershipTracker.checkAndReleaseOwnership(sig.x, sig.y, ownerUUID)) {
+                    out.add(sig)
+                }
+            }
+        }
+        return out
     }
 
     fun duplicateFrames(frameIndices: List<Int>, targetStartIndex: Int? = null) {
