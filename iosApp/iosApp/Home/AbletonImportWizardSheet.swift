@@ -19,10 +19,16 @@ struct AbletonImportWizardSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    private enum ActivePicker: Identifiable {
+        case palette
+        case apollo
+
+        var id: Self { self }
+    }
+
     @State private var palettePath: String = ""
     @State private var apolloPath: String = ""
-    @State private var showingPalettePicker = false
-    @State private var showingApolloPicker  = false
+    @State private var activePicker: ActivePicker? = nil
 
     private var importName: String {
         (importPath as NSString).lastPathComponent
@@ -63,7 +69,7 @@ struct AbletonImportWizardSheet: View {
                                 .truncationMode(.middle)
                         }
                         Button("Change…") {
-                            showingPalettePicker = true
+                            activePicker = .palette
                         }
                         Button("Remove", role: .destructive) {
                             palettePath = ""
@@ -72,7 +78,7 @@ struct AbletonImportWizardSheet: View {
 
                     if palettePath.isEmpty {
                         Button("Select Palette…") {
-                            showingPalettePicker = true
+                            activePicker = .palette
                         }
                     }
                 } header: {
@@ -97,7 +103,7 @@ struct AbletonImportWizardSheet: View {
                                 .truncationMode(.middle)
                         }
                         Button("Change…") {
-                            showingApolloPicker = true
+                            activePicker = .apollo
                         }
                         Button("Remove", role: .destructive) {
                             apolloPath = ""
@@ -106,7 +112,7 @@ struct AbletonImportWizardSheet: View {
 
                     if apolloPath.isEmpty {
                         Button("Select Apollo Project…") {
-                            showingApolloPicker = true
+                            activePicker = .apollo
                         }
                     }
                 } header: {
@@ -129,24 +135,21 @@ struct AbletonImportWizardSheet: View {
                 }
             }
         }
-        // Palette file picker
         .fileImporter(
-            isPresented: $showingPalettePicker,
-            allowedContentTypes: [.data]
+            isPresented: Binding(
+                get: { activePicker != nil },
+                set: { if !$0 { activePicker = nil } }
+            ),
+            allowedContentTypes: activePicker == .apollo
+                ? [UTType(filenameExtension: "approj") ?? .data, .data, .item]
+                : [UTType(filenameExtension: "palette") ?? .data, .item, .data, .plainText]
         ) { result in
-            if case .success(let url) = result {
-                palettePath = indexPickedFile(url: url)
-            }
-        }
-        // Apollo project picker
-        .fileImporter(
-            isPresented: $showingApolloPicker,
-            allowedContentTypes: [
-                UTType(filenameExtension: "approj") ?? .data
-            ]
-        ) { result in
-            if case .success(let url) = result {
-                apolloPath = indexPickedFile(url: url)
+            guard case .success(let url) = result else { return }
+            let pickedPath = indexPickedFile(url: url)
+            if activePicker == .apollo {
+                apolloPath = pickedPath
+            } else {
+                palettePath = pickedPath
             }
         }
     }
