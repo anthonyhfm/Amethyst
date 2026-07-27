@@ -60,6 +60,8 @@ sealed interface KeyframesChainDeviceContract {
         val isolate: Boolean = false,
         val pinch: Float = 0f, // Range [-2,2]
         val bilateralPinch: Boolean = false,
+        val useOwnershipTracking: Boolean = false,
+        val ownershipId: String = "",
         @Transient
         val renderedAnimation: List<Pair<Int, List<Signal>>> = emptyList(),
     ) : DeviceState()
