@@ -313,13 +313,22 @@ object AbletonTutorialDetector {
         for (track in tracks) {
             val allDevices = collectAllDevices(track.deviceChain.devices)
             for (device in allDevices) {
-                val targetId = when (device) {
-                    is InstrumentGroupDevice -> device.chainSelector.automationTarget?.id ?: device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id
-                    is MidiEffectGroupDevice -> device.chainSelector.automationTarget?.id ?: device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id
-                    else -> null
-                }
-                if (targetId != null) {
-                    targetIds.add(targetId)
+                when (device) {
+                    is InstrumentGroupDevice -> {
+                        device.chainSelector.automationTarget?.id?.let { targetIds.add(it) }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targetIds.add(it) }
+                        device.macros.forEach { macro ->
+                            macro.automationTarget?.id?.let { targetIds.add(it) }
+                        }
+                    }
+                    is MidiEffectGroupDevice -> {
+                        device.chainSelector.automationTarget?.id?.let { targetIds.add(it) }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targetIds.add(it) }
+                        device.macros.forEach { macro ->
+                            macro.automationTarget?.id?.let { targetIds.add(it) }
+                        }
+                    }
+                    else -> {}
                 }
             }
         }

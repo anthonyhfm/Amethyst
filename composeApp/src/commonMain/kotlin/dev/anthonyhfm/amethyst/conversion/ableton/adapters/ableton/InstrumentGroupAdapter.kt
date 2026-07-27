@@ -33,15 +33,21 @@ class InstrumentGroupAdapter(
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<InstrumentGroupDevice.Branches.InstrumentBranch> = device.branches.branches
 
-        val hasChains = device.chainSelector.keyMidi != null || branches.size > 1 || branches.any { it.branchSelectorRange.min.value != 0 || it.branchSelectorRange.max.value != 127 }
+        val hasMacroFilter = device.chainSelector.keyMidi != null || branches.any {
+            it.branchSelectorRange.min.value != 0 || (it.branchSelectorRange.max.value != 0 && it.branchSelectorRange.max.value != 127)
+        }
+
+        val hasPageSwitching = chainDepth == 0 && (
+            device.chainSelector.keyMidi != null || branches.any {
+                it.branchSelectorRange.min.value > 0 || it.branchSelectorRange.max.value > 0
+            }
+        )
 
         val groups = mutableListOf<Group>()
 
         groups.addAll(
             branches.mapIndexed { index, branch ->
                 val enabled = branch.masterDevice.speaker.manual.value
-
-                if (!enabled) return@mapIndexed null
 
                 Group(
                     name = branch.name.effectiveName.let {
@@ -61,7 +67,7 @@ class InstrumentGroupAdapter(
                             val minKey = branch.zoneSettings.keyRange.min.value
                             val maxKey = branch.zoneSettings.keyRange.max.value
 
-                            if (hasChains) {
+                            if (hasMacroFilter) {
                                 if (maxMacro - minMacro == 0) {
                                     add(
                                         MacroFilterChainDeviceState(
@@ -208,13 +214,13 @@ class InstrumentGroupAdapter(
                                     )?.toDeviceStates() ?: emptyList()
                                 }
                             )
-                        }
+                        }.withMuteState(enabled)
                     )
                 )
-            }.filterNotNull()
+            }
         )
 
-        if (hasChains) {
+        if (hasPageSwitching) {
             groups.add(
                 Group(
                     name = "Page Switching",

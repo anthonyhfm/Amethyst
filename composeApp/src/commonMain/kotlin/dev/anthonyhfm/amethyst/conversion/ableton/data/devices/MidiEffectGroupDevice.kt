@@ -54,19 +54,40 @@ data class MidiEffectGroupDevice(
     @XmlSerialName("MacroControls.8")
     val macro8: Macro? = null,
     @XmlElement
-    @XmlSerialName("MacroControls.16")
-    val macro16: Macro? = null,
+    @XmlSerialName("MacroControls.9")
+    val macro9: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.10")
+    val macro10: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.11")
+    val macro11: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.12")
+    val macro12: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.13")
+    val macro13: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.14")
+    val macro14: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.15")
+    val macro15: Macro? = null,
 
     @Transient
-    val macros: List<Macro> = listOfNotNull(macro0, macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8, macro16)
+    val macros: List<Macro> = listOfNotNull(
+        macro0, macro1, macro2, macro3, macro4, macro5, macro6, macro7,
+        macro8, macro9, macro10, macro11, macro12, macro13, macro14, macro15
+    )
 ) : AbletonDevice {
     fun getPageMacro(liveVersion: dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion?): Macro? {
         return when (liveVersion) {
             dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_11,
-            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_12 -> macro16 ?: macro8 ?: macro0
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_12 -> macro15 ?: macro7 ?: macro0
             dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_9,
-            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_10 -> macro8 ?: macro16 ?: macro0
-            else -> macro16 ?: macro8 ?: macro0
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_10 -> macro7 ?: macro15 ?: macro0
+            else -> macro15 ?: macro7 ?: macro0
         }
     }
     @Serializable
