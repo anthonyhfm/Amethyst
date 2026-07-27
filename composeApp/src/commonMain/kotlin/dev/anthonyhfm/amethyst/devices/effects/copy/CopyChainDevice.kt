@@ -95,7 +95,8 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceAround
                     ) {
                         ToggleOption(
                             label = "Wrap",
@@ -123,36 +124,36 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
                                 state.update { it.copy(infinite = infinite) }
                             }
                         )
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        CopyTimeControls(
-                            timing = deviceState.timing,
-                            onTimingChanged = { timing ->
-                                val before = state.value
-                                state.update { it.copy(timing = timing) }
-                                pushStateChange(before, state.value)
-                            },
-                            gate = deviceState.gate,
-                            onGateChanged = { gate ->
-                                val before = state.value
-                                state.update { it.copy(gate = gate) }
-                                pushStateChange(before, state.value)
-                            },
-                            pinch = deviceState.pinch,
-                            onPinchChanged = { pinch ->
-                                val before = state.value
-                                state.update { it.copy(pinch = pinch) }
-                                pushStateChange(before, state.value)
-                            },
-                            bilateral = deviceState.bilateral,
-                            onToggleBilateral = {
-                                val before = state.value
-                                state.update { it.copy(bilateral = !it.bilateral) }
-                                pushStateChange(before, state.value)
-                            }
-                        )
                     }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    CopyTimeControls(
+                        timing = deviceState.timing,
+                        onTimingChanged = { timing ->
+                            val before = state.value
+                            state.update { it.copy(timing = timing) }
+                            pushStateChange(before, state.value)
+                        },
+                        gate = deviceState.gate,
+                        onGateChanged = { gate ->
+                            val before = state.value
+                            state.update { it.copy(gate = gate) }
+                            pushStateChange(before, state.value)
+                        },
+                        pinch = deviceState.pinch,
+                        onPinchChanged = { pinch ->
+                            val before = state.value
+                            state.update { it.copy(pinch = pinch) }
+                            pushStateChange(before, state.value)
+                        },
+                        bilateral = deviceState.bilateral,
+                        onToggleBilateral = {
+                            val before = state.value
+                            state.update { it.copy(bilateral = !it.bilateral) }
+                            pushStateChange(before, state.value)
+                        }
+                    )
                 }
 
                 Separator(orientation = SeparatorOrientation.Vertical)
