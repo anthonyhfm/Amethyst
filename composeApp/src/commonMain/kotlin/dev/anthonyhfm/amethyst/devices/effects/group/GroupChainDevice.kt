@@ -133,6 +133,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
     }
 
     override fun onStateRestored() {
+        super.onStateRestored()
         AutomappingManager.clearTargetIfMissing(this)
     }
 

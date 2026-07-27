@@ -7,4 +7,7 @@ import kotlinx.serialization.Transient
 abstract class DeviceState {
     @Transient
     open var isMuted: Boolean = false
+
+    @Transient
+    open var isCollapsed: Boolean = false
 }

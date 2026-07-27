@@ -104,6 +104,8 @@ private data class SampleRenderCache(
 class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     override val state = MutableStateFlow(SampleChainDeviceState())
     override val helpRef = "Sample"
+    override val title: String
+        get() = state.value.let { if (it.isLoaded) it.fileName.ifEmpty { "Sample" } else "Sample" }
     override val audioRole = AudioChainDeviceRole.Generator
 
     private val triggerQueue = SampleTriggerQueue()
@@ -336,6 +338,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
     }
 
     override fun onStateRestored() {
+        super.onStateRestored()
         renderCache.value = null
         primeAudioSnapshot()
     }

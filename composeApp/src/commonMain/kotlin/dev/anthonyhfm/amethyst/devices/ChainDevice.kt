@@ -12,6 +12,7 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.workspace.chain.ui.CollapsedChainDevice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -58,11 +59,23 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     open val helpRef: String? = null
 
+    open val title: String
+        get() = helpRef ?: this::class.simpleName?.removeSuffix("ChainDevice") ?: "Device"
+
+    @Composable
+    open fun CollapsedContent() {
+        CollapsedChainDevice(device = this)
+    }
+
     var parentChain: Chain? = null
 
     val isMuted: Boolean
         get() = state.value.isMuted
 
+    val isCollapsed: Boolean
+        get() = isCollapsedState.value
+
+    var isCollapsedState: MutableState<Boolean> = mutableStateOf(false)
     var isDragging: MutableState<Boolean> = mutableStateOf(false)
 
     open fun onAddedToChain() = Unit
@@ -85,7 +98,19 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
         }
     }
 
-    open fun onStateRestored() = Unit
+    fun setCollapsed(collapsed: Boolean) {
+        val current = state.value
+        if (current.isCollapsed != collapsed) {
+            current.isCollapsed = collapsed
+            isCollapsedState.value = collapsed
+            state.update { current }
+            parentChain?.onDeviceRuntimeStateChanged()
+        }
+    }
+
+    open fun onStateRestored() {
+        isCollapsedState.value = state.value.isCollapsed
+    }
 
     @Composable
     abstract fun Content()

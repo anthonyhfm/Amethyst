@@ -549,9 +549,11 @@
     <string name="workspace_autoplay_switch_to_learning">切换到学习模式</string>
     <string name="workspace_autoplay_switch_to_normal">切换到常规播放</string>
     <string name="workspace_bpm_changer_content_description">每分钟节拍数 (BPM)</string>
+    <string name="workspace_chain_chaineditor_collapse">折叠</string>
     <string name="workspace_chain_chaineditor_copy">复制</string>
     <string name="workspace_chain_chaineditor_delete">删除</string>
     <string name="workspace_chain_chaineditor_duplicate">重复</string>
+    <string name="workspace_chain_chaineditor_expand">展开</string>
     <string name="workspace_chain_chaineditor_get_help">获取帮助</string>
     <string name="workspace_chain_chaineditor_mute">静音</string>
     <string name="workspace_chain_chaineditor_paste">粘贴</string>

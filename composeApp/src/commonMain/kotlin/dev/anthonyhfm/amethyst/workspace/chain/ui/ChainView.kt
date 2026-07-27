@@ -1,7 +1,6 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,6 +34,7 @@ import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.modifier.clickableWithDoubleTap
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 
 @Composable
@@ -126,24 +126,29 @@ fun ChainView(
 
                             TitleBarModifierProvider(
                                 Modifier
-                                    .clickable {
-                                        val chainDeviceSelectable = Selectable.ChainDevice(
-                                            parent = chain,
-                                            device = device
-                                        )
-                                        when {
-                                            ModifierKeysState.isShiftPressed -> {
-                                                SelectionManager.selectRangeInChain(
-                                                    targetDevice = chainDeviceSelectable,
-                                                    devicesInChain = devices
-                                                )
+                                    .clickableWithDoubleTap(
+                                        onSingleClick = {
+                                            val chainDeviceSelectable = Selectable.ChainDevice(
+                                                parent = chain,
+                                                device = device
+                                            )
+                                            when {
+                                                ModifierKeysState.isShiftPressed -> {
+                                                    SelectionManager.selectRangeInChain(
+                                                        targetDevice = chainDeviceSelectable,
+                                                        devicesInChain = devices
+                                                    )
+                                                }
+                                                ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
+                                                    SelectionManager.select(chainDeviceSelectable, single = false)
+                                                }
+                                                else -> SelectionManager.select(chainDeviceSelectable)
                                             }
-                                            ModifierKeysState.isMetaPressed || ModifierKeysState.isAltPressed -> {
-                                                SelectionManager.select(chainDeviceSelectable, single = false)
-                                            }
-                                            else -> SelectionManager.select(chainDeviceSelectable)
+                                        },
+                                        onDoubleClick = {
+                                            device.setCollapsed(!device.isCollapsed)
                                         }
-                                    }
+                                    )
                                     .then(
                                         if (showContextMenu) {
                                             Modifier.rightClickable {
@@ -181,6 +186,8 @@ fun ChainView(
                                     } else Color.Unspecified
 
                                     val deviceState by device.state.collectAsState()
+                                    val isCollapsed by device.isCollapsedState
+
                                     Box(
                                         modifier = Modifier
                                             .chainDeviceMuteEffect(deviceState.isMuted)
@@ -190,10 +197,13 @@ fun ChainView(
                                                 } else Modifier
                                             )
                                     ) {
-                                        when (device) {
+                                        if (isCollapsed) {
+                                            device.CollapsedContent()
+                                        } else when (device) {
                                             is GroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
                                             is MultiGroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
                                             is ChokeChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+
                                             else -> device.Content()
                                         }
                                     }

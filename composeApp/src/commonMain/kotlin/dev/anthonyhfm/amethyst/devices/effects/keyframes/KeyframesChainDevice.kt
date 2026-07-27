@@ -1007,6 +1007,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     override fun onStateRestored() {
+        super.onStateRestored()
         renderAnimation()
     }
 

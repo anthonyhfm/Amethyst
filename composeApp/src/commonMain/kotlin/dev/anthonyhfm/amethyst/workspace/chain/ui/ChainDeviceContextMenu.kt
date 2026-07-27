@@ -13,8 +13,10 @@ import com.composables.icons.lucide.BookOpenText
 import com.composables.icons.lucide.ClipboardPaste
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.CopyPlus
+import com.composables.icons.lucide.Expand
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Replace
+import com.composables.icons.lucide.Shrink
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
@@ -59,6 +61,26 @@ fun ChainDeviceContextMenu(
                 icon = Lucide.VolumeX,
                 onClick = {
                     device.setMuted(true)
+                    onDismiss()
+                }
+            )
+        }
+
+        if (device.isCollapsed) {
+            ChainContextMenuItem(
+                label = stringResource(Res.string.workspace_chain_chaineditor_expand),
+                icon = Lucide.Expand,
+                onClick = {
+                    device.setCollapsed(false)
+                    onDismiss()
+                }
+            )
+        } else {
+            ChainContextMenuItem(
+                label = stringResource(Res.string.workspace_chain_chaineditor_collapse),
+                icon = Lucide.Shrink,
+                onClick = {
+                    device.setCollapsed(true)
                     onDismiss()
                 }
             )

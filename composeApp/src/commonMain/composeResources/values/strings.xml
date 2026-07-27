@@ -550,9 +550,11 @@
     <string name="workspace_autoplay_switch_to_learning">Switch to Learning Mode</string>
     <string name="workspace_autoplay_switch_to_normal">Switch to Normal Playback</string>
     <string name="workspace_bpm_changer_content_description">Beats per minute</string>
+    <string name="workspace_chain_chaineditor_collapse">Collapse</string>
     <string name="workspace_chain_chaineditor_copy">Copy</string>
     <string name="workspace_chain_chaineditor_delete">Delete</string>
     <string name="workspace_chain_chaineditor_duplicate">Duplicate</string>
+    <string name="workspace_chain_chaineditor_expand">Expand</string>
     <string name="workspace_chain_chaineditor_get_help">Get Help</string>
     <string name="workspace_chain_chaineditor_mute">Mute</string>
     <string name="workspace_chain_chaineditor_paste">Paste</string>
