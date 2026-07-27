@@ -26,7 +26,6 @@ import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
-import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
 import dev.anthonyhfm.amethyst.settings.data.SettingsRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
@@ -56,7 +55,7 @@ object AbletonConverter : AmethystConverter {
     var special = ProjectSpecials()
 
     var bpm: Double = 120.0
-        private set
+        internal set
 
     var liveVersion: LiveVersion? = null
         private set
@@ -259,11 +258,7 @@ object AbletonConverter : AmethystConverter {
         bpm = abletonData.liveSet.masterTrack.deviceChain.mixer.tempo.manual.value
         projectLayout = layout
 
-        val autoPlayData: AutoPlayData = if (ExperimentalSettings.abletonTutorial.flow.value) {
-            AbletonTutorialDetector.getAutoPlayData(layout, abletonData.liveSet.tracks.midiTracks)
-        } else {
-            AutoPlayData(actions = emptyMap())
-        }
+        val autoPlayData: AutoPlayData = AbletonTutorialDetector.getAutoPlayData(layout, abletonData.liveSet.tracks.midiTracks)
 
         val audioTracks = when (layout) {
             is AbletonLayout.Single -> listOfNotNull(layout.audioTrack)

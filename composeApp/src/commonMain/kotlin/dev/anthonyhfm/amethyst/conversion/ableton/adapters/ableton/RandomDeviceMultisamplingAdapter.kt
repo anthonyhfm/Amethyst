@@ -50,6 +50,11 @@ class RandomDeviceMultisamplingAdapter (
             }.flatten()
         }
 
+        val containerOnState = instrumentContainer?.on?.manual?.value
+            ?: midiContainer?.on?.manual?.value
+            ?: drumContainer?.on?.manual?.value
+            ?: true
+
         if (randomChance == 1.0 && altModeEnabled) {
             return listOf(
                 MultiGroupChainDeviceState(
@@ -114,7 +119,7 @@ class RandomDeviceMultisamplingAdapter (
                         }
                     }
                 )
-            ).withMuteState(random.on.manual.value)
+            ).withMuteState(containerOnState)
         }
 
         println("Random device does not have Chance 100% and Alt mode, skipping...; Values: chance=$randomChance, steps=$multiSteps, alt=$altModeEnabled")

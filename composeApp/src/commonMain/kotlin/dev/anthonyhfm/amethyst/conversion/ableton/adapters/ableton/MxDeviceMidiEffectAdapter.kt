@@ -17,6 +17,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator1Ada
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator3Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator4Adapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.WormholeLiteAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.nev.WormholeAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DelayAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
@@ -115,6 +116,10 @@ class MxDeviceMidiEffectAdapter(
                 "5ef8dd91805de9f50000565f21d1485c",
                 "4daa43e6e4704693794cb14a33cc00fa" -> {
                     return InfinityAdapter().toDeviceStates()
+                }
+
+                "b587108a297a3eb744172735c5d3f064" -> {
+                    return WormholeLiteAdapter(device).toDeviceStates()
                 }
 
                 "220a5d8ae9bd63f21c8292c03774ef90",

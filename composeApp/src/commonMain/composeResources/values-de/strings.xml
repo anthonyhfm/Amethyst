@@ -356,7 +356,6 @@
     <string name="settings_discord_rpc_title">Discord Rich Presence</string>
     <string name="settings_discord_show_project_title">Aktuelles Projekt anzeigen</string>
     <string name="settings_discord_show_workspace_state_title">Aktuellen Workspace-Status anzeigen</string>
-    <string name="settings_experimental_ableton_tutorial_title">Ableton Tutorial-Erkennung</string>
     <string name="settings_experimental_crystal_compositions_title">Crystal Compositions</string>
     <string name="settings_experimental_group_title">Experimentelle Features</string>
     <string name="settings_experimental_live_collab_title">Live Collaboration (nur LAN)</string>

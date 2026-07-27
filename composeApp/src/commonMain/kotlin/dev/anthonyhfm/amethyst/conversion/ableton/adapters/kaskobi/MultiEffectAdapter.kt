@@ -70,6 +70,11 @@ class MultiEffectAdapter (
             }.flatten()
         }
 
+        val containerOnState = instrumentContainer?.on?.manual?.value
+            ?: midiContainer?.on?.manual?.value
+            ?: drumContainer?.on?.manual?.value
+            ?: true
+
         return listOf(
             MultiGroupChainDeviceState(
                 type = TYPE.FORWARD,
@@ -133,6 +138,6 @@ class MultiEffectAdapter (
                     }
                 }
             )
-        )
+        ).withMuteState(containerOnState)
     }
 }

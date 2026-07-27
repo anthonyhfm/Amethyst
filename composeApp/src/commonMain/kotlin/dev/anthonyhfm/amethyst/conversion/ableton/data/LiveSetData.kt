@@ -55,7 +55,10 @@ data class MidiTrack(
     val deviceChain: DeviceChain,
     @XmlElement
     @XmlSerialName("TakeLanes")
-    val takeLanes: TakeLanes? = null
+    val takeLanes: TakeLanes? = null,
+    @XmlElement
+    @XmlSerialName("AutomationEnvelopes")
+    val automationEnvelopes: AutomationEnvelopes? = null
 ) {
     @Serializable
     data class Name(
@@ -261,3 +264,73 @@ data class MidiClip(
         }
     }
 }
+
+@Serializable
+data class AutomationEnvelopes(
+    @XmlElement
+    @XmlSerialName("Envelopes")
+    val envelopes: Envelopes? = null
+) {
+    @Serializable
+    data class Envelopes(
+        val envelopes: List<AutomationEnvelope> = emptyList()
+    )
+
+    @Serializable
+    data class AutomationEnvelope(
+        @XmlSerialName("Id")
+        val id: Int? = null,
+
+        @XmlElement
+        @XmlSerialName("EnvelopeTarget")
+        val envelopeTarget: EnvelopeTarget? = null,
+
+        @XmlElement
+        @XmlSerialName("Automation")
+        val automation: Automation? = null
+    )
+
+    @Serializable
+    data class EnvelopeTarget(
+        @XmlElement
+        @XmlSerialName("PointeeId")
+        val pointeeId: PointeeId? = null
+    )
+
+    @Serializable
+    data class PointeeId(
+        @XmlSerialName("Value")
+        val value: Int? = null
+    )
+
+    @Serializable
+    data class Automation(
+        @XmlElement
+        @XmlSerialName("Events")
+        val events: Events? = null
+    )
+
+    @Serializable
+    data class Events(
+        val floatEvents: List<FloatEvent> = emptyList()
+    )
+
+    @Serializable
+    @XmlSerialName("FloatEvent")
+    data class FloatEvent(
+        @XmlSerialName("Id")
+        val id: Int? = null,
+
+        @XmlSerialName("Time")
+        val time: Double = 0.0,
+
+        @XmlSerialName("Value")
+        val value: Float = 0f
+    )
+}
+
+@Serializable
+data class AutomationTarget(
+    @XmlSerialName("Id")
+    val id: Int? = null
+)

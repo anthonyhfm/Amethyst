@@ -2,10 +2,15 @@ package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AutomationEnvelopes
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiClip
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
+import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 object AbletonTutorialDetector {
@@ -53,6 +58,17 @@ object AbletonTutorialDetector {
                 )
                 println("rawActions after fallback tracks: ${rawActions.size} time entries")
             }
+        }
+
+        val macroActions = detectMacroAutomationActions(layout, tracks, tutorialStartBeats)
+        if (macroActions.isNotEmpty()) {
+            println("=== TutorialDetector: Merging ${macroActions.size} macro automation timestamps into AutoPlay ===")
+            val combined = rawActions.toMutableMap()
+            for ((timeMs, actionList) in macroActions) {
+                val existing = combined.getOrElse(timeMs) { emptyList() }
+                combined[timeMs] = existing + actionList
+            }
+            rawActions = combined
         }
 
         val deduped = rawActions.mapValues { (_, list) -> list.distinct() }
@@ -163,8 +179,6 @@ object AbletonTutorialDetector {
                 val pitch = keyTrack.midiKey.value
 
                 val padIndex = DRUM_RACK_TO_XY[pitch]
-
-                println("KeyTrack for pitch=$pitch mappedToPadIndex=$padIndex")
 
                 keyTrack.notes.notes.forEach { note ->
                     val velocity = note.velocity
@@ -299,4 +313,111 @@ object AbletonTutorialDetector {
         println("  → Using all ${nonEmptyClips.size} non-empty timeline clip(s)")
         return nonEmptyClips
     }
+
+    fun extractPageMacroAutomationTargets(tracks: List<MidiTrack>): Set<Int> {
+        val targetIds = mutableSetOf<Int>()
+        for (track in tracks) {
+            val allDevices = collectAllDevices(track.deviceChain.devices)
+            for (device in allDevices) {
+                val targetId = when (device) {
+                    is InstrumentGroupDevice -> device.macro0?.automationTarget?.id
+                    is MidiEffectGroupDevice -> device.macro0?.automationTarget?.id
+                    else -> null
+                }
+                if (targetId != null) {
+                    targetIds.add(targetId)
+                }
+            }
+        }
+        return targetIds
+    }
+
+    private fun collectAllDevices(devices: List<AbletonDevice>): List<AbletonDevice> {
+        val result = mutableListOf<AbletonDevice>()
+        for (device in devices) {
+            result.add(device)
+            when (device) {
+                is InstrumentGroupDevice -> {
+                    for (branch in device.branches.branches) {
+                        result.addAll(collectAllDevices(branch.deviceChain.deviceChain.devices.devices))
+                    }
+                }
+                is MidiEffectGroupDevice -> {
+                    for (branch in device.branches.branches) {
+                        result.addAll(collectAllDevices(branch.deviceChain.deviceChain.devices.devices))
+                    }
+                }
+                else -> {}
+            }
+        }
+        return result
+    }
+
+    fun detectMacroAutomationActions(
+        layout: AbletonLayout,
+        tracks: List<MidiTrack>,
+        tutorialStartBeats: Double
+    ): Map<Double, List<AutoPlayData.Action>> {
+        val targetIds = extractPageMacroAutomationTargets(tracks)
+        if (targetIds.isEmpty()) return emptyMap()
+
+        println("Found Page Switch Macro automation target IDs: $targetIds")
+
+        val bpm = AbletonConverter.bpm
+        if (bpm <= 0.0) return emptyMap()
+
+        val msPerBeat = 60000.0 / bpm
+        val result = mutableMapOf<Double, MutableList<AutoPlayData.Action>>()
+
+        val offset = IntOffset.Zero
+
+        for (track in tracks) {
+            val envelopes = track.automationEnvelopes?.envelopes?.envelopes.orEmpty()
+            for (envelope in envelopes) {
+                val pointeeId = envelope.envelopeTarget?.pointeeId?.value
+                if (pointeeId != null && pointeeId in targetIds) {
+                    val rawEvents = envelope.automation?.events?.floatEvents.orEmpty()
+                    if (rawEvents.isEmpty()) continue
+
+                    val sortedEvents = rawEvents
+                        .sortedWith(compareBy<AutomationEnvelopes.FloatEvent> { it.time }.thenBy { it.id ?: 0 })
+                    val dedupedEvents = mutableListOf<AutomationEnvelopes.FloatEvent>()
+                    for (ev in sortedEvents) {
+                        if (dedupedEvents.isNotEmpty() && dedupedEvents.last().time == ev.time) {
+                            dedupedEvents[dedupedEvents.lastIndex] = ev
+                        } else {
+                            dedupedEvents.add(ev)
+                        }
+                    }
+
+                    var lastEmittedPage = -1
+
+                    for (event in dedupedEvents) {
+                        val timeBeats = event.time - tutorialStartBeats
+                        val targetPage = event.value.roundToInt()
+
+                        if (targetPage !in 0..15) continue
+                        if (targetPage == lastEmittedPage) continue
+
+                        val timeMs = if (timeBeats < 0.0) 0.0 else timeBeats * msPerBeat
+                        lastEmittedPage = targetPage
+
+                        val padX = if (targetPage < 8) 9 + offset.x else 0 + offset.x
+                        val padY = 1 + (targetPage % 8) + offset.y
+
+                        val pressAction = AutoPlayData.Action(x = padX, y = padY, down = true)
+                        val releaseAction = AutoPlayData.Action(x = padX, y = padY, down = false)
+
+                        result.getOrPut(timeMs) { mutableListOf() }.add(pressAction)
+                        result.getOrPut(timeMs + 50.0) { mutableListOf() }.add(releaseAction)
+
+                        println("  [Macro Automation] Page switch to Page ${targetPage + 1} (value=$targetPage) at beat ${event.time} (timeline beats=$timeBeats, ms=$timeMs) -> Pad ($padX, $padY)")
+                    }
+                }
+            }
+        }
+
+        return result
+    }
 }
+

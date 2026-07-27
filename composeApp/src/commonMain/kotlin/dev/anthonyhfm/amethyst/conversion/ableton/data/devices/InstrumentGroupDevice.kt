@@ -3,9 +3,11 @@ package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AutomationTarget
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import nl.adaptivity.xmlutil.serialization.XmlElement
 import nl.adaptivity.xmlutil.serialization.XmlSerialName
 
@@ -22,7 +24,43 @@ data class InstrumentGroupDevice(
 
     @XmlElement
     val chainSelector: ChainSelector,
+
+    @XmlElement
+    @XmlSerialName("MacroControls.0")
+    val macro0: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.1")
+    val macro1: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.2")
+    val macro2: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.3")
+    val macro3: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.4")
+    val macro4: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.5")
+    val macro5: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.6")
+    val macro6: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.7")
+    val macro7: Macro? = null,
+
+    @Transient
+    val macros: List<Macro> = listOfNotNull(macro0, macro1, macro2, macro3, macro4, macro5, macro6, macro7)
 ) : AbletonDevice {
+    @Serializable
+    data class Macro(
+        @XmlElement
+        val manual: AbletonManual<Float> = AbletonManual(0f),
+        @XmlElement
+        @XmlSerialName("AutomationTarget")
+        val automationTarget: AutomationTarget? = null
+    )
     @Serializable
     data class ChainSelector(
         @XmlElement

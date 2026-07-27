@@ -58,6 +58,11 @@ class MultiAdapter(
 
         val steps = dataObj.steps.first().toInt()
 
+        val containerOnState = instrumentContainer?.on?.manual?.value
+            ?: midiContainer?.on?.manual?.value
+            ?: drumContainer?.on?.manual?.value
+            ?: true
+
         return listOf(
             MultiGroupChainDeviceState(
                 type = TYPE.FORWARD,
@@ -121,7 +126,7 @@ class MultiAdapter(
                     }
                 }
             )
-        )
+        ).withMuteState(containerOnState)
     }
 
     @Serializable
