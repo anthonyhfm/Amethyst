@@ -81,11 +81,20 @@ jobs:
         run: mkdir -p composeApp/src/commonMain/composeResources/files && cp -r ml3-graphics/. composeApp/src/commonMain/composeResources/files/
 
       - name: Setup Nucleus
-        uses: kdroidFilter/Nucleus/.github/actions/setup-nucleus@main
+        # The following upstream commit switched JVM packaging from JBR to
+        # Temurin/Microsoft JDKs, which currently makes jlink fail on macOS and
+        # Linux. Keep the last known-good JBR-based setup immutable.
+        uses: kdroidFilter/Nucleus/.github/actions/setup-nucleus@bc084b45920b36174de76115370c87f436bcc6cb
         with:
           packaging-tools: 'true'
           setup-gradle: 'true'
           setup-node: 'true'
+
+      - name: Setup Android SDK for Windows ARM
+        if: matrix.os == 'windows-11-arm'
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          packages: 'platform-tools platforms;android-36'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
