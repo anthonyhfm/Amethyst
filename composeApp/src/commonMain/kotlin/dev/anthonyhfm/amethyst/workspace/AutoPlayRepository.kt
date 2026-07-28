@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace
 
 import androidx.compose.ui.graphics.Color
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import kotlinx.coroutines.CoroutineScope
@@ -171,6 +172,7 @@ object AutoPlayRepository {
     fun stopAutoPlay() {
         Heaven.cancelJobsForOwner(this)
         Heaven.clear()
+        Echo.stopAll()
         progressJob?.cancel()
         progressJob = null
         _progress.value = 0f
