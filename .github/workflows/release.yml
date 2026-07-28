@@ -94,7 +94,9 @@ jobs:
         if: matrix.os == 'windows-11-arm'
         uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
         with:
-          packages: 'platform-tools platforms;android-36'
+          # Gobley configures Android Rust builds even for the desktop package
+          # task and dereferences the AGP-default NDK during configuration.
+          packages: 'platform-tools platforms;android-36 build-tools;34.0.0 ndk;26.1.10909125'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
