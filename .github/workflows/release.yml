@@ -63,6 +63,13 @@ jobs:
             artifact-ext: deb
             artifact-name: amethyst-linux-deb
 
+          - os: ubuntu-latest
+            name: Linux Fedora RPM
+            task: packageReleaseRpm
+            artifact-dir: rpm
+            artifact-ext: rpm
+            artifact-name: amethyst-linux-fedora-rpm
+
 
     steps:
       - name: Checkout
@@ -118,7 +125,7 @@ jobs:
       - name: Install Linux native dependencies
         if: runner.os == 'Linux'
         shell: bash
-        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev
+        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev rpm
 
       - name: Build
         shell: bash
@@ -186,6 +193,7 @@ jobs:
             release-artifacts/release-assets-amethyst-macos-arm64/*.dmg
             release-artifacts/release-assets-amethyst-macos-amd64/*.dmg
             release-artifacts/release-assets-amethyst-linux-deb/*.deb
+            release-artifacts/release-assets-amethyst-linux-fedora-rpm/*.rpm
             release-artifacts/release-assets-amethyst-linux-appimage/*.AppImage
             release-artifacts/update-yml/*.yml
           fail_on_unmatched_files: false

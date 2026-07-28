@@ -214,7 +214,7 @@ nucleus.application {
         packageVersion = "1.0.0"
         homepage = "https://amethyst.anthonyhfm.dev"
 
-        targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.AppImage)
+        targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
 
         includeAllModules = true
 
