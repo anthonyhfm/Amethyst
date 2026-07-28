@@ -6,16 +6,27 @@ import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 
 class LaunchpadDeviceMiniMk3(
     connection: AmethystMidiDeviceConnection,
-) : LaunchpadDevice(connection) {
+    firmware: LaunchpadFirmware = LaunchpadFirmware.Original,
+) : LaunchpadDevice(connection, firmware) {
+    override fun prepareFastLedUpdates(
+        updates: List<RawLEDUpdate>,
+    ): List<RawLEDUpdate> = updates.filter(::isNineByNineFastLedPitch)
+
     override fun clear() { }
 
     override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
+        if (sendFastLedUpdates(updates)) return
+
         updates.chunked(78).forEach { chunked ->
             sendMidi(getEffectSysEx(chunked))
         }
     }
 
     override fun getEffectSysEx(updates: List<RawLEDUpdate>): ByteArray {
+        if (usesFastLedFormat) {
+            return getFastLedEffectSysEx(updates)
+        }
+
         return mutableListOf<Byte>().apply {
             addAll(arrayOf(240.toByte(), 0.toByte(), 32.toByte(), 41.toByte(), 2.toByte(), 13.toByte(), 3.toByte()))
 
@@ -36,16 +47,17 @@ class LaunchpadDeviceMiniMk3(
     }
 
     companion object {
+        private fun isNineByNineFastLedPitch(update: RawLEDUpdate): Boolean {
+            val pitch = update.index.toInt() and 0xFF
+            return pitch / 10 in 1..9 && pitch % 10 in 1..9
+        }
+
         @OptIn(ExperimentalUnsignedTypes::class)
         fun identify(inquiry: UByteArray): Boolean {
             if (inquiry.size > 18) return false
 
             try {
                 val cutdown = inquiry.copyOfRange(2, inquiry.lastIndex - 4)
-
-                println(inquiry.contentToString())
-
-                println(cutdown.contentEquals(ubyteArrayOf(0u, 6u, 2u, 0u, 32u, 41u, 19u, 1u, 0u, 0u)))
 
                 return cutdown.contentEquals(ubyteArrayOf(0u, 6u, 2u, 0u, 32u, 41u, 19u, 1u, 0u, 0u))
             } catch (e: Exception) {

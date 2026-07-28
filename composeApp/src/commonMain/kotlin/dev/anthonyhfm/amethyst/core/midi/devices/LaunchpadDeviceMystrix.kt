@@ -5,8 +5,9 @@ import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 
 class LaunchpadDeviceMystrix(
-    connection: AmethystMidiDeviceConnection
-) : LaunchpadDevice(connection) {
+    connection: AmethystMidiDeviceConnection,
+    firmware: LaunchpadFirmware = LaunchpadFirmware.Original,
+) : LaunchpadDevice(connection, firmware) {
     override fun clear() { }
 
     override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {

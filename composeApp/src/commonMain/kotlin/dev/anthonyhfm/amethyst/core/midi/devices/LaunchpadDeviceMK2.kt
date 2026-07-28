@@ -6,7 +6,12 @@ import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 
 class LaunchpadDeviceMK2(
     connection: AmethystMidiDeviceConnection,
-) : LaunchpadDevice(connection) {
+    firmware: LaunchpadFirmware = LaunchpadFirmware.Original,
+) : LaunchpadDevice(connection, firmware) {
+    override fun prepareFastLedUpdates(
+        updates: List<RawLEDUpdate>,
+    ): List<RawLEDUpdate> = updates.filter(::isNineByNineFastLedPitch)
+
     override fun clear() {
         val clearSysEx = byteArrayOf(240.toByte(), 0.toByte(), 32.toByte(), 41.toByte(), 2.toByte(), 24.toByte(), 14.toByte(), 0.toByte(), 247.toByte())
 
@@ -14,12 +19,18 @@ class LaunchpadDeviceMK2(
     }
 
     override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
+        if (sendFastLedUpdates(updates)) return
+
         updates.chunked(78).forEach { chunked ->
             sendMidi(getEffectSysEx(chunked))
         }
     }
 
     override fun getEffectSysEx(updates: List<RawLEDUpdate>): ByteArray {
+        if (usesFastLedFormat) {
+            return getFastLedEffectSysEx(updates)
+        }
+
         return mutableListOf<Byte>().apply {
             addAll(arrayOf(240.toByte(), 0.toByte(), 32.toByte(), 41.toByte(), 2.toByte(), 24.toByte(), 11.toByte()))
 
@@ -39,6 +50,11 @@ class LaunchpadDeviceMK2(
     }
 
     companion object {
+        private fun isNineByNineFastLedPitch(update: RawLEDUpdate): Boolean {
+            val pitch = update.index.toInt() and 0xFF
+            return pitch / 10 in 1..9 && pitch % 10 in 1..9
+        }
+
         @OptIn(ExperimentalUnsignedTypes::class)
         fun identify(inquiry: UByteArray): Boolean {
             if (inquiry.size > 18) return false

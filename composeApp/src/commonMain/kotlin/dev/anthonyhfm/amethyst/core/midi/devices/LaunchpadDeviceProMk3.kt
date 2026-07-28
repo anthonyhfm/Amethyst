@@ -6,7 +6,15 @@ import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 
 class LaunchpadDeviceProMk3(
     connection: AmethystMidiDeviceConnection,
-) : LaunchpadDevice(connection) {
+    firmware: LaunchpadFirmware = LaunchpadFirmware.Original,
+) : LaunchpadDevice(connection, firmware) {
+    override fun prepareFastLedUpdates(
+        updates: List<RawLEDUpdate>,
+    ): List<RawLEDUpdate> = updates.filter { update ->
+        val pitch = update.index.toInt() and 0xFF
+        (pitch in 1..99 && pitch != 9) || pitch in 101..107
+    }
+
     override fun clear() {
         val clearSysEx = byteArrayOf(0xF0.toByte(), 0x00.toByte(), 0x20.toByte(), 0x29.toByte(), 0x02.toByte(), 0x0E.toByte(), 0x03.toByte(), 0x00.toByte(), 0xF7.toByte())
 
@@ -14,18 +22,26 @@ class LaunchpadDeviceProMk3(
     }
 
     override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
-        updates.filter {
+        val updatesWithTopButtonMirrors = updates.filter {
             it.index in 1 until 8
         }.map {
             it.copy(
                 index = (100 + it.index).toByte()
             )
-        }.plus(updates).chunked(78).forEach { chunked ->
+        }.plus(updates)
+
+        if (sendFastLedUpdates(updatesWithTopButtonMirrors)) return
+
+        updatesWithTopButtonMirrors.chunked(78).forEach { chunked ->
             sendMidi(getEffectSysEx(chunked))
         }
     }
 
     override fun getEffectSysEx(updates: List<RawLEDUpdate>): ByteArray {
+        if (usesFastLedFormat) {
+            return getFastLedEffectSysEx(updates)
+        }
+
         return mutableListOf<Byte>().apply {
             addAll(arrayOf(240.toByte(), 0.toByte(), 32.toByte(), 41.toByte(), 2.toByte(), 14.toByte(), 3.toByte()))
 

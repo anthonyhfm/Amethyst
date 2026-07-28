@@ -33,6 +33,11 @@ data class AmethystMidiDeviceDetails(
     val type: LaunchpadDeviceType
 )
 
+data class LaunchpadDeviceIdentification(
+    val type: LaunchpadDeviceType,
+    val firmware: LaunchpadFirmware,
+)
+
 class AmethystMidiManager {
     private val midiAccess: AmethystMidiAccess? = platformMidiAccess
 
@@ -47,6 +52,7 @@ class AmethystMidiManager {
         val input: AmethystMidiInput?,
         val output: AmethystMidiOutput?,
         val detectedType: LaunchpadDeviceType?,
+        val detectedFirmware: LaunchpadFirmware,
         var friendlyName: String
     )
 
@@ -59,6 +65,7 @@ class AmethystMidiManager {
         stopAutoDetectLoop()
         midiInScope.cancel()
         activeConnections.values.forEach { conn ->
+            printConnectionState("Disconnected", conn)
             conn.input?.close()
             conn.output?.close()
         }
@@ -72,33 +79,67 @@ class AmethystMidiManager {
         LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 to { LaunchpadDeviceProMk3.identify(it) },
         LaunchpadDeviceType.LAUNCHPAD_X to { LaunchpadDeviceX.identify(it) },
         LaunchpadDeviceType.LAUNCHPAD_MINI_MK3 to { LaunchpadDeviceMiniMk3.identify(it) },
-        LaunchpadDeviceType.LAUNCHPAD_PRO_CFW to { LaunchpadDevicePro.identifyCFW(it) },
         LaunchpadDeviceType.LAUNCHPAD_PRO to { LaunchpadDevicePro.identify(it) },
         LaunchpadDeviceType.LAUNCHPAD_MK2 to { LaunchpadDeviceMK2.identify(it) },
         LaunchpadDeviceType.MYSTRIX to { LaunchpadDeviceMystrix.identify(it) },
     )
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun getDeviceTypeByInquiry(data: ByteArray): LaunchpadDeviceType? {
+    fun getDeviceIdentificationByInquiry(data: ByteArray): LaunchpadDeviceIdentification? {
         val convertedData = data.toUByteArray()
         val messageStart = convertedData.indexOf(240u)
-        val messageEnd = convertedData.indexOf(247u)
-
-        if (messageStart == -1 || messageEnd == -1) return null
+        if (messageStart == -1) return null
+        val messageEnd = (messageStart + 1 until convertedData.size)
+            .firstOrNull { convertedData[it] == 247.toUByte() }
+            ?: return null
 
         val sysex = convertedData.copyOfRange(messageStart, messageEnd + 1)
+        if (sysex.size <= 1 || sysex[1] != 126.toUByte()) return null
 
-        if (sysex.size > 1 && sysex[1] == 126.toUByte()) {
-            return inquiryTests.entries.find {
-                it.value(sysex)
-            }?.key
+        val type = inquiryTests.entries.firstOrNull { it.value(sysex) }?.key ?: return null
+        val revision = sysex.copyOfRange(sysex.lastIndex - 4, sysex.lastIndex)
+        return LaunchpadDeviceIdentification(type, identifyFirmware(type, revision))
+    }
+
+    fun getDeviceTypeByInquiry(data: ByteArray): LaunchpadDeviceType? {
+        return getDeviceIdentificationByInquiry(data)?.type
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    private fun identifyFirmware(
+        type: LaunchpadDeviceType,
+        revision: UByteArray,
+    ): LaunchpadFirmware {
+        // CoreFW's standard Device Inquiry marker is documented in references/firmware.md.
+        if (
+            type != LaunchpadDeviceType.MYSTRIX &&
+            revision.contentEquals(ubyteArrayOf(0u, 9u, 9u, 9u))
+        ) {
+            return LaunchpadFirmware.CoreFW
         }
 
-        return null
+        val isMat1jaczyyy = when (type) {
+            LaunchpadDeviceType.LAUNCHPAD_X ->
+                revision.contentEquals(ubyteArrayOf(0u, 3u, 5u, 2u))
+            LaunchpadDeviceType.LAUNCHPAD_MINI_MK3 ->
+                revision.contentEquals(ubyteArrayOf(0u, 4u, 0u, 8u))
+            LaunchpadDeviceType.LAUNCHPAD_MK2 ->
+                revision.contentEquals(ubyteArrayOf(0u, 1u, 7u, 2u))
+            LaunchpadDeviceType.LAUNCHPAD_PRO ->
+                revision.contentEquals(ubyteArrayOf(0u, 99u, 102u, 121u))
+            else -> false
+        }
+
+        return if (isMat1jaczyyy) {
+            LaunchpadFirmware.Mat1jaczyyy
+        } else {
+            LaunchpadFirmware.Original
+        }
     }
 
     private data class DetectedTypeAndPorts(
         val type: LaunchpadDeviceType,
+        val firmware: LaunchpadFirmware,
         val inputConnection: AmethystMidiInput,
         val outputConnection: AmethystMidiOutput
     )
@@ -123,9 +164,14 @@ class AmethystMidiManager {
                 val jobs = openedInputs.map { conn ->
                     CoroutineScope(Dispatchers.IO).launch {
                         conn.messages.collect { msg ->
-                            val type = getDeviceTypeByInquiry(msg)
-                            if (type != null && detected == null) {
-                                detected = DetectedTypeAndPorts(type, conn, outputConnection)
+                            val identification = getDeviceIdentificationByInquiry(msg)
+                            if (identification != null && detected == null) {
+                                detected = DetectedTypeAndPorts(
+                                    identification.type,
+                                    identification.firmware,
+                                    conn,
+                                    outputConnection,
+                                )
                             }
                         }
                     }
@@ -209,7 +255,7 @@ class AmethystMidiManager {
 
         if (input != null && output != null && type != null) {
             val conn = AmethystMidiDeviceConnection(active.device, input, output)
-            val launchpadDevice = type.mapLaunchpadDevice(conn)
+            val launchpadDevice = type.mapLaunchpadDevice(conn, active.detectedFirmware)
 
             val job = midiInScope.launch {
                 input.messages.collect { msg ->
@@ -294,12 +340,14 @@ class AmethystMidiManager {
         val access = midiAccess ?: return
         val discovered = access.discoverDevices()
         val discoveredIds = discovered.map { it.id }.toSet()
+        val connectedDevices = mutableListOf<ActiveDeviceConnection>()
 
         val deadDeviceIds = activeConnections.filter { it.value.input?.isOpen == false || it.value.output?.isOpen == false }.keys
         val disconnectedIds = activeConnections.keys.filter { it !in discoveredIds } + deadDeviceIds
         for (id in disconnectedIds.distinct()) {
             val conn = activeConnections.remove(id)
             if (conn != null) {
+                printConnectionState("Disconnected", conn)
                 conn.input?.close()
                 conn.output?.close()
                 Heaven.devices.forEach { element ->
@@ -321,17 +369,27 @@ class AmethystMidiManager {
                     input = detection.inputConnection,
                     output = detection.outputConnection,
                     detectedType = detection.type,
+                    detectedFirmware = detection.firmware,
                     friendlyName = detection.type.label
                 )
                 activeConnections[device.id] = conn
+                connectedDevices += conn
             }
         }
 
         updateDetectedDevicesList()
+        connectedDevices.forEach { printConnectionState("Connected", it) }
 
         for (conn in activeConnections.values) {
             autoConnectDevice(conn)
         }
+    }
+
+    private fun printConnectionState(
+        state: String,
+        connection: ActiveDeviceConnection,
+    ) {
+        println("[$state] ${connection.friendlyName} - ${connection.detectedFirmware.label}")
     }
 
     fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray) {
@@ -400,15 +458,17 @@ class AmethystMidiManager {
         }
     }
 
-    private fun LaunchpadDeviceType.mapLaunchpadDevice(connection: AmethystMidiDeviceConnection): LaunchpadDevice? {
+    private fun LaunchpadDeviceType.mapLaunchpadDevice(
+        connection: AmethystMidiDeviceConnection,
+        firmware: LaunchpadFirmware,
+    ): LaunchpadDevice {
         return when (this) {
-            LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 -> LaunchpadDeviceProMk3(connection)
-            LaunchpadDeviceType.LAUNCHPAD_X -> LaunchpadDeviceX(connection)
-            LaunchpadDeviceType.LAUNCHPAD_MINI_MK3 -> LaunchpadDeviceMiniMk3(connection)
-            LaunchpadDeviceType.LAUNCHPAD_PRO -> LaunchpadDevicePro(connection)
-            LaunchpadDeviceType.LAUNCHPAD_PRO_CFW -> LaunchpadDevicePro(connection, true)
-            LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(connection)
-            LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(connection)
+            LaunchpadDeviceType.LAUNCHPAD_PRO_MK3 -> LaunchpadDeviceProMk3(connection, firmware)
+            LaunchpadDeviceType.LAUNCHPAD_X -> LaunchpadDeviceX(connection, firmware)
+            LaunchpadDeviceType.LAUNCHPAD_MINI_MK3 -> LaunchpadDeviceMiniMk3(connection, firmware)
+            LaunchpadDeviceType.LAUNCHPAD_PRO -> LaunchpadDevicePro(connection, firmware)
+            LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(connection, firmware)
+            LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(connection, firmware)
         }
     }
 }
