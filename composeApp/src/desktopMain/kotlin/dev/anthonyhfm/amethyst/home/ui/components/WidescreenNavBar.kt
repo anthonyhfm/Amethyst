@@ -58,6 +58,8 @@ import dev.anthonyhfm.amethyst.ui.theme.large
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.ui.icons.AmethystIcons
+import dev.anthonyhfm.amethyst.ui.icons.filled.Saddam
 import io.github.kdroidfilter.nucleus.core.runtime.ExecutableRuntime
 import org.jetbrains.compose.resources.painterResource
 
@@ -67,7 +69,17 @@ fun WidescreenNavBar(
 ) {
     val current by navigator.currentBackStackEntryAsState()
     var currentNavigation: HomeNavRoute by remember { mutableStateOf(HomeNavRoute.Recent) }
+    var sidebarToggleCount by remember { mutableStateOf(0) }
+    var hasObservedInitialSidebarState by remember { mutableStateOf(false) }
     val sidebarState = LocalSidebarState.current
+
+    LaunchedEffect(sidebarState.expanded) {
+        if (hasObservedInitialSidebarState) {
+            sidebarToggleCount++
+        } else {
+            hasObservedInitialSidebarState = true
+        }
+    }
 
     LaunchedEffect(current) {
         currentNavigation = when (current?.destination?.route) {
@@ -185,6 +197,17 @@ fun WidescreenNavBar(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+        }
+
+        if (sidebarToggleCount >= 6) {
+            Icon(
+                imageVector = AmethystIcons.Filled.Saddam,
+                contentDescription = null,
+                tint = Theme[colors][foreground].copy(alpha = 0.08f),
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 100.dp, height = 24.dp),
+            )
         }
 
         SidebarSeparator(modifier = Modifier.alpha(0.75f))
