@@ -15,7 +15,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -52,10 +51,9 @@ class DrumGroupDeviceAdapter(
                                 val y: Int = 9 - xy / 10
 
                                 add(
-                                    CoordinateFilterChainDeviceState(
-                                        filters = listOf(
-                                            Pair(x + offset.x,  y + offset.y)
-                                        )
+                                    AbletonConverter.coordinateFilter(
+                                        launchpad = AbletonConverter.launchpadTarget(offset),
+                                        localCoordinates = listOf(Pair(x, y)),
                                     )
                                 )
 

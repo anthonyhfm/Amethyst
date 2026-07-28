@@ -25,7 +25,6 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -35,7 +34,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
-class AbletonArpeggiatorChainDevice : LEDChainDevice<AbletonArpeggiatorChainDeviceState>() {
+class AbletonArpeggiatorChainDevice : GenericChainDevice<AbletonArpeggiatorChainDeviceState>() {
     override val state = MutableStateFlow(AbletonArpeggiatorChainDeviceState())
 
     @Composable
@@ -47,7 +46,7 @@ class AbletonArpeggiatorChainDevice : LEDChainDevice<AbletonArpeggiatorChainDevi
             title = "Arpeggiator",
             isSelected = isSelected,
             isDragging = isDragging.value,
-            modifier = Modifier.width(240.dp),
+            modifier = Modifier.width(200.dp),
             titleBarModifier = LocalTitleBarModifier.current
         ) {
             Box(
@@ -65,51 +64,69 @@ class AbletonArpeggiatorChainDevice : LEDChainDevice<AbletonArpeggiatorChainDevi
         }
     }
 
-    override fun ledSignalEnter(n: List<Signal.LED>) {
-        Heaven.devices.forEach { device ->
-            val onDeviceSignals = n.filter {
-                val pos = device.position.value
+    override fun signalEnter(n: List<Signal>) {
+        n.forEach { signal ->
+            when (signal) {
+                is Signal.AudioSignal -> signalExit?.invoke(listOf(signal))
+                is Signal.LED, is Signal.Midi -> Heaven.devices.forEach deviceLoop@ { device ->
+                    val pos = device.position.value
+                    val (x, y) = when (signal) {
+                        is Signal.LED -> signal.x to signal.y
+                        is Signal.Midi -> signal.x to signal.y
+                        is Signal.AudioSignal -> error("Audio signals are handled before coordinate conversion")
+                    }
 
-                pos.x <= it.x && pos.x + device.layout.cols >= it.x && pos.y <= it.y && pos.y + device.layout.cols >= it.y
-            }
+                    if (pos.x > x || pos.x + device.layout.cols < x || pos.y > y || pos.y + device.layout.cols < y) {
+                        return@deviceLoop
+                    }
 
-            onDeviceSignals.forEach { signal ->
-                val pos = device.position.value
+                    val signalX = x - pos.x
+                    val signalY = y - pos.y
 
-                val signalX = signal.x - pos.x
-                val signalY = signal.y - pos.y
+                    val local = (signalX + ((9 - (signalY)) * 10)).toInt()
 
-                val local = (signalX + ((9 - (signalY)) * 10)).toInt()
+                    repeat(state.value.steps) { index ->
+                        Heaven.schedule(
+                            delayInMs = state.value.rate.toMsValue(WorkspaceRepository.bpm.value).toDouble() * index,
+                        ) {
+                            val drIndex: Int = XY_TO_DRUM_RACK[local] + index
 
-                repeat(state.value.steps) { index ->
-                    Heaven.schedule(
-                        delayInMs = state.value.rate.toMsValue(WorkspaceRepository.bpm.value).toDouble() * index,
-                    ) {
-                        val drIndex: Int = XY_TO_DRUM_RACK[local] + index
+                            val newX = DRUM_RACK_TO_XY[drIndex] % 10 + pos.x.toInt()
+                            val newY = 9 - DRUM_RACK_TO_XY[drIndex] / 10 + pos.y.toInt()
 
-                        val newX = DRUM_RACK_TO_XY[drIndex] % 10
-                        val newY = 9 - DRUM_RACK_TO_XY[drIndex] / 10
-
-                        signalExit?.invoke(
-                            listOf(
-                                signal.copy(
-                                    x = newX,
-                                    y = newY,
-                                    color = state.value.color?.let {
-                                        Color(
-                                            red = it.first,
-                                            green = it.second,
-                                            blue = it.second,
+                            signalExit?.invoke(
+                                listOf(
+                                    when (signal) {
+                                        is Signal.LED -> signal.copy(
+                                            x = newX,
+                                            y = newY,
+                                            color = state.value.color?.let {
+                                                Color(
+                                                    red = it.first,
+                                                    green = it.second,
+                                                    blue = it.second,
+                                                )
+                                            } ?: signal.color
                                         )
-                                    } ?: signal.color
+                                        is Signal.Midi -> signal.copy(x = newX, y = newY)
+                                        is Signal.AudioSignal -> error("Audio signals are handled before coordinate conversion")
+                                    }
                                 )
                             )
-                        )
 
-                        Heaven.schedule(
-                            delayInMs = (state.value.rate.toMsValue(WorkspaceRepository.bpm.value).toDouble() * (state.value.gate / 100f)),
-                        ) {
-                            signalExit?.invoke(listOf(signal.copy(x = newX, y = newY, color = Color.Black)))
+                            Heaven.schedule(
+                                delayInMs = (state.value.rate.toMsValue(WorkspaceRepository.bpm.value).toDouble() * (state.value.gate / 100f)),
+                            ) {
+                                signalExit?.invoke(
+                                    listOf(
+                                        when (signal) {
+                                            is Signal.LED -> signal.copy(x = newX, y = newY, color = Color.Black)
+                                            is Signal.Midi -> signal.copy(x = newX, y = newY, velocity = 0)
+                                            is Signal.AudioSignal -> error("Audio signals are handled before coordinate conversion")
+                                        }
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -133,4 +150,3 @@ data class AbletonArpeggiatorChainDeviceState(
     val color: Triple<Float, Float, Float>? = null,
     val gate: Float = 50f // ableton handles this differently
 ) : DeviceState()
-

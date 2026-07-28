@@ -66,7 +66,7 @@ class Resonator3Adapter(
 
         val gradientEnabled: Boolean = parameters.getEnumValue(if (isUpdatedVersion) 1 else 24) == 1
 
-        val colorCount = parameters.getIntValue(if (isUpdatedVersion) 2 else 16).coerceIn(1, 16) - 1
+        val colorCount = parameters.getIntValue(if (isUpdatedVersion) 2 else 17).coerceIn(1, 16) - 1
 
         val gradientColors: List<Int> = run {
             val ids = if (isUpdatedVersion) {

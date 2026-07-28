@@ -59,7 +59,7 @@ class MidiLauncherProAdapter(
             data = data,
             palette = palette,
             bpm = AbletonConverter.bpm,
-            xyOffset = offset
+            launchpad = AbletonConverter.launchpadTarget(offset).midiImportTarget(),
         )
 
         keyframes = keyframes.copy(

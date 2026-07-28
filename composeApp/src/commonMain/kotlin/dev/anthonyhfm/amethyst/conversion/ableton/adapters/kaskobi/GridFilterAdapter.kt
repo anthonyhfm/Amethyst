@@ -1,9 +1,9 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
 import androidx.compose.ui.unit.IntOffset
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -15,14 +15,15 @@ class GridFilterAdapter(
         val data = jsonDecoder.decodeFromString<GridFilterData>(blob)
 
         return listOf(
-            CoordinateFilterChainDeviceState(
-                filters = data.matrixctrl.chunked(3).map { list ->
+            AbletonConverter.coordinateFilter(
+                launchpad = AbletonConverter.launchpadTarget(offset),
+                localCoordinates = data.matrixctrl.chunked(3).map { list ->
                     // For some reason, the third data block is always "1.0". Maybe it has something to do with the color in max or some shit
                     val x = list[0].toInt()
                     val y = list[1].toInt()
 
-                    Pair(x + offset.x, y + offset.y)
-                }
+                    Pair(x, y)
+                },
             )
         )
     }

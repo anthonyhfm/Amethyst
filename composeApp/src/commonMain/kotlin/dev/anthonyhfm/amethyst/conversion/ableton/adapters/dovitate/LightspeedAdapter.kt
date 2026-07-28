@@ -7,7 +7,6 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceFileDropList
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
@@ -51,13 +50,11 @@ class LightspeedAdapter(
                             name = "Lightspeed Entry",
                             stateChain = StateChain(
                                 devices = listOfNotNull(
-                                    CoordinateFilterChainDeviceState(
-                                        filters = listOf(
-                                            Pair(
-                                                first = index % 10,
-                                                second = 9 - index / 10
-                                            )
-                                        )
+                                    AbletonConverter.coordinateFilter(
+                                        launchpad = AbletonConverter.launchpadTarget(offset),
+                                        localCoordinates = listOf(
+                                            Pair(index % 10, 9 - index / 10),
+                                        ),
                                     ),
                                     getKeyframesFromFileDrop(it)
                                 )
@@ -88,8 +85,7 @@ class LightspeedAdapter(
             data = data,
             palette = palette,
             bpm = AbletonConverter.bpm,
-            xyOffset = offset
+            launchpad = AbletonConverter.launchpadTarget(offset).midiImportTarget(),
         )
     }
 }
-

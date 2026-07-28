@@ -16,11 +16,34 @@ import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.milliseconds
 
 object MidiFileImporter {
-    fun loadData(
+    internal data class DeviceTarget(
+        val launchpadId: String,
+        val offset: IntOffset,
+    ) {
+        fun keyframesEntry(
+            localX: Int,
+            localY: Int,
+            r: Float,
+            g: Float,
+            b: Float,
+        ): KeyframesChainDeviceContract.KeyframesEntry =
+            KeyframesChainDeviceContract.KeyframesEntry(
+                x = localX + offset.x,
+                y = localY + offset.y,
+                r = r,
+                g = g,
+                b = b,
+                launchpadId = launchpadId,
+                localX = localX,
+                localY = localY,
+            )
+    }
+
+    internal fun loadData(
         data: ByteArray,
         bpm: Double = 120.0,
         palette: Array<Triple<Int, Int, Int>> = Palettes.novation,
-        xyOffset: IntOffset = IntOffset.Zero
+        launchpad: DeviceTarget,
     ): KeyframesChainDeviceContract.KeyframesChainDeviceState {
         var offset = 0
 
@@ -160,20 +183,24 @@ object MidiFileImporter {
 
                     if (pitch in 0 until DRUM_RACK_TO_XY.size) {
                         val xy = DRUM_RACK_TO_XY[pitch]
-                        val x = (xy % 10) + xyOffset.x
-                        val y = (9 - (xy / 10)) + xyOffset.y
+                        val localX = xy % 10
+                        val localY = 9 - (xy / 10)
 
-                        val filtered = currentFrame.entries.filterNot { it.x == x && it.y == y }
+                        val filtered = currentFrame.entries.filterNot {
+                            it.launchpadId == launchpad.launchpadId &&
+                                it.localX == localX &&
+                                it.localY == localY
+                        }
                         val updatedEntries =
                             if (noteOn) {
                                 val idx = velocity.coerceIn(0, palette.size - 1)
                                 val triple = palette[idx]
-                                filtered + KeyframesChainDeviceContract.KeyframesEntry(
-                                    x = x,
-                                    y = y,
+                                filtered + launchpad.keyframesEntry(
+                                    localX = localX,
+                                    localY = localY,
                                     r = triple.first / 63f,
                                     g = triple.second / 63f,
-                                    b = triple.third / 63f
+                                    b = triple.third / 63f,
                                 )
                             } else {
                                 filtered

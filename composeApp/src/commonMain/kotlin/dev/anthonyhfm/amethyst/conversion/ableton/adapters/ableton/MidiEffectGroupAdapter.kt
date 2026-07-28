@@ -10,12 +10,12 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.MultiAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonPageIndexing
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
-import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
@@ -41,6 +41,15 @@ class MidiEffectGroupAdapter(
                 it.branchSelectorRange.min.value > 0 || it.branchSelectorRange.max.value > 0
             }
         )
+
+        val pageSelectorOffset = if (hasPageSwitching) {
+            AbletonPageIndexing.sourceOffset(
+                chainDepth = chainDepth,
+                selectorMinimum = device.chainSelector.midiControllerRange?.min?.value,
+            )
+        } else {
+            0
+        }
 
         val groups = mutableListOf<Group>()
 
@@ -69,8 +78,14 @@ class MidiEffectGroupAdapter(
                     },
                     stateChain = StateChain(
                         devices = mutableListOf<DeviceState>().apply {
-                            val minMacro = branch.branchSelectorRange.min.value
-                            val maxMacro = branch.branchSelectorRange.max.value
+                            val minMacro = AbletonPageIndexing.normalizeSelectorValue(
+                                value = branch.branchSelectorRange.min.value,
+                                sourceOffset = pageSelectorOffset,
+                            )
+                            val maxMacro = AbletonPageIndexing.normalizeSelectorValue(
+                                value = branch.branchSelectorRange.max.value,
+                                sourceOffset = pageSelectorOffset,
+                            )
 
                             val minKey = branch.zoneSettings.keyRange.min.value
                             val maxKey = branch.zoneSettings.keyRange.max.value
@@ -106,8 +121,9 @@ class MidiEffectGroupAdapter(
 
                             if (maxKey - minKey != 127 || minKey == maxKey) {
                                 add(
-                                    CoordinateFilterChainDeviceState(
-                                        filters = IntArray(maxKey + 1 - minKey) {
+                                    AbletonConverter.coordinateFilter(
+                                        launchpad = AbletonConverter.launchpadTarget(offset),
+                                        localCoordinates = IntArray(maxKey + 1 - minKey) {
                                             minKey + it
                                         }.map {
                                             val xy = DRUM_RACK_TO_XY[it]
@@ -115,8 +131,8 @@ class MidiEffectGroupAdapter(
                                             val x: Int = xy % 10
                                             val y: Int = xy / 10
 
-                                            Pair(x + offset.x,  (9 - y) + offset.y)
-                                        }
+                                            Pair(x, 9 - y)
+                                        },
                                     )
                                 )
                             }
@@ -236,10 +252,9 @@ class MidiEffectGroupAdapter(
                                                 name = "Page ${i + 1}",
                                                 stateChain = StateChain(
                                                     devices = listOf(
-                                                        CoordinateFilterChainDeviceState(
-                                                            filters = listOf(
-                                                                Pair(9 + offset.x, (1 + i) + offset.y)
-                                                            )
+                                                        AbletonConverter.coordinateFilter(
+                                                            launchpad = AbletonConverter.launchpadTarget(offset),
+                                                            localCoordinates = listOf(Pair(9, 1 + i)),
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,
@@ -262,10 +277,9 @@ class MidiEffectGroupAdapter(
                                                 name = "Page ${9 + i}",
                                                 stateChain = StateChain(
                                                     devices = listOf(
-                                                        CoordinateFilterChainDeviceState(
-                                                            filters = listOf(
-                                                                Pair(0 + offset.x, (1 + i) + offset.y)
-                                                            )
+                                                        AbletonConverter.coordinateFilter(
+                                                            launchpad = AbletonConverter.launchpadTarget(offset),
+                                                            localCoordinates = listOf(Pair(0, 1 + i)),
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,

@@ -1,11 +1,15 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Timer
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
+import dev.anthonyhfm.amethyst.ui.components.DialType
 import kotlinx.serialization.Serializable
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -24,6 +28,8 @@ object FrameLimitNode : TransformNode() {
     override val label = "Frame Limit"
     override val icon = Lucide.Timer
     override val pickerCategory = CompositionNodePickerCategory.Time
+    override val bodyHeight: Dp = 128.dp
+    override val bodyWidth: Dp = 128.dp
 
     override fun defaultState() = FrameLimitNodeState()
 
@@ -49,16 +55,18 @@ object FrameLimitNode : TransformNode() {
         val state = node.state as? FrameLimitNodeState ?: return
 
         NodeControls {
-            AutomatableSlider(
+            AutomatableDial(
                 parameterId = "frames",
-                label = "Frames per cycle",
-                value = state.frames.toFloat(),
-                range = 1f..120f,
+                type = DialType.Steps(values = (1..120).toList()),
+                value = state.frames,
+                defaultValue = 0,
+                title = "FPS",
+                text = "${state.frames} FPS",
                 onValueChange = {
                     onNodeChange(
                         node.copy(
                             state = state.copy(
-                                frames = it.roundToInt(),
+                                frames = it,
                             )
                         )
                     )

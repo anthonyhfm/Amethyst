@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
@@ -516,9 +517,17 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     if (file == null) return@runBlocking
 
                     try {
+                        val launchpad = Heaven.devices.firstOrNull() ?: return@runBlocking
                         val data = MidiFileImporter.loadData(
                             data = file.readBytes(),
-                            bpm = WorkspaceRepository.bpm.value
+                            bpm = WorkspaceRepository.bpm.value,
+                            launchpad = MidiFileImporter.DeviceTarget(
+                                launchpadId = launchpad.launchpadId,
+                                offset = IntOffset(
+                                    x = launchpad.position.value.x.toInt(),
+                                    y = launchpad.position.value.y.toInt(),
+                                ),
+                            ),
                         )
 
                         this@KeyframesChainDevice.state.update {
@@ -657,11 +666,17 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     fun refreshVirtualDevices() {
-        Heaven.clear()
-
-        Heaven.midiEnter(
-            state.value.frames[state.value.currentFrameIndex].entries.mapNotNull { it.resolveToSignal(Color(it.r, it.g, it.b)) }
-        )
+        Heaven.clear {
+            if (WorkspaceRepository.mode.value === customMode) {
+                val currentFrame = state.value.frames.getOrNull(state.value.currentFrameIndex)
+                    ?: return@clear
+                Heaven.midiEnter(
+                    currentFrame.entries.mapNotNull {
+                        it.resolveToSignal(Color(it.r, it.g, it.b))
+                    }
+                )
+            }
+        }
     }
 
     fun renderAnimation() {

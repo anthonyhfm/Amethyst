@@ -22,10 +22,11 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
-import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
+import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
@@ -33,6 +34,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScaleToFit
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadIdealised
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
@@ -44,11 +46,16 @@ import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
-import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadIdealised
 
 class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDeviceState>() {
     override val state = MutableStateFlow(CoordinateFilterChainDeviceState())
@@ -57,6 +64,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     private val customMode: CoordinateFilterWorkspaceMode = CoordinateFilterWorkspaceMode()
     private val dragVisitedPads: MutableSet<LaunchpadPadFilter> = mutableSetOf()
     private var dragRemoveMode: Boolean = false
+    private val stateObserverScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     init {
         customMode.modeClose = {
@@ -77,6 +85,18 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
 
         customMode.modeWakeup = {
             refreshVirtualDevices()
+        }
+
+        stateObserverScope.launch {
+            state
+                .map { it.filters to it.padFilters }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect {
+                    if (WorkspaceRepository.mode.value === customMode) {
+                        refreshVirtualDevices()
+                    }
+                }
         }
     }
 
@@ -231,27 +251,9 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         }
 
         pushStateChange(stateBefore, state.value)
-
-        if (WorkspaceRepository.mode.value is CoordinateFilterWorkspaceMode) {
-            val globalX = localX + device.position.value.x.toInt()
-            val globalY = localY + device.position.value.y.toInt()
-            Heaven.midiEnter(
-                listOf(
-                    Signal.LED(
-                        origin = this,
-                        x = globalX,
-                        y = globalY,
-                        color = if (enabled) Color.Green else Color.Black,
-                        layer = 0
-                    )
-                )
-            )
-        }
     }
 
     fun refreshVirtualDevices() {
-        Heaven.clear()
-
         val signals = if (state.value.padFilters.isNotEmpty()) {
             state.value.padFilters.mapNotNull { filter ->
                 val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
@@ -270,7 +272,11 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
             }
         }
 
-        Heaven.midiEnter(signals)
+        Heaven.clear {
+            if (WorkspaceRepository.mode.value === customMode) {
+                Heaven.midiEnter(signals)
+            }
+        }
     }
 
     fun onSetKeyFilter(device: LaunchpadViewportElement, localX: Int, localY: Int) {
@@ -328,4 +334,3 @@ data class CoordinateFilterChainDeviceState(
     val filters: List<Pair<Int, Int>> = emptyList(),
     val padFilters: List<LaunchpadPadFilter> = emptyList()
 ) : DeviceState()
-

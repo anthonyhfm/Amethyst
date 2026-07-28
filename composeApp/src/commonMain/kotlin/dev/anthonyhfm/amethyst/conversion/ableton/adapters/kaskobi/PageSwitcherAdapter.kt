@@ -1,10 +1,10 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
 import androidx.compose.ui.unit.IntOffset
+import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
-import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
@@ -35,10 +35,9 @@ class PageSwitcherAdapter(
                                                     name = "Page ${i + 1}",
                                                     stateChain = StateChain(
                                                         devices = listOf(
-                                                            CoordinateFilterChainDeviceState(
-                                                                filters = listOf(
-                                                                    Pair(9 + offset.x, 1 + i + offset.y)
-                                                                )
+                                                            AbletonConverter.coordinateFilter(
+                                                                launchpad = AbletonConverter.launchpadTarget(offset),
+                                                                localCoordinates = listOf(Pair(9, 1 + i)),
                                                             ),
                                                             MacroControlChainDeviceState(
                                                                 macro = 0,
@@ -61,10 +60,9 @@ class PageSwitcherAdapter(
                                                     name = "Page ${9 + i}",
                                                     stateChain = StateChain(
                                                         devices = listOf(
-                                                            CoordinateFilterChainDeviceState(
-                                                                filters = listOf(
-                                                                    Pair(0 + offset.x, 1 + i + offset.y)
-                                                                )
+                                                            AbletonConverter.coordinateFilter(
+                                                                launchpad = AbletonConverter.launchpadTarget(offset),
+                                                                localCoordinates = listOf(Pair(0, 1 + i)),
                                                             ),
                                                             MacroControlChainDeviceState(
                                                                 macro = 0,

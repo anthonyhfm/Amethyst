@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonMidiControllerRange
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AutomationTarget
@@ -101,6 +102,8 @@ data class InstrumentGroupDevice(
     data class ChainSelector(
         @XmlElement
         val keyMidi: ChainSelector.KeyMidi? = null,
+        @XmlElement
+        val midiControllerRange: AbletonMidiControllerRange? = null,
         @XmlElement
         @XmlSerialName("AutomationTarget")
         val automationTarget: AutomationTarget? = null

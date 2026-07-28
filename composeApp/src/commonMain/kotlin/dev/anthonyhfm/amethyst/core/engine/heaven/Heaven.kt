@@ -412,7 +412,7 @@ object Heaven {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun clear() {
+    fun clear(afterClear: (() -> Unit)? = null) {
         synchronized(schedulerMutationLock) {
             globalGeneration.incrementAndGet()
             synchronized(ownerGenerationLock) {
@@ -430,6 +430,7 @@ object Heaven {
 
             lastRenderNanos = -1L
             renderAtNanos = -1L
+            afterClear?.invoke()
         }
     }
 

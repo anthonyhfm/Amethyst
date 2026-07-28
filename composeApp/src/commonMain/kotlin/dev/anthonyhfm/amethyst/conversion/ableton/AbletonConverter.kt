@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.conversion.ableton
 
-import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceInstrumentAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
@@ -23,6 +22,7 @@ import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -57,6 +57,9 @@ object AbletonConverter : AmethystConverter {
         private set
 
     var projectLayout: AbletonLayout? = null
+        private set
+
+    internal var launchpadLayout: AbletonLaunchpadLayout? = null
         private set
 
     var palette: Array<Triple<Int, Int, Int>> = Palettes.novation
@@ -253,6 +256,11 @@ object AbletonConverter : AmethystConverter {
 
         bpm = abletonData.liveSet.masterTrack.deviceChain.mixer.tempo.manual.value
         projectLayout = layout
+        val launchpadLayout = AbletonLaunchpadLayout.create(
+            count = if (layout is AbletonLayout.Single) 1 else 2,
+        )
+        this.launchpadLayout = launchpadLayout
+        val leftLaunchpadOffset = launchpadLayout.target(index = 0).offset
 
         liveVersion = when {
             abletonData.minorVersion.startsWith("9") -> LiveVersion.LIVE_9
@@ -279,11 +287,13 @@ object AbletonConverter : AmethystConverter {
         reporter?.update(0.78f, statusText = analyzingLightsMsg, detailText = null)
 
         if (layout is AbletonLayout.Dual2Light) {
-            layout.lightsLeft?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, IntOffset.Zero) }
-            layout.lightsRight?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, IntOffset(x = 10, y = 0)) }
+            layout.lightsLeft?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, leftLaunchpadOffset) }
+            layout.lightsRight?.let {
+                Dual2LightLayoutScanner.scanTrackForMixer(it, launchpadLayout.target(index = 1).offset)
+            }
         }
 
-        val lights = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
+        val rawLights = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
             StateChain(
                 devices = listOf(
                     GroupChainDeviceState(
@@ -292,14 +302,14 @@ object AbletonConverter : AmethystConverter {
                                 Group(
                                     name = "Left",
                                     stateChain = layout.lightsLeft?.let {
-                                        MidiChainReader()
+                                        MidiChainReader(offset = leftLaunchpadOffset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
                                     stateChain = layout.lightsRight?.let {
-                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
+                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 )
@@ -309,21 +319,24 @@ object AbletonConverter : AmethystConverter {
                                 Group(
                                     name = "Left",
                                     stateChain = layout.lightsLeft?.let {
-                                        MidiChainReader()
+                                        MidiChainReader(offset = leftLaunchpadOffset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Left to Right",
                                     stateChain = layout.lightsLeftToRight?.let {
-                                        MidiChainReader(outputOffset = IntOffset(x = 10, y = 0))
+                                        MidiChainReader(
+                                            offset = leftLaunchpadOffset,
+                                            outputOffset = launchpadLayout.offsetBetween(fromIndex = 0, toIndex = 1),
+                                        )
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
                                     stateChain = layout.lightsRight?.let {
-                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
+                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 ),
@@ -331,8 +344,8 @@ object AbletonConverter : AmethystConverter {
                                     name = "Right to Left",
                                     stateChain = layout.lightsRightToLeft?.let {
                                         MidiChainReader(
-                                            offset = IntOffset(x = 10, y = 0),
-                                            outputOffset = IntOffset(x = -10, y = 0)
+                                            offset = launchpadLayout.target(index = 1).offset,
+                                            outputOffset = launchpadLayout.offsetBetween(fromIndex = 1, toIndex = 0),
                                         )
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
@@ -343,10 +356,12 @@ object AbletonConverter : AmethystConverter {
                 )
             )
         } else {
-            (layout as AbletonLayout.Single).lightsTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+            (layout as AbletonLayout.Single).lightsTrack?.let {
+                MidiChainReader(offset = leftLaunchpadOffset).readMidiChain(it)
+            } ?: StateChain(emptyList())
         }
 
-        val samples = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
+        val rawSamples = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
             StateChain(
                 devices = listOf(
                     GroupChainDeviceState(
@@ -355,14 +370,14 @@ object AbletonConverter : AmethystConverter {
                                 Group(
                                     name = "Left",
                                     stateChain = layout.audioLeft?.let {
-                                        MidiChainReader()
+                                        MidiChainReader(offset = leftLaunchpadOffset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
                                     stateChain = layout.audioRight?.let {
-                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
+                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 )
@@ -372,14 +387,14 @@ object AbletonConverter : AmethystConverter {
                                 Group(
                                     name = "Left",
                                     stateChain = layout.audioLeft?.let {
-                                        MidiChainReader()
+                                        MidiChainReader(offset = leftLaunchpadOffset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 ),
                                 Group(
                                     name = "Right",
                                     stateChain = layout.audioRight?.let {
-                                        MidiChainReader(offset = IntOffset(x = 10, y = 0))
+                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
                                             .readMidiChain(it)
                                     } ?: StateChain(emptyList())
                                 )
@@ -389,7 +404,9 @@ object AbletonConverter : AmethystConverter {
                 )
             )
         } else {
-            (layout as AbletonLayout.Single).audioTrack?.let { MidiChainReader().readMidiChain(it) } ?: StateChain(emptyList())
+            (layout as AbletonLayout.Single).audioTrack?.let {
+                MidiChainReader(offset = leftLaunchpadOffset).readMidiChain(it)
+            } ?: StateChain(emptyList())
         }
 
         audioMap = emptyMap()
@@ -399,33 +416,29 @@ object AbletonConverter : AmethystConverter {
 
         return SavableWorkspaceData(
             title = name,
-            lights = lights,
-            sampling = samples,
+            lights = rawLights,
+            sampling = rawSamples,
             autoPlay = autoPlayData,
             settings = WorkspaceSettings(
                 bpm = bpm
             ),
-            launchpadDevices = if (layout is AbletonLayout.Single) {
-                listOf(
-                    SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
-                        positionX = 0f,
-                        positionY = 0f
-                    )
-                )
-            } else {
-                listOf(
-                    SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
-                        positionX = 0f,
-                        positionY = 0f
-                    ),
-                    SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
-                        positionX = 10f,
-                        positionY = 0f
-                    )
-                )
-            }
-        )
+            launchpadDevices = launchpadLayout.launchpads,
+        ).also {
+            this.launchpadLayout = null
+        }
     }
+
+    internal fun launchpadTarget(offset: androidx.compose.ui.unit.IntOffset): AbletonLaunchpadLayout.Target =
+        checkNotNull(launchpadLayout) { "Ableton launchpads must be allocated before converting devices" }
+            .targetAt(offset)
+
+    internal fun coordinateFilter(
+        launchpad: AbletonLaunchpadLayout.Target,
+        localCoordinates: List<Pair<Int, Int>>,
+    ): CoordinateFilterChainDeviceState =
+        CoordinateFilterChainDeviceState(
+            padFilters = localCoordinates.map { (x, y) -> launchpad.padFilter(x, y) },
+        )
 
     enum class LiveVersion {
         LIVE_12,
