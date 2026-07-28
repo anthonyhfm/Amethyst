@@ -57,6 +57,7 @@ import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -86,6 +87,15 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
         val gradientSteps: Int?
     )
 
+    /**
+     * Keep the signature and its immutable result in one atomic value. MIDI events are handled
+     * concurrently, so updating these as separate fields could expose a mismatched pair.
+     */
+    private data class FadeCacheEntry(
+        val signature: FadeSignature,
+        val fade: List<FadeInfo>
+    )
+
     private data class GradientRunKey(
         val origin: Any?,
         val x: Int,
@@ -94,11 +104,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
         val blendingMode: Signal.LED.BlendingMode
     )
 
-    private var cachedFadeSignature: FadeSignature? = null
-    private var cachedFade: List<FadeInfo> = emptyList()
-    private val colorStepBuffer = mutableListOf<Color>()
-    private val stepCountBuffer = mutableListOf<Int>()
-    private val cutoffBuffer = mutableListOf<Int>()
+    private val fadeCache = atomic<FadeCacheEntry?>(null)
     private val activeRunTokens = mutableMapOf<GradientRunKey, Long>()
     private var nextRunToken = 0L
 
@@ -738,13 +744,14 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
     }
 
     private fun generateFade(): List<FadeInfo> {
+        val deviceState = state.value
         val samplingFps = resolvedSamplingFps()
         val frameTime = 1000.0 / samplingFps
         val bpm = WorkspaceRepository.bpm.value
-        val totalTime = state.value.timing.toMsValue(bpm) * (state.value.gate * 2)
-        val manualSteps = state.value.gradientSteps // null = INF (auto), 2-16 = manual step count
+        val totalTime = deviceState.timing.toMsValue(bpm) * (deviceState.gate * 2)
+        val manualSteps = deviceState.gradientSteps // null = INF (auto), 2-16 = manual step count
 
-        val gradientData = state.value.gradientData.sortedBy { it.position }
+        val gradientData = deviceState.gradientData.sortedBy { it.position }
 
         if (gradientData.size < 2) return emptyList()
 
@@ -754,11 +761,11 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             },
             fps = samplingFps,
             totalTimeBits = totalTime.toDouble().toBits(),
-            gradientSteps = state.value.gradientSteps
+            gradientSteps = manualSteps
         )
-        cachedFadeSignature?.let { cachedSig ->
-            if (cachedSig == signature) return cachedFade
-        }
+        fadeCache.value
+            ?.takeIf { it.signature == signature }
+            ?.let { return it.fade }
 
         // Handle manualSteps (discrete steps generated overall in the device)
         if (manualSteps != null && manualSteps in 2..16) {
@@ -776,14 +783,14 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
             } else {
                 fade.add(FadeInfo(Color(lastColor.r, lastColor.g, lastColor.b), totalTime.toDouble()))
             }
-            cachedFadeSignature = signature
-            cachedFade = fade
-            return fade
+            return publishFade(signature, fade)
         }
 
-        colorStepBuffer.clear()
-        stepCountBuffer.clear()
-        cutoffBuffer.clear()
+        // These buffers deliberately stay local. Multiple MIDI events can generate fades at the
+        // same time, and sharing mutable lists here caused reads of cleared ArrayList slots.
+        val colorStepBuffer = mutableListOf<Color>()
+        val stepCountBuffer = mutableListOf<Int>()
+        val cutoffBuffer = mutableListOf<Int>()
         cutoffBuffer.add(0)
 
         for (i in 0 until gradientData.size - 1) {
@@ -876,10 +883,14 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
 
         fade.add(FadeInfo(colorStepBuffer.last(), totalTime.toDouble()))
 
-        cachedFadeSignature = signature
-        cachedFade = fade
+        return publishFade(signature, fade)
+    }
 
-        return fade
+    private fun publishFade(signature: FadeSignature, fade: List<FadeInfo>): List<FadeInfo> {
+        // Publish an immutable snapshot so callers and the cache never share mutable state.
+        val immutableFade = fade.toList()
+        fadeCache.value = FadeCacheEntry(signature, immutableFade)
+        return immutableFade
     }
 
     private fun scheduleFadeStep(
