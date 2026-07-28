@@ -51,7 +51,8 @@ fun DeviceSettingsDialog(
 
     var selectedDevice: AmethystMidiDeviceDetails? by remember(uuid, device, devices) {
         mutableStateOf(
-            devices.firstOrNull { it.id == device?.savedInputPortId }
+            devices.firstOrNull { it.id == device?.savedMidiDeviceId }
+                ?: devices.firstOrNull { it.id == device?.savedInputPortId }
                 ?: devices.firstOrNull { it.friendlyName == device?.savedInputPortName }
         )
     }
@@ -94,7 +95,7 @@ fun DeviceSettingsDialog(
                 AlertDialogAction(
                     onClick = {
                         if (WorkspaceRepository.mode.value is LayoutWorkspaceMode) {
-                            AmethystMidiManager().changeDeviceConfig(uuid, selectedDevice?.id)
+                            WorkspaceRepository.changeMidiDeviceConfig(uuid, selectedDevice?.id)
                         }
                         WorkspaceRepository.closeDeviceConfigurator()
                     },
@@ -125,7 +126,7 @@ fun DeviceSettingsDialog(
                 AlertDialogAction(
                     onClick = {
                         if (WorkspaceRepository.mode.value is LayoutWorkspaceMode) {
-                            AmethystMidiManager().changeDeviceConfig(uuid, selectedDevice?.id)
+                            WorkspaceRepository.changeMidiDeviceConfig(uuid, selectedDevice?.id)
                         }
                         WorkspaceRepository.closeDeviceConfigurator()
                     },

@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PolyphaseSincResampler
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
+import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import kotlinx.atomicfu.AtomicLongArray
@@ -31,10 +32,11 @@ internal class SampleRenderSnapshot private constructor(
         get() = endFrame - startFrame
 
     companion object {
-        fun from(
+        fun prepareSource(
             state: SampleChainDeviceState,
+            outputSampleRate: Int,
             rawData: ByteArray? = state.resolvedRawData(),
-        ): SampleRenderSnapshot? {
+        ): ByteArrayPcmAudioSource? {
             rawData ?: return null
             val bytesPerSample = state.bitDepth / 8
             val bytesPerFrame = bytesPerSample * state.channels
@@ -48,14 +50,61 @@ internal class SampleRenderSnapshot private constructor(
             ) {
                 return null
             }
-            val source = ByteArrayPcmAudioSource(
+            val original = ByteArrayPcmAudioSource(
                 id = state.fileName.ifBlank { "sample" },
                 sampleRate = state.sampleRate,
                 channels = state.channels,
                 bitDepth = state.bitDepth,
                 rawData = rawData,
             )
+            if (state.sampleRate == outputSampleRate) return original
 
+            val outputFrames = (
+                original.frameCount.toDouble() * outputSampleRate / original.sampleRate
+                ).toLong().coerceAtLeast(1L)
+            require(outputFrames <= Int.MAX_VALUE / (state.channels * 3)) {
+                "Prepared sample is too large"
+            }
+            val preparedBytes = ByteArray(outputFrames.toInt() * state.channels * 3)
+            val frame = FloatArray(state.channels)
+            val resampler = PolyphaseSincResampler(
+                sourceRate = original.sampleRate,
+                outputRate = outputSampleRate,
+                channels = original.channels,
+            )
+            var outputFrame = 0
+            while (outputFrame < outputFrames.toInt()) {
+                resampler.readFrame(
+                    source = original,
+                    destination = frame,
+                    lowerBoundFrame = 0L,
+                    upperBoundFrameExclusive = original.frameCount,
+                )
+                var channel = 0
+                while (channel < state.channels) {
+                    writePcm24(
+                        destination = preparedBytes,
+                        sampleIndex = outputFrame * state.channels + channel,
+                        sample = frame[channel],
+                    )
+                    channel++
+                }
+                resampler.advance()
+                outputFrame++
+            }
+            return ByteArrayPcmAudioSource(
+                id = original.id,
+                sampleRate = outputSampleRate,
+                channels = original.channels,
+                bitDepth = 24,
+                rawData = preparedBytes,
+            )
+        }
+
+        fun from(
+            state: SampleChainDeviceState,
+            source: ByteArrayPcmAudioSource,
+        ): SampleRenderSnapshot? {
             val startFrame = (source.frameCount * state.startPosition)
                 .toLong()
                 .coerceIn(0, source.frameCount)
@@ -84,6 +133,23 @@ internal class SampleRenderSnapshot private constructor(
                             it.target == TimelineTrackAutomationTarget.VOLUME
                     },
             )
+        }
+
+        private fun writePcm24(
+            destination: ByteArray,
+            sampleIndex: Int,
+            sample: Float,
+        ) {
+            val normalized = sample.takeIf(Float::isFinite)?.coerceIn(-1f, 1f) ?: 0f
+            val value = if (normalized <= -1f) {
+                -8_388_608
+            } else {
+                (normalized * 8_388_607f).toInt()
+            }
+            val offset = sampleIndex * 3
+            destination[offset] = (value and 0xff).toByte()
+            destination[offset + 1] = ((value ushr 8) and 0xff).toByte()
+            destination[offset + 2] = ((value ushr 16) and 0xff).toByte()
         }
     }
 }
@@ -165,9 +231,6 @@ internal class SampleVoiceRenderer {
     )
     private var snapshot: SampleRenderSnapshot? = null
     private var sourcePosition = 0.0
-    private var resampler: PolyphaseSincResampler? = null
-    private var preparedSourceRate = 0
-    private var preparedSourceChannels = 0
     private val resampledFrame = FloatArray(2)
     private var transitionFramesRemaining = 0
     private var transitionFramesTotal = 0
@@ -179,9 +242,12 @@ internal class SampleVoiceRenderer {
     val isActive: Boolean
         get() = snapshot != null
 
+    val mixGain: Float
+        get() = snapshot?.volumeGain ?: 0f
+
     val sourceFrame: Long
         get() = snapshot?.let {
-            floor(resampler?.sourcePosition ?: sourcePosition).toLong().coerceIn(
+            floor(sourcePosition).toLong().coerceIn(
                 it.startFrame,
                 it.endFrame,
             )
@@ -189,43 +255,12 @@ internal class SampleVoiceRenderer {
 
     fun prepare(configuration: AudioConfiguration) {
         this.configuration = configuration
-        resampler = null
-        preparedSourceRate = 0
-        preparedSourceChannels = 0
         stop()
     }
 
-    /**
-     * Allocates a resampler, when necessary, on the control thread before a
-     * trigger is published to the realtime audio thread.
-     */
-    fun prepareSnapshot(snapshot: SampleRenderSnapshot) {
-        val source = snapshot.source
-        if (
-            preparedSourceRate == source.sampleRate &&
-            preparedSourceChannels == source.channels
-        ) {
-            return
-        }
-        resampler = if (source.sampleRate == configuration.sampleRate) {
-            null
-        } else {
-            PolyphaseSincResampler(
-                sourceRate = source.sampleRate,
-                outputRate = configuration.sampleRate,
-                channels = source.channels,
-            )
-        }
-        preparedSourceRate = source.sampleRate
-        preparedSourceChannels = source.channels
-    }
-
     fun trigger(snapshot: SampleRenderSnapshot) {
-        check(
-            preparedSourceRate == snapshot.source.sampleRate &&
-                preparedSourceChannels == snapshot.source.channels
-        ) {
-            "Sample voice must be prepared before triggering"
+        check(snapshot.source.sampleRate == configuration.sampleRate) {
+            "Sample source must be prepared at the output sample rate"
         }
         transitionLeft = lastLeft
         transitionRight = lastRight
@@ -235,15 +270,13 @@ internal class SampleVoiceRenderer {
         transitionFramesRemaining = transitionFramesTotal
         this.snapshot = snapshot
         sourcePosition = snapshot.startFrame.toDouble()
-        resampler?.reset(snapshot.startFrame.toDouble())
     }
 
     fun render(block: AudioProcessingBlock) {
         val activeSnapshot = snapshot ?: return
         var frame = 0
         while (frame < block.frameCount && snapshot != null) {
-            val currentSourcePosition = resampler?.sourcePosition
-                ?: sourcePosition
+            val currentSourcePosition = sourcePosition
             if (currentSourcePosition >= activeSnapshot.endFrame) {
                 stop()
                 break
@@ -288,8 +321,7 @@ internal class SampleVoiceRenderer {
             lastLeft = renderedLeft
             lastRight = renderedRight
             if (transitionFramesRemaining > 0) transitionFramesRemaining--
-            resampler?.advance()
-                ?: run { sourcePosition += 1.0 }
+            sourcePosition += 1.0
             frame++
         }
     }
@@ -306,22 +338,12 @@ internal class SampleVoiceRenderer {
     }
 
     private fun readSourceFrame(snapshot: SampleRenderSnapshot) {
-        val activeResampler = resampler
-        if (activeResampler == null) {
-            resampledFrame[0] = snapshot.source.sample(sourcePosition.toLong(), 0)
-            resampledFrame[1] = if (snapshot.source.channels == 1) {
-                resampledFrame[0]
-            } else {
-                snapshot.source.sample(sourcePosition.toLong(), 1)
-            }
-            return
+        resampledFrame[0] = snapshot.source.sample(sourcePosition.toLong(), 0)
+        resampledFrame[1] = if (snapshot.source.channels == 1) {
+            resampledFrame[0]
+        } else {
+            snapshot.source.sample(sourcePosition.toLong(), 1)
         }
-        activeResampler.readFrame(
-            source = snapshot.source,
-            destination = resampledFrame,
-            lowerBoundFrame = snapshot.startFrame,
-            upperBoundFrameExclusive = snapshot.endFrame,
-        )
         if (snapshot.source.channels == 1) {
             resampledFrame[1] = resampledFrame[0]
         }
@@ -390,10 +412,6 @@ internal class SampleVoicePool(
         latestVoiceIndex = -1
     }
 
-    fun prepareSnapshot(snapshot: SampleRenderSnapshot) {
-        voices.forEach { it.prepareSnapshot(snapshot) }
-    }
-
     fun trigger(snapshot: SampleRenderSnapshot) {
         var selectedIndex = -1
         var offset = 0
@@ -412,9 +430,12 @@ internal class SampleVoicePool(
         nextVoiceIndex = (selectedIndex + 1) % voices.size
     }
 
-    fun render(block: AudioProcessingBlock) {
+    fun render(block: AudioProcessingBlock, context: AudioRenderContext) {
         voices.forEach { voice ->
-            if (voice.isActive) voice.render(block)
+            if (voice.isActive) {
+                context.addMixContribution(voice.mixGain)
+                voice.render(block)
+            }
         }
     }
 

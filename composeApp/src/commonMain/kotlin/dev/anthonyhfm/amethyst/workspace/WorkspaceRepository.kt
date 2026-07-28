@@ -179,15 +179,16 @@ object WorkspaceRepository {
     }
 
     private fun setupMidiAutoDetect() {
+        midiManager.startAutoDetectLoop()
         repositoryScope.launch {
-            ViewportRepository.devices.collect { devices ->
-                if (devices.isNotEmpty()) {
-                    midiManager.startAutoDetectLoop()
-                } else {
-                    midiManager.stopAutoDetectLoop()
-                }
+            ViewportRepository.devices.collect {
+                midiManager.refreshConnections()
             }
         }
+    }
+
+    fun changeMidiDeviceConfig(uuid: String, deviceId: String?) {
+        midiManager.changeDeviceConfig(uuid, deviceId)
     }
 
     private fun setupModeTransitionObserver() {
@@ -424,8 +425,8 @@ object WorkspaceRepository {
         val element = ViewportRepository.devices.value.firstOrNull { it.selectionUUID == uuid || it.launchpadId == uuid }
             ?: return false
 
-        element.launchpadDevice?.connection?.input?.close()
-        element.launchpadDevice?.midiOutput?.close()
+        midiManager.detachElement(element)
+        element.close()
         if (!fromRemote) {
             DeviceSyncCoordinator.onDeviceRemoved(element.launchpadId)
         }
@@ -605,8 +606,8 @@ object WorkspaceRepository {
         canonicalizeSampleSources(samplingChain)
 
         ViewportRepository.devices.value.forEach { device ->
-            device.launchpadDevice?.connection?.input?.close()
-            device.launchpadDevice?.midiOutput?.close()
+            midiManager.detachElement(device)
+            device.close()
         }
         val loadedDevices = workspaceData.launchpadDevices.map { savedDevice ->
             val device = when (savedDevice) {
@@ -623,6 +624,7 @@ object WorkspaceRepository {
                 position.value = Offset(savedDevice.positionX, savedDevice.positionY)
                 rotationDegrees.floatValue = savedDevice.rotationDegrees
                 if (savedDevice.id.isNotEmpty()) launchpadId = savedDevice.id
+                savedMidiDeviceId = savedDevice.midiDeviceId
                 savedInputPortId = savedDevice.inputPortId
                 savedInputPortName = savedDevice.inputPortName
                 savedOutputPortId = savedDevice.outputPortId
@@ -802,6 +804,7 @@ object WorkspaceRepository {
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
+                        midiDeviceId = device.savedMidiDeviceId,
                         inputPortId = inputPortId,
                         inputPortName = inputPortName,
                         outputPortId = outputPortId,
@@ -812,6 +815,7 @@ object WorkspaceRepository {
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
+                        midiDeviceId = device.savedMidiDeviceId,
                         inputPortId = inputPortId,
                         inputPortName = inputPortName,
                         outputPortId = outputPortId,
@@ -822,6 +826,7 @@ object WorkspaceRepository {
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
+                        midiDeviceId = device.savedMidiDeviceId,
                         inputPortId = inputPortId,
                         inputPortName = inputPortName,
                         outputPortId = outputPortId,
@@ -832,6 +837,7 @@ object WorkspaceRepository {
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
+                        midiDeviceId = device.savedMidiDeviceId,
                         inputPortId = inputPortId,
                         inputPortName = inputPortName,
                         outputPortId = outputPortId,
@@ -842,6 +848,7 @@ object WorkspaceRepository {
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
+                        midiDeviceId = device.savedMidiDeviceId,
                         inputPortId = inputPortId,
                         inputPortName = inputPortName,
                         outputPortId = outputPortId,
@@ -852,6 +859,7 @@ object WorkspaceRepository {
                         positionX = device.position.value.x,
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
+                        midiDeviceId = device.savedMidiDeviceId,
                         inputPortId = inputPortId,
                         inputPortName = inputPortName,
                         outputPortId = outputPortId,
@@ -863,6 +871,7 @@ object WorkspaceRepository {
                         positionY = device.position.value.y,
                         rotationDegrees = device.rotationDegrees.floatValue,
                         style = device.style,
+                        midiDeviceId = device.savedMidiDeviceId,
                         inputPortId = inputPortId,
                         inputPortName = inputPortName,
                         outputPortId = outputPortId,
@@ -921,8 +930,8 @@ object WorkspaceRepository {
         
         // Clear devices
         ViewportRepository.devices.value.forEach { device ->
-            device.launchpadDevice?.connection?.input?.close()
-            device.launchpadDevice?.midiOutput?.close()
+            midiManager.detachElement(device)
+            device.close()
         }
         ViewportRepository.clear()
         

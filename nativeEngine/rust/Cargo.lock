@@ -28,6 +28,8 @@ dependencies = [
 name = "amethyst-native-engine"
 version = "0.1.0"
 dependencies = [
+ "alsa",
+ "audio_thread_priority",
  "core-foundation",
  "coremidi",
  "coremidi-sys",

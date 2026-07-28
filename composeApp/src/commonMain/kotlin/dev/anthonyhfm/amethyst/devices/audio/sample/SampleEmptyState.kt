@@ -30,9 +30,11 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SampleEmptyState(
@@ -95,7 +97,11 @@ fun SampleEmptyState(
                                             sourceId = source.id,
                                         )
                                     }
-                                    onLoaded()
+                                    // Snapshot creation can include high-quality sample-rate
+                                    // conversion. Keep that work off the UI thread.
+                                    withContext(Dispatchers.Default) {
+                                        onLoaded()
+                                    }
                                 } ?: run {
                                     println("Failed to decode audio file: ${selectedFile.name}")
                                 }

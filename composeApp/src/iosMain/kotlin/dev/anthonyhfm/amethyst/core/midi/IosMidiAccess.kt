@@ -439,6 +439,9 @@ class IosMidiOutput(
                     platform.posix.usleep(1000u)
                     status = MIDISend(outputPort, destinationEndpoint, pktListPtr)
                 }
+                check(status == 0) {
+                    "CoreMIDI send failed for output $portId (OSStatus $status)"
+                }
             }
         }
     }

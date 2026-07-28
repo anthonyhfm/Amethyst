@@ -27,11 +27,12 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 abstract class LaunchpadViewportElement(
     override var position: MutableState<Offset> = mutableStateOf(Offset(0f, 0f)),
-) : ViewportElement, Selectable {
+) : ViewportElement, Selectable, AutoCloseable {
     abstract val name: String
     abstract override var shape: Shape
     abstract override var size: Size
@@ -46,6 +47,7 @@ abstract class LaunchpadViewportElement(
     val renderScope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     var launchpadDevice: LaunchpadDevice? = null
+    var savedMidiDeviceId: String? = null
     var savedInputPortId: String? = null
     var savedInputPortName: String? = null
     var savedOutputPortId: String? = null
@@ -53,6 +55,22 @@ abstract class LaunchpadViewportElement(
     val previewState: LaunchpadPreviewState = LaunchpadPreviewState()
 
     val screen = Screen()
+
+    fun sendFullMidiSnapshot() {
+        val colors = Array(101) { index -> screen.getColor(index) }
+        val updates = colors.mapIndexed { index, color ->
+            dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate(index.toByte(), color)
+        }
+        val rotatedUpdates = rotateMidiUpdates(updates, layout, rotationDegrees.floatValue)
+        launchpadDevice?.sendUpdate(rotatedUpdates, colors)
+    }
+
+    override fun close() {
+        launchpadDevice?.close()
+        launchpadDevice = null
+        screen.close()
+        renderScope.cancel()
+    }
 
     init {
         screen.screenExit = { u, c ->

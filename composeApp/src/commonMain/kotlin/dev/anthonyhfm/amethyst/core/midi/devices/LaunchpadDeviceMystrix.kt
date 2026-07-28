@@ -10,11 +10,8 @@ class LaunchpadDeviceMystrix(
 ) : LaunchpadDevice(connection, firmware) {
     override fun clear() { }
 
-    override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
-        updates.chunked(78).forEach { chunked ->
-            sendMidi(getEffectSysEx(chunked))
-        }
-    }
+    override fun encodeUpdate(updates: List<RawLEDUpdate>): List<ByteArray> =
+        updates.chunked(78).map(::getEffectSysEx)
 
     override fun getEffectSysEx(updates: List<RawLEDUpdate>): ByteArray {
         return mutableListOf<Byte>().apply {

@@ -6,8 +6,6 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
 import dev.anthonyhfm.amethyst.core.midi.devices.*
-import dev.anthonyhfm.amethyst.core.util.Platform
-import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -38,8 +36,9 @@ data class LaunchpadDeviceIdentification(
     val firmware: LaunchpadFirmware,
 )
 
-class AmethystMidiManager {
-    private val midiAccess: AmethystMidiAccess? = platformMidiAccess
+class AmethystMidiManager(
+    private val midiAccess: AmethystMidiAccess? = platformMidiAccess,
+) {
 
     val midiInScope = CoroutineScope(Dispatchers.IO.limitedParallelism(4))
     private var monitorJob: Job? = null
@@ -63,15 +62,15 @@ class AmethystMidiManager {
 
     fun close() {
         stopAutoDetectLoop()
-        midiInScope.cancel()
+        detachAllWorkspaceDevices()
         activeConnections.values.forEach { conn ->
             printConnectionState("Disconnected", conn)
             conn.input?.close()
             conn.output?.close()
         }
         activeConnections.clear()
-        elementCollectorJobs.values.forEach { it.cancel() }
-        elementCollectorJobs.clear()
+        midiAccess?.close()
+        midiInScope.cancel()
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
@@ -231,11 +230,22 @@ class AmethystMidiManager {
 
     private fun autoConnectDevice(active: ActiveDeviceConnection) {
         val element = Heaven.devices.find {
-            it.savedInputPortId == active.device.id ||
-            (it.savedInputPortId == null && it.savedInputPortName == active.friendlyName)
+            it.savedMidiDeviceId == active.device.id ||
+                it.savedInputPortId == active.device.id ||
+                it.savedInputPortId == active.input?.portId ||
+                it.savedOutputPortId == active.output?.portId ||
+                (
+                    it.savedMidiDeviceId == null &&
+                        it.savedInputPortId == null &&
+                        it.savedInputPortName == active.friendlyName
+                )
         } ?: if (Heaven.devices.size == 1 && activeConnections.size == 1) {
             val single = Heaven.devices.first()
-            if (single.savedInputPortId == null && single.savedInputPortName == null) {
+            if (
+                single.savedMidiDeviceId == null &&
+                single.savedInputPortId == null &&
+                single.savedInputPortName == null
+            ) {
                 single
             } else null
         } else null
@@ -247,7 +257,7 @@ class AmethystMidiManager {
     }
 
     private fun connectElement(element: LaunchpadViewportElement, active: ActiveDeviceConnection) {
-        elementCollectorJobs[element.selectionUUID]?.cancel()
+        detachElement(element)
 
         val input = active.input
         val output = active.output
@@ -259,32 +269,28 @@ class AmethystMidiManager {
 
             val job = midiInScope.launch {
                 input.messages.collect { msg ->
-                    val msgCopy = msg.copyOf()
-                    if (platform is Platform.iOS) {
-                        msgCopy.toList().chunked(3).forEach {
-                            element.onMidiMessage(it.toByteArray())
-                        }
-                    } else {
-                        element.onMidiMessage(msgCopy)
-                    }
+                    element.onMidiMessage(msg.copyOf())
                 }
             }
 
             elementCollectorJobs[element.selectionUUID] = job
             element.launchpadDevice = launchpadDevice
-            element.savedInputPortId = active.device.id
+            element.savedMidiDeviceId = active.device.id
+            element.savedInputPortId = input.portId
+            element.savedOutputPortId = output.portId
             element.savedInputPortName = active.friendlyName
+            element.savedOutputPortName = active.friendlyName
+            element.sendFullMidiSnapshot()
         }
     }
 
     fun changeDeviceConfig(uuid: String, deviceId: String?) {
         val element = Heaven.devices.find { it.selectionUUID == uuid } ?: return
 
-        elementCollectorJobs[element.selectionUUID]?.cancel()
-        elementCollectorJobs.remove(element.selectionUUID)
-        element.launchpadDevice = null
+        detachElement(element)
 
         if (deviceId == null) {
+            element.savedMidiDeviceId = null
             element.savedInputPortId = null
             element.savedInputPortName = null
             element.savedOutputPortId = null
@@ -296,8 +302,31 @@ class AmethystMidiManager {
         if (active != null) {
             connectElement(element, active)
         } else {
-            element.savedInputPortId = deviceId
+            element.savedMidiDeviceId = deviceId
+            element.savedInputPortId = null
             element.savedInputPortName = null
+            element.savedOutputPortId = null
+            element.savedOutputPortName = null
+        }
+    }
+
+    fun detachElement(element: LaunchpadViewportElement) {
+        elementCollectorJobs.remove(element.selectionUUID)?.cancel()
+        element.launchpadDevice?.close()
+        element.launchpadDevice = null
+    }
+
+    fun detachAllWorkspaceDevices() {
+        Heaven.devices.forEach(::detachElement)
+        elementCollectorJobs.values.forEach { it.cancel() }
+        elementCollectorJobs.clear()
+    }
+
+    fun refreshConnections() {
+        if (!midiInScope.isActive) return
+        midiInScope.launch {
+            runCatching { rescanDevicesSerially() }
+                .onFailure { println("MIDI rescan failed: ${it.message}") }
         }
     }
 
@@ -309,15 +338,18 @@ class AmethystMidiManager {
             val nativeChangeJob = launch {
                 access.deviceChanges.collect {
                     runCatching { rescanDevicesSerially() }
+                        .onFailure { println("MIDI hotplug rescan failed: ${it.message}") }
                 }
             }
 
             try {
                 runCatching { rescanDevicesSerially() }
+                    .onFailure { println("Initial MIDI rescan failed: ${it.message}") }
 
                 while (isActive) {
                     delay(2000)
                     runCatching { rescanDevicesSerially() }
+                        .onFailure { println("MIDI health-check failed: ${it.message}") }
                 }
             } finally {
                 nativeChangeJob.cancel()
@@ -352,9 +384,7 @@ class AmethystMidiManager {
                 conn.output?.close()
                 Heaven.devices.forEach { element ->
                     if (element.launchpadDevice?.connection?.input?.portId == conn.input?.portId) {
-                        elementCollectorJobs[element.selectionUUID]?.cancel()
-                        elementCollectorJobs.remove(element.selectionUUID)
-                        element.launchpadDevice = null
+                        detachElement(element)
                     }
                 }
             }

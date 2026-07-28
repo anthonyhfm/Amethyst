@@ -7,6 +7,9 @@ import dev.anthonyhfm.amethyst.settings.data.AudioSettings
 import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import platform.Foundation.NSRecursiveLock
 
 /** Native iOS implementation of the shared Echo renderer and voice graph. */
@@ -16,6 +19,8 @@ actual object Echo {
     private var playback = AudioPlaybackEngine(AudioChain())
     private var output: IosAudioOutput? = null
     private var preferredBufferFrames = DEFAULT_BUFFER_FRAMES
+    private val mutableOutputStatus = MutableStateFlow(AudioOutputStatus())
+    actual val outputStatus: StateFlow<AudioOutputStatus> = mutableOutputStatus.asStateFlow()
 
     actual suspend fun decodeAudioFile(
         filePath: String,
@@ -46,7 +51,19 @@ actual object Echo {
             initialMasterGain = AudioSettings.masterVolume.value,
         )
         if (!initialized) {
+            mutableOutputStatus.value = AudioOutputStatus(
+                requestedMode = AudioOutputMode.Shared,
+                activeMode = AudioOutputMode.Shared,
+                error = activeOutput.startFailure ?: "App is in background",
+            )
             println("Echo/iOS: output initialization failed: ${activeOutput.startFailure ?: "app is in background"}")
+        } else {
+            mutableOutputStatus.value = AudioOutputStatus(
+                available = true,
+                backend = "Core Audio",
+                sampleRate = activeOutput.sampleRate,
+                periodFrames = activeOutput.periodFrames,
+            )
         }
         initialized
     }
@@ -66,9 +83,11 @@ actual object Echo {
     }
 
     /** iOS owns output-route selection through Control Center and route pickers. */
-    actual fun outputDevices(): List<String> = emptyList()
+    actual fun outputDevices(): List<AudioOutputDevice> = emptyList()
 
-    actual fun setPreferredOutputDevice(name: String?) = Unit
+    actual fun setPreferredOutputDevice(id: String?) = Unit
+
+    actual fun setExclusiveMode(enabled: Boolean) = Unit
 
     actual fun setMasterGain(gain: Float) {
         playback.setMasterGain(gain)
@@ -186,5 +205,5 @@ actual object Echo {
         }
     }
 
-    private const val DEFAULT_BUFFER_FRAMES = 128
+    private const val DEFAULT_BUFFER_FRAMES = 64
 }

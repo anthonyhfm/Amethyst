@@ -2,6 +2,29 @@ package dev.anthonyhfm.amethyst.core.engine.echo
 
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import kotlinx.coroutines.flow.StateFlow
+
+data class AudioOutputDevice(
+    val id: String,
+    val displayName: String,
+    val isDefault: Boolean = false,
+)
+
+enum class AudioOutputMode {
+    Shared,
+    Exclusive,
+}
+
+data class AudioOutputStatus(
+    val available: Boolean = false,
+    val backend: String = "",
+    val requestedMode: AudioOutputMode = AudioOutputMode.Shared,
+    val activeMode: AudioOutputMode = AudioOutputMode.Shared,
+    val sampleRate: Int = 0,
+    val periodFrames: Int = 0,
+    val fallbackReason: String? = null,
+    val error: String? = null,
+)
 
 data class AudioSourcePlayback(
     val sourceId: String,
@@ -22,8 +45,10 @@ expect object Echo {
     /** Opens the platform output using the configured low-latency buffer size. */
     fun initialize(): Boolean
     fun setPreferredBufferFrames(frames: Int)
-    fun outputDevices(): List<String>
-    fun setPreferredOutputDevice(name: String?)
+    fun outputDevices(): List<AudioOutputDevice>
+    fun setPreferredOutputDevice(id: String?)
+    fun setExclusiveMode(enabled: Boolean)
+    val outputStatus: StateFlow<AudioOutputStatus>
     fun setMasterGain(gain: Float)
     fun attachAudioChain(chain: AudioChain)
     fun play(audioSignal: Signal.AudioSignal): String?

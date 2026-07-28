@@ -10,10 +10,15 @@ import dev.anthonyhfm.amethyst.nativeengine.audio.NativePcmOutput
 import dev.anthonyhfm.amethyst.settings.data.AudioSettings
 import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.locks.LockSupport
 import kotlin.math.max
 
@@ -21,6 +26,18 @@ actual object Echo {
     private val decoder = NativeEchoDecoder()
     private val formats = listOf("wav", "mp3", "flac", "ogg", "aiff", "aif", "aifc")
     private val renderRunning = AtomicBoolean(false)
+    private val mutableOutputStatus = MutableStateFlow(AudioOutputStatus())
+    actual val outputStatus: StateFlow<AudioOutputStatus> = mutableOutputStatus.asStateFlow()
+
+    @Volatile
+    private var controlThread: Thread? = null
+    private val controlExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "echo-audio-control").apply {
+            isDaemon = true
+            priority = Thread.NORM_PRIORITY + 1
+            controlThread = this
+        }
+    }
 
     @Volatile
     private var playback = AudioPlaybackEngine(AudioChain())
@@ -34,18 +51,25 @@ actual object Echo {
     @Volatile
     private var initialized = false
 
-    private var preferredBufferFrames = NativePcmOutput.DEFAULT_PERIOD_FRAMES
+    private var preferredBufferFrames = DEFAULT_BUFFER_FRAMES
     private var preferredOutputDevice: String? = null
+    private var exclusiveMode = false
 
-    @Synchronized
-    actual fun initialize(): Boolean {
+    actual fun initialize(): Boolean = onControlThread { initializeOnControlThread() }
+
+    private fun initializeOnControlThread(): Boolean {
         if (initialized) return true
         val nextOutput = NativePcmOutput()
         val info = nextOutput.initialize(
             preferredPeriodFrames = preferredBufferFrames,
             preferredOutputDevice = preferredOutputDevice,
+            exclusive = exclusiveMode,
         )
         if (!info.available || info.channels.toInt() != OUTPUT_CHANNELS) {
+            mutableOutputStatus.value = AudioOutputStatus(
+                requestedMode = if (exclusiveMode) AudioOutputMode.Exclusive else AudioOutputMode.Shared,
+                error = info.error ?: "Stereo output is unavailable",
+            )
             nextOutput.close()
             return false
         }
@@ -74,6 +98,7 @@ actual object Echo {
             floatBuffer = floatBuffer,
             renderBuffer = renderBuffer,
             periodFrames = periodFrames,
+            allowWhenStopped = true,
         )
         if (nextOutput.start() != null) {
             nextPlayback.release()
@@ -82,9 +107,27 @@ actual object Echo {
         }
 
         output = nextOutput
+        mutableOutputStatus.value = AudioOutputStatus(
+            available = true,
+            backend = info.backend,
+            requestedMode = if (info.requestedExclusive) {
+                AudioOutputMode.Exclusive
+            } else {
+                AudioOutputMode.Shared
+            },
+            activeMode = if (info.activeExclusive) {
+                AudioOutputMode.Exclusive
+            } else {
+                AudioOutputMode.Shared
+            },
+            sampleRate = configuration.sampleRate,
+            periodFrames = periodFrames,
+            fallbackReason = info.fallbackReason,
+        )
         renderRunning.set(true)
         renderThread = Thread(
             {
+                nextOutput.promoteCurrentThreadToRealtime(periodFrames, configuration.sampleRate)
                 renderLoop(
                     playback = nextPlayback,
                     output = nextOutput,
@@ -105,7 +148,6 @@ actual object Echo {
         return true
     }
 
-    @Synchronized
     actual fun setPreferredBufferFrames(frames: Int) {
         val normalized = when {
             frames <= 64 -> 64
@@ -113,37 +155,56 @@ actual object Echo {
             frames <= 256 -> 256
             else -> frames.coerceAtMost(2_048)
         }
-        if (preferredBufferFrames == normalized) return
-        preferredBufferFrames = normalized
-        restartIfRunning()
+        controlExecutor.execute {
+            if (preferredBufferFrames == normalized) return@execute
+            preferredBufferFrames = normalized
+            restartIfRunning()
+        }
     }
 
-    actual fun outputDevices(): List<String> {
-        val active = output
-        if (active != null) return active.outputDevices()
-        return runCatching { NativePcmOutput().use { it.outputDevices() } }
-            .getOrDefault(emptyList())
+    actual fun outputDevices(): List<AudioOutputDevice> = onControlThread {
+        val devices = runCatching {
+            output?.outputDevices()
+                ?: NativePcmOutput().use { it.outputDevices() }
+        }.getOrDefault(emptyList())
+        devices.map {
+            AudioOutputDevice(
+                id = it.id,
+                displayName = it.displayName,
+                isDefault = it.isDefault,
+            )
+        }
     }
 
-    @Synchronized
-    actual fun setPreferredOutputDevice(name: String?) {
-        val normalized = name?.takeIf { it.isNotBlank() }
-        if (preferredOutputDevice == normalized) return
-        preferredOutputDevice = normalized
-        restartIfRunning()
+    actual fun setPreferredOutputDevice(id: String?) {
+        val normalized = id?.takeIf { it.isNotBlank() }
+        controlExecutor.execute {
+            if (preferredOutputDevice == normalized) return@execute
+            preferredOutputDevice = normalized
+            restartIfRunning()
+        }
+    }
+
+    actual fun setExclusiveMode(enabled: Boolean) {
+        controlExecutor.execute {
+            if (exclusiveMode == enabled) return@execute
+            exclusiveMode = enabled
+            restartIfRunning()
+        }
     }
 
     actual fun setMasterGain(gain: Float) {
         playback.setMasterGain(gain)
     }
 
-    @Synchronized
     actual fun attachAudioChain(chain: AudioChain) {
-        if (playback.renderer.chain === chain) return
-        val shouldRestart = initialized
-        stopOutput()
-        playback = AudioPlaybackEngine(chain)
-        if (shouldRestart) initialize()
+        onControlThread {
+            if (playback.renderer.chain === chain) return@onControlThread
+            val shouldRestart = initialized
+            stopOutput()
+            playback = AudioPlaybackEngine(chain)
+            if (shouldRestart) initializeOnControlThread()
+        }
     }
 
     actual suspend fun decodeAudioFile(
@@ -258,17 +319,17 @@ actual object Echo {
 
     actual fun reset() = playback.reset()
 
-    @Synchronized
     actual fun shutdown() {
-        stopOutput()
-        decoder.shutdown()
+        onControlThread {
+            stopOutput()
+            decoder.shutdown()
+        }
     }
 
-    @Synchronized
     private fun restartIfRunning() {
         if (!initialized) return
         stopOutput()
-        initialize()
+        initializeOnControlThread()
     }
 
     private fun stopOutput() {
@@ -283,6 +344,12 @@ actual object Echo {
         output?.close()
         output = null
         playback.release()
+    }
+
+    private fun <T> onControlThread(block: () -> T): T {
+        if (Thread.currentThread() === controlThread) return block()
+        val future: Future<T> = controlExecutor.submit<T> { block() }
+        return future.get()
     }
 
     private fun renderLoop(
@@ -338,6 +405,7 @@ actual object Echo {
         floatBuffer: FloatBuffer,
         renderBuffer: FloatArray,
         periodFrames: Int,
+        allowWhenStopped: Boolean = false,
     ) {
         playback.renderer.render(renderBuffer, periodFrames)
         directBuffer.clear()
@@ -345,7 +413,7 @@ actual object Echo {
         floatBuffer.put(renderBuffer)
         directBuffer.limit(renderBuffer.size * Float.SIZE_BYTES)
         var remainingFrames = periodFrames
-        while (remainingFrames > 0 && (renderRunning.get() || !initialized)) {
+        while (remainingFrames > 0 && (renderRunning.get() || allowWhenStopped)) {
             val written = output.writeInterleaved(directBuffer, remainingFrames)
             if (written <= 0) {
                 LockSupport.parkNanos(MINIMUM_PARK_NANOS)
@@ -397,5 +465,6 @@ actual object Echo {
     private const val NANOS_PER_SECOND = 1_000_000_000L
     private const val MINIMUM_PARK_NANOS = 50_000L
     private const val TELEMETRY_INTERVAL_NANOS = 250_000_000L
-    private const val STABLE_LATENCY_RECOVERY_NANOS = 10L * NANOS_PER_SECOND
+    private const val STABLE_LATENCY_RECOVERY_NANOS = 30L * NANOS_PER_SECOND
+    private const val DEFAULT_BUFFER_FRAMES = 64
 }

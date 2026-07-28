@@ -52,6 +52,7 @@ data class SavableWorkspaceData(
         val id: String
         val rotationDegrees: Float
         val type: ViewportDeviceType
+        val midiDeviceId: String?
         val inputPortId: String?
         val inputPortName: String?
         val outputPortId: String?
@@ -77,6 +78,7 @@ data class SavableWorkspaceData(
             @ProtoNumber(6) override val inputPortName: String? = null,
             @ProtoNumber(7) override val outputPortId: String? = null,
             @ProtoNumber(8) override val outputPortName: String? = null,
+            @ProtoNumber(9) override val midiDeviceId: String? = null,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_PRO
         }
@@ -91,6 +93,7 @@ data class SavableWorkspaceData(
             @ProtoNumber(6) override val inputPortName: String? = null,
             @ProtoNumber(7) override val outputPortId: String? = null,
             @ProtoNumber(8) override val outputPortName: String? = null,
+            @ProtoNumber(9) override val midiDeviceId: String? = null,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_PRO_MK3
         }
@@ -105,6 +108,7 @@ data class SavableWorkspaceData(
             @ProtoNumber(6) override val inputPortName: String? = null,
             @ProtoNumber(7) override val outputPortId: String? = null,
             @ProtoNumber(8) override val outputPortName: String? = null,
+            @ProtoNumber(9) override val midiDeviceId: String? = null,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_X
         }
@@ -119,6 +123,7 @@ data class SavableWorkspaceData(
             @ProtoNumber(6) override val inputPortName: String? = null,
             @ProtoNumber(7) override val outputPortId: String? = null,
             @ProtoNumber(8) override val outputPortName: String? = null,
+            @ProtoNumber(9) override val midiDeviceId: String? = null,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_IDEALISED
         }
@@ -133,6 +138,7 @@ data class SavableWorkspaceData(
             @ProtoNumber(6) override val inputPortName: String? = null,
             @ProtoNumber(7) override val outputPortId: String? = null,
             @ProtoNumber(8) override val outputPortName: String? = null,
+            @ProtoNumber(9) override val midiDeviceId: String? = null,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.LAUNCHPAD_MK2
         }
@@ -147,6 +153,7 @@ data class SavableWorkspaceData(
             @ProtoNumber(6) override val inputPortName: String? = null,
             @ProtoNumber(7) override val outputPortId: String? = null,
             @ProtoNumber(8) override val outputPortName: String? = null,
+            @ProtoNumber(9) override val midiDeviceId: String? = null,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.MYSTRIX
         }
@@ -162,6 +169,7 @@ data class SavableWorkspaceData(
             @ProtoNumber(7) override val inputPortName: String? = null,
             @ProtoNumber(8) override val outputPortId: String? = null,
             @ProtoNumber(9) override val outputPortName: String? = null,
+            @ProtoNumber(10) override val midiDeviceId: String? = null,
         ) : SavableViewportLaunchpad {
             override val type: ViewportDeviceType get() = ViewportDeviceType.MIDIFIGHTER64
 

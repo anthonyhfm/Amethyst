@@ -21,7 +21,7 @@ class LaunchpadDeviceProMk3(
         sendMidi(clearSysEx)
     }
 
-    override fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
+    override fun encodeUpdate(updates: List<RawLEDUpdate>): List<ByteArray> {
         val updatesWithTopButtonMirrors = updates.filter {
             it.index in 1 until 8
         }.map {
@@ -29,12 +29,11 @@ class LaunchpadDeviceProMk3(
                 index = (100 + it.index).toByte()
             )
         }.plus(updates)
+        val addressableUpdates = prepareFastLedUpdates(updatesWithTopButtonMirrors)
 
-        if (sendFastLedUpdates(updatesWithTopButtonMirrors)) return
-
-        updatesWithTopButtonMirrors.chunked(78).forEach { chunked ->
-            sendMidi(getEffectSysEx(chunked))
-        }
+        return encodeFastLedUpdates(addressableUpdates)
+            // Launchpad Pro MK3 Programmer's Reference: RGB LED SysEx supports up to 106 LEDs.
+            ?: addressableUpdates.chunked(106).map(::getEffectSysEx)
     }
 
     override fun getEffectSysEx(updates: List<RawLEDUpdate>): ByteArray {

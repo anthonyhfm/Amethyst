@@ -1,4 +1,6 @@
 mod ring;
+#[cfg(target_os = "windows")]
+mod wasapi_exclusive;
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -15,12 +17,17 @@ const RING_PERIODS: usize = 4;
 
 #[derive(uniffi::Record, Clone, Debug, PartialEq, Eq)]
 pub struct PcmOutputDeviceInfo {
+    pub device_id: String,
     pub device_name: String,
     pub sample_rate: u32,
     pub channels: u32,
     pub period_frames: u32,
     pub ring_capacity_frames: u32,
     pub sample_format: String,
+    pub backend: String,
+    pub requested_exclusive: bool,
+    pub active_exclusive: bool,
+    pub fallback_reason: Option<String>,
     pub available: bool,
     pub error: Option<String>,
 }
@@ -28,16 +35,28 @@ pub struct PcmOutputDeviceInfo {
 impl PcmOutputDeviceInfo {
     fn unavailable(error: Option<String>) -> Self {
         Self {
+            device_id: String::new(),
             device_name: String::new(),
             sample_rate: 0,
             channels: 0,
             period_frames: 0,
             ring_capacity_frames: 0,
             sample_format: String::new(),
+            backend: String::new(),
+            requested_exclusive: false,
+            active_exclusive: false,
+            fallback_reason: None,
             available: false,
             error,
         }
     }
+}
+
+#[derive(uniffi::Record, Clone, Debug, PartialEq, Eq)]
+pub struct PcmOutputDevice {
+    pub id: String,
+    pub display_name: String,
+    pub is_default: bool,
 }
 
 #[derive(uniffi::Record, Clone, Debug, PartialEq, Eq)]
@@ -51,14 +70,14 @@ pub struct PcmOutputTelemetry {
     pub running: bool,
 }
 
-struct CallbackTelemetry {
+pub(crate) struct CallbackTelemetry {
     consumed_frames: AtomicU64,
     underruns: AtomicU64,
-    stream_errors: AtomicU64,
+    pub(crate) stream_errors: AtomicU64,
 }
 
 impl CallbackTelemetry {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             consumed_frames: AtomicU64::new(0),
             underruns: AtomicU64::new(0),
@@ -66,7 +85,12 @@ impl CallbackTelemetry {
         }
     }
 
-    fn record_callback(&self, consumed_samples: usize, requested_samples: usize, channels: usize) {
+    pub(crate) fn record_callback(
+        &self,
+        consumed_samples: usize,
+        requested_samples: usize,
+        channels: usize,
+    ) {
         self.consumed_frames
             .fetch_add((consumed_samples / channels) as u64, Ordering::Relaxed);
         if consumed_samples < requested_samples {
@@ -81,10 +105,38 @@ enum ServiceCommand {
     Shutdown(Option<mpsc::SyncSender<()>>),
 }
 
-struct StartedOutput {
-    info: PcmOutputDeviceInfo,
-    ring: Arc<SpscFloatRing>,
-    callback_telemetry: Arc<CallbackTelemetry>,
+pub(crate) struct StartedOutput {
+    pub(crate) info: PcmOutputDeviceInfo,
+    pub(crate) ring: Arc<SpscFloatRing>,
+    pub(crate) callback_telemetry: Arc<CallbackTelemetry>,
+}
+
+enum OutputStream {
+    Cpal(cpal::Stream),
+    #[cfg(target_os = "windows")]
+    WasapiExclusive(wasapi_exclusive::ExclusiveOutputStream),
+}
+
+impl OutputStream {
+    fn play(&self) -> Result<(), String> {
+        match self {
+            Self::Cpal(stream) => stream
+                .play()
+                .map_err(|error| format!("Cannot start output stream: {error}")),
+            #[cfg(target_os = "windows")]
+            Self::WasapiExclusive(stream) => stream.play(),
+        }
+    }
+
+    fn pause(&self) -> Result<(), String> {
+        match self {
+            Self::Cpal(stream) => stream
+                .pause()
+                .map_err(|error| format!("Cannot pause output stream: {error}")),
+            #[cfg(target_os = "windows")]
+            Self::WasapiExclusive(stream) => stream.pause(),
+        }
+    }
 }
 
 #[derive(uniffi::Object)]
@@ -97,6 +149,7 @@ pub struct PcmOutputService {
     callback_telemetry: Mutex<Option<Arc<CallbackTelemetry>>>,
     preferred_period_frames: AtomicU32,
     preferred_output_device: Mutex<Option<String>>,
+    preferred_exclusive: AtomicBool,
     device_info: Mutex<PcmOutputDeviceInfo>,
     running: AtomicBool,
 }
@@ -112,6 +165,7 @@ impl PcmOutputService {
             callback_telemetry: Mutex::new(None),
             preferred_period_frames: AtomicU32::new(DEFAULT_PERIOD_FRAMES),
             preferred_output_device: Mutex::new(None),
+            preferred_exclusive: AtomicBool::new(false),
             device_info: Mutex::new(PcmOutputDeviceInfo::unavailable(None)),
             running: AtomicBool::new(false),
         })
@@ -132,6 +186,7 @@ impl PcmOutputService {
             .lock()
             .expect("device mutex")
             .clone();
+        let preferred_exclusive = self.preferred_exclusive.load(Ordering::Relaxed);
         let (command_sender, command_receiver) = mpsc::channel();
         let (startup_sender, startup_receiver) = mpsc::sync_channel(1);
         if let Err(error) = std::thread::Builder::new()
@@ -142,6 +197,7 @@ impl PcmOutputService {
                     startup_sender,
                     preferred_period_frames,
                     preferred_output_device,
+                    preferred_exclusive,
                 );
             })
         {
@@ -248,10 +304,25 @@ impl PcmOutputService {
             .unwrap_or(0)
     }
 
-    pub fn output_devices(&self) -> Vec<String> {
-        cpal::default_host()
-            .output_devices()
-            .map(|devices| devices.map(|device| device.to_string()).collect())
+    pub fn output_devices(&self) -> Vec<PcmOutputDevice> {
+        let host = cpal::default_host();
+        let default_id = host
+            .default_output_device()
+            .and_then(|device| device.id().ok())
+            .map(|id| id.id().to_owned());
+        host.output_devices()
+            .map(|devices| {
+                devices
+                    .filter_map(|device| {
+                        let id = device.id().ok()?.id().to_owned();
+                        Some(PcmOutputDevice {
+                            is_default: default_id.as_deref() == Some(id.as_str()),
+                            id,
+                            display_name: device.to_string(),
+                        })
+                    })
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -263,6 +334,28 @@ impl PcmOutputService {
     pub fn set_preferred_output_device(&self, name: String) {
         *self.preferred_output_device.lock().expect("device mutex") =
             (!name.trim().is_empty()).then_some(name);
+    }
+
+    pub fn set_preferred_exclusive(&self, exclusive: bool) {
+        self.preferred_exclusive.store(exclusive, Ordering::Relaxed);
+    }
+
+    pub fn promote_current_thread_to_realtime(
+        &self,
+        period_frames: u32,
+        sample_rate: u32,
+    ) -> Option<String> {
+        match audio_thread_priority::promote_current_thread_to_real_time(period_frames, sample_rate)
+        {
+            Ok(handle) => {
+                // The caller is the long-lived audio render thread. Demotion is
+                // unnecessary when that thread exits, and retaining the handle
+                // in Kotlin would add lifecycle traffic to the realtime path.
+                std::mem::forget(handle);
+                None
+            }
+            Err(error) => Some(error.to_string()),
+        }
     }
 }
 
@@ -304,8 +397,13 @@ fn run_output_service(
     startup_sender: mpsc::SyncSender<Result<StartedOutput, String>>,
     preferred_period_frames: u32,
     preferred_output_device: Option<String>,
+    preferred_exclusive: bool,
 ) {
-    let (stream, started) = match build_stream(preferred_period_frames, preferred_output_device) {
+    let (stream, started) = match build_stream(
+        preferred_period_frames,
+        preferred_output_device,
+        preferred_exclusive,
+    ) {
         Ok(value) => value,
         Err(error) => {
             let _ = startup_sender.send(Err(error));
@@ -319,15 +417,11 @@ fn run_output_service(
     while let Ok(command) = command_receiver.recv() {
         match command {
             ServiceCommand::Start(result_sender) => {
-                let result = stream
-                    .play()
-                    .map_err(|error| format!("Cannot start output stream: {error}"));
+                let result = stream.play();
                 let _ = result_sender.send(result);
             }
             ServiceCommand::Pause(result_sender) => {
-                let result = stream
-                    .pause()
-                    .map_err(|error| format!("Cannot pause output stream: {error}"));
+                let result = stream.pause();
                 let _ = result_sender.send(result);
             }
             ServiceCommand::Shutdown(completion_sender) => {
@@ -344,19 +438,54 @@ fn run_output_service(
 fn build_stream(
     preferred_period_frames: u32,
     preferred_output_device: Option<String>,
-) -> Result<(cpal::Stream, StartedOutput), String> {
+    preferred_exclusive: bool,
+) -> Result<(OutputStream, StartedOutput), String> {
+    #[cfg(target_os = "windows")]
+    if preferred_exclusive {
+        match wasapi_exclusive::build(preferred_period_frames, preferred_output_device.clone()) {
+            Ok((stream, started)) => {
+                return Ok((OutputStream::WasapiExclusive(stream), started));
+            }
+            Err(exclusive_error) => {
+                return build_cpal_stream(
+                    preferred_period_frames,
+                    preferred_output_device,
+                    true,
+                    Some(exclusive_error),
+                );
+            }
+        }
+    }
+    build_cpal_stream(
+        preferred_period_frames,
+        preferred_output_device,
+        preferred_exclusive,
+        None,
+    )
+}
+
+fn build_cpal_stream(
+    preferred_period_frames: u32,
+    preferred_output_device: Option<String>,
+    preferred_exclusive: bool,
+    fallback_reason: Option<String>,
+) -> Result<(OutputStream, StartedOutput), String> {
     let host = cpal::default_host();
     let device = match preferred_output_device {
-        Some(name) => host
+        Some(identifier) => host
             .output_devices()
             .map_err(|error| format!("Cannot enumerate output devices: {error}"))?
-            .find(|device| device.to_string() == name)
-            .ok_or_else(|| format!("Configured output device is unavailable: {name}"))?,
+            .find(|device| {
+                device.id().ok().is_some_and(|id| id.id() == identifier)
+                    || device.to_string() == identifier
+            })
+            .ok_or_else(|| format!("Configured output device is unavailable: {identifier}"))?,
         None => host
             .default_output_device()
             .ok_or_else(|| "No default output device available".to_owned())?,
     };
     let device_name = device.to_string();
+    let device_id = device.id().map(|id| id.id().to_owned()).unwrap_or_default();
     let supported_config = device
         .default_output_config()
         .map_err(|error| format!("Cannot get output config: {error}"))?;
@@ -420,17 +549,27 @@ fn build_stream(
     .map_err(|error| format!("Cannot build output stream: {error}"))?;
 
     let info = PcmOutputDeviceInfo {
+        device_id,
         device_name,
         sample_rate,
         channels: channels as u32,
         period_frames,
         ring_capacity_frames: ring_capacity_frames as u32,
         sample_format: format!("{:?}", supported_config.sample_format()),
+        backend: "cpal".to_owned(),
+        requested_exclusive: preferred_exclusive,
+        active_exclusive: false,
+        fallback_reason: fallback_reason.or_else(|| {
+            preferred_exclusive.then(|| {
+                "Exclusive output is unavailable on this platform/backend; using shared output"
+                    .to_owned()
+            })
+        }),
         available: true,
         error: None,
     };
     Ok((
-        stream,
+        OutputStream::Cpal(stream),
         StartedOutput {
             info,
             ring,

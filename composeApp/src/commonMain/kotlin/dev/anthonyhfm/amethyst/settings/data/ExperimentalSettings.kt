@@ -10,11 +10,4 @@ object ExperimentalSettings : SettingsGroup("Experimental Features", Res.string.
         titleRes = Res.string.settings_experimental_live_collab_title,
         default = false,
     )
-
-    val crystalCompositions: Setting.Toggle = toggle(
-        key = "crystalCompositions",
-        title = "Crystal Compositions",
-        titleRes = Res.string.settings_experimental_crystal_compositions_title,
-        default = false,
-    )
 }

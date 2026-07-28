@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.settings.data.Setting
+import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutputMode
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
 import dev.anthonyhfm.amethyst.ui.components.primitives.Slider
@@ -24,6 +26,11 @@ import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.roundToInt
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.settings_audio_mode_exclusive
+import amethyst.composeapp.generated.resources.settings_audio_mode_fallback
+import amethyst.composeapp.generated.resources.settings_audio_mode_shared
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SettingRenderer(setting: Setting<*>) {
@@ -39,7 +46,26 @@ fun SettingRenderer(setting: Setting<*>) {
 @Composable
 private fun ToggleSettingItem(setting: Setting.Toggle) {
     val checked by setting.flow.collectAsState()
-    SettingsItem(title = setting.title) {
+    val outputStatus by Echo.outputStatus.collectAsState()
+    val subtitle = if (setting.key == "echoExclusiveMode" && outputStatus.available) {
+        outputStatus.fallbackReason?.let {
+            stringResource(Res.string.settings_audio_mode_fallback, it)
+        } ?: when (outputStatus.activeMode) {
+            AudioOutputMode.Exclusive -> stringResource(
+                Res.string.settings_audio_mode_exclusive,
+                outputStatus.sampleRate,
+                outputStatus.periodFrames,
+            )
+            AudioOutputMode.Shared -> stringResource(
+                Res.string.settings_audio_mode_shared,
+                outputStatus.sampleRate,
+                outputStatus.periodFrames,
+            )
+        }
+    } else {
+        null
+    }
+    SettingsItem(title = setting.title, subtitle = subtitle) {
         Switch(
             checked = checked,
             onCheckedChange = { setting.update(it) },
@@ -106,4 +132,3 @@ private fun TextFieldSettingItem(setting: Setting.TextField) {
         )
     }
 }
-

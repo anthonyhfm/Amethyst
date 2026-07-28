@@ -43,6 +43,7 @@ fun main(args: Array<String>) {
     Echo.setPreferredOutputDevice(
         AudioSettings.outputDevice.value.takeUnless { it == AudioSettings.SystemDefaultOutputDevice }
     )
+    Echo.setExclusiveMode(AudioSettings.exclusiveMode?.value == true)
     Echo.initialize()
     
     // Initialize Discord RPC manager (will connect if enabled in settings)

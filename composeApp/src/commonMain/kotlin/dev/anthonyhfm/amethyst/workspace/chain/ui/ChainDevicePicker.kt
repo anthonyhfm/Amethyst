@@ -31,8 +31,6 @@ import androidx.compose.material.icons.twotone.Timer
 import androidx.compose.material.icons.twotone.Transform
 import androidx.compose.material.icons.twotone._123
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
@@ -64,7 +62,6 @@ import androidx.compose.material.icons.twotone.Add
 import androidx.compose.material.icons.twotone.Contrast
 import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.twotone.Preview
-import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
 import dev.anthonyhfm.amethyst.devices.effects.color_filter.ColorFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.preview.PreviewChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
@@ -79,8 +76,6 @@ fun ChainDevicePicker(
     onPickComponent: (GenericChainDevice<*>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val crystalCompositions by ExperimentalSettings.crystalCompositions.flow.collectAsState()
-
     NavigableChainContextMenu(
         expanded = visible,
         onDismissRequest = onDismiss
@@ -117,9 +112,7 @@ fun ChainDevicePicker(
                 }
                 "shape" -> {
                     ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_copy), icon = Icons.TwoTone.ContentCopy, onClick = { onPickComponent(CopyChainDevice()) })
-                    if (crystalCompositions) {
-                        ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_composition), icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
-                    }
+                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_composition), icon = Icons.TwoTone.Diamond, onClick = { onPickComponent(CompositionChainDevice()) })
                     ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_keyframes), icon = Icons.TwoTone.Timeline, onClick = { onPickComponent(KeyframesChainDevice()) })
                     ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_piano_roll), icon = Icons.TwoTone.Piano, onClick = { onPickComponent(PianoRollChainDevice()) })
                 }

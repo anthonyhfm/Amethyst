@@ -13,6 +13,9 @@ import dev.anthonyhfm.amethyst.settings.data.AudioSettings
 import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import java.util.concurrent.atomic.AtomicBoolean
@@ -25,6 +28,8 @@ actual object Echo {
     private val decoder = NativeEchoDecoder()
     private val formats = listOf("wav", "mp3", "flac", "ogg", "aiff", "aif", "aifc")
     private val renderRunning = AtomicBoolean(false)
+    private val mutableOutputStatus = MutableStateFlow(AudioOutputStatus())
+    actual val outputStatus: StateFlow<AudioOutputStatus> = mutableOutputStatus.asStateFlow()
 
     /** Guards against duplicate render-thread/native-stream teardown across repeated app background/foreground transitions. */
     private val backgrounded = AtomicBoolean(false)
@@ -53,6 +58,7 @@ actual object Echo {
             preferredOutputDevice = preferredOutputDevice,
         )
         if (!info.available) {
+            mutableOutputStatus.value = AudioOutputStatus(error = info.error)
             Log.e(TAG, "PCM output initialization failed: ${info.error ?: "unknown error"}")
             nextOutput.close()
             return false
@@ -100,6 +106,12 @@ actual object Echo {
         }
 
         output = nextOutput
+        mutableOutputStatus.value = AudioOutputStatus(
+            available = true,
+            backend = info.backend,
+            sampleRate = configuration.sampleRate,
+            periodFrames = periodFrames,
+        )
         renderRunning.set(true)
         renderThread = Thread(
             {
@@ -138,10 +150,12 @@ actual object Echo {
     }
 
     /** Android output is system-default-only; no device picker is offered. */
-    actual fun outputDevices(): List<String> = emptyList()
+    actual fun outputDevices(): List<AudioOutputDevice> = emptyList()
 
     /** Android output is system-default-only; no device picker is offered. */
-    actual fun setPreferredOutputDevice(name: String?) = Unit
+    actual fun setPreferredOutputDevice(id: String?) = Unit
+
+    actual fun setExclusiveMode(enabled: Boolean) = Unit
 
     actual fun setMasterGain(gain: Float) {
         playback.setMasterGain(gain)

@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 
 sealed interface Signal {
     val origin: Any?
+    val extras: Map<String, Int>
 
     data class LED(
         override val origin: Any?,
@@ -14,7 +15,8 @@ sealed interface Signal {
         val layer: Int = 0,
         val blendingMode: BlendingMode = BlendingMode.Normal,
         val blendingRange: Int = 1,
-        val opacity: Float = 1f
+        val opacity: Float = 1f,
+        override val extras: Map<String, Int> = mapOf()
     ) : Signal {
         enum class BlendingMode {
             Normal, Multiply, Screen, Mask
@@ -26,6 +28,7 @@ sealed interface Signal {
         val x: Int,
         val y: Int,
         val velocity: Int,
+        override val extras: Map<String, Int> = mapOf()
     ) : Signal
 
     data class AudioSignal(
@@ -37,6 +40,7 @@ sealed interface Signal {
         val durationMs: Long = 0,
         val gain: Float = 1f,
         val pan: Float = 0f,
+        override val extras: Map<String, Int> = mapOf()
     ) : Signal {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true

@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.nativeengine.audio
 import com.sun.jna.Library
 import com.sun.jna.Native
 import dev.anthonyhfm.amethyst.nativeengine.PcmOutputDeviceInfo
+import dev.anthonyhfm.amethyst.nativeengine.PcmOutputDevice
 import dev.anthonyhfm.amethyst.nativeengine.PcmOutputService
 import dev.anthonyhfm.amethyst.nativeengine.PcmOutputTelemetry
 import java.nio.ByteBuffer
@@ -26,10 +27,12 @@ class NativePcmOutput : AutoCloseable {
     fun initialize(
         preferredPeriodFrames: Int = DEFAULT_PERIOD_FRAMES,
         preferredOutputDevice: String? = null,
+        exclusive: Boolean = false,
     ): PcmOutputDeviceInfo {
         require(preferredPeriodFrames > 0) { "preferredPeriodFrames must be positive" }
         service.setPreferredPeriodFrames(preferredPeriodFrames.toUInt())
         service.setPreferredOutputDevice(preferredOutputDevice.orEmpty())
+        service.setPreferredExclusive(exclusive)
         val info = service.initialize()
         ringHandle = if (info.available) service.ringHandle() else 0UL
         channels = info.channels.toInt()
@@ -83,7 +86,13 @@ class NativePcmOutput : AutoCloseable {
         return PcmOutputDirectBridge.amethyst_pcm_output_queued_frames(ringHandle.toLong())
     }
 
-    fun outputDevices(): List<String> = service.outputDevices()
+    fun outputDevices(): List<PcmOutputDevice> = service.outputDevices()
+
+    fun promoteCurrentThreadToRealtime(periodFrames: Int, sampleRate: Int): String? =
+        service.promoteCurrentThreadToRealtime(
+            periodFrames.coerceAtLeast(1).toUInt(),
+            sampleRate.coerceAtLeast(1).toUInt(),
+        )
 
     fun shutdown() {
         ringHandle = 0UL

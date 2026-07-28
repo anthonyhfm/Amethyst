@@ -36,6 +36,7 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
 import dev.anthonyhfm.amethyst.devices.AudioChainDeviceRole
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
@@ -98,6 +99,7 @@ private data class SampleRenderCache(
     val state: SampleChainDeviceState,
     val outputSampleRate: Int,
     val rawData: ByteArray?,
+    val preparedSource: ByteArrayPcmAudioSource?,
     val snapshot: SampleRenderSnapshot?,
 )
 
@@ -322,7 +324,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
             voicePool.trigger(pending)
             pending = triggerQueue.poll()
         }
-        voicePool.render(block)
+        voicePool.render(block, context)
         publishedPlayheadFrame.value = voicePool.sourceFrame
     }
 
@@ -362,16 +364,34 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         ) {
             return cached.snapshot
         }
-        val snapshot = SampleRenderSnapshot.from(
-            state = deviceState,
-            rawData = resolvedRawData,
-        )
-        snapshot?.let(voicePool::prepareSnapshot)
+        val preparedSource = if (
+            cached != null &&
+            cached.outputSampleRate == outputSampleRate &&
+            cached.rawData === resolvedRawData &&
+            cached.state.sampleRate == deviceState.sampleRate &&
+            cached.state.channels == deviceState.channels &&
+            cached.state.bitDepth == deviceState.bitDepth
+        ) {
+            cached.preparedSource
+        } else {
+            SampleRenderSnapshot.prepareSource(
+                state = deviceState,
+                outputSampleRate = outputSampleRate,
+                rawData = resolvedRawData,
+            )
+        }
+        val snapshot = preparedSource?.let {
+            SampleRenderSnapshot.from(
+                state = deviceState,
+                source = it,
+            )
+        }
         return snapshot.also {
             renderCache.value = SampleRenderCache(
                 state = deviceState,
                 outputSampleRate = outputSampleRate,
                 rawData = resolvedRawData,
+                preparedSource = preparedSource,
                 snapshot = it,
             )
         }

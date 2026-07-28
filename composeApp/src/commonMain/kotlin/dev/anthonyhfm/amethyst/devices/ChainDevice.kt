@@ -40,6 +40,8 @@ class AudioRenderContext(
         private set
     var transportFrame: Long = transportFrame
         private set
+    var mixContributionEnergy: Float = 0f
+        private set
 
     internal fun configure(
         sampleRate: Int,
@@ -49,6 +51,16 @@ class AudioRenderContext(
         this.sampleRate = sampleRate
         this.absoluteFrame = absoluteFrame
         this.transportFrame = transportFrame
+        mixContributionEnergy = 0f
+    }
+
+    /**
+     * Reports a nominal contribution to the adaptive master headroom stage.
+     * This is called only by the single render thread.
+     */
+    fun addMixContribution(gain: Float) {
+        if (!gain.isFinite() || gain <= 0f) return
+        mixContributionEnergy += gain * gain
     }
 }
 

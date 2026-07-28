@@ -4,6 +4,7 @@ import dev.anthonyhfm.amethyst.core.engine.audio.AudioRenderer
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioRenderCommand
 import dev.anthonyhfm.amethyst.core.engine.audio.source.AudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.PcmAudioVoice
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.VoiceId
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
@@ -75,16 +76,26 @@ class AudioPlaybackEngine(
         pan: Float = 0f,
         targetFrame: Long = renderer.absoluteFrame,
     ): String? {
-        if (renderer.configuration == null) return null
+        val configuration = renderer.configuration ?: return null
+        val preparedSource = runCatching {
+            PreparedAudioSourceCache.getOrPrepare(source, configuration.sampleRate)
+        }.getOrNull() ?: return null
+        val frameScale = configuration.sampleRate.toDouble() / source.sampleRate
+        val preparedStartFrame = (sourceStartFrame * frameScale)
+            .toLong()
+            .coerceIn(0L, preparedSource.frameCount)
+        val preparedEndFrame = (sourceEndFrameExclusive * frameScale)
+            .toLong()
+            .coerceIn(preparedStartFrame, preparedSource.frameCount)
         val voiceId = VoiceId(nextVoiceId.getAndIncrement())
         val publicId = "echo-${voiceId.value}"
         val voice = runCatching {
             PcmAudioVoice(
                 id = voiceId,
-                source = source,
+                source = preparedSource,
                 startFrame = targetFrame,
-                sourceStartFrame = sourceStartFrame,
-                sourceEndFrameExclusive = sourceEndFrameExclusive,
+                sourceStartFrame = preparedStartFrame,
+                sourceEndFrameExclusive = preparedEndFrame,
                 gain = gain.coerceAtLeast(0f),
                 pan = pan.coerceIn(-1f, 1f),
             )

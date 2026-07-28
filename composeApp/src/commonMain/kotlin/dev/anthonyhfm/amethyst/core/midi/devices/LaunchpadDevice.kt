@@ -2,34 +2,51 @@ package dev.anthonyhfm.amethyst.core.midi.devices
 
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
-import dev.anthonyhfm.amethyst.core.engine.heaven.Screen
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiOutput
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 import dev.anthonyhfm.amethyst.core.util.FastLED
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
 
 abstract class LaunchpadDevice(
     open val connection: AmethystMidiDeviceConnection,
     val firmware: LaunchpadFirmware,
-) {
-    val screen: Screen = Screen()
-
-    protected val outscope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
-    private val sendChannel = Channel<ByteArray>(Channel.UNLIMITED)
+) : AutoCloseable {
+    protected val outscope = CoroutineScope(Dispatchers.IO.limitedParallelism(1) + SupervisorJob())
+    private val frameChannel = Channel<Array<Color>>(Channel.CONFLATED)
+    private val desiredColorsLock = SynchronizedObject()
+    private val desiredColors = Array(101) { Color.Black }
+    @Volatile
+    private var closed = false
 
     init {
-        screen.screenExit = { updates, colors ->
-            sendUpdate(updates, colors)
-        }
-
         outscope.launch {
-            for (data in sendChannel) {
-                runCatching {
-                    midiOutput.send(data)
+            var lastSentColors: Array<Color>? = null
+            for (colors in frameChannel) {
+                val updates = colors.mapIndexedNotNull { index, color ->
+                    if (lastSentColors?.get(index) == color) null
+                    else RawLEDUpdate(index.toByte(), color)
+                }
+                if (updates.isEmpty()) continue
+
+                val result = runCatching {
+                    encodeUpdate(updates).forEach(midiOutput::send)
+                }
+                if (result.isSuccess) {
+                    lastSentColors = colors
+                } else {
+                    println("MIDI output ${midiOutput.portId} failed: ${result.exceptionOrNull()?.message}")
+                    midiOutput.close()
+                    break
                 }
             }
         }
@@ -39,7 +56,21 @@ abstract class LaunchpadDevice(
 
     abstract fun clear()
 
-    abstract fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>)
+    fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
+        if (closed || updates.isEmpty()) return
+        val latest = synchronized(desiredColorsLock) {
+            updates.forEach { update ->
+                val index = update.index.toInt() and 0xFF
+                if (index in desiredColors.indices) {
+                    desiredColors[index] = update.color
+                }
+            }
+            desiredColors.copyOf()
+        }
+        frameChannel.trySend(latest)
+    }
+
+    protected abstract fun encodeUpdate(updates: List<RawLEDUpdate>): List<ByteArray>
 
     abstract fun getEffectSysEx(updates: List<RawLEDUpdate>): ByteArray
 
@@ -48,17 +79,23 @@ abstract class LaunchpadDevice(
     }
 
     protected fun sendMidi(data: ByteArray) {
-        sendChannel.trySend(data)
+        if (closed) return
+        outscope.launch {
+            runCatching { midiOutput.send(data) }
+                .onFailure {
+                    println("MIDI output ${midiOutput.portId} failed: ${it.message}")
+                    midiOutput.close()
+                }
+        }
     }
 
-    protected fun sendFastLedUpdates(updates: List<RawLEDUpdate>): Boolean {
-        if (!usesFastLedFormat) return false
+    protected fun encodeFastLedUpdates(updates: List<RawLEDUpdate>): List<ByteArray>? {
+        if (!usesFastLedFormat) return null
 
         val addressableUpdates = prepareFastLedUpdates(updates)
-        FastLED.compressToChunks(addressableUpdates, fastLedMaxPayloadSize).forEach { payload ->
-            sendMidi(getFastLedSysEx(payload))
+        return FastLED.compressToChunks(addressableUpdates, fastLedMaxPayloadSize).map { payload ->
+            getFastLedSysEx(payload)
         }
-        return true
     }
 
     protected fun getFastLedEffectSysEx(updates: List<RawLEDUpdate>): ByteArray {
@@ -76,6 +113,13 @@ abstract class LaunchpadDevice(
 
     private fun getFastLedSysEx(payload: ByteArray): ByteArray {
         return FAST_LED_HEADER + payload + SYSEX_END
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        frameChannel.close()
+        outscope.cancel()
     }
 
     protected val usesFastLedFormat: Boolean
