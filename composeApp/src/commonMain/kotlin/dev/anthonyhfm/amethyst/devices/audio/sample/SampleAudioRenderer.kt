@@ -4,7 +4,6 @@ import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PolyphaseSincResampler
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
-import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import kotlinx.atomicfu.AtomicLongArray
@@ -242,9 +241,6 @@ internal class SampleVoiceRenderer {
     val isActive: Boolean
         get() = snapshot != null
 
-    val mixGain: Float
-        get() = snapshot?.volumeGain ?: 0f
-
     val sourceFrame: Long
         get() = snapshot?.let {
             floor(sourcePosition).toLong().coerceIn(
@@ -430,10 +426,9 @@ internal class SampleVoicePool(
         nextVoiceIndex = (selectedIndex + 1) % voices.size
     }
 
-    fun render(block: AudioProcessingBlock, context: AudioRenderContext) {
+    fun render(block: AudioProcessingBlock) {
         voices.forEach { voice ->
             if (voice.isActive) {
-                context.addMixContribution(voice.mixGain)
                 voice.render(block)
             }
         }

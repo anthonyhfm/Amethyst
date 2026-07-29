@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.core.engine.audio
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioCommandQueue
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioRenderCommand
 import dev.anthonyhfm.amethyst.core.engine.audio.dsp.StereoLinkedLookaheadLimiter
-import dev.anthonyhfm.amethyst.core.engine.audio.dsp.AdaptiveMixHeadroom
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.AudioVoice
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.VoiceId
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
@@ -23,7 +22,6 @@ class AudioRenderer(
     val chain: AudioChain,
     val commandQueue: AudioCommandQueue = AudioCommandQueue(),
     val maximumVoices: Int = DEFAULT_MAXIMUM_VOICES,
-    val adaptiveHeadroom: AdaptiveMixHeadroom = AdaptiveMixHeadroom(),
     val limiter: StereoLinkedLookaheadLimiter = StereoLinkedLookaheadLimiter(),
     val limiterEnabled: Boolean = true,
 ) {
@@ -90,7 +88,6 @@ class AudioRenderer(
             transportFrame = initialAbsoluteFrame,
         )
         limiter.prepare(configuration.sampleRate)
-        adaptiveHeadroom.prepare(configuration.sampleRate)
         chain.prepareAudio(configuration)
         clearVoices()
         commandQueue.clear()
@@ -188,7 +185,6 @@ class AudioRenderer(
         clearVoices()
         chain.resetAudio()
         limiter.reset()
-        adaptiveHeadroom.reset()
         renderedFrame.value = absoluteFrame
         masterGain = 1f
         targetMasterGain = 1f
@@ -225,11 +221,6 @@ class AudioRenderer(
 
         chain.processAudio(block, context)
         renderVoices(block, context)
-        adaptiveHeadroom.processInterleaved(
-            samples = block.samples,
-            frameCount = frameCount,
-            contributionEnergy = context.mixContributionEnergy,
-        )
         applyMasterGain(block.samples, frameCount)
         if (limiterEnabled) {
             limiter.processInterleaved(block.samples, frameCount)

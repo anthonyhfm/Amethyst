@@ -24,6 +24,9 @@ data class AudioOutputStatus(
     val periodFrames: Int = 0,
     val fallbackReason: String? = null,
     val error: String? = null,
+    val underrunCount: Long = 0L,
+    val streamErrorCount: Long = 0L,
+    val renderDeadlineMissCount: Long = 0L,
 )
 
 data class AudioSourcePlayback(

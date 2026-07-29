@@ -35,6 +35,15 @@ import platform.posix.clock_gettime
 import platform.posix.memset
 import platform.posix.timespec
 import kotlin.math.roundToInt
+import kotlin.time.TimeSource
+
+internal data class IosAudioHealthUpdate(
+    val renderDeadlineMissDelta: Long,
+    val renderErrorDelta: Long,
+    val sampleRate: Int,
+    val periodFrames: Int,
+    val monotonicMillis: Long,
+)
 
 /**
  * Pull-based iOS output for live performance.
@@ -47,24 +56,29 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalForeignApi::class)
 internal class IosAudioOutput(
     private val playback: AudioPlaybackEngine,
+    private val onHealthUpdate: (IosAudioHealthUpdate) -> Unit,
 ) {
     private val lifecycleLock = NSRecursiveLock()
     private val session = AVAudioSession.sharedInstance()
     private val renderEnabled = atomic(false)
     private val wantsRunning = atomic(false)
-    private val firstRenderFailureReported = atomic(false)
     private val foreground = atomic(
         UIApplication.sharedApplication.applicationState !=
             UIApplicationState.UIApplicationStateBackground,
     )
     private val renderBuffer = FloatArray(MAX_RENDER_FRAMES * OUTPUT_CHANNELS)
     private val observers = mutableListOf<Any>()
-    private val callbackOverloadStreak = atomic(0)
+    private val deadlinePolicy = AudioRenderDeadlinePolicy(
+        consecutiveMissesBeforeFallback = DEADLINE_MISSES_BEFORE_FALLBACK,
+    )
     private val requestLargerBuffer = atomic(false)
     private val previousCallbackStart = atomic(0L)
     private val previousCallbackFrames = atomic(0)
+    private val renderDeadlineMisses = atomic(0L)
+    private val renderErrors = atomic(0L)
     private val controlScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val callbackClock = nativeHeap.alloc<timespec>()
+    private val healthClockStart = TimeSource.Monotonic.markNow()
 
     private var engine: AVAudioEngine? = null
     private var sourceNode: AVAudioSourceNode? = null
@@ -76,6 +90,8 @@ internal class IosAudioOutput(
 
     init {
         controlScope.launch {
+            var lastDeadlineMisses = 0L
+            var lastRenderErrors = 0L
             while (isActive) {
                 delay(ADAPTATION_POLL_MS)
                 if (
@@ -88,6 +104,21 @@ internal class IosAudioOutput(
                         }
                     }
                 }
+                val currentDeadlineMisses = renderDeadlineMisses.value
+                val currentRenderErrors = renderErrors.value
+                onHealthUpdate(
+                    IosAudioHealthUpdate(
+                        renderDeadlineMissDelta =
+                            (currentDeadlineMisses - lastDeadlineMisses).coerceAtLeast(0L),
+                        renderErrorDelta =
+                            (currentRenderErrors - lastRenderErrors).coerceAtLeast(0L),
+                        sampleRate = configuredSampleRate,
+                        periodFrames = configuredPeriodFrames,
+                        monotonicMillis = controlMonotonicMillis(),
+                    )
+                )
+                lastDeadlineMisses = currentDeadlineMisses
+                lastRenderErrors = currentRenderErrors
             }
         }
     }
@@ -108,15 +139,17 @@ internal class IosAudioOutput(
         preferredBufferFrames: Int,
         initialMasterGain: Float,
     ): Boolean = withLifecycleLock {
+        wantsRunning.value = true
+        installObserversIfNeeded()
+        if (!foreground.value) return@withLifecycleLock false
+        // Repeated play() calls must not undo an automatic 128 -> 256
+        // adaptation. Explicit setting changes use updatePreferredBufferFrames.
+        if (renderEnabled.value && engine?.running == true) return@withLifecycleLock true
         this.preferredBufferFrames = preferredBufferFrames.coerceIn(
             MIN_BUFFER_FRAMES,
             MAX_PREFERRED_BUFFER_FRAMES,
         )
         this.initialMasterGain = initialMasterGain.coerceAtLeast(0f)
-        wantsRunning.value = true
-        installObserversIfNeeded()
-        if (!foreground.value) return@withLifecycleLock false
-        if (renderEnabled.value && engine?.running == true) return@withLifecycleLock true
         startHardware()
     }
 
@@ -322,10 +355,8 @@ internal class IosAudioOutput(
             }
             isSilence?.pointed?.value = false
             NO_ERR
-        } catch (error: Throwable) {
-            if (firstRenderFailureReported.compareAndSet(expect = false, update = true)) {
-                println("Echo/iOS: render callback failed: ${error.stackTraceToString()}")
-            }
+        } catch (_: Throwable) {
+            renderErrors.incrementAndGet()
             clear(buffers)
             isSilence?.pointed?.value = true
             NO_ERR
@@ -351,7 +382,7 @@ internal class IosAudioOutput(
         priorFrameCount: Int,
     ) {
         if (priorStartedAt <= 0L || priorFrameCount != frameCount) {
-            callbackOverloadStreak.value = 0
+            deadlinePolicy.record(overloaded = false)
             return
         }
         val periodTicks = startedAt - priorStartedAt
@@ -361,20 +392,23 @@ internal class IosAudioOutput(
                 renderTicks > 0L &&
                 renderTicks > periodTicks / DEADLINE_DENOMINATOR * DEADLINE_NUMERATOR
         if (!overloaded) {
-            callbackOverloadStreak.value = 0
+            deadlinePolicy.record(overloaded = false)
             return
         }
 
-        val misses = callbackOverloadStreak.incrementAndGet()
-        if (misses >= DEADLINE_MISSES_BEFORE_FALLBACK) {
+        renderDeadlineMisses.incrementAndGet()
+        if (deadlinePolicy.record(overloaded = true)) {
             requestLargerBuffer.value = true
-            callbackOverloadStreak.value = 0
         }
     }
 
     private fun monotonicNanos(): Long {
         clock_gettime(CLOCK_MONOTONIC.toUInt(), callbackClock.ptr)
         return callbackClock.tv_sec * NANOS_PER_SECOND + callbackClock.tv_nsec
+    }
+
+    private fun controlMonotonicMillis(): Long {
+        return healthClockStart.elapsedNow().inWholeMilliseconds
     }
 
     private fun copyToAudioBufferList(
@@ -506,8 +540,8 @@ internal class IosAudioOutput(
     private companion object {
         const val OUTPUT_CHANNELS = 2
         const val MIN_BUFFER_FRAMES = 64
-        const val DEFAULT_BUFFER_FRAMES = 64
-        const val FALLBACK_BUFFER_FRAMES = 128
+        const val DEFAULT_BUFFER_FRAMES = 128
+        const val FALLBACK_BUFFER_FRAMES = 256
         const val MAX_PREFERRED_BUFFER_FRAMES = 2_048
         const val MAX_RENDER_FRAMES = 4_096
         const val DEFAULT_SAMPLE_RATE = 48_000.0

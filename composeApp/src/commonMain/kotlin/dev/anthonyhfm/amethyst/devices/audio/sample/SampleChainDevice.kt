@@ -324,7 +324,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
             voicePool.trigger(pending)
             pending = triggerQueue.poll()
         }
-        voicePool.render(block, context)
+        voicePool.render(block)
         publishedPlayheadFrame.value = voicePool.sourceFrame
     }
 

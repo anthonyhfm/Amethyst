@@ -129,7 +129,7 @@ class StereoLinkedLookaheadLimiter(
 
     companion object {
         const val DEFAULT_LOOKAHEAD_MILLIS = 1.0
-        const val DEFAULT_CEILING_DB = -1f
+        const val DEFAULT_CEILING_DB = 0f
         const val DEFAULT_RELEASE_MILLIS = 50.0
     }
 }

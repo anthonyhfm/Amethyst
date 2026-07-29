@@ -665,6 +665,23 @@ mod tests {
     }
 
     #[test]
+    fn two_primed_periods_are_consumed_without_underruns() {
+        let ring = SpscFloatRing::new(4, 2);
+        let telemetry = CallbackTelemetry::new();
+        let primed = [0.25, -0.25, 0.5, -0.5, 0.75, -0.75, 1.0, -1.0];
+        assert_eq!(ring.write_interleaved(&primed), primed.len());
+
+        let mut first_period = [0.0; 4];
+        let mut second_period = [0.0; 4];
+        consume_f32(&ring, &telemetry, &mut first_period);
+        consume_f32(&ring, &telemetry, &mut second_period);
+
+        assert_eq!(first_period, primed[..4]);
+        assert_eq!(second_period, primed[4..]);
+        assert_eq!(telemetry.underruns.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
     fn integer_callbacks_use_format_correct_silence() {
         let signed_ring = SpscFloatRing::new(1, 1);
         let signed_telemetry = CallbackTelemetry::new();

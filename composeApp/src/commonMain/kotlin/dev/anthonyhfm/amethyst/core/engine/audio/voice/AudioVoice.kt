@@ -85,7 +85,6 @@ class PcmAudioVoice(
     override fun render(block: AudioProcessingBlock, context: AudioRenderContext) {
         val activeResampler = resampler ?: return
         if (isFinished) return
-        context.addMixContribution(currentGain)
 
         var outputFrame = 0
         if (context.absoluteFrame < startFrame) {

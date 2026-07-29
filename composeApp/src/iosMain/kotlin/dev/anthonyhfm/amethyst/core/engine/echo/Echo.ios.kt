@@ -21,6 +21,11 @@ actual object Echo {
     private var preferredBufferFrames = DEFAULT_BUFFER_FRAMES
     private val mutableOutputStatus = MutableStateFlow(AudioOutputStatus())
     actual val outputStatus: StateFlow<AudioOutputStatus> = mutableOutputStatus.asStateFlow()
+    private val healthLogThrottle = AudioHealthLogThrottle()
+    private var totalStreamErrors = 0L
+    private var totalRenderDeadlineMisses = 0L
+    private var loggedStreamErrors = 0L
+    private var loggedRenderDeadlineMisses = 0L
 
     actual suspend fun decodeAudioFile(
         filePath: String,
@@ -45,7 +50,8 @@ actual object Echo {
     actual fun getSupportedFormats(): List<String> = IosAudioDecoder.formats
 
     actual fun initialize(): Boolean = withLifecycleLock {
-        val activeOutput = output ?: IosAudioOutput(playback).also { output = it }
+        val activeOutput = output
+            ?: IosAudioOutput(playback, ::onIosHealthUpdate).also { output = it }
         val initialized = activeOutput.initialize(
             preferredBufferFrames = preferredBufferFrames,
             initialMasterGain = AudioSettings.masterVolume.value,
@@ -55,6 +61,8 @@ actual object Echo {
                 requestedMode = AudioOutputMode.Shared,
                 activeMode = AudioOutputMode.Shared,
                 error = activeOutput.startFailure ?: "App is in background",
+                streamErrorCount = totalStreamErrors,
+                renderDeadlineMissCount = totalRenderDeadlineMisses,
             )
             println("Echo/iOS: output initialization failed: ${activeOutput.startFailure ?: "app is in background"}")
         } else {
@@ -63,6 +71,8 @@ actual object Echo {
                 backend = "Core Audio",
                 sampleRate = activeOutput.sampleRate,
                 periodFrames = activeOutput.periodFrames,
+                streamErrorCount = totalStreamErrors,
+                renderDeadlineMissCount = totalRenderDeadlineMisses,
             )
         }
         initialized
@@ -205,5 +215,43 @@ actual object Echo {
         }
     }
 
-    private const val DEFAULT_BUFFER_FRAMES = 64
+    private fun onIosHealthUpdate(update: IosAudioHealthUpdate) {
+        withLifecycleLock {
+            totalStreamErrors += update.renderErrorDelta
+            totalRenderDeadlineMisses += update.renderDeadlineMissDelta
+            val previous = mutableOutputStatus.value
+            mutableOutputStatus.value = previous.copy(
+                sampleRate = update.sampleRate.takeIf { it > 0 } ?: previous.sampleRate,
+                periodFrames = update.periodFrames.takeIf { it > 0 } ?: previous.periodFrames,
+                streamErrorCount = totalStreamErrors,
+                renderDeadlineMissCount = totalRenderDeadlineMisses,
+            )
+            val changed =
+                update.renderErrorDelta > 0L || update.renderDeadlineMissDelta > 0L
+            val shouldLog = if (changed) {
+                healthLogThrottle.markChanged(update.monotonicMillis)
+            } else {
+                healthLogThrottle.poll(update.monotonicMillis)
+            }
+            if (shouldLog) logAudioHealth()
+        }
+    }
+
+    private fun logAudioHealth() {
+        val streamErrorDelta = totalStreamErrors - loggedStreamErrors
+        val deadlineMissDelta =
+            totalRenderDeadlineMisses - loggedRenderDeadlineMisses
+        loggedStreamErrors = totalStreamErrors
+        loggedRenderDeadlineMisses = totalRenderDeadlineMisses
+        val status = mutableOutputStatus.value
+        println(
+            "[Echo/iOS] audio health: " +
+                "streamErrors=+$streamErrorDelta/$totalStreamErrors, " +
+                "renderDeadlineMisses=+$deadlineMissDelta/$totalRenderDeadlineMisses, " +
+                "backend=${status.backend}, sampleRate=${status.sampleRate}, " +
+                "periodFrames=${status.periodFrames}",
+        )
+    }
+
+    private const val DEFAULT_BUFFER_FRAMES = 128
 }

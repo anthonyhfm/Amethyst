@@ -24,7 +24,7 @@ object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_ti
         key = "echoRenderBufferFrames",
         title = "Buffer Size",
         titleRes = Res.string.settings_audio_buffer_size_title,
-        default = 64,
+        default = 128,
         options = listOf(64, 128, 256),
         codec = SettingCodec.Int,
         label = { "$it frames" },

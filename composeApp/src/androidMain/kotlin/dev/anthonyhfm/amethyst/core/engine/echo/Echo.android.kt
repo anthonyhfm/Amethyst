@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
@@ -28,8 +29,19 @@ actual object Echo {
     private val decoder = NativeEchoDecoder()
     private val formats = listOf("wav", "mp3", "flac", "ogg", "aiff", "aif", "aifc")
     private val renderRunning = AtomicBoolean(false)
+    private val healthMonitorRunning = AtomicBoolean(false)
     private val mutableOutputStatus = MutableStateFlow(AudioOutputStatus())
     actual val outputStatus: StateFlow<AudioOutputStatus> = mutableOutputStatus.asStateFlow()
+    private val healthLogThrottle = AudioHealthLogThrottle()
+
+    @Volatile
+    private var totalUnderruns = 0L
+
+    @Volatile
+    private var totalStreamErrors = 0L
+
+    private var loggedUnderruns = 0L
+    private var loggedStreamErrors = 0L
 
     /** Guards against duplicate render-thread/native-stream teardown across repeated app background/foreground transitions. */
     private val backgrounded = AtomicBoolean(false)
@@ -42,6 +54,9 @@ actual object Echo {
 
     @Volatile
     private var renderThread: Thread? = null
+
+    @Volatile
+    private var healthMonitorThread: Thread? = null
 
     @Volatile
     private var initialized = false
@@ -58,7 +73,11 @@ actual object Echo {
             preferredOutputDevice = preferredOutputDevice,
         )
         if (!info.available) {
-            mutableOutputStatus.value = AudioOutputStatus(error = info.error)
+            mutableOutputStatus.value = AudioOutputStatus(
+                error = info.error,
+                underrunCount = totalUnderruns,
+                streamErrorCount = totalStreamErrors,
+            )
             Log.e(TAG, "PCM output initialization failed: ${info.error ?: "unknown error"}")
             nextOutput.close()
             return false
@@ -88,15 +107,17 @@ actual object Echo {
         val floatBuffer = directBuffer.asFloatBuffer()
         val renderBuffer = FloatArray(periodFrames * OUTPUT_CHANNELS)
 
-        // Prime one period before the hardware starts to avoid a cold-start underrun.
-        renderAndWritePeriod(
-            playback = nextPlayback,
-            output = nextOutput,
-            directBuffer = directBuffer,
-            floatBuffer = floatBuffer,
-            renderBuffer = renderBuffer,
-            periodFrames = periodFrames,
-        )
+        // Keep two complete periods ready before hardware playback starts.
+        repeat(AudioOutputBufferingPolicy.TARGET_QUEUED_PERIODS) {
+            renderAndWritePeriod(
+                playback = nextPlayback,
+                output = nextOutput,
+                directBuffer = directBuffer,
+                floatBuffer = floatBuffer,
+                renderBuffer = renderBuffer,
+                periodFrames = periodFrames,
+            )
+        }
         val startError = nextOutput.start()
         if (startError != null) {
             Log.e(TAG, "PCM output failed to start: $startError")
@@ -111,6 +132,8 @@ actual object Echo {
             backend = info.backend,
             sampleRate = configuration.sampleRate,
             periodFrames = periodFrames,
+            underrunCount = totalUnderruns,
+            streamErrorCount = totalStreamErrors,
         )
         renderRunning.set(true)
         renderThread = Thread(
@@ -133,6 +156,7 @@ actual object Echo {
             start()
         }
         initialized = true
+        startHealthMonitor(nextOutput)
         return true
     }
 
@@ -323,6 +347,7 @@ actual object Echo {
 
     private fun stopOutput() {
         initialized = false
+        stopHealthMonitor()
         renderRunning.set(false)
         renderThread?.let { thread ->
             if (thread !== Thread.currentThread()) {
@@ -345,27 +370,9 @@ actual object Echo {
         sampleRate: Int,
     ) {
         val periodNanos = periodFrames * NANOS_PER_SECOND / sampleRate.coerceAtLeast(1)
-        var targetPeriods = 1
-        var lastUnderrunCount = 0UL
-        var lastUnderrunAtNanos = 0L
-        var nextTelemetryAtNanos = 0L
+        val targetQueuedFrames =
+            AudioOutputBufferingPolicy.targetQueuedFrames(periodFrames)
         while (renderRunning.get()) {
-            val now = System.nanoTime()
-            if (now >= nextTelemetryAtNanos) {
-                val telemetry = output.telemetry()
-                if (telemetry.underruns > lastUnderrunCount) {
-                    lastUnderrunCount = telemetry.underruns
-                    lastUnderrunAtNanos = now
-                    targetPeriods = 2
-                } else if (
-                    targetPeriods > 1 &&
-                    now - lastUnderrunAtNanos >= STABLE_LATENCY_RECOVERY_NANOS
-                ) {
-                    targetPeriods = 1
-                }
-                nextTelemetryAtNanos = now + TELEMETRY_INTERVAL_NANOS
-            }
-            val targetQueuedFrames = periodFrames * targetPeriods
             if (output.queuedFrames() >= targetQueuedFrames) {
                 LockSupport.parkNanos((periodNanos / 4L).coerceAtLeast(MINIMUM_PARK_NANOS))
                 continue
@@ -379,6 +386,77 @@ actual object Echo {
                 periodFrames = periodFrames,
             )
         }
+    }
+
+    private fun startHealthMonitor(monitoredOutput: NativePcmOutput) {
+        stopHealthMonitor()
+        healthMonitorRunning.set(true)
+        healthMonitorThread = Thread(
+            {
+                var lastUnderruns = 0UL
+                var lastStreamErrors = 0UL
+                while (healthMonitorRunning.get()) {
+                    val telemetry = runCatching { monitoredOutput.telemetry() }.getOrNull()
+                    if (telemetry != null) {
+                        val underrunDelta = counterDelta(telemetry.underruns, lastUnderruns)
+                        val streamErrorDelta =
+                            counterDelta(telemetry.streamErrors, lastStreamErrors)
+                        lastUnderruns = telemetry.underruns
+                        lastStreamErrors = telemetry.streamErrors
+                        if (underrunDelta > 0L || streamErrorDelta > 0L) {
+                            totalUnderruns += underrunDelta
+                            totalStreamErrors += streamErrorDelta
+                            mutableOutputStatus.value = mutableOutputStatus.value.copy(
+                                underrunCount = totalUnderruns,
+                                streamErrorCount = totalStreamErrors,
+                            )
+                        }
+                        val nowMillis = SystemClock.elapsedRealtime()
+                        val shouldLog = if (underrunDelta > 0L || streamErrorDelta > 0L) {
+                            healthLogThrottle.markChanged(nowMillis)
+                        } else {
+                            healthLogThrottle.poll(nowMillis)
+                        }
+                        if (shouldLog) logAudioHealth()
+                    }
+                    LockSupport.parkNanos(HEALTH_MONITOR_INTERVAL_NANOS)
+                }
+            },
+            "echo-audio-health",
+        ).apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun stopHealthMonitor() {
+        healthMonitorRunning.set(false)
+        healthMonitorThread?.let { thread ->
+            if (thread !== Thread.currentThread()) {
+                thread.join(HEALTH_MONITOR_JOIN_MILLIS)
+            }
+        }
+        healthMonitorThread = null
+    }
+
+    private fun logAudioHealth() {
+        val underrunDelta = totalUnderruns - loggedUnderruns
+        val streamErrorDelta = totalStreamErrors - loggedStreamErrors
+        loggedUnderruns = totalUnderruns
+        loggedStreamErrors = totalStreamErrors
+        val status = mutableOutputStatus.value
+        Log.w(
+            TAG,
+            "Audio health: underruns=+$underrunDelta/$totalUnderruns, " +
+                "streamErrors=+$streamErrorDelta/$totalStreamErrors, " +
+                "backend=${status.backend}, sampleRate=${status.sampleRate}, " +
+                "periodFrames=${status.periodFrames}",
+        )
+    }
+
+    private fun counterDelta(current: ULong, previous: ULong): Long {
+        val delta = if (current >= previous) current - previous else current
+        return delta.coerceAtMost(Long.MAX_VALUE.toULong()).toLong()
     }
 
     private fun renderAndWritePeriod(
@@ -444,8 +522,8 @@ actual object Echo {
     private const val OUTPUT_CHANNELS = 2
     private const val MAXIMUM_RENDER_BLOCK_FRAMES = 256
     private const val RENDER_THREAD_JOIN_MILLIS = 1_000L
+    private const val HEALTH_MONITOR_JOIN_MILLIS = 1_000L
     private const val NANOS_PER_SECOND = 1_000_000_000L
     private const val MINIMUM_PARK_NANOS = 50_000L
-    private const val TELEMETRY_INTERVAL_NANOS = 250_000_000L
-    private const val STABLE_LATENCY_RECOVERY_NANOS = 10L * NANOS_PER_SECOND
+    private const val HEALTH_MONITOR_INTERVAL_NANOS = 250_000_000L
 }
