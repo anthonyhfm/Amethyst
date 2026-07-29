@@ -72,3 +72,9 @@ sealed interface Signal {
         }
     }
 }
+
+fun Signal.isOn(): Boolean = when (this) {
+    is Signal.LED -> color != Color.Black && opacity > 0f && (color.red > 0f || color.green > 0f || color.blue > 0f)
+    is Signal.Midi -> velocity > 0
+    else -> true
+}

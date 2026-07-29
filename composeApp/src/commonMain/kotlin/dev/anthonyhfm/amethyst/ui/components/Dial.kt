@@ -63,6 +63,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.devices.LocalChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
 import dev.anthonyhfm.amethyst.ui.modifier.VerticalDrag
 import dev.anthonyhfm.amethyst.ui.modifier.gesturesDisabled
@@ -112,7 +116,48 @@ fun <T> Dial(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     defaultValue: T? = null,
+    automationParameter: AutomationParameter? = null,
+    isAutomated: Boolean = false,
+    hasAutomation: Boolean = false,
 ) {
+    val chainDevice = LocalChainDevice.current
+    val node = LocalCompositionNode.current
+
+    if (!isAutomated && automationParameter != null && chainDevice != null) {
+        AutomatableDial(
+            parameterId = automationParameter.id,
+            automationParameter = automationParameter,
+            type = type,
+            value = value,
+            defaultValue = defaultValue ?: value,
+            title = title ?: automationParameter.label,
+            text = text ?: "",
+            onValueChange = onValueChange,
+            onResolveTextValue = onResolveTextValue,
+            containerColor = containerColor,
+            dialColor = dialColor,
+            modifier = modifier,
+        )
+        return
+    }
+
+    if (!isAutomated && title != null && node != null) {
+        AutomatableDial(
+            parameterId = title.lowercase().replace(" ", "_"),
+            type = type,
+            value = value,
+            defaultValue = defaultValue ?: value,
+            title = title,
+            text = text ?: "",
+            onValueChange = onValueChange,
+            onResolveTextValue = onResolveTextValue,
+            containerColor = containerColor,
+            dialColor = dialColor,
+            modifier = modifier,
+        )
+        return
+    }
+
     when (type) {
         DialType.Continuous -> ContinuousDial(
             value = value as Float,
@@ -128,6 +173,7 @@ fun <T> Dial(
             dialColor = dialColor,
             modifier = modifier,
             enabled = enabled,
+            isAutomated = hasAutomation,
         )
 
         DialType.Knob -> ContinuousDial(
@@ -144,6 +190,7 @@ fun <T> Dial(
             dialColor = dialColor,
             modifier = modifier,
             enabled = enabled,
+            isAutomated = hasAutomation,
         )
 
         is DialType.Steps<*> -> SteppedDial(
@@ -160,6 +207,7 @@ fun <T> Dial(
             dialColor = dialColor,
             modifier = modifier,
             enabled = enabled,
+            isAutomated = hasAutomation,
         )
     }
 }
@@ -179,6 +227,7 @@ private fun ContinuousDial(
     dialColor: Color,
     modifier: Modifier,
     enabled: Boolean,
+    isAutomated: Boolean = false,
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dialValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
@@ -206,6 +255,7 @@ private fun ContinuousDial(
             modifier = dialModifier,
             enabled = enabled,
             knob = knob,
+            isAutomated = isAutomated,
             onDoubleClick = {
                 dialValue = defaultValue
                 onValueChange(defaultValue)
@@ -237,7 +287,7 @@ private fun <T> SteppedDial(
     values: List<T>, value: T, onStartValueChange: (T) -> Unit, onValueChange: (T) -> Unit,
     onFinishValueChange: (T) -> Unit, defaultValue: T?, title: String?, text: String?,
     onResolveTextValue: ((String) -> Unit)?, containerColor: Color, dialColor: Color,
-    modifier: Modifier, enabled: Boolean,
+    modifier: Modifier, enabled: Boolean, isAutomated: Boolean = false,
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var index by remember { mutableStateOf(values.indexOf(value).coerceAtLeast(0)) }
@@ -266,6 +316,7 @@ private fun <T> SteppedDial(
                 onFinishValueChange(values[index])
             },
             containerColor = containerColor, dialColor = dialColor, modifier = dialModifier, enabled = enabled,
+            isAutomated = isAutomated,
             onDoubleClick = {
                 index = values.indexOf(defaultValue ?: values.first()).coerceAtLeast(0)
                 progress = progressForSelection(index, values.size)
@@ -302,6 +353,7 @@ internal fun DialSurface(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     knob: Boolean = false,
+    isAutomated: Boolean = false,
     onDoubleClick: () -> Unit = { },
     onIncrement: (() -> Unit)? = null,
     onDecrement: (() -> Unit)? = null,
@@ -332,149 +384,155 @@ internal fun DialSurface(
     val borderWidth = 1.dp
 
     Box(
-        modifier = modifier
-            .gesturesDisabled(!enabled)
-            .alpha(if (enabled) 1f else 0.45f)
-            .size(DialSurfaceSize)
-            .then(
-                if (isFocused) {
-                    Modifier.drawBehind {
-                        val strokeWidth = 2.dp.toPx()
-                        val outlineRadius = (size.minDimension / 2f) + (strokeWidth / 2f)
-                        drawCircle(
-                            color = focusedBorderColor,
-                            radius = outlineRadius,
-                            style = Stroke(width = strokeWidth)
-                        )
-                    }
-                } else {
-                    Modifier
-                }
-            )
-            .shadow(1.dp, CircleShape)
-            .clip(CircleShape)
-            .then(
-                if (enabled) {
-                    Modifier.pointerHoverIcon(PointerIcon.VerticalDrag)
-                } else {
-                    Modifier
-                }
-            )
-            .focusRequester(focusRequester)
-            .focusable(enabled = enabled, interactionSource = interactionSource)
-            .onKeyEvent { event ->
-                if (enabled && event.type == KeyEventType.KeyDown) {
-                    when (event.key) {
-                        Key.DirectionUp -> {
-                            currentOnIncrement?.invoke()
-                            true
-                        }
-
-                        Key.DirectionDown -> {
-                            currentOnDecrement?.invoke()
-                            true
-                        }
-
-                        Key.Escape -> {
-                            focusManager.clearFocus()
-                            true
-                        }
-
-                        else -> false
-                    }
-                } else {
-                    false
-                }
-            }
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                awaitEachGesture {
-                    awaitFirstDown(pass = PointerEventPass.Initial)
-                    focusRequester.requestFocus()
-                }
-            }
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                detectTapGestures(
-                    onDoubleTap = { onDoubleClick() }
-                )
-            }
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-
-                var dragProgress = currentProgress
-
-                detectDragGestures(
-                    onDragStart = {
-                        focusRequester.requestFocus()
-                        dragProgress = currentProgress
-                        currentOnDragStart()
-                    },
-                    onDrag = { _, offset ->
-                        val raw = dragProgress + (offset.y * -1f) * DialDragFactor
-                        dragProgress = when {
-                            raw >= 1f - DialBoundaryEpsilon -> 1f
-                            raw <= DialBoundaryEpsilon -> 0f
-                            else -> raw.coerceIn(0f, 1f)
-                        }
-                        currentOnDragProgressChange(dragProgress)
-                    },
-                    onDragEnd = currentOnDragEnd,
-                )
-            }
-            .background(resolvedContainerColor)
-            .border(borderWidth, borderColor, CircleShape)
-            .padding(DialOuterPadding)
+        modifier = modifier.size(DialSurfaceSize)
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 4.5.dp.toPx()
-            val dialRadius = size.minDimension / 2f - strokeWidth / 2f
-            val innerRadius = dialRadius - strokeWidth * 1.15f
-
-            drawArc(
-                color = trackColor,
-                startAngle = if (knob) -90f else DialArcStart,
-                sweepAngle = if (knob) 360f else DialArcSweep,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            drawArc(
-                color = resolvedDialColor,
-                startAngle = if (knob) -90f else DialArcStart,
-                sweepAngle = (if (knob) 360f else DialArcSweep) * resolvedProgress,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            drawCircle(
-                color = centerColor,
-                radius = innerRadius.coerceAtLeast(0f),
-                center = center
-            )
-
-            drawCircle(
-                color = innerOutlineColor,
-                radius = innerRadius.coerceAtLeast(0f),
-                center = center,
-                style = Stroke(width = 1.dp.toPx())
-            )
-        }
-
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
                 .fillMaxSize()
-                .padding(DialIndicatorInset)
-                .rotate(if (knob) resolvedProgress * 360f else DialRotationStart + (resolvedProgress * DialRotationSweep))
+                .gesturesDisabled(!enabled)
+                .alpha(if (enabled) 1f else 0.45f)
+                .then(
+                    if (isFocused) {
+                        Modifier.drawBehind {
+                            val strokeWidth = 2.dp.toPx()
+                            val outlineRadius = (size.minDimension / 2f) + (strokeWidth / 2f)
+                            drawCircle(
+                                color = focusedBorderColor,
+                                radius = outlineRadius,
+                                style = Stroke(width = strokeWidth)
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
+                .shadow(1.dp, CircleShape)
+                .clip(CircleShape)
+                .then(
+                    if (enabled) {
+                        Modifier.pointerHoverIcon(PointerIcon.VerticalDrag)
+                    } else {
+                        Modifier
+                    }
+                )
+                .focusRequester(focusRequester)
+                .focusable(enabled = enabled, interactionSource = interactionSource)
+                .onKeyEvent { event ->
+                    if (enabled && event.type == KeyEventType.KeyDown) {
+                        when (event.key) {
+                            Key.DirectionUp -> {
+                                currentOnIncrement?.invoke()
+                                true
+                            }
+
+                            Key.DirectionDown -> {
+                                currentOnDecrement?.invoke()
+                                true
+                            }
+
+                            Key.Escape -> {
+                                focusManager.clearFocus()
+                                true
+                            }
+
+                            else -> false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    detectTapGestures(
+                        onDoubleTap = { currentOnDragStart(); onDoubleClick() }
+                    )
+                }
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        currentOnDragStart()
+                        var lastY = down.position.y
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            val currentY = change.position.y
+                            val deltaY = lastY - currentY
+                            lastY = currentY
+                            if (deltaY != 0f) {
+                                val newProgress = (currentProgress + (deltaY * DialDragFactor)).coerceIn(0f, 1f)
+                                currentOnDragProgressChange(newProgress)
+                            }
+                            change.consume()
+                        }
+                        currentOnDragEnd()
+                    }
+                }
+                .background(resolvedContainerColor)
+                .border(borderWidth, borderColor, CircleShape)
+                .padding(DialOuterPadding)
         ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 4.5.dp.toPx()
+                val dialRadius = size.minDimension / 2f - strokeWidth / 2f
+                val innerRadius = dialRadius - strokeWidth * 1.15f
+
+                drawArc(
+                    color = trackColor,
+                    startAngle = if (knob) -90f else DialArcStart,
+                    sweepAngle = if (knob) 360f else DialArcSweep,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+
+                drawArc(
+                    color = resolvedDialColor,
+                    startAngle = if (knob) -90f else DialArcStart,
+                    sweepAngle = (if (knob) 360f else DialArcSweep) * resolvedProgress,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+
+                drawCircle(
+                    color = centerColor,
+                    radius = innerRadius.coerceAtLeast(0f),
+                    center = center
+                )
+
+                drawCircle(
+                    color = innerOutlineColor,
+                    radius = innerRadius.coerceAtLeast(0f),
+                    center = center,
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            }
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .clip(CircleShape)
-                    .width(DialIndicatorWidth)
-                    .height(DialIndicatorHeight)
-                    .background(indicatorColor)
+                    .align(Alignment.Center)
+                    .fillMaxSize()
+                    .padding(DialIndicatorInset)
+                    .rotate(if (knob) resolvedProgress * 360f else DialRotationStart + (resolvedProgress * DialRotationSweep))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .clip(CircleShape)
+                        .width(DialIndicatorWidth)
+                        .height(DialIndicatorHeight)
+                        .background(indicatorColor)
+                )
+            }
+        }
+
+        if (isAutomated) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(8.dp)
+                    .background(Color(0xFFFF3B30), CircleShape)
+                    .border(1.dp, centerColor, CircleShape)
             )
         }
     }

@@ -46,9 +46,42 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.core.controls.automation.enumSnapPoints
+import dev.anthonyhfm.amethyst.devices.Automatable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+
 class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
     override val state = MutableStateFlow(BlurChainDeviceState())
     override val helpRef = "Blur"
+
+    sealed class Params : AutomationParameter {
+        object Radius : Params() {
+            override val id = "radius"
+            override val label = "Radius"
+            override val curveMode = CurveMode.Unipolar
+            override val displayRange = 1f..8f
+            override val displayDecimals = 0
+        }
+
+        object Amount : Params() {
+            override val id = "amount"
+            override val label = "Amount"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object Shape : Params() {
+            override val id = "shape"
+            override val label = "Shape"
+            override val snapPoints = enumSnapPoints<BlurShape> { it.label }
+        }
+    }
 
     private val activePads = mutableMapOf<Pair<Int, Int>, Signal.LED>()
     private val previousOutput = mutableMapOf<Pair<Int, Int>, Signal.LED>()
@@ -66,8 +99,6 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
             modifier = Modifier.width(200.dp),
             titleBarModifier = LocalTitleBarModifier.current
         ) {
-            var beforeState = deviceState.copy()
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -81,8 +112,10 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 ) {
                     Dial(
+                        automationParameter = Params.Radius,
                         title = "Radius",
                         value = deviceState.radius,
+                        defaultValue = 1,
                         type = DialType.Steps(IntArray(8) { it + 1 }.toList()),
                         text = "${deviceState.radius}",
                         onResolveTextValue = {
@@ -90,8 +123,6 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
                                 state.update { s -> s.copy(radius = v) }
                             }
                         },
-                        onStartValueChange = { beforeState = state.value.copy() },
-                        onFinishValueChange = { pushStateChange(beforeState, state.value.copy(radius = it)) },
                         onValueChange = { v -> state.update { it.copy(radius = v) } },
                     )
 
@@ -100,13 +131,13 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
                     }
 
                     Dial(
+                        automationParameter = Params.Amount,
                         type = DialType.Continuous,
                         title = "Amount",
-                        text = "${(deviceState.amount * 100).roundToInt()}%",
                         value = deviceState.amount,
-                        onStartValueChange = { beforeState = state.value.copy() },
+                        defaultValue = 1f,
+                        text = "${(deviceState.amount * 100).roundToInt()}%",
                         onValueChange = { v -> state.update { it.copy(amount = v.coerceIn(0f, 1f)) } },
-                        onFinishValueChange = { pushStateChange(beforeState, state.value) },
                         onResolveTextValue = {
                             it.removeSuffix("%").trim().toIntOrNull()?.coerceIn(0, 100)?.let { v ->
                                 state.update { s -> s.copy(amount = v / 100f) }
@@ -178,34 +209,40 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val s = state.value
+        synchronized(this) {
+            val rawS = state.value
+            val automatedAmount = evaluateAutomatedDialValue("amount", rawS.amount)
+            val automatedRadiusNorm = evaluateAutomatedDialValue("radius", rawS.radius / 8f)
+            val automatedRadius = (automatedRadiusNorm * 8f).roundToInt().coerceIn(1, 8)
+            val s = rawS.copy(amount = automatedAmount, radius = automatedRadius)
 
-        for (signal in n) {
-            val pos = Pair(signal.x, signal.y)
-            if (signal.color.isLit()) {
-                activePads[pos] = signal
-            } else {
-                activePads.remove(pos)
+            for (signal in n) {
+                val pos = Pair(signal.x, signal.y)
+                if (signal.color.isLit()) {
+                    activePads[pos] = signal
+                } else {
+                    activePads.remove(pos)
+                }
             }
-        }
 
-        val newOutput = computeBlurOutput(s)
-        val output = mutableListOf<Signal.LED>()
+            val newOutput = computeBlurOutput(s)
+            val output = mutableListOf<Signal.LED>()
 
-        for ((_, signal) in newOutput) {
-            output.add(signal)
-        }
-
-        for ((pos, signal) in previousOutput) {
-            if (!newOutput.containsKey(pos)) {
-                output.add(signal.copy(color = Color.Black, opacity = 1f))
+            for ((_, signal) in newOutput) {
+                output.add(signal)
             }
+
+            for ((pos, signal) in previousOutput) {
+                if (!newOutput.containsKey(pos)) {
+                    output.add(signal.copy(color = Color.Black, opacity = 1f))
+                }
+            }
+
+            previousOutput.clear()
+            newOutput.forEach { (pos, sig) -> if (sig.color.isLit()) previousOutput[pos] = sig }
+
+            signalExit?.invoke(output)
         }
-
-        previousOutput.clear()
-        newOutput.forEach { (pos, sig) -> if (sig.color.isLit()) previousOutput[pos] = sig }
-
-        signalExit?.invoke(output)
     }
 
     private fun computeBlurOutput(s: BlurChainDeviceState): Map<Pair<Int, Int>, Signal.LED> {
@@ -355,11 +392,21 @@ enum class BlurEdgeHandling(val label: String) {
     Wrap("Wrap"),
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class BlurChainDeviceState(
+    @Automatable(BlurChainDevice.Params.Radius::class)
     val radius: Int = 1,
+    @Automatable(BlurChainDevice.Params.Shape::class)
     val shape: BlurShape = BlurShape.Circle,
+    @Automatable(BlurChainDevice.Params.Amount::class)
     val amount: Float = 1f,
     val curve: BlurCurve = BlurCurve.Linear,
     val edgeHandling: BlurEdgeHandling = BlurEdgeHandling.None,
-) : DeviceState()
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    override val automations: Map<String, DialAutomationLane> = emptyMap(),
+) : DeviceState() {
+    override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState =
+        copy(automations = automations)
+}

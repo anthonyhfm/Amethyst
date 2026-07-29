@@ -26,16 +26,22 @@ import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.LocalChainDevice
 
 @Composable
 fun ChainDeviceShell(
     title: String,
     isSelected: Boolean,
+    device: GenericChainDevice<*>? = null,
     isDragging: Boolean = false,
     modifier: Modifier = Modifier,
     titleBarModifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val currentDevice = device ?: LocalChainDevice.current
+
     val titleBarColor = if (isSelected) {
         Theme[colors][selectionSurface]
     } else {
@@ -83,7 +89,9 @@ fun ChainDeviceShell(
                 .fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
-            content()
+            CompositionLocalProvider(LocalChainDevice provides currentDevice) {
+                content()
+            }
         }
     }
 }

@@ -2,11 +2,14 @@ package dev.anthonyhfm.amethyst.devices.effects.composition.ui.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.input.pointer.pointerInput
@@ -47,9 +50,25 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LinePoint
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledSlider as PrimitiveLabeledSlider
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledRangeSlider as PrimitiveLabeledRangeSlider
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import dev.anthonyhfm.amethyst.devices.LocalChainDevice
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.ui.components.automation.DialAutomationPopover
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import kotlin.math.roundToInt
+
 @Composable
 fun <T> AutomatableDial(
     parameterId: String,
+    automationParameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter? = null,
     type: DialType<T>,
     value: T,
     defaultValue: T,
@@ -57,11 +76,31 @@ fun <T> AutomatableDial(
     text: String,
     onValueChange: (T) -> Unit,
     onResolveTextValue: ((String) -> Unit)? = null,
+    containerColor: Color = Color.Unspecified,
+    dialColor: Color = Color.Unspecified,
     modifier: Modifier = Modifier,
 ) {
     val node = LocalCompositionNode.current
     val onAutomationAction = LocalAutomationHandler.current
     val nodeChangeCallbacks = LocalNodeChangeCallbacks.current
+    val chainDevice = LocalChainDevice.current
+
+    val automations by chainDevice?.dialAutomations?.collectAsState() ?: remember { mutableStateOf(emptyMap()) }
+    val dialLane: DialAutomationLane? = automations[parameterId]
+    var currentDisplayValue by remember(value, dialLane) { mutableStateOf(value) }
+
+    if (chainDevice != null && dialLane != null) {
+        LaunchedEffect(dialLane, value) {
+            while (true) {
+                withFrameNanos {
+                    val manualNorm = getManualNormalizedValue(type, value)
+                    val autoNorm = chainDevice.evaluateAutomatedDialValue(parameterId, manualNorm)
+                    currentDisplayValue = computeAutomatedDisplayValue(type, value, autoNorm)
+                }
+            }
+        }
+    }
+
     val parameter = if (node != null) {
         node.automationParameters().firstOrNull { it.id == parameterId }
     } else {
@@ -69,10 +108,11 @@ fun <T> AutomatableDial(
     }
 
     @Composable
-    fun RenderDial() {
+    fun RenderDial(renderValue: T = currentDisplayValue) {
+        val hasAutomation = dialLane != null || (parameter != null && node?.lane(parameter.id) != null)
         PrimitiveDial(
             type = type,
-            value = value,
+            value = renderValue,
             defaultValue = defaultValue,
             title = title,
             text = text,
@@ -80,7 +120,11 @@ fun <T> AutomatableDial(
             onValueChange = onValueChange,
             onFinishValueChange = { nodeChangeCallbacks.onFinish() },
             onResolveTextValue = onResolveTextValue,
+            containerColor = containerColor,
+            dialColor = dialColor,
             modifier = modifier,
+            isAutomated = true,
+            hasAutomation = hasAutomation,
         )
     }
 
@@ -102,8 +146,85 @@ fun <T> AutomatableDial(
                 )
             }
         }
+    } else if (chainDevice != null) {
+        var showPopover by remember { mutableStateOf(false) }
+
+        val triggerContent: @Composable () -> Unit = {
+            ContextMenu(
+                trigger = { RenderDial() }
+            ) {
+                AutomatableContextMenuItem(
+                    label = if (dialLane != null) "Edit $title Automation" else "Automate $title",
+                    icon = if (dialLane != null) Lucide.Pencil else Lucide.Plus,
+                    onClick = {
+                        if (dialLane == null) {
+                            chainDevice.setDialAutomation(parameterId, DialAutomationLane(parameterId))
+                        }
+                        showPopover = true
+                    }
+                )
+                if (dialLane != null) {
+                    AutomatableContextMenuItem(
+                        label = "Remove $title Automation",
+                        icon = Lucide.Trash2,
+                        onClick = {
+                            chainDevice.setDialAutomation(parameterId, null)
+                            showPopover = false
+                        }
+                    )
+                }
+            }
+        }
+
+        if (dialLane != null) {
+            val resolvedParameter = automationParameter ?: object : dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter {
+                override val id: String = parameterId
+                override val label: String = title
+            }
+            DialAutomationPopover(
+                expanded = showPopover,
+                parameter = resolvedParameter,
+                lane = dialLane,
+                onUpdateLane = { updatedLane -> chainDevice.setDialAutomation(parameterId, updatedLane) },
+                onRemoveAutomation = {
+                    chainDevice.setDialAutomation(parameterId, null)
+                    showPopover = false
+                },
+                onDismissRequest = { showPopover = false },
+                trigger = triggerContent
+            )
+        } else {
+            triggerContent()
+        }
     } else {
         RenderDial()
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun <T> computeAutomatedDisplayValue(
+    type: DialType<T>,
+    manualValue: T,
+    automatedNorm: Float
+): T = when (type) {
+    DialType.Continuous, DialType.Knob -> automatedNorm.coerceIn(0f, 1f) as T
+    is DialType.Steps<*> -> {
+        val list = type.values
+        if (list.isEmpty()) manualValue
+        else {
+            val index = (automatedNorm * (list.size - 1)).roundToInt().coerceIn(0, list.size - 1)
+            list[index] as T
+        }
+    }
+}
+
+private fun <T> getManualNormalizedValue(type: DialType<T>, manualValue: T): Float = when (type) {
+    DialType.Continuous, DialType.Knob -> (manualValue as? Float) ?: 0.5f
+    is DialType.Steps<*> -> {
+        val list = type.values
+        val idx = list.indexOf(manualValue)
+        if (idx < 0 || list.size <= 1) 0.5f
+        else idx.toFloat() / (list.size - 1)
     }
 }
 

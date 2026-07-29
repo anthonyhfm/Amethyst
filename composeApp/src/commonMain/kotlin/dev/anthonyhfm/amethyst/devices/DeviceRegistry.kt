@@ -78,6 +78,7 @@ object DeviceRegistry {
 
     @Suppress("UNCHECKED_CAST")
     fun pack(device: GenericChainDevice<*>): DeviceState {
+        device.persistAutomationsToState()
         val factory = _factories[device.state.value::class] as? ChainDeviceFactory<DeviceState>
             ?: error("No factory registered for device state: ${device.state.value::class.simpleName}")
         return factory.pack(device as GenericChainDevice<DeviceState>)

@@ -25,13 +25,55 @@ import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.devices.Automatable
 
 class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
     override val state = MutableStateFlow(AdjustChainDeviceState())
     override val helpRef = "Adjust"
+
+    sealed class Params : AutomationParameter {
+        object Brightness : Params() {
+            override val id = "brightness"
+            override val label = "Brightness"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..200f
+            override val displayDecimals = 0
+        }
+
+        object Contrast : Params() {
+            override val id = "contrast"
+            override val label = "Contrast"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..200f
+            override val displayDecimals = 0
+        }
+
+        object Temperature : Params() {
+            override val id = "temperature"
+            override val label = "Temp"
+            override val curveMode = CurveMode.Bipolar
+            override val displayRange = -100f..100f
+            override val displayDecimals = 0
+        }
+
+        object Tint : Params() {
+            override val id = "tint"
+            override val label = "Tint"
+            override val curveMode = CurveMode.Bipolar
+            override val displayRange = -100f..100f
+            override val displayDecimals = 0
+        }
+    }
 
     @Composable
     override fun Content() {
@@ -45,8 +87,6 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
             modifier = Modifier.width(180.dp),
             titleBarModifier = LocalTitleBarModifier.current
         ) {
-            var beforeState = deviceState.copy()
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Col 1: Brightness + Contrast
                 Column(
@@ -55,18 +95,16 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.Brightness,
                         type = DialType.Continuous,
                         title = "Brightness",
                         text = "${(deviceState.brightness * 100).roundToInt()}%",
                         value = deviceState.brightness / 2f,
-                        onStartValueChange = { beforeState = state.value.copy() },
+                        defaultValue = 0.5f,
                         onValueChange = { value ->
                             state.update {
                                 it.copy(
-                                    brightness = (value * 2f).coerceIn(
-                                        0f,
-                                        2f
-                                    )
+                                    brightness = (value * 2f).coerceIn(0f, 2f)
                                 )
                             }
                         },
@@ -74,24 +112,19 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
                             text.removeSuffix("%").trim().toIntOrNull()?.takeIf { it in 0..200 }
                                 ?.let { v -> applyResolved { it.copy(brightness = v / 100f) } }
                         },
-                        onFinishValueChange = { value ->
-                            pushStateChange(beforeState, state.value.copy(brightness = (value * 2f).coerceIn(0f, 2f)))
-                        }
                     )
                     Dial(
+                        automationParameter = Params.Contrast,
                         type = DialType.Continuous,
                         title = "Contrast",
                         text = "${(deviceState.contrast * 100).roundToInt()}%",
                         value = deviceState.contrast / 2f,
-                        onStartValueChange = { beforeState = state.value.copy() },
+                        defaultValue = 0.5f,
                         onValueChange = { value -> state.update { it.copy(contrast = (value * 2f).coerceIn(0f, 2f)) } },
                         onResolveTextValue = { text ->
                             text.removeSuffix("%").trim().toIntOrNull()?.takeIf { it in 0..200 }
                                 ?.let { v -> applyResolved { it.copy(contrast = v / 100f) } }
                         },
-                        onFinishValueChange = { value ->
-                            pushStateChange(beforeState, state.value.copy(contrast = (value * 2f).coerceIn(0f, 2f)))
-                        }
                     )
                 }
 
@@ -106,34 +139,30 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.Temperature,
                         title = "Temp",
                         text = "${(deviceState.temperature * 100).toInt()}",
                         type = DialType.Steps(List(201) { -100 + it }),
                         value = (deviceState.temperature * 100).toInt(),
-                        onStartValueChange = { beforeState = state.value.copy() },
+                        defaultValue = 0,
                         onValueChange = { value -> state.update { it.copy(temperature = value / 100f) } },
                         onResolveTextValue = { text ->
                             text.trim().toIntOrNull()?.takeIf { it in -100..100 }
                                 ?.let { v -> applyResolved { it.copy(temperature = v / 100f) } }
                         },
-                        onFinishValueChange = { value ->
-                            pushStateChange(beforeState, state.value.copy(temperature = value / 100f))
-                        }
                     )
                     Dial(
+                        automationParameter = Params.Tint,
                         title = "Tint",
                         text = "${(deviceState.tint * 100).toInt()}",
                         type = DialType.Steps(List(201) { -100 + it }),
                         value = (deviceState.tint * 100).toInt(),
-                        onStartValueChange = { beforeState = state.value.copy() },
+                        defaultValue = 0,
                         onValueChange = { value -> state.update { it.copy(tint = value / 100f) } },
                         onResolveTextValue = { text ->
                             text.trim().toIntOrNull()?.takeIf { it in -100..100 }
                                 ?.let { v -> applyResolved { it.copy(tint = v / 100f) } }
                         },
-                        onFinishValueChange = { value ->
-                            pushStateChange(beforeState, state.value.copy(tint = value / 100f))
-                        }
                     )
                 }
             }
@@ -147,12 +176,33 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
         pushStateChange(before, after)
     }
 
+    private val activeSignals = mutableMapOf<Pair<Int, Int>, Signal.LED>()
+
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val s = state.value
-        signalExit?.invoke(n.map { signal ->
-            if (signal.color == Color.Transparent || signal.color.alpha == 0f) return@map signal
-            signal.copy(color = applyAdjust(signal.color, s))
-        })
+        synchronized(this) {
+            for (signal in n) {
+                val key = Pair(signal.x, signal.y)
+                if (signal.color != Color.Black && signal.opacity > 0f && (signal.color.red > 0f || signal.color.green > 0f || signal.color.blue > 0f)) {
+                    activeSignals[key] = signal
+                } else {
+                    activeSignals.remove(key)
+                }
+            }
+
+            val rawS = state.value
+            val autoB = evaluateAutomatedDialValue("brightness", rawS.brightness / 2f) * 2f
+            val autoC = evaluateAutomatedDialValue("contrast", rawS.contrast / 2f) * 2f
+            val autoTemp = (evaluateAutomatedDialValue("temperature", (rawS.temperature + 1f) / 2f) * 2f) - 1f
+            val autoTint = (evaluateAutomatedDialValue("tint", (rawS.tint + 1f) / 2f) * 2f) - 1f
+            val s = rawS.copy(brightness = autoB, contrast = autoC, temperature = autoTemp, tint = autoTint)
+
+            val activeList = activeSignals.values.toList()
+            if (activeList.isNotEmpty()) {
+                signalExit?.invoke(activeList.map { signal ->
+                    signal.copy(color = applyAdjust(signal.color, s))
+                })
+            }
+        }
     }
 
     private fun applyAdjust(color: Color, s: AdjustChainDeviceState): Color {
@@ -189,10 +239,24 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class AdjustChainDeviceState(
+    @Automatable(AdjustChainDevice.Params.Brightness::class)
     val brightness: Float = 1f,
+
+    @Automatable(AdjustChainDevice.Params.Contrast::class)
     val contrast: Float = 1f,
+
+    @Automatable(AdjustChainDevice.Params.Temperature::class)
     val temperature: Float = 0f,
-    val tint: Float = 0f
-) : DeviceState()
+
+    @Automatable(AdjustChainDevice.Params.Tint::class)
+    val tint: Float = 0f,
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    override val automations: Map<String, DialAutomationLane> = emptyMap(),
+) : DeviceState() {
+    override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState =
+        copy(automations = automations)
+}

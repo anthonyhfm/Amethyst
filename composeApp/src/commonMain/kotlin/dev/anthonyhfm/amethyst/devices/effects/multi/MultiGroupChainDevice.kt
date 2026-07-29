@@ -290,6 +290,9 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
     }
 
     override fun signalEnter(n: List<Signal>) {
+        if (n.isNotEmpty()) {
+            triggerDialAutomations()
+        }
         n.forEach {
             val down: Boolean = when (it) {
                 is Signal.LED -> it.color != Color.Black

@@ -3,8 +3,10 @@ package dev.anthonyhfm.amethyst.devices
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isOn
 import dev.anthonyhfm.amethyst.core.engine.elements.SignalReceiver
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -13,9 +15,17 @@ import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.workspace.chain.ui.CollapsedChainDevice
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+
+val LocalChainDevice = staticCompositionLocalOf<GenericChainDevice<*>?> { null }
 
 enum class AudioChainDeviceRole {
     Generator,
@@ -129,6 +139,93 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     abstract override fun signalEnter(n: List<Signal>)
 
+    val dialAutomations = MutableStateFlow<Map<String, dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane>>(emptyMap())
+    private val dialAutomationRuntimes = mutableMapOf<String, dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationRuntime>()
+
+    fun setDialAutomation(parameterId: String, lane: dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane?) {
+        val current = dialAutomations.value.toMutableMap()
+        if (lane == null) {
+            current.remove(parameterId)
+            dialAutomationRuntimes.remove(parameterId)
+        } else {
+            current[parameterId] = lane
+            val runtime = dialAutomationRuntimes[parameterId]
+            if (runtime != null) {
+                runtime.lane = lane
+            } else {
+                dialAutomationRuntimes[parameterId] = dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationRuntime(lane)
+            }
+        }
+        dialAutomations.value = current
+    }
+
+    fun getDialAutomation(parameterId: String): dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane? {
+        return dialAutomations.value[parameterId]
+    }
+
+    /**
+     * Loads persisted automation lanes from DeviceState into the runtime map.
+     * Called automatically by ChainDeviceFactory.unpack().
+     */
+    fun restoreAutomationsFromState() {
+        state.value.automations.forEach { (id, lane) ->
+            setDialAutomation(id, lane)
+        }
+    }
+
+    /**
+     * Writes current runtime automation lanes back into DeviceState for persistence.
+     * Called automatically by DeviceRegistry.pack().
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun persistAutomationsToState() {
+        val currentAutomations = dialAutomations.value
+        if (currentAutomations.isEmpty() && state.value.automations.isEmpty()) return
+        val updated = state.value.withAutomations(currentAutomations) as State
+        state.value = updated
+    }
+
+    private val automationScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var automationTickerJob: Job? = null
+
+    fun triggerDialAutomations(nowMs: Long = System.currentTimeMillis()) {
+        dialAutomationRuntimes.values.forEach { it.trigger(nowMs) }
+        startAutomationTicker()
+    }
+
+    open fun onAutomationTick() {
+        // Subclasses override to re-evaluate parameters during active signal processing
+    }
+
+    private fun startAutomationTicker() {
+        if (automationTickerJob?.isActive == true) return
+        automationTickerJob = automationScope.launch {
+            while (dialAutomationRuntimes.values.any { it.isRunning }) {
+                onAutomationTick()
+                delay(16L) // ~60 FPS continuous update loop
+            }
+            onAutomationTick()
+        }
+    }
+
+    fun evaluateAutomatedDialValue(
+        parameterId: String,
+        manualNormalizedValue: Float,
+        nowMs: Long = System.currentTimeMillis(),
+        bpm: Float = 120f
+    ): Float {
+        val runtime = dialAutomationRuntimes[parameterId] ?: return manualNormalizedValue
+        if (!runtime.isRunning) return manualNormalizedValue
+        val progress = runtime.currentProgress(nowMs, bpm)
+        val automatedNormalized = runtime.lane.valueAt(progress, manualNormalizedValue * 2f - 1f)
+        val automated0to1 = (automatedNormalized + 1f) * 0.5f
+        return if (runtime.lane.settings.isAdditive) {
+            (manualNormalizedValue + automatedNormalized * 0.5f).coerceIn(0f, 1f)
+        } else {
+            automated0to1.coerceIn(0f, 1f)
+        }
+    }
+
     protected fun pushStateChange(before: State, after: State) {
         if (before != after) {
             UndoManager.addAction(
@@ -151,10 +248,21 @@ abstract class LEDChainDevice <State : @Serializable DeviceState> : GenericChain
     abstract fun ledSignalEnter(n: List<Signal.LED>)
 
     override fun signalEnter(n: List<Signal>) {
-        n.filterIsInstance<Signal.LED>().let {
-            if (it.isNotEmpty()) {
-                ledSignalEnter(it)
+        synchronized(this) {
+            if (n.any { it.isOn() }) {
+                triggerDialAutomations()
             }
+            n.filterIsInstance<Signal.LED>().let {
+                if (it.isNotEmpty()) {
+                    ledSignalEnter(it)
+                }
+            }
+        }
+    }
+
+    override fun onAutomationTick() {
+        synchronized(this) {
+            ledSignalEnter(emptyList())
         }
     }
 }
@@ -178,6 +286,9 @@ abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericCha
     open fun releaseAudio() = Unit
 
     override fun signalEnter(n: List<Signal>) {
+        if (n.isNotEmpty()) {
+            triggerDialAutomations()
+        }
         signalExit?.invoke(n)
     }
 }

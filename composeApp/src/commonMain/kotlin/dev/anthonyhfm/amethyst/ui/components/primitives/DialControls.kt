@@ -25,6 +25,9 @@ fun <T> Dial(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     defaultValue: T? = null,
+    automationParameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter? = null,
+    isAutomated: Boolean = false,
+    hasAutomation: Boolean = false,
 ) = dev.anthonyhfm.amethyst.ui.components.Dial(
     type = type,
     value = value,
@@ -39,6 +42,9 @@ fun <T> Dial(
     modifier = modifier,
     enabled = enabled,
     defaultValue = defaultValue,
+    automationParameter = automationParameter,
+    isAutomated = isAutomated,
+    hasAutomation = hasAutomation,
 )
 
 @Composable

@@ -14,5 +14,6 @@ interface ChainDeviceFactory<S : DeviceState> {
 
     fun unpack(state: S): GenericChainDevice<S> = create().apply {
         this.state.update { state }
+        restoreAutomationsFromState()
     }
 }

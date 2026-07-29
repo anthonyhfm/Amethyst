@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,6 +31,7 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.LocalChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
@@ -197,14 +199,16 @@ fun ChainView(
                                                 } else Modifier
                                             )
                                     ) {
-                                        if (isCollapsed) {
-                                            device.CollapsedContent()
-                                        } else when (device) {
-                                            is GroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
-                                            is MultiGroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
-                                            is ChokeChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+                                        CompositionLocalProvider(LocalChainDevice provides device) {
+                                            if (isCollapsed) {
+                                                device.CollapsedContent()
+                                            } else when (device) {
+                                                is GroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+                                                is MultiGroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+                                                is ChokeChainDevice -> device.Content(dragAndDropState = dragAndDropState)
 
-                                            else -> device.Content()
+                                                else -> device.Content()
+                                            }
                                         }
                                     }
                                 }
