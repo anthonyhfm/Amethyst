@@ -120,9 +120,7 @@ fun CopyTimeControls(
                         }
                     }
                 },
-                modifier = Modifier.rightClickable {
-                    onGateChanged(0.5f)
-                },
+                defaultValue = 0.5f,
             )
         } else {
             Dial(
@@ -139,9 +137,7 @@ fun CopyTimeControls(
                         }
                     }
                 },
-                modifier = Modifier.rightClickable {
-                    onGateChanged(0.5f)
-                },
+                defaultValue = 0.5f,
             )
         }
 
@@ -412,9 +408,7 @@ fun CopyOffsetCard(
                             onChangeOffset(offset.copy(angle = angle))
                         }
                     },
-                    modifier = Modifier.rightClickable {
-                        onChangeOffset(offset.copy(angle = 0))
-                    }
+                    defaultValue = 0f,
                 )
             }
         }

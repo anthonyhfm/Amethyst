@@ -65,6 +65,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import kotlin.math.roundToInt
 
+import dev.anthonyhfm.amethyst.ui.components.FlatDial
+
 @Composable
 fun <T> AutomatableDial(
     parameterId: String,
@@ -79,6 +81,7 @@ fun <T> AutomatableDial(
     containerColor: Color = Color.Unspecified,
     dialColor: Color = Color.Unspecified,
     modifier: Modifier = Modifier,
+    isFlat: Boolean = false,
 ) {
     val node = LocalCompositionNode.current
     val onAutomationAction = LocalAutomationHandler.current
@@ -110,22 +113,41 @@ fun <T> AutomatableDial(
     @Composable
     fun RenderDial(renderValue: T = currentDisplayValue) {
         val hasAutomation = dialLane != null || (parameter != null && node?.lane(parameter.id) != null)
-        PrimitiveDial(
-            type = type,
-            value = renderValue,
-            defaultValue = defaultValue,
-            title = title,
-            text = text,
-            onStartValueChange = { nodeChangeCallbacks.onStart() },
-            onValueChange = onValueChange,
-            onFinishValueChange = { nodeChangeCallbacks.onFinish() },
-            onResolveTextValue = onResolveTextValue,
-            containerColor = containerColor,
-            dialColor = dialColor,
-            modifier = modifier,
-            isAutomated = true,
-            hasAutomation = hasAutomation,
-        )
+        if (isFlat) {
+            FlatDial(
+                type = type,
+                value = renderValue,
+                defaultValue = defaultValue,
+                title = title,
+                text = text,
+                onStartValueChange = { nodeChangeCallbacks.onStart() },
+                onValueChange = onValueChange,
+                onFinishValueChange = { nodeChangeCallbacks.onFinish() },
+                onResolveTextValue = onResolveTextValue,
+                containerColor = containerColor,
+                dialColor = dialColor,
+                modifier = modifier,
+                isAutomated = true,
+                hasAutomation = hasAutomation,
+            )
+        } else {
+            PrimitiveDial(
+                type = type,
+                value = renderValue,
+                defaultValue = defaultValue,
+                title = title,
+                text = text,
+                onStartValueChange = { nodeChangeCallbacks.onStart() },
+                onValueChange = onValueChange,
+                onFinishValueChange = { nodeChangeCallbacks.onFinish() },
+                onResolveTextValue = onResolveTextValue,
+                containerColor = containerColor,
+                dialColor = dialColor,
+                modifier = modifier,
+                isAutomated = true,
+                hasAutomation = hasAutomation,
+            )
+        }
     }
 
     if (parameter != null && onAutomationAction != null) {
@@ -146,7 +168,7 @@ fun <T> AutomatableDial(
                 )
             }
         }
-    } else if (chainDevice != null) {
+    } else if (chainDevice != null && (automationParameter != null || dialLane != null)) {
         var showPopover by remember { mutableStateOf(false) }
 
         val triggerContent: @Composable () -> Unit = {

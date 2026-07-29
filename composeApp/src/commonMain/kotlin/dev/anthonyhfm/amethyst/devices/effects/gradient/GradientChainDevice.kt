@@ -384,14 +384,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                                     }
                                 }
                             },
-                            modifier = Modifier
-                                .rightClickable {
-                                    val before = state.value
-                                    state.update {
-                                        it.copy(gate = 0.5f)
-                                    }
-                                    pushStateChange(before, state.value)
-                                },
+                            defaultValue = 0.5f,
                         )
                         val gradientStepsList = (deviceState.gradientData.size.coerceAtLeast(2)..16).toList() + null
                         val stepsDisplayText = when (deviceState.gradientSteps) {

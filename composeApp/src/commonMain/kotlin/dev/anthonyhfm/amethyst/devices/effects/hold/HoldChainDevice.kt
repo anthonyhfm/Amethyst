@@ -137,17 +137,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                                     after = state.value
                                 )
                             },
-                            modifier = Modifier
-                                .rightClickable {
-                                    pushStateChange(
-                                        before = state.value,
-                                        after = state.value.copy(gate = 0.5f)
-                                    )
-
-                                    state.update {
-                                        it.copy(gate = 0.5f) // Reset gate to its original state
-                                    }
-                                },
+                            defaultValue = 0.5f,
                             enabled = deviceState.mode != HoldMode.Infinite
                         )
                     }

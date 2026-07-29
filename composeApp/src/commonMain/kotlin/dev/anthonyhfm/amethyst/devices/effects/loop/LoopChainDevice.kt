@@ -209,14 +209,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                                 }
                             }
                         },
-                        modifier = Modifier
-                            .rightClickable {
-                                val before = state.value
-                                state.update {
-                                    it.copy(gate = 0.5f) // Reset gate to its original state
-                                }
-                                pushStateChange(before, state.value)
-                            },
+                        defaultValue = 0.5f,
                     )
                 }
             }

@@ -53,6 +53,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
 import dev.anthonyhfm.amethyst.devices.LocalChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
@@ -119,11 +121,12 @@ fun <T> Dial(
     automationParameter: AutomationParameter? = null,
     isAutomated: Boolean = false,
     hasAutomation: Boolean = false,
+    isAutomatable: Boolean = true,
 ) {
     val chainDevice = LocalChainDevice.current
     val node = LocalCompositionNode.current
 
-    if (!isAutomated && automationParameter != null && chainDevice != null) {
+    if (isAutomatable && !isAutomated && automationParameter != null && chainDevice != null) {
         AutomatableDial(
             parameterId = automationParameter.id,
             automationParameter = automationParameter,
@@ -141,21 +144,25 @@ fun <T> Dial(
         return
     }
 
-    if (!isAutomated && title != null && node != null) {
-        AutomatableDial(
-            parameterId = title.lowercase().replace(" ", "_"),
-            type = type,
-            value = value,
-            defaultValue = defaultValue ?: value,
-            title = title,
-            text = text ?: "",
-            onValueChange = onValueChange,
-            onResolveTextValue = onResolveTextValue,
-            containerColor = containerColor,
-            dialColor = dialColor,
-            modifier = modifier,
-        )
-        return
+    if (isAutomatable && !isAutomated && title != null && node != null) {
+        val paramId = title.lowercase().replace(" ", "_")
+        val hasNodeParam = node.automationParameters().any { it.id == paramId }
+        if (hasNodeParam) {
+            AutomatableDial(
+                parameterId = paramId,
+                type = type,
+                value = value,
+                defaultValue = defaultValue ?: value,
+                title = title,
+                text = text ?: "",
+                onValueChange = onValueChange,
+                onResolveTextValue = onResolveTextValue,
+                containerColor = containerColor,
+                dialColor = dialColor,
+                modifier = modifier,
+            )
+            return
+        }
     }
 
     when (type) {
@@ -230,25 +237,25 @@ private fun ContinuousDial(
     isAutomated: Boolean = false,
 ) {
     var isDragging by remember { mutableStateOf(false) }
-    var dialValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
-    LaunchedEffect(value) {
-        if (!isDragging) {
-            dialValue = value.coerceIn(0f, 1f)
-        }
-    }
-    LaunchedEffect(dialValue) { onValueChange(dialValue) }
+    var dragValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
+
+    val currentProgress = if (isDragging) dragValue else value.coerceIn(0f, 1f)
 
     DialContent(title, text, enabled, modifier, onResolveTextValue) { dialModifier ->
         DialSurface(
-            progress = dialValue,
+            progress = currentProgress,
             onDragStart = {
                 isDragging = true
-                onStartValueChange(dialValue)
+                dragValue = value.coerceIn(0f, 1f)
+                onStartValueChange(dragValue)
             },
-            onDragProgressChange = { dialValue = it },
+            onDragProgressChange = { newProgress ->
+                dragValue = newProgress
+                onValueChange(newProgress)
+            },
             onDragEnd = {
                 isDragging = false
-                onFinishValueChange(dialValue)
+                onFinishValueChange(dragValue)
             },
             containerColor = containerColor,
             dialColor = dialColor,
@@ -257,18 +264,22 @@ private fun ContinuousDial(
             knob = knob,
             isAutomated = isAutomated,
             onDoubleClick = {
-                dialValue = defaultValue
+                isDragging = false
+                dragValue = defaultValue.coerceIn(0f, 1f)
+                onStartValueChange(currentProgress)
                 onValueChange(defaultValue)
                 onFinishValueChange(defaultValue)
             },
             onIncrement = {
-                changeContinuousValue(dialValue, 0.01f, onStartValueChange) {
-                    dialValue = it; onFinishValueChange(it)
+                changeContinuousValue(currentProgress, 0.01f, onStartValueChange) { next ->
+                    onValueChange(next)
+                    onFinishValueChange(next)
                 }
             },
             onDecrement = {
-                changeContinuousValue(dialValue, -0.01f, onStartValueChange) {
-                    dialValue = it; onFinishValueChange(it)
+                changeContinuousValue(currentProgress, -0.01f, onStartValueChange) { next ->
+                    onValueChange(next)
+                    onFinishValueChange(next)
                 }
             },
         )
@@ -290,48 +301,60 @@ private fun <T> SteppedDial(
     modifier: Modifier, enabled: Boolean, isAutomated: Boolean = false,
 ) {
     var isDragging by remember { mutableStateOf(false) }
-    var index by remember { mutableStateOf(values.indexOf(value).coerceAtLeast(0)) }
-    var progress by remember { mutableStateOf(progressForSelection(values.indexOf(value).coerceAtLeast(0), values.size)) }
-    LaunchedEffect(value, values) {
-        if (!isDragging) {
-            index = values.indexOf(value).coerceAtLeast(0); progress = progressForSelection(index, values.size)
-        }
-    }
-    LaunchedEffect(index) { onValueChange(values[index]) }
+    val currentIndex = values.indexOf(value).coerceAtLeast(0)
+    var dragIndex by remember { mutableStateOf(currentIndex) }
+    var dragProgress by remember { mutableStateOf(progressForSelection(currentIndex, values.size)) }
+
+    val effectiveIndex = if (isDragging) dragIndex else currentIndex
+    val surfaceProgress = if (isDragging) dragProgress else displayProgressForSelection(currentIndex, values.size)
+
     DialContent(title, text, enabled, modifier, onResolveTextValue) { dialModifier ->
         DialSurface(
-            progress = displayProgressForSelection(index, values.size),
+            progress = surfaceProgress,
             onDragStart = {
                 isDragging = true
-                onStartValueChange(values[index])
+                dragIndex = currentIndex
+                dragProgress = progressForSelection(currentIndex, values.size)
+                onStartValueChange(values[currentIndex])
             },
             onDragProgressChange = { newProgress ->
-                progress = newProgress
-                val next = if (values.size <= 1) 0 else (progress * (values.size - 1)).roundToInt()
-                    .coerceIn(0, values.lastIndex)
-                index = next
+                dragProgress = newProgress
+                val next = if (values.size <= 1) 0 else (newProgress * (values.size - 1)).roundToInt().coerceIn(0, values.lastIndex)
+                if (next != dragIndex) {
+                    dragIndex = next
+                    onValueChange(values[next])
+                }
             },
             onDragEnd = {
                 isDragging = false
-                onFinishValueChange(values[index])
+                onFinishValueChange(values[dragIndex])
             },
             containerColor = containerColor, dialColor = dialColor, modifier = dialModifier, enabled = enabled,
             isAutomated = isAutomated,
             onDoubleClick = {
-                index = values.indexOf(defaultValue ?: values.first()).coerceAtLeast(0)
-                progress = progressForSelection(index, values.size)
-                onValueChange(values[index]); onFinishValueChange(values[index])
+                val target = defaultValue ?: values.first()
+                val targetIndex = values.indexOf(target).coerceAtLeast(0)
+                isDragging = false
+                dragIndex = targetIndex
+                dragProgress = progressForSelection(targetIndex, values.size)
+                onStartValueChange(values[effectiveIndex])
+                onValueChange(target)
+                onFinishValueChange(target)
             },
             onIncrement = {
-                if (index < values.lastIndex) {
-                    onStartValueChange(values[index]); index++; progress =
-                        progressForSelection(index, values.size); onFinishValueChange(values[index])
+                if (effectiveIndex < values.lastIndex) {
+                    val next = values[effectiveIndex + 1]
+                    onStartValueChange(values[effectiveIndex])
+                    onValueChange(next)
+                    onFinishValueChange(next)
                 }
             },
             onDecrement = {
-                if (index > 0) {
-                    onStartValueChange(values[index]); index--; progress =
-                        progressForSelection(index, values.size); onFinishValueChange(values[index])
+                if (effectiveIndex > 0) {
+                    val next = values[effectiveIndex - 1]
+                    onStartValueChange(values[effectiveIndex])
+                    onValueChange(next)
+                    onFinishValueChange(next)
                 }
             },
         )
@@ -420,12 +443,12 @@ internal fun DialSurface(
                 .onKeyEvent { event ->
                     if (enabled && event.type == KeyEventType.KeyDown) {
                         when (event.key) {
-                            Key.DirectionUp -> {
+                            Key.DirectionUp, Key.DirectionRight -> {
                                 currentOnIncrement?.invoke()
                                 true
                             }
 
-                            Key.DirectionDown -> {
+                            Key.DirectionDown, Key.DirectionLeft -> {
                                 currentOnDecrement?.invoke()
                                 true
                             }
@@ -444,14 +467,21 @@ internal fun DialSurface(
                 .pointerInput(enabled) {
                     if (!enabled) return@pointerInput
                     detectTapGestures(
-                        onDoubleTap = { currentOnDragStart(); onDoubleClick() }
+                        onTap = { focusRequester.requestFocus() },
+                        onDoubleTap = {
+                            focusRequester.requestFocus()
+                            onDoubleClick()
+                        }
                     )
                 }
                 .pointerInput(enabled) {
                     if (!enabled) return@pointerInput
                     awaitEachGesture {
-                        val down = awaitFirstDown()
-                        currentOnDragStart()
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        if (!currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+
+                        focusRequester.requestFocus()
+                        var isDragStarted = false
                         var lastY = down.position.y
                         while (true) {
                             val event = awaitPointerEvent()
@@ -461,12 +491,18 @@ internal fun DialSurface(
                             val deltaY = lastY - currentY
                             lastY = currentY
                             if (deltaY != 0f) {
+                                if (!isDragStarted) {
+                                    isDragStarted = true
+                                    currentOnDragStart()
+                                }
                                 val newProgress = (currentProgress + (deltaY * DialDragFactor)).coerceIn(0f, 1f)
                                 currentOnDragProgressChange(newProgress)
+                                change.consume()
                             }
-                            change.consume()
                         }
-                        currentOnDragEnd()
+                        if (isDragStarted) {
+                            currentOnDragEnd()
+                        }
                     }
                 }
                 .background(resolvedContainerColor)

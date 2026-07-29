@@ -9,14 +9,16 @@ class ApolloRotateAdapter(
     model: ApolloModel.Device.Rotate
 ) : ApolloAdapter<ApolloModel.Device.Rotate>(model) {
     override fun toDeviceState(): DeviceState {
+        val (mode, angle) = when (model.mode) {
+            0 -> Pair(RotateChainDeviceState.RotateMode.DEGREES_90, 90f)
+            1 -> Pair(RotateChainDeviceState.RotateMode.DEGREES_180, 180f)
+            2 -> Pair(RotateChainDeviceState.RotateMode.DEGREES_270, 270f)
+            else -> Pair(RotateChainDeviceState.RotateMode.DEGREES_90, 90f)
+        }
         return RotateChainDeviceState(
             bypass = model.bypass,
-            mode = when (model.mode) {
-                0 -> RotateChainDeviceState.RotateMode.DEGREES_90
-                1 -> RotateChainDeviceState.RotateMode.DEGREES_180
-                2 -> RotateChainDeviceState.RotateMode.DEGREES_270
-                else -> RotateChainDeviceState.RotateMode.DEGREES_90
-            }
+            mode = mode,
+            angleDegrees = angle
         )
     }
 }

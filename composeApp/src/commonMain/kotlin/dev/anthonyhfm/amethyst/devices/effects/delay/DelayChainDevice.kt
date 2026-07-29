@@ -107,13 +107,7 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable 
                             }
                         }
                     },
-                    modifier = Modifier
-                        .rightClickable {
-                            val before = state.value
-                            val after = before.copy(gate = 0.5f)
-                            state.value = after
-                            pushStateChange(before, after)
-                        },
+                    defaultValue = 0.5f,
                 )
             }
         }
