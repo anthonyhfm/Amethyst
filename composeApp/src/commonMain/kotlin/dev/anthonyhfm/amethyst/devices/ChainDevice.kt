@@ -15,6 +15,7 @@ import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.workspace.chain.ui.CollapsedChainDevice
+import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -190,7 +191,8 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
         automationTickerJob = automationScope.launch {
             while (dialAutomationRuntimes.values.any { it.isRunning }) {
                 onAutomationTick()
-                delay(16L) // ~60 FPS continuous update loop
+                val frameIntervalMs = (1000.0 / Heaven.fps.coerceAtLeast(1)).toLong().coerceAtLeast(1L)
+                delay(frameIntervalMs)
             }
             onAutomationTick()
         }
