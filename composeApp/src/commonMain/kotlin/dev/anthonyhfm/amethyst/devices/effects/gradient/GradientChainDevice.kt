@@ -38,6 +38,13 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.effects.gradient.ui.GradientEditorBar
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
+import dev.anthonyhfm.amethyst.devices.Automatable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -79,6 +86,16 @@ enum class GradientSmoothness {
 class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(GradientChainDeviceState())
     override val helpRef = "Gradient"
+
+    sealed class Params : AutomationParameter {
+        object Steps : Params() {
+            override val id = "steps"
+            override val label = "Steps"
+            override val curveMode = CurveMode.Unipolar
+            override val displayRange = 2f..16f
+            override val displayDecimals = 0
+        }
+    }
 
     private data class FadeSignature(
         val gradientHash: Int,
@@ -384,6 +401,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
                         }
                         var beforeState = state.value
                         Dial(
+                            automationParameter = Params.Steps,
                             title = "Steps",
                             value = deviceState.gradientSteps,
                             type = DialType.Steps(gradientStepsList),
@@ -749,7 +767,13 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
         val frameTime = 1000.0 / samplingFps
         val bpm = WorkspaceRepository.bpm.value
         val totalTime = deviceState.timing.toMsValue(bpm) * (deviceState.gate * 2)
-        val manualSteps = deviceState.gradientSteps // null = INF (auto), 2-16 = manual step count
+        val rawSteps = deviceState.gradientSteps
+        val manualSteps = if (getDialAutomation(Params.Steps.id) != null) {
+            val autoStepsNorm = evaluateAutomatedDialValue(Params.Steps.id, ((rawSteps ?: 16) - 2) / 14f)
+            (2 + (autoStepsNorm * 14f).roundToInt()).coerceIn(2, 16)
+        } else {
+            rawSteps
+        }
 
         val gradientData = deviceState.gradientData.sortedBy { it.position }
 
@@ -941,6 +965,10 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
+        if (n.any { it.color.isLit() }) {
+            triggerDialAutomations()
+        }
+
         val litSignals = n.filter { it.color != Color.Black }
 
         n.asSequence()
@@ -995,6 +1023,7 @@ class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeabl
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class GradientChainDeviceState(
     val gradientData: List<GradientColor> = listOf(
@@ -1005,8 +1034,15 @@ data class GradientChainDeviceState(
     val durationMs: Double = 0.0,
     val gate: Float = 0.5f,
     val loop: Boolean = false,
+
+    @Automatable(GradientChainDevice.Params.Steps::class)
     val gradientSteps: Int? = null,
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    override val automations: Map<String, DialAutomationLane> = emptyMap(),
 ) : DeviceState() {
+    override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState =
+        copy(automations = automations)
     @Serializable
     data class GradientColor(
         val position: Float,

@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
@@ -32,9 +33,72 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.devices.Automatable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+
 class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
     override val state = MutableStateFlow(ColorFilterChainDeviceState())
     override val helpRef = "ColorFilter"
+
+    sealed class Params : AutomationParameter {
+        object Hue : Params() {
+            override val id = "hue"
+            override val label = "Hue"
+            override val curveMode = CurveMode.Bipolar
+            override val unit = "°"
+            override val displayRange = -180f..180f
+            override val displayDecimals = 0
+        }
+
+        object HueTolerance : Params() {
+            override val id = "hueTolerance"
+            override val label = "Hue Tol"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object Saturation : Params() {
+            override val id = "saturation"
+            override val label = "Saturation"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object SaturationTolerance : Params() {
+            override val id = "saturationTolerance"
+            override val label = "Sat Tol"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object Value : Params() {
+            override val id = "value"
+            override val label = "Value"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object ValueTolerance : Params() {
+            override val id = "valueTolerance"
+            override val label = "Val Tol"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+    }
 
     @Composable
     override fun Content() {
@@ -59,6 +123,7 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.Hue,
                         title = "Hue",
                         text = "${deviceState.hue}°",
                         type = DialType.Steps(List(361) { -180 + it }),
@@ -82,6 +147,7 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     )
 
                     Dial(
+                        automationParameter = Params.HueTolerance,
                         type = DialType.Continuous,
                         title = "Tolerance",
                         text = "${(deviceState.hueTolerance * 100).roundToInt()}%",
@@ -115,6 +181,7 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.Saturation,
                         type = DialType.Continuous,
                         title = "Saturation",
                         text = "${(deviceState.saturation * 100).roundToInt()}%",
@@ -138,6 +205,7 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     )
 
                     Dial(
+                        automationParameter = Params.SaturationTolerance,
                         type = DialType.Continuous,
                         title = "Tolerance",
                         text = "${(deviceState.saturationTolerance * 100).roundToInt()}%",
@@ -171,6 +239,7 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.Value,
                         type = DialType.Continuous,
                         title = "Value",
                         text = "${(deviceState.value * 100).roundToInt()}%",
@@ -194,6 +263,7 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
                     )
 
                     Dial(
+                        automationParameter = Params.ValueTolerance,
                         type = DialType.Continuous,
                         title = "Tolerance",
                         text = "${(deviceState.valueTolerance * 100).roundToInt()}%",
@@ -231,10 +301,30 @@ class ColorFilterChainDevice : LEDChainDevice<ColorFilterChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val s = state.value
+        val rawS = state.value
+
+        if (n.any { it.color.isLit() }) {
+            triggerDialAutomations()
+        }
+
+        val autoHue = ((evaluateAutomatedDialValue(Params.Hue.id, (rawS.hue + 180f) / 360f) * 360f) - 180f).toInt()
+        val autoHueTol = evaluateAutomatedDialValue(Params.HueTolerance.id, rawS.hueTolerance)
+        val autoSat = evaluateAutomatedDialValue(Params.Saturation.id, rawS.saturation)
+        val autoSatTol = evaluateAutomatedDialValue(Params.SaturationTolerance.id, rawS.saturationTolerance)
+        val autoVal = evaluateAutomatedDialValue(Params.Value.id, rawS.value)
+        val autoValTol = evaluateAutomatedDialValue(Params.ValueTolerance.id, rawS.valueTolerance)
+
+        val s = rawS.copy(
+            hue = autoHue,
+            hueTolerance = autoHueTol,
+            saturation = autoSat,
+            saturationTolerance = autoSatTol,
+            value = autoVal,
+            valueTolerance = autoValTol
+        )
 
         val filtered = n.filter { i ->
-            if (i.color == Color.Transparent || i.color.alpha == 0f) return@filter true
+            if (i.color == Color.Transparent || i.color.alpha == 0f || !i.color.isLit()) return@filter true
 
             val (h, sat, v) = i.color.toHsv()
 
@@ -292,12 +382,30 @@ private fun String.parsePercentValue(): Float? = removeSuffix("%")
     ?.takeIf { it in 0..100 }
     ?.div(100f)
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class ColorFilterChainDeviceState(
+    @Automatable(ColorFilterChainDevice.Params.Hue::class)
     val hue: Int = 0,
+
+    @Automatable(ColorFilterChainDevice.Params.HueTolerance::class)
     val hueTolerance: Float = 0.05f,
+
+    @Automatable(ColorFilterChainDevice.Params.Saturation::class)
     val saturation: Float = 1f,
+
+    @Automatable(ColorFilterChainDevice.Params.SaturationTolerance::class)
     val saturationTolerance: Float = 0.05f,
+
+    @Automatable(ColorFilterChainDevice.Params.Value::class)
     val value: Float = 1f,
-    val valueTolerance: Float = 0.05f
-) : DeviceState()
+
+    @Automatable(ColorFilterChainDevice.Params.ValueTolerance::class)
+    val valueTolerance: Float = 0.05f,
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    override val automations: Map<String, DialAutomationLane> = emptyMap(),
+) : DeviceState() {
+    override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState =
+        copy(automations = automations)
+}

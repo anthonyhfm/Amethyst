@@ -40,9 +40,35 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
+import dev.anthonyhfm.amethyst.devices.Automatable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+
 class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
     override val state = MutableStateFlow(LayerChainDeviceState())
     override val helpRef = "Layer"
+
+    sealed class Params : AutomationParameter {
+        object Layer : Params() {
+            override val id = "layer"
+            override val label = "Layer"
+            override val curveMode = CurveMode.Bipolar
+            override val displayRange = -20f..20f
+            override val displayDecimals = 0
+        }
+
+        object Range : Params() {
+            override val id = "range"
+            override val label = "Range"
+            override val curveMode = CurveMode.Unipolar
+            override val displayRange = 0f..20f
+            override val displayDecimals = 0
+        }
+    }
 
     @Composable
     override fun Content() {
@@ -72,6 +98,7 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Dial(
+                        automationParameter = Params.Layer,
                         title = "Layer",
                         value = deviceState.layer,
                         type = DialType.Steps(IntArray(41) { -20 + it }.toList()),
@@ -108,6 +135,7 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                     }
 
                     Dial(
+                        automationParameter = Params.Range,
                         title = "Range",
                         value = deviceState.range,
                         type = DialType.Steps(IntArray(21) { it }.toList()),
@@ -187,12 +215,21 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
+        val rawS = state.value
+
+        if (n.any { it.color.isLit() }) {
+            triggerDialAutomations()
+        }
+
+        val autoLayer = ((evaluateAutomatedDialValue(Params.Layer.id, (rawS.layer + 20f) / 40f) * 40f) - 20f).toInt()
+        val autoRange = (evaluateAutomatedDialValue(Params.Range.id, rawS.range / 20f) * 20f).toInt()
+
         signalExit?.invoke(
             n.map {
                 it.copy(
-                    layer = state.value.layer,
-                    blendingMode = state.value.mode,
-                    blendingRange = state.value.range
+                    layer = autoLayer,
+                    blendingMode = rawS.mode,
+                    blendingRange = autoRange
                 )
             }
         )
@@ -205,9 +242,20 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class LayerChainDeviceState(
+    @Automatable(LayerChainDevice.Params.Layer::class)
     val layer: Int = 0,
+
     val mode: Signal.LED.BlendingMode = Signal.LED.BlendingMode.Normal,
-    val range: Int = 1
-) : DeviceState()
+
+    @Automatable(LayerChainDevice.Params.Range::class)
+    val range: Int = 1,
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    override val automations: Map<String, DialAutomationLane> = emptyMap(),
+) : DeviceState() {
+    override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState =
+        copy(automations = automations)
+}

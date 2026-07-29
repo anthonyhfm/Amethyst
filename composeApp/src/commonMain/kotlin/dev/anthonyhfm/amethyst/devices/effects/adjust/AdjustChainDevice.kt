@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
@@ -176,33 +177,26 @@ class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
         pushStateChange(before, after)
     }
 
-    private val activeSignals = mutableMapOf<Pair<Int, Int>, Signal.LED>()
-
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        synchronized(this) {
-            for (signal in n) {
-                val key = Pair(signal.x, signal.y)
-                if (signal.color != Color.Black && signal.opacity > 0f && (signal.color.red > 0f || signal.color.green > 0f || signal.color.blue > 0f)) {
-                    activeSignals[key] = signal
-                } else {
-                    activeSignals.remove(key)
-                }
-            }
+        val rawS = state.value
 
-            val rawS = state.value
-            val autoB = evaluateAutomatedDialValue("brightness", rawS.brightness / 2f) * 2f
-            val autoC = evaluateAutomatedDialValue("contrast", rawS.contrast / 2f) * 2f
-            val autoTemp = (evaluateAutomatedDialValue("temperature", (rawS.temperature + 1f) / 2f) * 2f) - 1f
-            val autoTint = (evaluateAutomatedDialValue("tint", (rawS.tint + 1f) / 2f) * 2f) - 1f
-            val s = rawS.copy(brightness = autoB, contrast = autoC, temperature = autoTemp, tint = autoTint)
-
-            val activeList = activeSignals.values.toList()
-            if (activeList.isNotEmpty()) {
-                signalExit?.invoke(activeList.map { signal ->
-                    signal.copy(color = applyAdjust(signal.color, s))
-                })
-            }
+        if (n.any { it.color.isLit() }) {
+            triggerDialAutomations()
         }
+
+        val autoB = evaluateAutomatedDialValue(Params.Brightness.id, rawS.brightness / 2f) * 2f
+        val autoC = evaluateAutomatedDialValue(Params.Contrast.id, rawS.contrast / 2f) * 2f
+        val autoTemp = (evaluateAutomatedDialValue(Params.Temperature.id, (rawS.temperature + 1f) / 2f) * 2f) - 1f
+        val autoTint = (evaluateAutomatedDialValue(Params.Tint.id, (rawS.tint + 1f) / 2f) * 2f) - 1f
+        val s = rawS.copy(brightness = autoB, contrast = autoC, temperature = autoTemp, tint = autoTint)
+
+        signalExit?.invoke(n.map { signal ->
+            if (signal.color == Color.Transparent || signal.color == Color.Black || signal.opacity <= 0f || !signal.color.isLit()) {
+                signal
+            } else {
+                signal.copy(color = applyAdjust(signal.color, s))
+            }
+        })
     }
 
     private fun applyAdjust(color: Color, s: AdjustChainDeviceState): Color {

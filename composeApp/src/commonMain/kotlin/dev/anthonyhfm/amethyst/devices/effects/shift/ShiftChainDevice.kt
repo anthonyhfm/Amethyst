@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
@@ -31,9 +32,63 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.devices.Automatable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+
 class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
     override val state = MutableStateFlow(ShiftChainDeviceState())
     override val helpRef = "Shift"
+
+    sealed class Params : AutomationParameter {
+        object Hue : Params() {
+            override val id = "hue"
+            override val label = "Hue"
+            override val curveMode = CurveMode.Bipolar
+            override val unit = "°"
+            override val displayRange = -180f..180f
+            override val displayDecimals = 0
+        }
+
+        object SaturationLow : Params() {
+            override val id = "saturationLow"
+            override val label = "Sat Low"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object SaturationMax : Params() {
+            override val id = "saturationMax"
+            override val label = "Sat High"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object ValueLow : Params() {
+            override val id = "valueLow"
+            override val label = "Val Low"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+
+        object ValueHigh : Params() {
+            override val id = "valueHigh"
+            override val label = "Val High"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+    }
 
     @Composable
     override fun Content() {
@@ -57,6 +112,7 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.Hue,
                         title = "Hue",
                         text = "${deviceState.hue.toInt()}°",
                         type = DialType.Steps(List(361) { -180 + it }),
@@ -85,6 +141,7 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.SaturationLow,
                         type = DialType.Continuous,
                         title = "Sat Low",
                         text = "${(deviceState.saturationLow * 100).roundToInt()}%",
@@ -100,6 +157,7 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                         }
                     )
                     Dial(
+                        automationParameter = Params.SaturationMax,
                         type = DialType.Continuous,
                         title = "Sat High",
                         text = "${(deviceState.saturationMax * 100).roundToInt()}%",
@@ -127,6 +185,7 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                     modifier = Modifier.weight(1f)
                 ) {
                     Dial(
+                        automationParameter = Params.ValueLow,
                         type = DialType.Continuous,
                         title = "Val Low",
                         text = "${(deviceState.valueLow * 100).roundToInt()}%",
@@ -142,6 +201,7 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
                         }
                     )
                     Dial(
+                        automationParameter = Params.ValueHigh,
                         type = DialType.Continuous,
                         title = "Val High",
                         text = "${(deviceState.valueHigh * 100).roundToInt()}%",
@@ -169,16 +229,35 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val s = state.value
+        val rawS = state.value
+
+        if (n.any { it.color.isLit() }) {
+            triggerDialAutomations()
+        }
+
+        val autoHue = ((evaluateAutomatedDialValue(Params.Hue.id, (rawS.hue + 180f) / 360f) * 360f) - 180f)
+        val autoSatLow = evaluateAutomatedDialValue(Params.SaturationLow.id, rawS.saturationLow)
+        val autoSatMax = evaluateAutomatedDialValue(Params.SaturationMax.id, rawS.saturationMax)
+        val autoValLow = evaluateAutomatedDialValue(Params.ValueLow.id, rawS.valueLow)
+        val autoValHigh = evaluateAutomatedDialValue(Params.ValueHigh.id, rawS.valueHigh)
+
+        val s = rawS.copy(
+            hue = autoHue,
+            saturationLow = autoSatLow,
+            saturationMax = autoSatMax,
+            valueLow = autoValLow,
+            valueHigh = autoValHigh
+        )
+
         signalExit?.invoke(n.map { signal ->
-            if (signal.color == Color.Transparent || signal.color.alpha == 0f) return@map signal
+            if (signal.color == Color.Transparent || signal.color.alpha == 0f || !signal.color.isLit()) return@map signal
             signal.copy(color = applyShift(signal.color, s))
         })
     }
 
     private fun applyShift(color: Color, s: ShiftChainDeviceState): Color {
-        val r = color.red;
-        val g = color.green;
+        val r = color.red
+        val g = color.green
         val b = color.blue
 
         val cMax = max(r, max(g, b))
@@ -226,11 +305,27 @@ class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class ShiftChainDeviceState(
+    @Automatable(ShiftChainDevice.Params.Hue::class)
     val hue: Float = 0f,
+
+    @Automatable(ShiftChainDevice.Params.SaturationMax::class)
     val saturationMax: Float = 1f,
+
+    @Automatable(ShiftChainDevice.Params.SaturationLow::class)
     val saturationLow: Float = 0f,
+
+    @Automatable(ShiftChainDevice.Params.ValueHigh::class)
     val valueHigh: Float = 1f,
-    val valueLow: Float = 0f
-) : DeviceState()
+
+    @Automatable(ShiftChainDevice.Params.ValueLow::class)
+    val valueLow: Float = 0f,
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    override val automations: Map<String, DialAutomationLane> = emptyMap(),
+) : DeviceState() {
+    override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState =
+        copy(automations = automations)
+}

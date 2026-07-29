@@ -24,9 +24,27 @@ import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
+import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.devices.Automatable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+
 class OpacityChainDevice : LEDChainDevice<OpacityChainDeviceState>() {
     override val state = MutableStateFlow(OpacityChainDeviceState())
     override val helpRef = "Opacity"
+
+    sealed class Params : AutomationParameter {
+        object Opacity : Params() {
+            override val id = "opacity"
+            override val label = "Opacity"
+            override val curveMode = CurveMode.Unipolar
+            override val unit = "%"
+            override val displayRange = 0f..100f
+            override val displayDecimals = 0
+        }
+    }
 
     @Composable
     override fun Content() {
@@ -44,6 +62,7 @@ class OpacityChainDevice : LEDChainDevice<OpacityChainDeviceState>() {
             var beforeState = deviceState.copy()
 
             Dial(
+                automationParameter = Params.Opacity,
                 type = DialType.Continuous,
                 title = "Opacity",
                 text = "${(deviceState.opacity * 100).roundToInt()}%",
@@ -63,9 +82,17 @@ class OpacityChainDevice : LEDChainDevice<OpacityChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
+        val rawS = state.value
+
+        if (n.any { it.color.isLit() }) {
+            triggerDialAutomations()
+        }
+
+        val autoOpacity = evaluateAutomatedDialValue(Params.Opacity.id, rawS.opacity)
+
         signalExit?.invoke(n.map { signal ->
-            if (signal.color.isLit()) signal.copy(opacity = state.value.opacity)
-            else signal  // off signal passes through unmodified (opacity=1f default) to clear its slot
+            if (signal.color.isLit()) signal.copy(opacity = autoOpacity)
+            else signal  // off signal passes through unmodified to clear its slot
         })
     }
 
@@ -76,7 +103,15 @@ class OpacityChainDevice : LEDChainDevice<OpacityChainDeviceState>() {
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class OpacityChainDeviceState(
+    @Automatable(OpacityChainDevice.Params.Opacity::class)
     val opacity: Float = 1f,
-) : DeviceState()
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    override val automations: Map<String, DialAutomationLane> = emptyMap(),
+) : DeviceState() {
+    override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState =
+        copy(automations = automations)
+}
