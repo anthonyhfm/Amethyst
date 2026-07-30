@@ -458,18 +458,8 @@ actual object Echo {
     }
 
     private fun logAudioHealth() {
-        val underrunDelta = totalUnderruns - loggedUnderruns
-        val streamErrorDelta = totalStreamErrors - loggedStreamErrors
         loggedUnderruns = totalUnderruns
         loggedStreamErrors = totalStreamErrors
-        val status = mutableOutputStatus.value
-        println(
-            "[Echo/Desktop] audio health: " +
-                "underruns=+$underrunDelta/$totalUnderruns, " +
-                "streamErrors=+$streamErrorDelta/$totalStreamErrors, " +
-                "backend=${status.backend}, sampleRate=${status.sampleRate}, " +
-                "periodFrames=${status.periodFrames}",
-        )
     }
 
     private fun counterDelta(current: ULong, previous: ULong): Long {
