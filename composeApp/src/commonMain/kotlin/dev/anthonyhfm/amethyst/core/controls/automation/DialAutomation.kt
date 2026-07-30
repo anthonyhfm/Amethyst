@@ -34,6 +34,19 @@ data class DialAutomationLane(
     ),
     val settings: DialAutomationSettings = DialAutomationSettings(),
 ) {
+    companion object {
+        fun createInitial(parameterId: String, initialNormalizedValue: Float = 0.5f): DialAutomationLane {
+            val initVal = (initialNormalizedValue * 2f - 1f).coerceIn(-1f, 1f)
+            return DialAutomationLane(
+                parameterId = parameterId,
+                points = listOf(
+                    CompositionAutomationPoint(0f, initVal),
+                    CompositionAutomationPoint(1f, initVal)
+                )
+            )
+        }
+    }
+
     fun valueAt(progress: Float, fallback: Float): Float {
         val ordered = points.sortedBy(CompositionAutomationPoint::progress)
         if (ordered.isEmpty()) return fallback

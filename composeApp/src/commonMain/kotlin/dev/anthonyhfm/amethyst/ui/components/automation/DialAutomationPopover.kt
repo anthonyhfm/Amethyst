@@ -77,6 +77,7 @@ import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.chart2
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
@@ -147,15 +148,27 @@ fun DialAutomationPopover(
             ) {
                 val rawPopoverBg = Theme[colors][popover]
                 val borderCol = Theme[colors][border]
-                val popoverBg = if (rawPopoverBg.red < 0.1f && rawPopoverBg.green < 0.1f && rawPopoverBg.blue < 0.1f) {
-                    Color(0xFF1E2433)
+                val isDark = rawPopoverBg.red < 0.1f && rawPopoverBg.green < 0.1f && rawPopoverBg.blue < 0.1f
+
+                val popoverBg = if (isDark) {
+                    Color(0xFF141822)
                 } else {
                     rawPopoverBg
                 }
-                val popoverBorder = if (borderCol.red < 0.2f && borderCol.green < 0.2f && borderCol.blue < 0.2f) {
+                val popoverBorder = if (isDark) {
                     Color(0xFF3B475D)
                 } else {
                     borderCol
+                }
+                val editorPanelBg = if (isDark) {
+                    Color(0xFF0D111A)
+                } else {
+                    Theme[colors][secondary]
+                }
+                val editorPanelBorder = if (isDark) {
+                    Color(0xFF263042)
+                } else {
+                    borderCol.copy(alpha = 0.6f)
                 }
 
                 Column(
@@ -167,13 +180,13 @@ fun DialAutomationPopover(
                         modifier = Modifier
                             .fillMaxWidth()
                             .shadow(
-                                elevation = 16.dp,
+                                elevation = 20.dp,
                                 shape = RoundedCornerShape(12.dp),
-                                ambientColor = Color.Black,
-                                spotColor = Color.Black
+                                ambientColor = Color.Black.copy(alpha = 0.6f),
+                                spotColor = Color.Black.copy(alpha = 0.8f)
                             )
                             .background(popoverBg, RoundedCornerShape(12.dp))
-                            .border(1.5.dp, popoverBorder, RoundedCornerShape(12.dp))
+                            .border(1.dp, popoverBorder, RoundedCornerShape(12.dp))
                             .padding(12.dp)
                     ) {
                         Column(
@@ -247,13 +260,15 @@ fun DialAutomationPopover(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(150.dp)
-                                    .background(Theme[colors][secondary], RoundedCornerShape(8.dp))
-                                    .border(1.dp, borderCol.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(editorPanelBg, RoundedCornerShape(8.dp))
+                                    .border(1.dp, editorPanelBorder, RoundedCornerShape(8.dp))
                             ) {
                                 AutomationCanvas(
                                     points = lane.points,
                                     parameter = parameter,
                                     selectedPointId = selectedPointId,
+                                    panelBgColor = editorPanelBg,
                                     onSelect = { selectedPointId = it },
                                     onAdd = { p, value ->
                                         onUpdateLane(
@@ -411,8 +426,8 @@ fun DialAutomationPopover(
                                 close()
                             }
                             drawPath(fillPath, popoverBg)
-                            drawLine(popoverBorder, Offset(0f, 0f), Offset(size.width / 2f, size.height), 1.5.dp.toPx())
-                            drawLine(popoverBorder, Offset(size.width / 2f, size.height), Offset(size.width, 0f), 1.5.dp.toPx())
+                            drawLine(popoverBorder, Offset(0f, 0f), Offset(size.width / 2f, size.height), 1.dp.toPx())
+                            drawLine(popoverBorder, Offset(size.width / 2f, size.height), Offset(size.width, 0f), 1.dp.toPx())
                         }
                     }
                 }
@@ -426,6 +441,7 @@ private fun AutomationCanvas(
     points: List<CompositionAutomationPoint>,
     parameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter? = null,
     selectedPointId: String?,
+    panelBgColor: Color = Theme[colors][secondary],
     onSelect: (String?) -> Unit,
     onAdd: (Float, Float) -> Unit,
     onMove: (String, Float, Float) -> Unit,
@@ -439,12 +455,12 @@ private fun AutomationCanvas(
     val currentOnAdd = rememberUpdatedState(onAdd)
     val currentOnMove = rememberUpdatedState(onMove)
     val currentOnMoveHandle = rememberUpdatedState(onMoveHandle)
-    val surfaceColor = Theme[colors][secondary]
+    val surfaceColor = panelBgColor
     val mutedColor = Theme[colors][mutedForeground]
-    val primaryColor = Theme[colors][primary]
+    val curveAccentColor = Theme[colors][chart2]
 
     val density = LocalDensity.current
-    val paddingPx = with(density) { 14.dp.toPx() }
+    val paddingPx = with(density) { 4.dp.toPx() }
 
     fun progressToX(p: Float, width: Float): Float {
         val usableWidth = (width - 2 * paddingPx).coerceAtLeast(1f)
@@ -474,7 +490,7 @@ private fun AutomationCanvas(
         }?.takeIf {
             val x = progressToX(it.progress, width)
             val y = valueToY(it.value, height)
-            (Offset(x, y) - position).getDistance() < 18f
+            (Offset(x, y) - position).getDistance() < 22f
         }
 
     fun handlePosition(point: CompositionAutomationPoint, incoming: Boolean, width: Float, height: Float): Offset? {
@@ -492,7 +508,7 @@ private fun AutomationCanvas(
     fun handleAt(position: Offset, width: Float, height: Float): AutomationDragTarget.Handle? {
         val selected = currentPoints.value.firstOrNull { it.pointId == currentSelectedPointId.value } ?: return null
         return listOf(true, false).firstNotNullOfOrNull { incoming ->
-            handlePosition(selected, incoming, width, height)?.takeIf { (it - position).getDistance() < 18f }
+            handlePosition(selected, incoming, width, height)?.takeIf { (it - position).getDistance() < 22f }
                 ?.let { AutomationDragTarget.Handle(selected.pointId, incoming) }
         }
     }
@@ -610,8 +626,8 @@ private fun AutomationCanvas(
                 lineTo(curvePoints.first().x, baselineY)
                 close()
             }
-            drawPath(fillPath, primaryColor.copy(alpha = .14f), style = Fill)
-            drawPath(strokePath, primaryColor, style = Stroke(2.5.dp.toPx()))
+            drawPath(fillPath, curveAccentColor.copy(alpha = .14f), style = Fill)
+            drawPath(strokePath, curveAccentColor, style = Stroke(2.5.dp.toPx()))
         }
 
         val zeroY = if (parameter?.curveMode == dev.anthonyhfm.amethyst.core.controls.automation.CurveMode.Bipolar) valueToY(0f, size.height) else valueToY(-1f, size.height)
@@ -625,13 +641,13 @@ private fun AutomationCanvas(
                     handlePosition(point, incoming, size.width, size.height)?.let { handle ->
                         drawLine(mutedColor.copy(alpha = .8f), center, handle, 1.5.dp.toPx())
                         drawCircle(surfaceColor, 6.dp.toPx(), handle)
-                        drawCircle(primaryColor, 6.dp.toPx(), handle, style = Stroke(2.dp.toPx()))
+                        drawCircle(curveAccentColor, 6.dp.toPx(), handle, style = Stroke(2.dp.toPx()))
                     }
                 }
                 drawCircle(surfaceColor, 8.dp.toPx(), center)
                 drawCircle(Color.White, 6.dp.toPx(), center)
-                drawCircle(primaryColor, 6.dp.toPx(), center, style = Stroke(2.dp.toPx()))
-            } else drawCircle(primaryColor, 5.dp.toPx(), center)
+                drawCircle(curveAccentColor, 6.dp.toPx(), center, style = Stroke(2.dp.toPx()))
+            } else drawCircle(curveAccentColor, 5.dp.toPx(), center)
         }
     }
 }

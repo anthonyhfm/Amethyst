@@ -180,7 +180,8 @@ fun <T> AutomatableDial(
                     icon = if (dialLane != null) Lucide.Pencil else Lucide.Plus,
                     onClick = {
                         if (dialLane == null) {
-                            chainDevice.setDialAutomation(parameterId, DialAutomationLane(parameterId))
+                            val manualNorm = getManualNormalizedValue(type, value)
+                            chainDevice.setDialAutomation(parameterId, DialAutomationLane.createInitial(parameterId, manualNorm))
                         }
                         showPopover = true
                     }
