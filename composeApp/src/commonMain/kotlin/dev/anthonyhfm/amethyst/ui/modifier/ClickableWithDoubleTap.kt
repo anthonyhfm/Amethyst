@@ -28,7 +28,7 @@ fun Modifier.clickableWithDoubleTap(
         if (up != null) {
             up.consume()
 
-            val now = System.now().epochSeconds
+            val now = System.now().toEpochMilliseconds()
             val isDoubleTap = (now - lastTapTime) <= doubleTapTimeoutMs
 
             lastTapTime = if (isDoubleTap) 0L else now

@@ -50,11 +50,14 @@ import kotlin.math.roundToInt
 
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
     override val state = MutableStateFlow(RotateChainDeviceState())
     override val helpRef = "Rotate"
 
+    private val lock = SynchronizedObject()
     private val activePads = mutableMapOf<Pair<Int, Int>, Signal.LED>()
     private val previousOutput = mutableMapOf<Pair<Int, Int>, Signal.LED>()
 
@@ -192,7 +195,7 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        synchronized(this) {
+        synchronized(lock) {
             val rawS = state.value
             val autoNorm = evaluateAutomatedDialValue(Params.Angle.id, (rawS.angleDegrees % 360f + 360f) % 360f / 360f)
             val angle = ((autoNorm * 360f) % 360f + 360f) % 360f

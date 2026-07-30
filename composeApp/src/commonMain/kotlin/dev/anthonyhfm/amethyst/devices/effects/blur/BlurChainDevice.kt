@@ -54,9 +54,16 @@ import dev.anthonyhfm.amethyst.devices.Automatable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+
 class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
     override val state = MutableStateFlow(BlurChainDeviceState())
     override val helpRef = "Blur"
+
+    private val lock = SynchronizedObject()
+    private val activePads = mutableMapOf<Pair<Int, Int>, Signal.LED>()
+    private val previousOutput = mutableMapOf<Pair<Int, Int>, Signal.LED>()
 
     sealed class Params : AutomationParameter {
         object Radius : Params() {
@@ -82,9 +89,6 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
             override val snapPoints = enumSnapPoints<BlurShape> { it.label }
         }
     }
-
-    private val activePads = mutableMapOf<Pair<Int, Int>, Signal.LED>()
-    private val previousOutput = mutableMapOf<Pair<Int, Int>, Signal.LED>()
 
     @Composable
     override fun Content() {
@@ -209,7 +213,7 @@ class BlurChainDevice : LEDChainDevice<BlurChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        synchronized(this) {
+        synchronized(lock) {
             val rawS = state.value
             val automatedAmount = evaluateAutomatedDialValue("amount", rawS.amount)
             val automatedRadiusNorm = evaluateAutomatedDialValue("radius", rawS.radius / 8f)

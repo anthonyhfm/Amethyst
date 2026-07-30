@@ -16,11 +16,14 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.workspace.chain.ui.CollapsedChainDevice
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlin.time.Clock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -177,7 +180,7 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
     private val automationScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var automationTickerJob: Job? = null
 
-    fun triggerDialAutomations(nowMs: Long = System.currentTimeMillis()) {
+    fun triggerDialAutomations(nowMs: Long = Clock.System.now().toEpochMilliseconds()) {
         dialAutomationRuntimes.values.forEach { it.trigger(nowMs) }
         startAutomationTicker()
     }
@@ -201,7 +204,7 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
     fun evaluateAutomatedDialValue(
         parameterId: String,
         manualNormalizedValue: Float,
-        nowMs: Long = System.currentTimeMillis(),
+        nowMs: Long = Clock.System.now().toEpochMilliseconds(),
         bpm: Float = 120f
     ): Float {
         val runtime = dialAutomationRuntimes[parameterId] ?: return manualNormalizedValue
@@ -232,13 +235,15 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 }
 
 abstract class LEDChainDevice <State : @Serializable DeviceState> : GenericChainDevice<State>() {
+    private val deviceLock = SynchronizedObject()
+
     @Composable
     abstract override fun Content()
 
     abstract fun ledSignalEnter(n: List<Signal.LED>)
 
     override fun signalEnter(n: List<Signal>) {
-        synchronized(this) {
+        synchronized(deviceLock) {
             if (n.any { it.isOn() }) {
                 triggerDialAutomations()
             }
@@ -251,7 +256,7 @@ abstract class LEDChainDevice <State : @Serializable DeviceState> : GenericChain
     }
 
     override fun onAutomationTick() {
-        synchronized(this) {
+        synchronized(deviceLock) {
             ledSignalEnter(emptyList())
         }
     }
