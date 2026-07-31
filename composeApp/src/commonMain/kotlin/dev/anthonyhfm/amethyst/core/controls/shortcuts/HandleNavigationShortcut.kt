@@ -16,6 +16,7 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.node
 
 fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
     // Alt+← / Alt+→ — switch workspace mode
@@ -45,6 +46,53 @@ fun handleNavigationShortcut(keyEvent: KeyEvent): Boolean {
 
     val currentSelections = SelectionManager.selections.value
     val anchor = currentSelections.lastOrNull() ?: return false
+
+    if (anchor is Selectable.CompositionAutomationPoint) {
+        val selectedPoints = currentSelections.filterIsInstance<Selectable.CompositionAutomationPoint>()
+        val first = anchor
+        val activeDevice = dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.lightsChain.devices.value.filterIsInstance<dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice>()
+            .firstOrNull { it.selectionUUID == first.deviceId }
+            ?: dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.samplingChain.devices.value.filterIsInstance<dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice>()
+                .firstOrNull { it.selectionUUID == first.deviceId }
+        val graph = activeDevice?.state?.value?.graph
+        val node = graph?.node(first.nodeId)
+        val lane = node?.automation?.firstOrNull { it.parameterId == first.parameterId }
+        if (lane != null && activeDevice != null) {
+            val selectedIds = selectedPoints.map { it.pointId }.toSet()
+            val beforePoints = lane.points
+            val valueNudge = when (keyEvent.key) {
+                Key.DirectionUp -> if (keyEvent.isShiftPressed) 0.10f else 0.02f
+                Key.DirectionDown -> if (keyEvent.isShiftPressed) -0.10f else -0.02f
+                else -> 0f
+            }
+            val progressNudge = when (keyEvent.key) {
+                Key.DirectionRight -> if (keyEvent.isShiftPressed) 0.05f else 0.01f
+                Key.DirectionLeft -> if (keyEvent.isShiftPressed) -0.05f else -0.01f
+                else -> 0f
+            }
+            val afterPoints = beforePoints.map { pt: dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint ->
+                if (pt.pointId in selectedIds) {
+                    pt.copy(
+                        value = (pt.value + valueNudge).coerceIn(-1f, 1f),
+                        progress = (pt.progress + progressNudge).coerceIn(0f, 1f)
+                    )
+                } else pt
+            }
+            val editor = dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor(activeDevice)
+            editor.replaceAutomationPoints(first.nodeId, first.parameterId, afterPoints)
+            dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.CompositionAutomationPointChange(
+                    deviceId = first.deviceId,
+                    nodeId = first.nodeId,
+                    parameterId = first.parameterId,
+                    beforePoints = beforePoints,
+                    afterPoints = afterPoints,
+                    editor = editor
+                )
+            )
+            return true
+        }
+    }
 
     // ↑/↓ — navigate group list when a GroupChainItem is selected
     if (keyEvent.key == Key.DirectionUp || keyEvent.key == Key.DirectionDown) {

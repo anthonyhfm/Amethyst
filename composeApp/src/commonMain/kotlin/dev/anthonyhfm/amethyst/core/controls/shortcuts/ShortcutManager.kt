@@ -103,7 +103,9 @@ object ShortcutManager {
             it is Selectable.GroupChainItem ||
                 it is Selectable.ChainDevice ||
                 it is Selectable.GradientStep ||
-                it is Selectable.PianoRollNote
+                it is Selectable.PianoRollNote ||
+                it is Selectable.CompositionAutomationPoint ||
+                it is Selectable.DialAutomationPoint
         }
     }
 

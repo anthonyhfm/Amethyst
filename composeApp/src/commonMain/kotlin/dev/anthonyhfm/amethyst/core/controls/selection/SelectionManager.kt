@@ -152,6 +152,21 @@ object SelectionManager {
             .filter { it.deviceId == deviceId && it.nodeId == nodeId && it.parameterId == parameterId }
             .mapTo(mutableSetOf(), Selectable.CompositionAutomationPoint::pointId)
 
+    fun selectDialAutomationPoints(
+        parameterId: String, pointIds: Collection<String>, handle: Selectable.DialAutomationHandle? = null,
+    ) {
+        replaceSelections(
+            listOf(Selectable.DialAutomationLane(parameterId)) +
+                pointIds.distinct().map { Selectable.DialAutomationPoint(parameterId, it) } +
+                listOfNotNull(handle)
+        )
+    }
+
+    fun selectedDialAutomationPointIds(parameterId: String): Set<String> =
+        selections.value.filterIsInstance<Selectable.DialAutomationPoint>()
+            .filter { it.parameterId == parameterId }
+            .mapTo(mutableSetOf(), Selectable.DialAutomationPoint::pointId)
+
     fun selectedTimelineAutomationPointIds(
         trackIndex: Int,
         lane: TimelineAutomationLaneKey,

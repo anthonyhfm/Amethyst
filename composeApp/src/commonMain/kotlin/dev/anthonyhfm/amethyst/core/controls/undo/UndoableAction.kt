@@ -232,6 +232,38 @@ sealed interface UndoableAction {
         val afterState: State
     ) : UndoableAction
 
+    data class CompositionAutomationPointChange(
+        val deviceId: String,
+        val nodeId: String,
+        val parameterId: String,
+        val beforePoints: List<dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint>,
+        val afterPoints: List<dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint>,
+        val editor: dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor,
+    ) : UndoableAction
+
+    data class DialAutomationPointChange(
+        val parameterId: String,
+        val beforePoints: List<dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint>,
+        val afterPoints: List<dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint>,
+        val onUpdatePoints: (List<dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint>) -> Unit,
+    ) : UndoableAction
+
+    data class DialAutomationLaneChange(
+        val chainDevice: dev.anthonyhfm.amethyst.devices.GenericChainDevice<*>,
+        val parameterId: String,
+        val beforeLane: dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane?,
+        val afterLane: dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane?,
+    ) : UndoableAction
+
+    data class CompositionAutomationLaneToggle(
+        val deviceId: String,
+        val nodeId: String,
+        val parameterId: String,
+        val beforeGraph: dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph,
+        val afterGraph: dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph,
+        val editor: dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor,
+    ) : UndoableAction
+
     data class WorkspaceModeChange(
         val beforeMode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode,
         val afterMode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode

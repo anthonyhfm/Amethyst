@@ -8,7 +8,10 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.node
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -319,6 +322,36 @@ object UndoManager {
                     // Zustand wiederherstellen
                     (device.state as kotlinx.coroutines.flow.MutableStateFlow<dev.anthonyhfm.amethyst.devices.DeviceState>).value = action.beforeState
                     device.onStateRestored()
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.CompositionAutomationPointChange -> {
+                    action.editor.replaceAutomationPoints(action.nodeId, action.parameterId, action.beforePoints)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.DialAutomationPointChange -> {
+                    action.onUpdatePoints(action.beforePoints)
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.DialAutomationLaneChange -> {
+                    action.chainDevice.setDialAutomation(action.parameterId, action.beforeLane)
+                    if (action.beforeLane == null) {
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.CompositionAutomationLaneToggle -> {
+                    action.editor.device.commitGraphEdit(action.beforeGraph)
+                    val node = action.beforeGraph.node(action.nodeId)
+                    val hasLaneNow = node?.lane(action.parameterId) != null
+                    if (!hasLaneNow) {
+                        action.editor.closeAutomation()
+                    } else {
+                        action.editor.editAutomation(action.nodeId, action.parameterId)
+                    }
                     redoStack.add(action)
                 }
 
@@ -821,6 +854,33 @@ object UndoManager {
                     val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<DeviceState>
                     device.state.value = action.afterState
                     device.onStateRestored()
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.CompositionAutomationPointChange -> {
+                    action.editor.replaceAutomationPoints(action.nodeId, action.parameterId, action.afterPoints)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.DialAutomationPointChange -> {
+                    action.onUpdatePoints(action.afterPoints)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.DialAutomationLaneChange -> {
+                    action.chainDevice.setDialAutomation(action.parameterId, action.afterLane)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.CompositionAutomationLaneToggle -> {
+                    action.editor.device.commitGraphEdit(action.afterGraph)
+                    val node = action.afterGraph.node(action.nodeId)
+                    val hasLaneNow = node?.lane(action.parameterId) != null
+                    if (hasLaneNow) {
+                        action.editor.editAutomation(action.nodeId, action.parameterId)
+                    } else {
+                        action.editor.closeAutomation()
+                    }
                     undoStack.add(action)
                 }
 

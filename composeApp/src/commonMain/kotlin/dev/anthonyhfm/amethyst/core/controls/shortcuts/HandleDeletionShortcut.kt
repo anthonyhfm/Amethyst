@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.node
 import kotlinx.coroutines.flow.update
 
 fun handleDeletionShortcut(): Boolean {
@@ -145,6 +146,40 @@ fun handleDeletionShortcut(): Boolean {
             }
 
             return true
+        }
+
+        selections.any { it is Selectable.CompositionAutomationPoint } -> {
+            val compPoints = selections.filterIsInstance<Selectable.CompositionAutomationPoint>()
+            val first = compPoints.first()
+            val activeDevice = dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.lightsChain.devices.value.filterIsInstance<dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice>()
+                .firstOrNull { it.selectionUUID == first.deviceId }
+                ?: dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.samplingChain.devices.value.filterIsInstance<dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice>()
+                    .firstOrNull { it.selectionUUID == first.deviceId }
+            val graph = activeDevice?.state?.value?.graph
+            val node = graph?.node(first.nodeId)
+            val lane = node?.automation?.firstOrNull { it.parameterId == first.parameterId }
+            if (lane != null && activeDevice != null) {
+                val pointIdsToRemove = compPoints.map { it.pointId }.toSet()
+                val beforePoints = lane.points
+                val afterPoints = beforePoints.filterNot { it.pointId in pointIdsToRemove }
+                if (afterPoints.size != beforePoints.size) {
+                    val editor = dev.anthonyhfm.amethyst.devices.effects.composition.CompositionGraphEditor(activeDevice)
+                    editor.replaceAutomationPoints(first.nodeId, first.parameterId, afterPoints)
+                    UndoManager.addAction(
+                        UndoableAction.CompositionAutomationPointChange(
+                            deviceId = first.deviceId,
+                            nodeId = first.nodeId,
+                            parameterId = first.parameterId,
+                            beforePoints = beforePoints,
+                            afterPoints = afterPoints,
+                            editor = editor
+                        )
+                    )
+                    SelectionManager.clear()
+                    return true
+                }
+            }
+            return false
         }
     }
 

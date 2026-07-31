@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -134,6 +137,7 @@ fun DialAutomationPopover(
     trigger: @Composable () -> Unit,
 ) {
     var selectedPointId by remember { mutableStateOf<String?>(null) }
+    var dragStartPoints by remember { mutableStateOf<List<CompositionAutomationPoint>?>(null) }
     var relativeArrowXPx by remember { mutableStateOf(247) }
     val density = LocalDensity.current
 
@@ -148,7 +152,7 @@ fun DialAutomationPopover(
             ) {
                 val rawPopoverBg = Theme[colors][popover]
                 val borderCol = Theme[colors][border]
-                val isDark = rawPopoverBg.red < 0.1f && rawPopoverBg.green < 0.1f && rawPopoverBg.blue < 0.1f
+                val isDark = rawPopoverBg.red < 0.5f
 
                 val popoverBg = if (isDark) {
                     Color(0xFF141822)
@@ -169,6 +173,11 @@ fun DialAutomationPopover(
                     Color(0xFF263042)
                 } else {
                     borderCol.copy(alpha = 0.6f)
+                }
+                val dividerColor = if (isDark) {
+                    Color(0xFF1F2837)
+                } else {
+                    borderCol.copy(alpha = 0.3f)
                 }
 
                 Column(
@@ -255,8 +264,8 @@ fun DialAutomationPopover(
                                 }
                             }
 
-                            // Curve Editor Canvas
-                            Box(
+                            // Curve Editor Canvas with Left Legend Sidebar
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(150.dp)
@@ -264,18 +273,47 @@ fun DialAutomationPopover(
                                     .background(editorPanelBg, RoundedCornerShape(8.dp))
                                     .border(1.dp, editorPanelBorder, RoundedCornerShape(8.dp))
                             ) {
-                                AutomationCanvas(
+                                AutomationValueLegend(
+                                    parameter = parameter,
+                                    editorPanelBg = editorPanelBg,
+                                    modifier = Modifier
+                                        .wrapContentWidth()
+                                        .fillMaxHeight()
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .width(1.dp)
+                                        .fillMaxHeight()
+                                        .background(dividerColor)
+                                )
+
+                                 AutomationCanvas(
                                     points = lane.points,
                                     parameter = parameter,
                                     selectedPointId = selectedPointId,
                                     panelBgColor = editorPanelBg,
-                                    onSelect = { selectedPointId = it },
+                                    onSelect = { id ->
+                                        selectedPointId = id
+                                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.selectDialAutomationPoints(lane.parameterId, listOfNotNull(id))
+                                    },
                                     onAdd = { p, value ->
-                                        onUpdateLane(
-                                            lane.copy(points = lane.points + CompositionAutomationPoint(p, value))
+                                        val before = lane.points
+                                        val after = before + CompositionAutomationPoint(p, value)
+                                        onUpdateLane(lane.copy(points = after))
+                                        dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                                            dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.DialAutomationPointChange(
+                                                parameterId = lane.parameterId,
+                                                beforePoints = before,
+                                                afterPoints = after,
+                                                onUpdatePoints = { newPoints -> onUpdateLane(lane.copy(points = newPoints)) }
+                                            )
                                         )
                                     },
                                     onMove = { id, p, value ->
+                                        if (dragStartPoints == null) {
+                                            dragStartPoints = lane.points
+                                        }
                                         onUpdateLane(
                                             lane.copy(points = lane.points.map {
                                                 if (it.pointId == id) it.copy(progress = p, value = value) else it
@@ -283,6 +321,9 @@ fun DialAutomationPopover(
                                         )
                                     },
                                     onMoveHandle = { id, incoming, time, value ->
+                                        if (dragStartPoints == null) {
+                                            dragStartPoints = lane.points
+                                        }
                                         onUpdateLane(
                                             lane.copy(points = lane.points.map { point ->
                                                 if (point.pointId != id) point
@@ -296,7 +337,24 @@ fun DialAutomationPopover(
                                             })
                                         )
                                     },
-                                    modifier = Modifier.fillMaxSize()
+                                    onDragFinished = {
+                                        val before = dragStartPoints
+                                        val after = lane.points
+                                        if (before != null && before != after) {
+                                            dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                                                dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.DialAutomationPointChange(
+                                                    parameterId = lane.parameterId,
+                                                    beforePoints = before,
+                                                    afterPoints = after,
+                                                    onUpdatePoints = { newPoints -> onUpdateLane(lane.copy(points = newPoints)) }
+                                                )
+                                            )
+                                        }
+                                        dragStartPoints = null
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
                                 )
                             }
 
@@ -446,6 +504,7 @@ private fun AutomationCanvas(
     onAdd: (Float, Float) -> Unit,
     onMove: (String, Float, Float) -> Unit,
     onMoveHandle: (String, Boolean, Float, Float) -> Unit,
+    onDragFinished: () -> Unit = {},
     modifier: Modifier,
 ) {
     var draggedTarget by remember { mutableStateOf<AutomationDragTarget?>(null) }
@@ -455,32 +514,18 @@ private fun AutomationCanvas(
     val currentOnAdd = rememberUpdatedState(onAdd)
     val currentOnMove = rememberUpdatedState(onMove)
     val currentOnMoveHandle = rememberUpdatedState(onMoveHandle)
+    val currentOnDragFinished = rememberUpdatedState(onDragFinished)
     val surfaceColor = panelBgColor
     val mutedColor = Theme[colors][mutedForeground]
     val curveAccentColor = Theme[colors][chart2]
 
-    val density = LocalDensity.current
-    val paddingPx = with(density) { 4.dp.toPx() }
+    fun progressToX(p: Float, width: Float): Float = p.coerceIn(0f, 1f) * width
 
-    fun progressToX(p: Float, width: Float): Float {
-        val usableWidth = (width - 2 * paddingPx).coerceAtLeast(1f)
-        return paddingPx + p.coerceIn(0f, 1f) * usableWidth
-    }
+    fun valueToY(v: Float, height: Float): Float = (1f - (v + 1f) * 0.5f) * height
 
-    fun valueToY(v: Float, height: Float): Float {
-        val usableHeight = (height - 2 * paddingPx).coerceAtLeast(1f)
-        return paddingPx + (1f - (v + 1f) * 0.5f) * usableHeight
-    }
+    fun xToProgress(x: Float, width: Float): Float = (x / width).coerceIn(0f, 1f)
 
-    fun xToProgress(x: Float, width: Float): Float {
-        val usableWidth = (width - 2 * paddingPx).coerceAtLeast(1f)
-        return ((x - paddingPx) / usableWidth).coerceIn(0f, 1f)
-    }
-
-    fun yToValue(y: Float, height: Float): Float {
-        val usableHeight = (height - 2 * paddingPx).coerceAtLeast(1f)
-        return (1f - ((y - paddingPx) / usableHeight).coerceIn(0f, 1f) * 2f).coerceIn(-1f, 1f)
-    }
+    fun yToValue(y: Float, height: Float): Float = (1f - (y / height).coerceIn(0f, 1f) * 2f).coerceIn(-1f, 1f)
 
     fun pointAt(position: Offset, width: Float, height: Float): CompositionAutomationPoint? =
         currentPoints.value.minByOrNull {
@@ -573,6 +618,8 @@ private fun AutomationCanvas(
                             null -> Unit
                         }
                     },
+                    onDragEnd = { draggedTarget = null; currentOnDragFinished.value() },
+                    onDragCancel = { draggedTarget = null; currentOnDragFinished.value() }
                 )
             },
     ) {
@@ -583,15 +630,15 @@ private fun AutomationCanvas(
 
         listOf(.25f, .5f, .75f).forEach { p ->
             val gridX = progressToX(p, size.width)
-            drawLine(mutedColor.copy(alpha = .18f), Offset(gridX, paddingPx), Offset(gridX, size.height - paddingPx), 1.dp.toPx())
+            drawLine(mutedColor.copy(alpha = .18f), Offset(gridX, 0f), Offset(gridX, size.height), 1.dp.toPx())
         }
 
         parameter?.snapPoints?.forEach { snap ->
             val snapY = valueToY(snap.normalizedValue, size.height)
             drawLine(
                 color = mutedColor.copy(alpha = 0.35f),
-                start = Offset(progressToX(0f, size.width), snapY),
-                end = Offset(progressToX(1f, size.width), snapY),
+                start = Offset(0f, snapY),
+                end = Offset(size.width, snapY),
                 strokeWidth = 1.dp.toPx()
             )
         }
@@ -632,22 +679,32 @@ private fun AutomationCanvas(
 
         val zeroY = if (parameter?.curveMode == dev.anthonyhfm.amethyst.core.controls.automation.CurveMode.Bipolar) valueToY(0f, size.height) else valueToY(-1f, size.height)
         val zeroAlpha = if (parameter?.curveMode == dev.anthonyhfm.amethyst.core.controls.automation.CurveMode.Bipolar) 0.5f else 0.2f
-        drawLine(mutedColor.copy(alpha = zeroAlpha), Offset(progressToX(0f, size.width), zeroY), Offset(progressToX(1f, size.width), zeroY), 1.dp.toPx())
+        drawLine(mutedColor.copy(alpha = zeroAlpha), Offset(0f, zeroY), Offset(size.width, zeroY), 1.dp.toPx())
+
+        fun Offset.clampInside(radius: Float): Offset = Offset(
+            x.coerceIn(radius, size.width - radius),
+            y.coerceIn(radius, size.height - radius)
+        )
 
         sorted.forEach { point ->
             val center = Offset(progressToX(point.progress, size.width), valueToY(point.value, size.height))
             if (point.pointId == selectedPointId) {
                 listOf(true, false).forEach { incoming ->
                     handlePosition(point, incoming, size.width, size.height)?.let { handle ->
-                        drawLine(mutedColor.copy(alpha = .8f), center, handle, 1.5.dp.toPx())
-                        drawCircle(surfaceColor, 6.dp.toPx(), handle)
-                        drawCircle(curveAccentColor, 6.dp.toPx(), handle, style = Stroke(2.dp.toPx()))
+                        val clampedHandle = handle.clampInside(6.dp.toPx())
+                        val clampedCenterForLine = center.clampInside(6.dp.toPx())
+                        drawLine(mutedColor.copy(alpha = .8f), clampedCenterForLine, clampedHandle, 1.5.dp.toPx())
+                        drawCircle(surfaceColor, 6.dp.toPx(), clampedHandle)
+                        drawCircle(curveAccentColor, 6.dp.toPx(), clampedHandle, style = Stroke(2.dp.toPx()))
                     }
                 }
-                drawCircle(surfaceColor, 8.dp.toPx(), center)
-                drawCircle(Color.White, 6.dp.toPx(), center)
-                drawCircle(curveAccentColor, 6.dp.toPx(), center, style = Stroke(2.dp.toPx()))
-            } else drawCircle(curveAccentColor, 5.dp.toPx(), center)
+                val clampedCenter = center.clampInside(8.dp.toPx())
+                drawCircle(surfaceColor, 8.dp.toPx(), clampedCenter)
+                drawCircle(Color.White, 6.dp.toPx(), clampedCenter)
+                drawCircle(curveAccentColor, 6.dp.toPx(), clampedCenter, style = Stroke(2.dp.toPx()))
+            } else {
+                drawCircle(curveAccentColor, 5.dp.toPx(), center.clampInside(5.dp.toPx()))
+            }
         }
     }
 }
@@ -835,5 +892,101 @@ private fun StepIconButton(
             tint = Theme[colors][foreground],
             modifier = Modifier.size(12.dp),
         )
+    }
+}
+
+@Composable
+private fun AutomationValueLegend(
+    parameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter?,
+    editorPanelBg: Color,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    val vertPaddingDp = 12.dp
+    val vertPaddingPx = with(density) { vertPaddingDp.toPx() }
+    val textColor = Theme[colors][mutedForeground]
+
+    val snapPoints = parameter?.snapPoints
+    val itemsToDraw: List<Pair<Float, String>> = if (!snapPoints.isNullOrEmpty()) {
+        snapPoints.map { snap ->
+            val label = snap.label ?: formatValueLabel(snap.normalizedValue, parameter)
+            snap.normalizedValue to label
+        }
+    } else {
+        val values = listOf(1f, 0f, -1f)
+        values.map { v -> v to formatValueLabel(v, parameter) }
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .wrapContentWidth()
+            .background(editorPanelBg.copy(alpha = 0.6f))
+            .padding(horizontal = 8.dp)
+    ) {
+        val heightPx = with(density) { maxHeight.toPx() }
+        val usableHeightPx = (heightPx - 2 * vertPaddingPx).coerceAtLeast(1f)
+
+        fun valueToY(v: Float): Dp {
+            val yPx = vertPaddingPx + (1f - (v + 1f) * 0.5f) * usableHeightPx
+            return with(density) { yPx.toDp() }
+        }
+
+        itemsToDraw.forEach { (v, labelText) ->
+            val yDp = valueToY(v)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = yDp - 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = labelText,
+                    style = Theme[typography][small],
+                    color = textColor,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+private fun formatValueLabel(
+    normalizedValue: Float,
+    parameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter?
+): String {
+    if (parameter == null) {
+        val pct = ((normalizedValue + 1f) * 50f).roundToInt()
+        return "$pct%"
+    }
+    val mode = parameter.curveMode
+    val unit = parameter.unit ?: ""
+    val range = parameter.displayRange
+    val val0to1 = (normalizedValue + 1f) * 0.5f
+    val actual = range.start + val0to1 * (range.endInclusive - range.start)
+
+    return when (mode) {
+        dev.anthonyhfm.amethyst.core.controls.automation.CurveMode.Bipolar -> {
+            if (unit == "%" || (unit.isEmpty() && range == 0f..1f)) {
+                val pct = (normalizedValue * 100f).roundToInt()
+                if (pct > 0) "+$pct%" else "$pct%"
+            } else {
+                val rounded = (actual * 10f).roundToInt() / 10f
+                val sign = if (rounded > 0f) "+" else ""
+                "$sign$rounded$unit"
+            }
+        }
+        dev.anthonyhfm.amethyst.core.controls.automation.CurveMode.Unipolar -> {
+            if (unit == "%" || (unit.isEmpty() && range == 0f..1f)) {
+                val pct = (val0to1 * 100f).roundToInt()
+                "$pct%"
+            } else {
+                val rounded = (actual * 10f).roundToInt() / 10f
+                "$rounded$unit"
+            }
+        }
     }
 }

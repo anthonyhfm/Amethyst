@@ -62,4 +62,8 @@ sealed interface ClipboardData {
     data class TimelineTracks(
         val tracks: List<TimelineTrack<*>>,
     ) : ClipboardData
+
+    data class AutomationPoints(
+        val points: List<dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationPoint>
+    ) : ClipboardData
 }

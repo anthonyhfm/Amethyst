@@ -181,7 +181,16 @@ fun <T> AutomatableDial(
                     onClick = {
                         if (dialLane == null) {
                             val manualNorm = getManualNormalizedValue(type, value)
-                            chainDevice.setDialAutomation(parameterId, DialAutomationLane.createInitial(parameterId, manualNorm))
+                            val initialLane = DialAutomationLane.createInitial(parameterId, manualNorm)
+                            chainDevice.setDialAutomation(parameterId, initialLane)
+                            dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                                dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.DialAutomationLaneChange(
+                                    chainDevice = chainDevice,
+                                    parameterId = parameterId,
+                                    beforeLane = null,
+                                    afterLane = initialLane
+                                )
+                            )
                         }
                         showPopover = true
                     }
@@ -191,8 +200,19 @@ fun <T> AutomatableDial(
                         label = "Remove $title Automation",
                         icon = Lucide.Trash2,
                         onClick = {
+                            val before = dialLane
                             chainDevice.setDialAutomation(parameterId, null)
                             showPopover = false
+                            if (before != null) {
+                                dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                                    dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.DialAutomationLaneChange(
+                                        chainDevice = chainDevice,
+                                        parameterId = parameterId,
+                                        beforeLane = before,
+                                        afterLane = null
+                                    )
+                                )
+                            }
                         }
                     )
                 }
@@ -210,8 +230,19 @@ fun <T> AutomatableDial(
                 lane = dialLane,
                 onUpdateLane = { updatedLane -> chainDevice.setDialAutomation(parameterId, updatedLane) },
                 onRemoveAutomation = {
+                    val before = dialLane
                     chainDevice.setDialAutomation(parameterId, null)
                     showPopover = false
+                    if (before != null) {
+                        dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                            dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.DialAutomationLaneChange(
+                                chainDevice = chainDevice,
+                                parameterId = parameterId,
+                                beforeLane = before,
+                                afterLane = null
+                            )
+                        )
+                    }
                 },
                 onDismissRequest = { showPopover = false },
                 trigger = triggerContent

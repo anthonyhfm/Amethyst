@@ -30,7 +30,7 @@ data class CompositionGraphSelection(
 data class CompositionAutomationFocus(val nodeId: String, val parameterId: String)
 
 /** Commands and transient selection for one Composition workspace session. */
-class CompositionGraphEditor(private val device: CompositionChainDevice) {
+class CompositionGraphEditor(val device: CompositionChainDevice) {
     private val _selection = MutableStateFlow(CompositionGraphSelection())
     val selection = _selection.asStateFlow()
     private val _automationFocus = MutableStateFlow<CompositionAutomationFocus?>(null)
@@ -41,6 +41,7 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
     fun closeAutomation() { _automationFocus.value = null }
 
     fun automate(nodeId: String, parameterId: String) {
+        val beforeGraph = device.state.value.graph
         device.updateGraph { graph ->
             val node = graph.node(nodeId) ?: return@updateGraph graph
             val parameter = node.automationParameter(parameterId) ?: return@updateGraph graph
@@ -52,6 +53,19 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
             )))
         }
         _automationFocus.value = CompositionAutomationFocus(nodeId, parameterId)
+        val afterGraph = device.state.value.graph
+        if (beforeGraph != afterGraph) {
+            dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.CompositionAutomationLaneToggle(
+                    deviceId = device.selectionUUID,
+                    nodeId = nodeId,
+                    parameterId = parameterId,
+                    beforeGraph = beforeGraph,
+                    afterGraph = afterGraph,
+                    editor = this
+                )
+            )
+        }
     }
 
     fun editAutomation(nodeId: String, parameterId: String) {
@@ -61,6 +75,7 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
     }
 
     fun removeAutomation(nodeId: String, parameterId: String, progress: Float) {
+        val beforeGraph = device.state.value.graph
         device.updateGraph { graph ->
             val node = graph.node(nodeId) ?: return@updateGraph graph
             val parameter = node.automationParameter(parameterId) ?: return@updateGraph graph
@@ -71,6 +86,19 @@ class CompositionGraphEditor(private val device: CompositionChainDevice) {
             graph.withNode(staticNode.copy(automation = staticNode.automation.filterNot { it.parameterId == parameterId }))
         }
         if (_automationFocus.value == CompositionAutomationFocus(nodeId, parameterId)) closeAutomation()
+        val afterGraph = device.state.value.graph
+        if (beforeGraph != afterGraph) {
+            dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.CompositionAutomationLaneToggle(
+                    deviceId = device.selectionUUID,
+                    nodeId = nodeId,
+                    parameterId = parameterId,
+                    beforeGraph = beforeGraph,
+                    afterGraph = afterGraph,
+                    editor = this
+                )
+            )
+        }
     }
 
     fun setAutomationPoint(nodeId: String, parameterId: String, progress: Float, nativeValue: Float) {

@@ -147,6 +147,24 @@ interface Selectable {
         val incoming: Boolean,
         override val selectionUUID: String = "composition-automation-handle:$deviceId:$nodeId:$parameterId:$pointId:${if (incoming) "in" else "out"}",
     ) : Selectable
+
+    data class DialAutomationLane(
+        val parameterId: String,
+        override val selectionUUID: String = "dial-automation-lane:$parameterId",
+    ) : Selectable
+
+    data class DialAutomationPoint(
+        val parameterId: String,
+        val pointId: String,
+        override val selectionUUID: String = "dial-automation-point:$parameterId:$pointId",
+    ) : Selectable
+
+    data class DialAutomationHandle(
+        val parameterId: String,
+        val pointId: String,
+        val incoming: Boolean,
+        override val selectionUUID: String = "dial-automation-handle:$parameterId:$pointId:${if (incoming) "in" else "out"}",
+    ) : Selectable
 }
 
 fun Selectable.TimelineEntryItem.toClipKey(): TimelineClipKey {

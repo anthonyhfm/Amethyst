@@ -32,7 +32,19 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.theme.Theme
@@ -45,12 +57,15 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.automation.segmentVal
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.node
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.chainBorder
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.chainSurface
+import dev.anthonyhfm.amethyst.ui.theme.chart2
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.popover
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.small
@@ -82,6 +97,14 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
     val pointLabel = selectedPoint?.let { point ->
         "Point · ${parameter.format(parameter.denormalise(point.value))} · ${((point.progress * 100).toInt())}%"
     } ?: "Point · —"
+
+    val rawPopoverBg = Theme[colors][popover]
+    val isDark = rawPopoverBg.red < 0.5f
+    val editorPanelBg = if (isDark) Color(0xFF0D111A) else Theme[colors][secondary]
+    val editorPanelBorder = if (isDark) Color(0xFF263042) else Theme[colors][border].copy(alpha = 0.6f)
+    val dividerColor = if (isDark) Color(0xFF1F2837) else Theme[colors][border].copy(alpha = 0.3f)
+
+    var dragStartPoints by remember { mutableStateOf<List<CompositionAutomationPoint>?>(null) }
 
     Column(
         modifier = Modifier.fillMaxWidth().height(200.dp)
@@ -124,12 +147,35 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
                 }
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(editorPanelBg, RoundedCornerShape(8.dp))
+                .border(1.dp, editorPanelBorder, RoundedCornerShape(8.dp))
+        ) {
+            AutomationValueLegend(
+                parameter = parameter,
+                editorPanelBg = editorPanelBg,
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .fillMaxHeight()
+            )
+
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(dividerColor)
+            )
+
             AutomationCanvas(
                 points = editorPoints,
                 playhead = progress,
                 selectedPointId = selectedPointId,
                 bipolar = parameter.bipolar,
+                panelBgColor = editorPanelBg,
                 onSelect = { id ->
                     SelectionManager.selectCompositionAutomationPoints(
                         deviceId,
@@ -139,19 +185,36 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
                     )
                 },
                 onAdd = { p, value ->
+                    val before = editorPoints
+                    val newPoint = CompositionAutomationPoint(p, value)
+                    val after = before + newPoint
                     editor.updateAutomationLane(node.id, parameter.id) { current ->
-                        current.copy(
-                            points = current.points + CompositionAutomationPoint(p, value)
-                        )
+                        current.copy(points = after)
                     }
+                    dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                        dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.CompositionAutomationPointChange(
+                            deviceId = deviceId,
+                            nodeId = node.id,
+                            parameterId = parameter.id,
+                            beforePoints = before,
+                            afterPoints = after,
+                            editor = editor
+                        )
+                    )
                 },
                 onMove = { id, p, value ->
+                    if (dragStartPoints == null) {
+                        dragStartPoints = editorPoints
+                    }
                     editor.previewAutomationPoints(
                         node.id,
                         parameter.id,
                         editorPoints.map { if (it.pointId == id) it.copy(progress = p, value = value) else it })
                 },
                 onMoveHandle = { id, incoming, time, value ->
+                    if (dragStartPoints == null) {
+                        dragStartPoints = editorPoints
+                    }
                     editor.previewAutomationPoints(node.id, parameter.id, editorPoints.map { point ->
                         if (point.pointId != id) point else if (incoming) point.copy(
                             inHandleTime = time, inHandleValue = value,
@@ -162,52 +225,92 @@ fun CompositionAutomationEditor(device: CompositionChainDevice, editor: Composit
                         )
                     })
                 },
-                onDragFinished = editor::commitAutomationPreview,
-                modifier = Modifier.fillMaxSize(),
-            )
-            AutomationValueAxis(
-                parameter = parameter,
-                modifier = Modifier.fillMaxSize().padding(4.dp),
+                onDragFinished = {
+                    val before = dragStartPoints
+                    val after = editorPoints
+                    editor.commitAutomationPreview()
+                    if (before != null && before != after) {
+                        dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
+                            dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.CompositionAutomationPointChange(
+                                deviceId = deviceId,
+                                nodeId = node.id,
+                                parameterId = parameter.id,
+                                beforePoints = before,
+                                afterPoints = after,
+                                editor = editor
+                            )
+                        )
+                    }
+                    dragStartPoints = null
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
             )
         }
     }
 }
 
 @Composable
-private fun AutomationValueAxis(
+private fun AutomationValueLegend(
     parameter: dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionAutomationParameter,
+    editorPanelBg: Color,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier) {
-        Text(
-            parameter.format(parameter.maximum),
-            style = Theme[typography][small],
-            color = Theme[colors][mutedForeground],
-            modifier = Modifier.align(Alignment.TopStart).background(Theme[colors][secondary], DefaultShape)
-                .padding(horizontal = 2.dp)
-        )
-        if (parameter.bipolar) {
-            Text(
-                parameter.format(0f),
-                style = Theme[typography][small],
-                color = Theme[colors][mutedForeground],
-                modifier = Modifier.align(Alignment.CenterStart).background(Theme[colors][secondary], DefaultShape)
-                    .padding(horizontal = 2.dp)
-            )
+    val density = LocalDensity.current
+    val vertPaddingDp = 12.dp
+    val vertPaddingPx = with(density) { vertPaddingDp.toPx() }
+    val textColor = Theme[colors][mutedForeground]
+
+    BoxWithConstraints(
+        modifier = modifier
+            .wrapContentWidth()
+            .background(editorPanelBg.copy(alpha = 0.6f))
+            .padding(horizontal = 8.dp)
+    ) {
+        val heightPx = with(density) { maxHeight.toPx() }
+        val usableHeightPx = (heightPx - 2 * vertPaddingPx).coerceAtLeast(1f)
+
+        fun valueToY(v: Float): Dp {
+            val yPx = vertPaddingPx + (1f - (v + 1f) * 0.5f) * usableHeightPx
+            return with(density) { yPx.toDp() }
         }
-        Text(
-            parameter.format(parameter.minimum),
-            style = Theme[typography][small],
-            color = Theme[colors][mutedForeground],
-            modifier = Modifier.align(Alignment.BottomStart).background(Theme[colors][secondary], DefaultShape)
-                .padding(horizontal = 2.dp)
-        )
+
+        val valuesToDraw = if (parameter.bipolar) listOf(1f, 0f, -1f) else listOf(1f, 0f, -1f)
+
+        valuesToDraw.forEach { v ->
+            val yDp = valueToY(v)
+            val labelText = when (v) {
+                1f -> parameter.format(parameter.maximum)
+                0f -> if (parameter.bipolar) parameter.format(0f) else parameter.format((parameter.minimum + parameter.maximum) / 2f)
+                else -> parameter.format(parameter.minimum)
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = yDp - 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = labelText,
+                    style = Theme[typography][small],
+                    color = textColor,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun AutomationCanvas(
     points: List<CompositionAutomationPoint>, playhead: Float, selectedPointId: String?, bipolar: Boolean,
+    panelBgColor: Color = Theme[colors][secondary],
     onSelect: (String?) -> Unit, onAdd: (Float, Float) -> Unit, onMove: (String, Float, Float) -> Unit,
     onMoveHandle: (String, Boolean, Float, Float) -> Unit, onDragFinished: () -> Unit, modifier: Modifier,
 ) {
@@ -218,18 +321,18 @@ private fun AutomationCanvas(
     val currentOnAdd = rememberUpdatedState(onAdd)
     val currentOnMove = rememberUpdatedState(onMove)
     val currentOnMoveHandle = rememberUpdatedState(onMoveHandle)
-    val surfaceColor = Theme[colors][secondary]
+    val surfaceColor = panelBgColor
     val mutedColor = Theme[colors][mutedForeground]
-    val primaryColor = Theme[colors][primary]
+    val curveAccentColor = Theme[colors][chart2]
     fun toValue(y: Float, height: Float) = (1f - (y / height).coerceIn(0f, 1f) * 2f).coerceIn(-1f, 1f)
     fun pointAt(position: Offset, width: Float, height: Float): CompositionAutomationPoint? =
         currentPoints.value.minByOrNull {
-            val x = it.progress * width;
+            val x = it.progress * width
             val y = (1f - (it.value + 1f) * .5f) * height
             (Offset(x, y) - position).getDistance()
         }?.takeIf {
-            val x = it.progress * width;
-            val y = (1f - (it.value + 1f) * .5f) * height; (Offset(x, y) - position).getDistance() < 18f
+            val x = it.progress * width
+            val y = (1f - (it.value + 1f) * .5f) * height; (Offset(x, y) - position).getDistance() < 22f
         }
 
     fun handlePosition(point: CompositionAutomationPoint, incoming: Boolean, width: Float, height: Float): Offset? {
@@ -249,7 +352,7 @@ private fun AutomationCanvas(
     fun handleAt(position: Offset, width: Float, height: Float): AutomationDragTarget.Handle? {
         val selected = currentPoints.value.firstOrNull { it.pointId == currentSelectedPointId.value } ?: return null
         return listOf(true, false).firstNotNullOfOrNull { incoming ->
-            handlePosition(selected, incoming, width, height)?.takeIf { (it - position).getDistance() < 18f }
+            handlePosition(selected, incoming, width, height)?.takeIf { (it - position).getDistance() < 22f }
                 ?.let { AutomationDragTarget.Handle(selected.pointId, incoming) }
         }
     }
@@ -257,12 +360,9 @@ private fun AutomationCanvas(
         modifier = modifier.background(surfaceColor, DefaultShape)
             .pointerInput(Unit) {
                 detectTapGestures(
-                    // Selection happens on press, before the drag recogniser can cancel a tap.
                     onPress = { position ->
                         val width = size.width.toFloat()
                         val height = size.height.toFloat()
-                        // A handle belongs to the already selected point. Do not clear that
-                        // point's selection before the drag recogniser gets to claim it.
                         val selectedId = handleAt(position, width, height)?.id
                             ?: pointAt(position, width, height)?.pointId
                         currentOnSelect.value(selectedId)
@@ -276,7 +376,7 @@ private fun AutomationCanvas(
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { p ->
-                        val width = size.width.toFloat();
+                        val width = size.width.toFloat()
                         val height = size.height.toFloat()
                         draggedTarget = handleAt(p, width, height) ?: pointAt(
                             p,
@@ -286,14 +386,14 @@ private fun AutomationCanvas(
                         (draggedTarget as? AutomationDragTarget.Point)?.let { currentOnSelect.value(it.id) }
                     },
                     onDrag = { change, _ ->
-                        val time = (change.position.x / size.width).coerceIn(0f, 1f);
+                        val time = (change.position.x / size.width).coerceIn(0f, 1f)
                         val value = toValue(change.position.y, size.height.toFloat())
                         when (val target = draggedTarget) {
                             is AutomationDragTarget.Point -> currentOnMove.value(target.id, time, value)
                             is AutomationDragTarget.Handle -> {
                                 val point = currentPoints.value.firstOrNull { it.pointId == target.id }
                                     ?: return@detectDragGestures
-                                val ordered = currentPoints.value.sortedBy(CompositionAutomationPoint::progress);
+                                val ordered = currentPoints.value.sortedBy(CompositionAutomationPoint::progress)
                                 val index = ordered.indexOfFirst { it.pointId == point.pointId }
                                 val neighbour =
                                     (if (target.incoming) ordered.getOrNull(index - 1) else ordered.getOrNull(index + 1))
@@ -359,31 +459,40 @@ private fun AutomationCanvas(
                 size.height
             ); lineTo(curvePoints.first().x, size.height); close()
             }
-            drawPath(fillPath, primaryColor.copy(alpha = .14f), style = Fill)
-            drawPath(strokePath, primaryColor, style = Stroke(3.dp.toPx()))
+            drawPath(fillPath, curveAccentColor.copy(alpha = .14f), style = Fill)
+            drawPath(strokePath, curveAccentColor, style = Stroke(2.5.dp.toPx()))
         }
-        val baselineY = if (bipolar) zeroY else size.height - .5.dp.toPx()
-        drawLine(mutedColor.copy(alpha = .5f), Offset(0f, baselineY), Offset(size.width, baselineY), 1.dp.toPx())
+        val baselineY = if (bipolar) zeroY else size.height
+        drawLine(mutedColor.copy(alpha = .35f), Offset(0f, baselineY), Offset(size.width, baselineY), 1.dp.toPx())
         drawLine(
-            Color.White.copy(alpha = .65f),
+            Color.White.copy(alpha = .8f),
             Offset(playhead * size.width, 0f),
             Offset(playhead * size.width, size.height),
-            1.dp.toPx()
+            1.5.dp.toPx()
         )
+
+        fun Offset.clampInside(radius: Float): Offset = Offset(
+            x.coerceIn(radius, size.width - radius),
+            y.coerceIn(radius, size.height - radius)
+        )
+
         sorted.forEach { point ->
             val center = Offset(point.progress * size.width, (1f - (point.value + 1f) * .5f) * size.height)
             if (point.pointId == selectedPointId) {
                 listOf(true, false).forEach { incoming ->
                     handlePosition(point, incoming, size.width, size.height)?.let { handle ->
-                        drawLine(mutedColor.copy(alpha = .8f), center, handle, 1.5.dp.toPx())
-                        drawCircle(surfaceColor, 7.dp.toPx(), handle)
-                        drawCircle(primaryColor, 7.dp.toPx(), handle, style = Stroke(2.dp.toPx()))
+                        val clampedHandle = handle.clampInside(6.dp.toPx())
+                        val clampedCenterForLine = center.clampInside(6.dp.toPx())
+                        drawLine(mutedColor.copy(alpha = .8f), clampedCenterForLine, clampedHandle, 1.5.dp.toPx())
+                        drawCircle(surfaceColor, 6.dp.toPx(), clampedHandle)
+                        drawCircle(curveAccentColor, 6.dp.toPx(), clampedHandle, style = Stroke(2.dp.toPx()))
                     }
                 }
-                drawCircle(surfaceColor, 9.dp.toPx(), center)
-                drawCircle(Color.White, 7.dp.toPx(), center)
-                drawCircle(primaryColor, 7.dp.toPx(), center, style = Stroke(2.dp.toPx()))
-            } else drawCircle(primaryColor, 6.dp.toPx(), center)
+                val clampedCenter = center.clampInside(8.dp.toPx())
+                drawCircle(surfaceColor, 8.dp.toPx(), clampedCenter)
+                drawCircle(Color.White, 6.dp.toPx(), clampedCenter)
+                drawCircle(curveAccentColor, 6.dp.toPx(), clampedCenter, style = Stroke(2.dp.toPx()))
+            } else drawCircle(curveAccentColor, 5.dp.toPx(), center.clampInside(5.dp.toPx()))
         }
     }
 }
