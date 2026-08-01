@@ -52,12 +52,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     override val state = MutableStateFlow(CoordinateFilterChainDeviceState())
     override val helpRef = "CoordinateFilter"
 

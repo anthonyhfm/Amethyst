@@ -443,12 +443,12 @@ internal fun DialSurface(
                 .onKeyEvent { event ->
                     if (enabled && event.type == KeyEventType.KeyDown) {
                         when (event.key) {
-                            Key.DirectionUp, Key.DirectionRight -> {
+                            Key.DirectionUp -> {
                                 currentOnIncrement?.invoke()
                                 true
                             }
 
-                            Key.DirectionDown, Key.DirectionLeft -> {
+                            Key.DirectionDown -> {
                                 currentOnDecrement?.invoke()
                                 true
                             }

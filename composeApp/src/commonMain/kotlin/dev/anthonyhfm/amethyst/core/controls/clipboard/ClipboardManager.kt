@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.ChainEffectEntry
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.buildSegment
 import dev.anthonyhfm.amethyst.timeline.data.copyWithShiftedStartMs
@@ -26,6 +27,8 @@ import dev.anthonyhfm.amethyst.timeline.data.cropAudioEntryEnd
 import dev.anthonyhfm.amethyst.timeline.data.deepCopy
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 
 object ClipboardManager {
     private val _clipboardData: MutableStateFlow<ClipboardData?> = MutableStateFlow(null)
@@ -56,6 +59,20 @@ object ClipboardManager {
                     
                     if (track is MidiTimelineTrack) {
                         val midiTrack = track
+
+                        val chainEffects = selections.mapNotNull { selection ->
+                            selection.clipId?.let { clipId ->
+                                midiTrack.chainEffectEntries.values.firstOrNull { it.clipId == clipId }
+                            }
+                        }
+                        if (chainEffects.isNotEmpty()) {
+                            setClipboardData(
+                                ClipboardData.TimelineChainEffects(
+                                    chainEffects.sortedBy { it.startTimeMs }.map { it.deepCopy() }
+                                )
+                            )
+                            return
+                        }
 
                         val entries = selections.mapNotNull {
                             sel -> midiTrack.entries[sel.entryStartMs]
@@ -260,24 +277,101 @@ object ClipboardManager {
 
             is ClipboardData.TimelineMidiEntries -> {
                 val (anchorTrackIndex, anchorTimeMs) = resolveTimelinePasteAnchor()
-                
-                val track = TimelineRepository.tracks.value.getOrNull(anchorTrackIndex)
-                if (track !is MidiTimelineTrack) return
-                
-                val midiTrack = track as TimelineTrack<MidiEntry>
+                val track = TimelineRepository.tracks.value.getOrNull(anchorTrackIndex) as? MidiTimelineTrack ?: return
+                val before = track.deepCopy()
+                val after = track.deepCopy() as MidiTimelineTrack
                 val earliest = clip.entries.minBy { it.startTimeMs }.startTimeMs
-
+                var changed = false
                 clip.entries.sortedBy { it.startTimeMs }.forEach { original ->
                     val offset = original.startTimeMs - earliest
                     val newStart = anchorTimeMs + offset
-                    val newEntry = original.copy(startTimeMs = newStart)
-                    midiTrack.entries[newStart] = newEntry
+                    val blockers = after.allOneDimensionalEntries()
+                    if (blockers.any { newStart >= it.startTimeMs && newStart < it.endTimeMs }) return@forEach
+                    val nextStart = blockers.map { it.startTimeMs }.filter { it > newStart }.minOrNull()
+                    val newEntry = original.copy(
+                        startTimeMs = newStart,
+                        durationMs = minOf(original.durationMs, nextStart?.minus(newStart) ?: Long.MAX_VALUE).coerceAtLeast(1L),
+                    )
+                    after.entries[newStart] = newEntry
+                    changed = true
                 }
-                
-                val current = TimelineRepository.tracks.value.toMutableList()
-                val newTrack = MidiTimelineTrack().apply { entries.putAll(midiTrack.entries) }
-                current[anchorTrackIndex] = newTrack
-                TimelineRepository.tracks.value = current.toList()
+                if (!changed) return
+                TimelineRepository.replaceTrack(anchorTrackIndex, after)
+                UndoManager.addAction(
+                    UndoableAction.TrackStateChange(anchorTrackIndex, before, after, mergeable = false)
+                )
+            }
+
+            is ClipboardData.TimelineChainEffects -> {
+                val mode = WorkspaceRepository.mode.value
+                if (mode is LightsChainWorkspaceMode || mode is SamplingChainWorkspaceMode) {
+                    val selectedGroups = SelectionManager.selections.value.filterIsInstance<Selectable.GroupChainItem>()
+                    if (selectedGroups.isNotEmpty()) {
+                        val firstSelected = selectedGroups.first()
+                        val targetIndex = selectedGroups.maxOfOrNull { it.groupIndex + 1 }
+                        val groupList = clip.entries.map { entry ->
+                            val devices = extractDevicesFromChainEffectEntry(entry)
+                            dev.anthonyhfm.amethyst.devices.effects.group.data.Group(
+                                name = entry.name,
+                                stateChain = StateChain(devices = devices.map { StateChain.packDevice(it) })
+                            )
+                        }
+                        when (val parent = firstSelected.parent) {
+                            is GroupChainDevice -> parent.pasteGroups(groupList, targetIndex)
+                            is MultiGroupChainDevice -> parent.pasteGroups(groupList, targetIndex)
+                        }
+                        return
+                    }
+
+                    val allExtractedDevices = clip.entries.flatMap { extractDevicesFromChainEffectEntry(it) }
+                    if (allExtractedDevices.isEmpty()) return
+
+                    val selectedChainDevices = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>()
+                    val parentChain = selectedChainDevices.firstOrNull()?.parent
+                    if (parentChain != null) {
+                        val indices = selectedChainDevices.filter { it.parent == parentChain }.map { sel ->
+                            parentChain.devices.value.indexOfFirst { it.selectionUUID == sel.device.selectionUUID }
+                        }.filter { it >= 0 }
+                        val baseIndex = (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
+                        allExtractedDevices.forEachIndexed { offset, device ->
+                            parentChain.add(device = device, atIndex = baseIndex + offset)
+                        }
+                    } else {
+                        val targetChain = if (mode is LightsChainWorkspaceMode) WorkspaceRepository.lightsChain else WorkspaceRepository.samplingChain
+                        val baseIndex = targetChain.devices.value.size
+                        allExtractedDevices.forEachIndexed { offset, device ->
+                            targetChain.add(device = device, atIndex = baseIndex + offset)
+                        }
+                    }
+                    return
+                }
+
+                val (anchorTrackIndex, anchorTimeMs) = resolveTimelinePasteAnchor()
+                val track = TimelineRepository.tracks.value.getOrNull(anchorTrackIndex) as? MidiTimelineTrack ?: return
+                val before = track.deepCopy()
+                val after = track.deepCopy() as MidiTimelineTrack
+                val earliest = clip.entries.minOfOrNull(ChainEffectEntry::startTimeMs) ?: return
+                var changed = false
+                clip.entries.sortedBy(ChainEffectEntry::startTimeMs).forEach { original ->
+                    val newStart = anchorTimeMs + (original.startTimeMs - earliest)
+                    val blockers = after.allOneDimensionalEntries()
+                    if (blockers.any { newStart >= it.startTimeMs && newStart < it.endTimeMs }) return@forEach
+                    val nextStart = blockers.map { it.startTimeMs }.filter { it > newStart }.minOrNull()
+                    val duration = minOf(original.durationMs, nextStart?.minus(newStart) ?: Long.MAX_VALUE).coerceAtLeast(1L)
+                    val pasted = original.deepCopy(
+                        clipId = UUID.randomUUID(),
+                        startTimeMs = newStart,
+                        durationMs = duration,
+                        maxDurationMs = if (duration < original.durationMs) duration else original.maxDurationMs,
+                    )
+                    after.chainEffectEntries[newStart] = pasted
+                    changed = true
+                }
+                if (!changed) return
+                TimelineRepository.replaceTrack(anchorTrackIndex, after)
+                UndoManager.addAction(
+                    UndoableAction.TrackStateChange(anchorTrackIndex, before, after, mergeable = false)
+                )
             }
 
             is ClipboardData.ChainDevice -> {
@@ -535,4 +629,15 @@ object ClipboardManager {
         toAdd.forEach { add -> entries[add.startTimeMs] = add }
         return adjustedNew
     }
+}
+
+fun extractDevicesFromChainEffectEntry(entry: ChainEffectEntry): List<GenericChainDevice<*>> {
+    val result = mutableListOf<GenericChainDevice<*>>()
+    entry.source?.let { srcState ->
+        result.add(StateChain.unpackDevice(srcState))
+    }
+    entry.processors.devices.forEach { procState ->
+        result.add(StateChain.unpackDevice(procState))
+    }
+    return result
 }

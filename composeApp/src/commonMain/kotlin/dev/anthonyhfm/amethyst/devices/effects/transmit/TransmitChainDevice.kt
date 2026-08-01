@@ -37,8 +37,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 
 class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     private val channels = (1..MAX_CHANNELS).toList()
     private var isAttachedToChain = false
 

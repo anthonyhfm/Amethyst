@@ -427,6 +427,7 @@
     <string name="timeline_grid_picker_flex_smallest">弹性：最小</string>
     <string name="timeline_grid_picker_no_grid">无网格</string>
     <string name="timeline_lane_create_midi_clip">创建 MIDI 剪辑</string>
+    <string name="timeline_lane_create_chain_effect">创建链式效果</string>
     <string name="timeline_pianoroll_action_apply">应用</string>
     <string name="timeline_pianoroll_action_double_length">双倍长度</string>
     <string name="timeline_pianoroll_action_double_speed">双倍速度</string>

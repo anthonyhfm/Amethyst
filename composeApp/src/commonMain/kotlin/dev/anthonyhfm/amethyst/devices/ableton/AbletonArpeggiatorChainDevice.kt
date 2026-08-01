@@ -27,6 +27,8 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -36,6 +38,14 @@ import kotlinx.serialization.Serializable
 
 class AbletonArpeggiatorChainDevice : GenericChainDevice<AbletonArpeggiatorChainDeviceState>() {
     override val state = MutableStateFlow(AbletonArpeggiatorChainDeviceState())
+
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        val current = state.value
+        if (current.steps <= 0) return TimelineDuration.None
+        val rateMs = current.rate.toMsValue(context.bpm.toDouble())
+        val duration = (current.steps - 1L) * rateMs + (rateMs * (current.gate / 100f)).toLong()
+        return TimelineDuration.Finite(duration.coerceAtLeast(0L))
+    }
 
     @Composable
     override fun Content() {
@@ -88,6 +98,7 @@ class AbletonArpeggiatorChainDevice : GenericChainDevice<AbletonArpeggiatorChain
                     repeat(state.value.steps) { index ->
                         Heaven.schedule(
                             delayInMs = state.value.rate.toMsValue(WorkspaceRepository.bpm.value).toDouble() * index,
+                            owner = this,
                         ) {
                             val drIndex: Int = XY_TO_DRUM_RACK[local] + index
 
@@ -116,6 +127,7 @@ class AbletonArpeggiatorChainDevice : GenericChainDevice<AbletonArpeggiatorChain
 
                             Heaven.schedule(
                                 delayInMs = (state.value.rate.toMsValue(WorkspaceRepository.bpm.value).toDouble() * (state.value.gate / 100f)),
+                                owner = this,
                             ) {
                                 signalExit?.invoke(
                                     listOf(

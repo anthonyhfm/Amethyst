@@ -27,6 +27,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -36,6 +38,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 
 class ClearChainDevice : GenericChainDevice<ClearChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     override val state = MutableStateFlow(ClearChainDeviceState())
     override val helpRef = "Clear"
 
@@ -114,7 +118,7 @@ class ClearChainDevice : GenericChainDevice<ClearChainDeviceState>() {
             }
 
             if (released) {
-                Heaven.schedule(1.0) {
+                Heaven.schedule(1.0, owner = this) {
                     val s = state.value
                     if (s.clearLights) Heaven.clear()
                     if (s.clearAudio) Echo.stopAll()

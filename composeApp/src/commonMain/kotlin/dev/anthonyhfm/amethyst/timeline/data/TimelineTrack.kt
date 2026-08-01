@@ -477,6 +477,9 @@ fun TimelineTrack<*>.deepCopy(
                     }
                 )
             },
+            chainEffectsToCopy = chainEffectEntries.mapValues { (_, entry) ->
+                entry.deepCopy()
+            },
             preserveTrackIdentity = preserveTrackIdentity
         )
 

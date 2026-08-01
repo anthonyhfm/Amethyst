@@ -33,6 +33,8 @@ import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -41,6 +43,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 
 class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     override val state = MutableStateFlow(FlipChainDeviceState())
     override val helpRef = "Flip"
 

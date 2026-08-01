@@ -64,7 +64,7 @@ fun TimelineLaneView(
     val maxTimelineEndMs = tracks.maxOfOrNull { track ->
         when (track) {
             is AudioTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeUs / 1000.0 } ?: 0.0
-            is MidiTimelineTrack -> track.entries.values.maxOfOrNull { it.endTimeMs.toDouble() } ?: 0.0
+            is MidiTimelineTrack -> track.allOneDimensionalEntries().maxOfOrNull { it.endTimeMs.toDouble() } ?: 0.0
             else -> 0.0
         }
     } ?: 0.0
@@ -247,6 +247,7 @@ fun TimelineLaneView(
                     viewport = renderViewport,
                     selectedTimeMs = laneSelectedTimeMs,
                     selectedEntryStarts = laneSelectedEntries.map { it.entryStartMs }.toSet(),
+                    selectedChainEffectIds = laneSelectedEntries.mapNotNull { it.clipId }.toSet(),
                     onDropInFile = { file ->
                         viewModel.addAudioFileToTrack(
                             trackIndex = index,
@@ -274,7 +275,14 @@ fun TimelineLaneView(
                         }
                     },
                     onDoubleClickLane = { timeMs -> onOpenMidiEntryAtTime(index, timeMs) },
-                    onCreateMidiClip = { startMs, endMs -> onCreateMidiEntry(index, startMs, endMs) }
+                    onCreateMidiClip = { startMs, endMs -> onCreateMidiEntry(index, startMs, endMs) },
+                    onCreateChainEffect = { startMs -> viewModel.createChainEffectEntry(index, startMs) },
+                    onSelectChainEffect = { clipId -> viewModel.selectChainEffectClip(index, clipId) },
+                    onMoveChainEffect = { clipId, newStart -> viewModel.moveChainEffect(index, clipId, newStart) },
+                    onResizeChainEffect = { clipId, newStart, newDuration ->
+                        viewModel.resizeChainEffect(index, clipId, newStart, newDuration)
+                    },
+                    onOpenChainEffect = { clipId -> viewModel.openChainEffect(index, clipId) },
                 )
             }
         }

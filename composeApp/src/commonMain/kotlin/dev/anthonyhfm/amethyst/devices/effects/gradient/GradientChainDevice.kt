@@ -37,6 +37,8 @@ import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.devices.effects.gradient.ui.GradientEditorBar
 import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
 import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
@@ -84,6 +86,12 @@ enum class GradientSmoothness {
 }
 
 class GradientChainDevice : LEDChainDevice<GradientChainDeviceState>(), Chokeable {
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        if (state.value.loop) return TimelineDuration.Unbounded
+        return TimelineDuration.Finite(
+            (state.value.timing.toMsValue(context.bpm.toDouble()) * (state.value.gate * 2f)).toLong().coerceAtLeast(0L)
+        )
+    }
     override val state = MutableStateFlow(GradientChainDeviceState())
     override val helpRef = "Gradient"
 

@@ -38,6 +38,7 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.modifier.clickableWithDoubleTap
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import kotlin.reflect.KClass
 
 @Composable
 fun ChainView(
@@ -49,11 +50,19 @@ fun ChainView(
     showRemoteFocus: Boolean = true,
     dragAfterLongPress: Boolean = false,
     expandedEmptyPickerWidth: Dp = 100.dp,
+    privateTimelineChain: Boolean = false,
+    isDeviceTypeEnabled: (KClass<out GenericChainDevice<*>>) -> Boolean = { true },
+    onAddDevice: ((GenericChainDevice<*>, Int) -> Unit)? = null,
+    onMoveDevice: ((fromIndex: Int, toIndex: Int) -> Unit)? = null,
 ) {
     val density = LocalDensity.current.density
     val devices by chain.devices
+    val effectivePrivateTimelineChain = privateTimelineChain || !chain.collaborationSyncEnabled
     val remoteFocuses by CollaborationPresence.remoteFocuses.collectAsState()
     val remoteCursors by CollaborationPresence.remoteCursors.collectAsState()
+    fun addDevice(device: GenericChainDevice<*>, index: Int) {
+        onAddDevice?.invoke(device, index) ?: chain.add(device, index)
+    }
 
     fun handleDrop(
         device: GenericChainDevice<*>,
@@ -71,6 +80,16 @@ fun ChainView(
             if (originalIndex < insertionIndex) insertionIndex - 1 else insertionIndex
         } else insertionIndex
         val safeIndex = finalIndex.coerceIn(0, chain.devices.value.size)
+
+        if (originChain === chain && onMoveDevice != null) {
+            onMoveDevice.invoke(originalIndex, safeIndex)
+            return
+        }
+
+        if (originChain !== chain && onAddDevice != null) {
+            onAddDevice.invoke(device, safeIndex)
+            return
+        }
 
         chain.add(device, safeIndex, fromUser = false)
 
@@ -94,7 +113,12 @@ fun ChainView(
                     dragAndDropState = dragAndDropState,
                     expanded = true,
                     expandedWidth = expandedEmptyPickerWidth,
-                    onAddComponent = { chain.add(it, 0) },
+                    allowExternalDrop = true,
+                    privateDestination = effectivePrivateTimelineChain,
+                    allowClipboardPaste = true,
+                    samplingOverride = if (effectivePrivateTimelineChain) false else null,
+                    isDeviceTypeEnabled = isDeviceTypeEnabled,
+                    onAddComponent = { addDevice(it, 0) },
                     onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                         handleDrop(device, originalIndex, originalUUID, originChain, 0)
                     }
@@ -109,7 +133,12 @@ fun ChainView(
                         slotIndex = 0,
                         dragAndDropState = dragAndDropState,
                         expanded = false,
-                        onAddComponent = { chain.add(it, 0) },
+                        allowExternalDrop = true,
+                        privateDestination = effectivePrivateTimelineChain,
+                        allowClipboardPaste = true,
+                        samplingOverride = if (effectivePrivateTimelineChain) false else null,
+                        isDeviceTypeEnabled = isDeviceTypeEnabled,
+                        onAddComponent = { addDevice(it, 0) },
                         onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                             handleDrop(device, originalIndex, originalUUID, originChain, 0)
                         }
@@ -221,7 +250,12 @@ fun ChainView(
                             slotIndex = insertionIndex,
                             dragAndDropState = dragAndDropState,
                             expanded = index == devices.lastIndex,
-                            onAddComponent = { chain.add(it, insertionIndex) },
+                            allowExternalDrop = true,
+                            privateDestination = effectivePrivateTimelineChain,
+                            allowClipboardPaste = true,
+                            samplingOverride = if (effectivePrivateTimelineChain) false else null,
+                            isDeviceTypeEnabled = isDeviceTypeEnabled,
+                            onAddComponent = { addDevice(it, insertionIndex) },
                             onDropDevice = { device, (originalIndex, originalUUID), originChain ->
                                 handleDrop(device, originalIndex, originalUUID, originChain, insertionIndex)
                             }

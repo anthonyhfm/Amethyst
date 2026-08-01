@@ -32,6 +32,11 @@ import dev.anthonyhfm.amethyst.devices.effects.shift.ShiftChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
 import kotlin.reflect.KClass
+import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 
 object DeviceRegistry {
     private val _factories = mutableMapOf<KClass<*>, ChainDeviceFactory<*>>()
@@ -92,4 +97,14 @@ object DeviceRegistry {
     }
 
     fun createFromState(state: DeviceState): GenericChainDevice<*> = unpack(state)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Suppress("UNCHECKED_CAST")
+    fun deepCopyState(state: DeviceState): DeviceState {
+        val factory = _factories[state::class] as? ChainDeviceFactory<DeviceState>
+            ?: error("No factory registered for device state: ${state::class.simpleName}")
+        val serializer = factory.serializer as KSerializer<DeviceState>
+        val bytes = AmethystProtoBuf.encodeToByteArray(serializer, state)
+        return AmethystProtoBuf.decodeFromByteArray(serializer, bytes)
+    }
 }

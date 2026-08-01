@@ -11,6 +11,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
 
 open class Chain : SignalReceiver() {
     val devices: MutableState<List<GenericChainDevice<*>>> = mutableStateOf(emptyList())
+    var collaborationSyncEnabled: Boolean = true
     internal var topologyChangedListener: (() -> Unit)? = null
 
     protected open fun onDevicesChanged(
@@ -71,6 +72,7 @@ open class Chain : SignalReceiver() {
         val current = devices.value.toMutableList()
         val insertIndex = atIndex?.coerceIn(0, current.size) ?: current.size
         current.add(insertIndex, device)
+        device.collaborationSyncEnabled = collaborationSyncEnabled
         replaceDevices(current)
         device.onAddedToChain(parentChain = this)
 
@@ -83,7 +85,9 @@ open class Chain : SignalReceiver() {
                 )
             )
 
-            ChainSyncCoordinator.onDevicePlaced(this, device, insertIndex)
+            if (collaborationSyncEnabled) {
+                ChainSyncCoordinator.onDevicePlaced(this, device, insertIndex)
+            }
         }
         reroute()
     }
@@ -100,7 +104,9 @@ open class Chain : SignalReceiver() {
                     )
                 )
 
-                ChainSyncCoordinator.onDeviceRemoved(this, deviceToRemove.selectionUUID)
+                if (collaborationSyncEnabled) {
+                    ChainSyncCoordinator.onDeviceRemoved(this, deviceToRemove.selectionUUID)
+                }
             }
             replaceDevices(devices.value.toMutableList().apply { removeAt(index) })
             deviceToRemove.onRemovedFromChain()
@@ -121,7 +127,9 @@ open class Chain : SignalReceiver() {
                     )
                 )
 
-                ChainSyncCoordinator.onDeviceRemoved(this, uuid)
+                if (collaborationSyncEnabled) {
+                    ChainSyncCoordinator.onDeviceRemoved(this, uuid)
+                }
             }
             replaceDevices(devices.value.toMutableList().apply { removeAll { it.selectionUUID == uuid } })
             deviceToRemove.onRemovedFromChain()

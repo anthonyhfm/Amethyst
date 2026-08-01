@@ -234,7 +234,21 @@ object TimelineCommandExecutor {
 
                 entryStartTimes.sorted().forEach { entryStartMs ->
                     val original = updatedEntries[entryStartMs] ?: return@forEach
-                    val duplicate = original.copy(startTimeMs = original.endTimeMs)
+                    var duplicateStart = original.endTimeMs
+                    while (true) {
+                        val blocker = (updatedEntries.values + track.chainEffectEntries.values)
+                            .firstOrNull { duplicateStart >= it.startTimeMs && duplicateStart < it.endTimeMs }
+                            ?: break
+                        duplicateStart = blocker.endTimeMs
+                    }
+                    val nextStart = (updatedEntries.values + track.chainEffectEntries.values)
+                        .map { it.startTimeMs }
+                        .filter { it > duplicateStart }
+                        .minOrNull()
+                    val duplicate = original.copy(
+                        startTimeMs = duplicateStart,
+                        durationMs = minOf(original.durationMs, nextStart?.minus(duplicateStart) ?: Long.MAX_VALUE).coerceAtLeast(1L),
+                    )
                     updatedEntries[duplicate.startTimeMs] = duplicate
                     createdEntries += TimelineCreatedEntry(trackIndex, duplicate.startTimeMs)
                 }
@@ -304,7 +318,10 @@ object TimelineCommandExecutor {
             }
 
             is MidiTimelineTrack -> {
-                deleteMidiEntriesInRange(afterTrack, startMs, endMs) || afterTrack.deleteAutomationRange(startMs, endMs)
+                val midiChanged = deleteMidiEntriesInRange(afterTrack, startMs, endMs)
+                val chainChanged = deleteChainEffectsInRange(afterTrack, startMs, endMs)
+                val autoChanged = afterTrack.deleteAutomationRange(startMs, endMs)
+                midiChanged || chainChanged || autoChanged
             }
 
             else -> false
@@ -741,6 +758,17 @@ object TimelineCommandExecutor {
         return true
     }
 
+    private fun deleteChainEffectsInRange(track: MidiTimelineTrack, startMs: Long, endMs: Long): Boolean {
+        val entriesToRemove = track.chainEffectEntries.values.filter { entry ->
+            entry.startTimeMs < endMs && entry.endTimeMs > startMs
+        }.map { it.startTimeMs }
+
+        if (entriesToRemove.isEmpty()) return false
+
+        entriesToRemove.forEach { track.chainEffectEntries.remove(it) }
+        return true
+    }
+
     private fun duplicateAudioEntriesInRange(
         track: AudioTimelineTrack,
         trackIndex: Int,
@@ -787,7 +815,16 @@ object TimelineCommandExecutor {
 
         entriesInRange.forEach { entry ->
             val offset = entry.startTimeMs - rangeStart
-            val duplicate = entry.copy(startTimeMs = endMs + offset)
+            val duplicateStart = endMs + offset
+            val blockers = updatedEntries.values + track.chainEffectEntries.values
+            if (blockers.any { duplicateStart >= it.startTimeMs && duplicateStart < it.endTimeMs }) {
+                return@forEach
+            }
+            val nextStart = blockers.map { it.startTimeMs }.filter { it > duplicateStart }.minOrNull()
+            val duplicate = entry.copy(
+                startTimeMs = duplicateStart,
+                durationMs = minOf(entry.durationMs, nextStart?.minus(duplicateStart) ?: Long.MAX_VALUE).coerceAtLeast(1L),
+            )
             updatedEntries[duplicate.startTimeMs] = duplicate
             createdEntries += TimelineCreatedEntry(trackIndex, duplicate.startTimeMs)
         }

@@ -24,6 +24,8 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
@@ -32,6 +34,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
 class AbletonPitcherChainDevice : GenericChainDevice<AbletonPitcherChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) = TimelineDuration.None
+
     override val state = MutableStateFlow(AbletonPitcherChainDeviceState())
 
     @Composable

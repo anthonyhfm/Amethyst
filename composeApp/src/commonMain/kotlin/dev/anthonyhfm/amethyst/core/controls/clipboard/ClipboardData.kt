@@ -11,6 +11,7 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionConnection
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.timeline.data.ChainEffectEntry
 
 sealed interface ClipboardData {
     data class CompositionSubgraph(
@@ -53,6 +54,10 @@ sealed interface ClipboardData {
 
     data class TimelineMidiEntries(
         val entries: List<MidiEntry>
+    ) : ClipboardData
+
+    data class TimelineChainEffects(
+        val entries: List<ChainEffectEntry>
     ) : ClipboardData
 
     data class PianoRollNotes(

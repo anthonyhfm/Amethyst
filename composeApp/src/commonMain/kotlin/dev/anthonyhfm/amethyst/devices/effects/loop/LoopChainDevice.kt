@@ -46,8 +46,17 @@ import kotlinx.serialization.Serializable
 import kotlin.math.max
 import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 
 class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        if (state.value.onHold) return TimelineDuration.Unbounded
+        val interval = state.value.timing.toMsValue(context.bpm.toDouble())
+        return TimelineDuration.Finite(
+            ((state.value.repeat - 1).coerceAtLeast(0).toLong() * interval).coerceAtLeast(0L)
+        )
+    }
     private val activeHoldKeys = mutableSetOf<String>()
     override val state = MutableStateFlow(LoopChainDeviceState())
     override val helpRef = "Loop"

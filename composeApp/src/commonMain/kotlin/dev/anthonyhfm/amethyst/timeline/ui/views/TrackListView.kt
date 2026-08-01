@@ -473,23 +473,25 @@ fun TrackInfo(
                                         onTrackSoloToggle(trackIndex)
                                     }
                                 )
-                                TrackToggleChip(
-                                    label = "A",
-                                    active = automationVisible,
-                                    activeContainer = activeChipContainer,
-                                    activeBorder = activeChipBorder,
-                                    activeContent = activeChipContent,
-                                    inactiveContainer = inactiveChipContainer,
-                                    inactiveBorder = inactiveChipBorder,
-                                    inactiveContent = inactiveChipContent,
-                                    onClick = {
-                                        SelectionManager.select(Selectable.TimelineTrack(trackIndex = trackIndex))
-                                        TimelineCommandSurface.toggleTrackAutomationVisibility(
-                                            trackIndex = trackIndex,
-                                            tracks = allTracks
-                                        )
-                                    }
-                                )
+                                if (track is AudioTimelineTrack) {
+                                    TrackToggleChip(
+                                        label = "A",
+                                        active = automationVisible,
+                                        activeContainer = activeChipContainer,
+                                        activeBorder = activeChipBorder,
+                                        activeContent = activeChipContent,
+                                        inactiveContainer = inactiveChipContainer,
+                                        inactiveBorder = inactiveChipBorder,
+                                        inactiveContent = inactiveChipContent,
+                                        onClick = {
+                                            SelectionManager.select(Selectable.TimelineTrack(trackIndex = trackIndex))
+                                            TimelineCommandSurface.toggleTrackAutomationVisibility(
+                                                trackIndex = trackIndex,
+                                                tracks = allTracks
+                                            )
+                                        }
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.weight(1f))

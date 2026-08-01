@@ -53,6 +53,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import dev.anthonyhfm.amethyst.timeline.ui.components.AudioClip
 import dev.anthonyhfm.amethyst.timeline.ui.components.MidiClip
+import dev.anthonyhfm.amethyst.timeline.ui.components.ChainEffectClip
 import dev.anthonyhfm.amethyst.timeline.ui.components.SelectionCursor
 import dev.anthonyhfm.amethyst.timeline.ui.components.timelineGridOverlay
 import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromContentX
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 
 @Composable
 fun TimelineLane(
@@ -88,13 +90,19 @@ fun TimelineLane(
     viewport: EditorViewportState,
     selectedTimeMs: Long?,
     selectedEntryStarts: Set<Long> = emptySet(),
+    selectedChainEffectIds: Set<String> = emptySet(),
     onDropInFile: (file: PlatformFile) -> Unit = {},
     onSelectTime: (Long) -> Unit = {},
     onSelectEntry: (Long) -> Unit = {},
     onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> },
     onResizeEntry: (oldStart: Long, newStart: Long, newDuration: Long) -> Unit = { _, _, _ -> },
     onDoubleClickLane: (Long) -> Unit = {},
-    onCreateMidiClip: (Long, Long) -> Unit = { _, _ -> }
+    onCreateMidiClip: (Long, Long) -> Unit = { _, _ -> },
+    onCreateChainEffect: (Long) -> Unit = {},
+    onSelectChainEffect: (String) -> Unit = {},
+    onMoveChainEffect: (String, Long) -> Unit = { _, _ -> },
+    onResizeChainEffect: (String, Long, Long) -> Unit = { _, _, _ -> },
+    onOpenChainEffect: (String) -> Unit = {},
 ) {
     val zoomLevel = viewport.zoomX
     val bpm by WorkspaceRepository.bpm.collectAsState()
@@ -270,14 +278,26 @@ fun TimelineLane(
                 )
                 .clipToBounds()
                 .rightClickable { position ->
-                    if (track is MidiTimelineTrack && selectedRange != null) {
+                    if (track is MidiTimelineTrack) {
                         contextMenuPosition = position
                         showContextMenu = true
                     }
                 }
                 .then(laneInteractionModifier)
         ) {
-        if (showContextMenu && selectedRange != null) {
+        if (showContextMenu && track is MidiTimelineTrack) {
+            val targetStartMs: Long
+            val targetEndMs: Long
+            if (selectedRange != null) {
+                targetStartMs = selectedRange.startMs
+                targetEndMs = selectedRange.endMs
+            } else {
+                val clickedTimeMs = viewport.screenToTimeMs(contextMenuPosition.x).toLong().coerceAtLeast(0L)
+                targetStartMs = GridUtils.snapToGrid(clickedTimeMs, zoomLevel, WorkspaceRepository.bpm.value, gridType)
+                val defaultBarMs = (60_000.0 / WorkspaceRepository.bpm.value.coerceAtLeast(1.0)).toLong() * 4L
+                targetEndMs = targetStartMs + defaultBarMs
+            }
+
             Popup(
                 popupPositionProvider = object : PopupPositionProvider {
                     override fun calculatePosition(
@@ -302,7 +322,16 @@ fun TimelineLane(
                         label = stringResource(Res.string.timeline_lane_create_midi_clip),
                         icon = Lucide.Plus,
                         onClick = {
-                            onCreateMidiClip(selectedRange.startMs, selectedRange.endMs)
+                            onCreateMidiClip(targetStartMs, targetEndMs)
+                            showContextMenu = false
+                        }
+                    )
+                    ContextMenuSeparator()
+                    ContextMenuItem(
+                        label = stringResource(Res.string.timeline_lane_create_chain_effect),
+                        icon = Lucide.Plus,
+                        onClick = {
+                            onCreateChainEffect(targetStartMs)
                             showContextMenu = false
                         }
                     )
@@ -393,6 +422,24 @@ fun TimelineLane(
                                 bpm = bpm,
                                 gridType = gridType
                             )
+                        }
+                    }
+                    val experimentalChainEffectEnabled by dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings.timelineChainEffects.flow.collectAsState()
+                    if (experimentalChainEffectEnabled) {
+                        track.chainEffectEntries.values.sortedBy { it.startTimeMs }.forEach { chainEntry ->
+                            androidx.compose.runtime.key(chainEntry.clipId) {
+                                ChainEffectClip(
+                                    entry = chainEntry,
+                                    viewport = viewport,
+                                    isSelected = chainEntry.clipId in selectedChainEffectIds,
+                                    onSelect = { onSelectChainEffect(chainEntry.clipId) },
+                                    onMove = { newStart -> onMoveChainEffect(chainEntry.clipId, newStart) },
+                                    onResize = { newStart, newDuration ->
+                                        onResizeChainEffect(chainEntry.clipId, newStart, newDuration)
+                                    },
+                                    onDoubleClick = { onOpenChainEffect(chainEntry.clipId) },
+                                )
+                            }
                         }
                     }
                 }

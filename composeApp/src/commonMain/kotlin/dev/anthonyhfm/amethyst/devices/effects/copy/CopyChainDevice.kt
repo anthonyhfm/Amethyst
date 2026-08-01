@@ -27,12 +27,50 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(CopyChainDeviceState())
     override val helpRef = "Copy"
+
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        val current = state.value
+        if (current.mode == CopyChainDeviceState.CopyMode.RANDOM_LOOP) {
+            return TimelineDuration.Unbounded
+        }
+        if (current.mode == CopyChainDeviceState.CopyMode.STATIC || current.mode == CopyChainDeviceState.CopyMode.RANDOM_SINGLE) {
+            return TimelineDuration.None
+        }
+        val steps = when (current.mode) {
+            CopyChainDeviceState.CopyMode.ANIMATE -> current.offsets.size.coerceAtLeast(1)
+            CopyChainDeviceState.CopyMode.INTERPOLATE,
+            CopyChainDeviceState.CopyMode.HOLD_INTERPOLATE -> {
+                current.offsets.sumOf { offset ->
+                    val configuredDistance = if (offset.isAbsolute) {
+                        maxOf(
+                            kotlin.math.abs(offset.absoluteX) + context.canvasWidth,
+                            kotlin.math.abs(offset.absoluteY) + context.canvasHeight,
+                        )
+                    } else {
+                        maxOf(kotlin.math.abs(offset.x), kotlin.math.abs(offset.y))
+                    }
+                    val linearUpperBound = maxOf(
+                        configuredDistance,
+                        context.canvasWidth,
+                        context.canvasHeight,
+                    ).coerceAtLeast(1)
+                    val arcMultiplier = (kotlin.math.abs(offset.angle) / 45 + 1).coerceAtLeast(1)
+                    linearUpperBound * arcMultiplier
+                }.coerceAtLeast(1)
+            }
+            else -> 0
+        }
+        val stepMs = current.timing.toMsValue(context.bpm.toDouble()) * (current.gate * 2f)
+        return TimelineDuration.Finite((stepMs * steps).toLong().coerceAtLeast(0L))
+    }
 
     @Composable
     override fun Content() {

@@ -28,10 +28,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 
 class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable {
     override val helpRef = "Delay"
     override val state = MutableStateFlow(DelayChainDeviceState())
+
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.Finite(
+            (state.value.timing.toMsValue(context.bpm.toDouble()) * (state.value.gate * 2f)).toLong().coerceAtLeast(0L)
+        )
 
     @Composable
     override fun Content() {

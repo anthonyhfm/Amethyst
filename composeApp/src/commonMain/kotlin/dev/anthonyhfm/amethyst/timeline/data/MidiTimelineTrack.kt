@@ -15,11 +15,13 @@ class MidiTimelineTrack : TimelineTrack<MidiEntry>() {
     override var isSoloed: Boolean = false
     override val automationLanes: MutableList<TimelineAutomationLane> = mutableListOf()
     override val entries: MutableMap<Long, MidiEntry> = mutableMapOf()
+    val chainEffectEntries: MutableMap<Long, ChainEffectEntry> = mutableMapOf()
     override var trackId: String = UUID.randomUUID()
     override val kind: TimelineTrackKind = TimelineTrackKind.MIDI
 
     fun copyWithEntries(
         entriesToCopy: Map<Long, MidiEntry> = entries,
+        chainEffectsToCopy: Map<Long, ChainEffectEntry> = chainEffectEntries,
         preserveTrackIdentity: Boolean = true
     ): MidiTimelineTrack {
         return MidiTimelineTrack().apply {
@@ -29,8 +31,18 @@ class MidiTimelineTrack : TimelineTrack<MidiEntry>() {
             name = this@MidiTimelineTrack.name
             copyMixerStateFrom(other = this@MidiTimelineTrack)
             entries.putAll(entriesToCopy)
+            chainEffectEntries.putAll(
+                if (preserveTrackIdentity) {
+                    chainEffectsToCopy
+                } else {
+                    chainEffectsToCopy.mapValues { (_, entry) -> entry.deepCopy(clipId = UUID.randomUUID()) }
+                }
+            )
         }
     }
+
+    fun allOneDimensionalEntries(): List<TimelineEntry> =
+        (entries.values + chainEffectEntries.values).sortedBy(TimelineEntry::startTimeMs)
 
     /**
      * Add a MIDI entry to the track at a specific time position

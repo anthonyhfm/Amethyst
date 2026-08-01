@@ -32,6 +32,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +63,39 @@ import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.snapshotFlow
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
-class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokeable {
+class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokeable, dev.anthonyhfm.amethyst.devices.TimelineTriggerable {
+    private fun timelineTrigger(color: Color): Signal.LED {
+        val root = state.value.rootKey
+        return Signal.LED(
+            origin = this,
+            x = root?.rem(10) ?: 0,
+            y = root?.div(10) ?: 0,
+            color = color,
+        )
+    }
+
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        val current = state.value
+        if (current.playbackMode == PlaybackMode.Loop) return TimelineDuration.Unbounded
+        // Mirrors renderAnimation(): every rendered transition is delayed by the
+        // previous frame's timing and the entering frame's gate. The synthetic
+        // terminal frame uses the default 0.5 gate.
+        val duration = current.frames.indices.sumOf { index ->
+            val frame = current.frames[index]
+            val enteringGate = current.frames.getOrNull(index + 1)?.gate ?: 0.5f
+            (frame.timing.toMsValue(context.bpm) * (enteringGate * 2f)).toLong()
+        } * current.repeats.coerceAtLeast(0)
+        return TimelineDuration.Finite(duration.coerceAtLeast(0L))
+    }
+
+    override fun startTimelineTrigger() {
+        ledSignalEnter(listOf(timelineTrigger(Color.White)))
+    }
+
+    override fun stopTimelineTrigger() {
+        ledSignalEnter(listOf(timelineTrigger(Color.Black)))
+        onChoke()
+    }
     override val state = MutableStateFlow(KeyframesChainDeviceState())
     override val helpRef = "Keyframes"
 

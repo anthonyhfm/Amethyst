@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.devices.effects.group.editor
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.core.controls.clipboard.extractDevicesFromChainEffectEntry
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -165,11 +166,27 @@ internal class GroupEditorActionLayer<State : DeviceState>(
     }
 
     fun pasteGroup(index: Int) {
-        val clipData = ClipboardManager.clipboardData.value as? ClipboardData.GroupChainItem ?: return
-        pasteGroups(
-            groups = clipData.groups,
-            targetIndex = (index + 1).coerceIn(0, groupsOf(stateFlow.value).size),
-        )
+        val clip = ClipboardManager.clipboardData.value
+        if (clip is ClipboardData.GroupChainItem) {
+            pasteGroups(
+                groups = clip.groups,
+                targetIndex = (index + 1).coerceIn(0, groupsOf(stateFlow.value).size),
+            )
+        } else if (clip is ClipboardData.TimelineChainEffects) {
+            val groupList = clip.entries.map { entry ->
+                val devices = extractDevicesFromChainEffectEntry(entry)
+                Group(
+                    name = entry.name,
+                    stateChain = StateChain(
+                        devices = devices.map { StateChain.packDevice(it) }
+                    )
+                )
+            }
+            pasteGroups(
+                groups = groupList,
+                targetIndex = (index + 1).coerceIn(0, groupsOf(stateFlow.value).size),
+            )
+        }
     }
 
     fun renameGroup(index: Int, newName: String) {

@@ -50,10 +50,14 @@ import kotlin.math.roundToInt
 
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     override val state = MutableStateFlow(RotateChainDeviceState())
     override val helpRef = "Rotate"
 

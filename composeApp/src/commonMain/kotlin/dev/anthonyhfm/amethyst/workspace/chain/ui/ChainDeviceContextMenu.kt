@@ -22,6 +22,7 @@ import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
+import dev.anthonyhfm.amethyst.core.controls.clipboard.extractDevicesFromChainEffectEntry
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
@@ -165,6 +166,45 @@ fun ChainDeviceContextMenu(
                             device = it,
                             atIndex = index
                         )
+                    }
+                    onDismiss()
+                }
+            )
+        }
+
+        if (currentClipboard is ClipboardData.TimelineChainEffects) {
+            ChainContextMenuItem(
+                label = stringResource(Res.string.workspace_chain_chaineditor_paste),
+                icon = Lucide.ClipboardPaste,
+                onClick = {
+                    val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
+                    val entries = (currentClipboard as ClipboardData.TimelineChainEffects).entries
+                    var offset = 1
+                    entries.forEach { entry ->
+                        val devices = extractDevicesFromChainEffectEntry(entry)
+                        devices.forEach { dev ->
+                            chain.add(device = dev, atIndex = index + offset)
+                            offset++
+                        }
+                    }
+                    onDismiss()
+                }
+            )
+
+            ChainContextMenuItem(
+                label = stringResource(Res.string.workspace_chain_chaineditor_paste_replace),
+                icon = Lucide.Replace,
+                onClick = {
+                    val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
+                    chain.remove(device.selectionUUID)
+                    val entries = (currentClipboard as ClipboardData.TimelineChainEffects).entries
+                    var offset = 0
+                    entries.forEach { entry ->
+                        val devices = extractDevicesFromChainEffectEntry(entry)
+                        devices.forEach { dev ->
+                            chain.add(device = dev, atIndex = index + offset)
+                            offset++
+                        }
                     }
                     onDismiss()
                 }

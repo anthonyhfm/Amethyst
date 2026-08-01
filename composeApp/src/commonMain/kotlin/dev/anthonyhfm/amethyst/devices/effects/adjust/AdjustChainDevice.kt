@@ -35,8 +35,12 @@ import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
 import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.devices.Automatable
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 
 class AdjustChainDevice : LEDChainDevice<AdjustChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     override val state = MutableStateFlow(AdjustChainDeviceState())
     override val helpRef = "Adjust"
 

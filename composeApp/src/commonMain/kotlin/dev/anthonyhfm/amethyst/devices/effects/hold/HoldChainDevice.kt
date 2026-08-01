@@ -38,8 +38,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 
 class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        if (state.value.mode == HoldMode.Infinite) return TimelineDuration.Unbounded
+        return TimelineDuration.Finite(
+            (state.value.timing.toMsValue(context.bpm.toDouble()) * (state.value.gate * 2f)).toLong().coerceAtLeast(0L)
+        )
+    }
     override val state = MutableStateFlow(HoldChainDeviceState())
     override val helpRef = "Hold"
 
@@ -317,7 +325,7 @@ class HoldChainDevice : GenericChainDevice<HoldChainDeviceState>(), Chokeable {
                     return@forEach
                 }
 
-                Heaven.schedule(0.0) {
+                Heaven.schedule(0.0, owner = this) {
                     if (signal is Signal.LED) {
                         signalExit?.invoke(listOf(signal.copy(color = Color.White)))
                     } else if (signal is Signal.Midi) {

@@ -428,6 +428,7 @@
     <string name="timeline_grid_picker_flex_smallest">Flexible: Smallest</string>
     <string name="timeline_grid_picker_no_grid">No Grid</string>
     <string name="timeline_lane_create_midi_clip">Create MIDI Clip</string>
+    <string name="timeline_lane_create_chain_effect">Create Chain Effect</string>
     <string name="timeline_pianoroll_action_apply">Apply</string>
     <string name="timeline_pianoroll_action_double_length">Double Length</string>
     <string name="timeline_pianoroll_action_double_speed">Double Speed</string>

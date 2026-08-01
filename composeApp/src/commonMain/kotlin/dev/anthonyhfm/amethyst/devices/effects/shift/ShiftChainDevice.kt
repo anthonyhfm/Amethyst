@@ -36,10 +36,14 @@ import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
 import dev.anthonyhfm.amethyst.core.controls.automation.CurveMode
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.devices.Automatable
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 
 class ShiftChainDevice : LEDChainDevice<ShiftChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     override val state = MutableStateFlow(ShiftChainDeviceState())
     override val helpRef = "Shift"
 

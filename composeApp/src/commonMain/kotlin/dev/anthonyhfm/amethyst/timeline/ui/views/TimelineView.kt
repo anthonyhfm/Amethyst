@@ -34,6 +34,7 @@ fun TimelineView(
     val gridType by WorkspaceRepository.gridType.collectAsState()
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
+    val openChainEffectClipId by viewModel.openChainEffectClipId.collectAsState()
 
     Column(
         modifier = Modifier
@@ -83,7 +84,8 @@ fun TimelineView(
 
         Row(
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxWidth()
+                .weight(1f),
         ) {
             TrackListView(
                 tracks = tracks,
@@ -111,6 +113,15 @@ fun TimelineView(
                 onCreateMidiEntry = { trackIndex, startMs, endMs ->
                     viewModel.createMidiEntry(trackIndex, startMs, endMs)
                 }
+            )
+        }
+
+        val experimentalChainEffectEnabled by dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings.timelineChainEffects.flow.collectAsState()
+        if (experimentalChainEffectEnabled && openChainEffectClipId != null) {
+            TimelineChainEffectPanel(
+                viewModel = viewModel,
+                clipId = openChainEffectClipId!!,
+                modifier = Modifier.fillMaxWidth().height(320.dp),
             )
         }
     }

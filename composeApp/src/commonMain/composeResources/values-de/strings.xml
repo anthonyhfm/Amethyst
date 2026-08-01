@@ -428,6 +428,7 @@
     <string name="timeline_grid_picker_flex_smallest">Flexibel: Min</string>
     <string name="timeline_grid_picker_no_grid">Kein Grid</string>
     <string name="timeline_lane_create_midi_clip">MIDI Clip erstellen</string>
+    <string name="timeline_lane_create_chain_effect">Chain Effect erstellen</string>
     <string name="timeline_pianoroll_action_apply">Anwenden</string>
     <string name="timeline_pianoroll_action_double_length">Doppelte Länge</string>
     <string name="timeline_pianoroll_action_double_speed">Doppelte Geschwindigkeit</string>

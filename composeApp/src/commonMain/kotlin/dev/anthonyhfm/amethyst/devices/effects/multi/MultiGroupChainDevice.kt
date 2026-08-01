@@ -71,11 +71,23 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
+import dev.anthonyhfm.amethyst.devices.parallelDuration
+import dev.anthonyhfm.amethyst.devices.serialDuration
+import dev.anthonyhfm.amethyst.devices.timelineDuration
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 
 class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), NestedChainDevice {
     override val helpRef = "Multi"
     override val state = MutableStateFlow(MultiGroupChainDeviceState())
+
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        val groupDuration = state.value.groups
+            .map { it.chain.timelineDuration(context) }
+            .parallelDuration()
+        return listOf(preprocessChain.timelineDuration(context), groupDuration).serialDuration()
+    }
 
     private val actionLayer = GroupEditorActionLayer(
         device = this,

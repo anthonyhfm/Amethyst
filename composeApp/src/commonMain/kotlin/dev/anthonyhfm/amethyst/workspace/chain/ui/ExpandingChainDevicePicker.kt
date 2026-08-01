@@ -21,7 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
+import dev.anthonyhfm.amethyst.core.controls.clipboard.extractDevicesFromChainEffectEntry
 import dev.anthonyhfm.amethyst.workspace.isMobilePhone
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +68,7 @@ import dev.anthonyhfm.amethyst.ui.modifier.rememberDelayedHoverAsState
 import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
@@ -74,6 +76,7 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.coroutines.flow.collectLatest
+import kotlin.reflect.KClass
 
 @Composable
 fun ExpandingChainDevicePicker(
@@ -87,6 +90,11 @@ fun ExpandingChainDevicePicker(
     hoverWidth: Dp = 56.dp,     // width on normal pointer hover / explicit expand
     dragPresenceWidth: Dp = 18.dp, // width for all slots while a drag is happening elsewhere
     indicatorWidth: Dp = 3.dp,
+    allowExternalDrop: Boolean = true,
+    privateDestination: Boolean = false,
+    allowClipboardPaste: Boolean = true,
+    samplingOverride: Boolean? = null,
+    isDeviceTypeEnabled: (KClass<out GenericChainDevice<*>>) -> Boolean = { true },
     onAddComponent: (GenericChainDevice<*>) -> Unit,
     onDropDevice: (device: GenericChainDevice<*>, Pair<Int, String>, originChain: Chain) -> Unit
 ) {
@@ -158,6 +166,7 @@ fun ExpandingChainDevicePicker(
                 state = dragAndDropState,
                 key = dropKey,
                 onDragEnter = { state ->
+                    if (!allowExternalDrop) return@dropTarget
                     val dragged = state.data
                     if (!isDroppingIntoSelf(dragged, destinationChain)) {
                         isDropHover = true
@@ -167,6 +176,7 @@ fun ExpandingChainDevicePicker(
                     isDropHover = false
                 },
                 onDrop = { state ->
+                    if (!allowExternalDrop) return@dropTarget
                     val dragged = state.data
                     if (isDroppingIntoSelf(dragged, destinationChain)) {
                         isDropHover = false
@@ -175,7 +185,19 @@ fun ExpandingChainDevicePicker(
 
                     val device = dragged // reuse original instance to keep state
 
-                    if (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
+                    if (privateDestination) {
+                        val oc = destinationChain.findDeviceChain(dragged.selectionUUID) ?: run {
+                            isDropHover = false
+                            return@dropTarget
+                        }
+                        val originalIndex = oc.devices.value.indexOfFirst { it.selectionUUID == dragged.selectionUUID }
+                        if (originalIndex == -1) {
+                            isDropHover = false
+                            return@dropTarget
+                        }
+                        destinationChain.remove(dragged.selectionUUID, false)
+                        onDropDevice(device, Pair(originalIndex, dragged.selectionUUID), oc)
+                    } else if (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
                         val oc = WorkspaceRepository.samplingChain.findDeviceChain(dragged.selectionUUID) ?: run {
                             isDropHover = false
                             return@dropTarget
@@ -206,6 +228,7 @@ fun ExpandingChainDevicePicker(
             )
             .hoverable(interaction)
             .rightClickable {
+                if (!allowClipboardPaste) return@rightClickable
                 val isDevice = clipboard is ClipboardData.ChainDevice
                 val isTimelineAudio =
                     (clipboard is ClipboardData.TimelineAudioEntries || clipboard is ClipboardData.TimelineAudioRange) &&
@@ -233,7 +256,8 @@ fun ExpandingChainDevicePicker(
             clipboard is ClipboardData.ChainDevice ||
             clipboard is ClipboardData.TimelineAudioEntries ||
             clipboard is ClipboardData.TimelineAudioRange ||
-            clipboard is ClipboardData.TimelineMidiEntries
+            clipboard is ClipboardData.TimelineMidiEntries ||
+            clipboard is ClipboardData.TimelineChainEffects
         ) {
             ChainContextMenu(
                 expanded = showRightClickMenu,
@@ -299,6 +323,21 @@ fun ExpandingChainDevicePicker(
                             showRightClickMenu = false
                         }
                     )
+                } else if (clipboard is ClipboardData.TimelineChainEffects) {
+                    ChainContextMenuItem(
+                        label = "Paste Chain Clip from Timeline",
+                        icon = Icons.Default.ContentPaste,
+                        onClick = {
+                            val entries = (clipboard as ClipboardData.TimelineChainEffects).entries
+                            entries.fastForEachReversed { entry ->
+                                val devices = extractDevicesFromChainEffectEntry(entry)
+                                devices.fastForEachReversed { device ->
+                                    destinationChain.add(device = device, atIndex = slotIndex)
+                                }
+                            }
+                            showRightClickMenu = false
+                        }
+                    )
                 }
             }
         }
@@ -345,13 +384,15 @@ fun ExpandingChainDevicePicker(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "Add a new device"
+                            contentDescription = "Add a new device",
+                            tint = Theme[colors][foreground],
                         )
                     }
 
                     ChainDevicePicker(
                         visible = pickerVisible,
-                        sampling = WorkspaceRepository.mode.value is SamplingChainWorkspaceMode,
+                        sampling = samplingOverride ?: (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode),
+                        isDeviceTypeEnabled = isDeviceTypeEnabled,
                         onDismiss = {
                             pickerVisible = false
                             isExpandedByTap = false

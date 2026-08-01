@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.ChainEffectEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
@@ -24,9 +25,13 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineTriggerable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,7 +50,25 @@ class TimelineViewModel : ViewModel() {
     val playheadPositionMs = TimelineRepository.playheadPositionMs
     val isPlaying = TimelineRepository.isPlaying
 
+    private val _openChainEffectClipId = MutableStateFlow<String?>(null)
+    val openChainEffectClipId: StateFlow<String?> = _openChainEffectClipId.asStateFlow()
+
     init {
+        TimelineKeyHandler.closeChainEffectPanel = {
+            if (_openChainEffectClipId.value == null) false else {
+                if (SelectionManager.selections.value.isNotEmpty()) {
+                    SelectionManager.clear()
+                    true
+                } else {
+                    closeChainEffect()
+                    true
+                }
+            }
+        }
+        TimelineKeyHandler.deleteChainEffectClip = ::deleteChainEffect
+        TimelineKeyHandler.duplicateChainEffectClip = { trackIndex, clipId ->
+            duplicateChainEffect(trackIndex, clipId)
+        }
         viewModelScope.launch {
             TimelineRepository.tracks.collect { repoTracks ->
                 _tracks.value = repoTracks
@@ -57,7 +80,10 @@ class TimelineViewModel : ViewModel() {
             WorkspaceRepository.gridType.collect { resnapTimelineSelections() }
         }
         viewModelScope.launch {
-            WorkspaceRepository.bpm.collect { resnapTimelineSelections() }
+            WorkspaceRepository.bpm.collect {
+                resnapTimelineSelections()
+                TimelineRepository.refreshChainEffectDurations()
+            }
         }
     }
 
@@ -102,7 +128,11 @@ class TimelineViewModel : ViewModel() {
 
                         is MidiTimelineTrack -> {
                             selection.trackIndex in visibleTrackIndices &&
-                                track.entries.containsKey(selection.entryStartMs)
+                                if (selection.clipId != null) {
+                                    track.chainEffectEntries.values.any { it.clipId == selection.clipId }
+                                } else {
+                                    track.entries.containsKey(selection.entryStartMs)
+                                }
                         }
 
                         else -> false
@@ -720,9 +750,13 @@ class TimelineViewModel : ViewModel() {
      */
     fun createMidiEntry(trackIndex: Int, startMs: Long, endMs: Long) {
         val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        if (track.hasOneDimensionalBlockerAt(startMs)) return
         val before = track.entries.values.toList()
-        
-        val duration = (endMs - startMs).coerceAtLeast(100L) // Ensure minimum duration
+        val nextStart = track.allOneDimensionalEntries().map { it.startTimeMs }.filter { it > startMs }.minOrNull()
+        val duration = minOf(
+            (endMs - startMs).coerceAtLeast(100L),
+            nextStart?.minus(startMs) ?: Long.MAX_VALUE,
+        ).coerceAtLeast(1L)
         val newEntry = MidiEntry(
             startTimeMs = startMs,
             durationMs = duration,
@@ -741,6 +775,234 @@ class TimelineViewModel : ViewModel() {
         UndoManager.addAction(UndoableAction.MidiTimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
         
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = startMs))
+    }
+
+    // ========== Timeline-owned Chain Effects ==========
+
+    fun createChainEffectEntry(trackIndex: Int, startMs: Long): ChainEffectEntry? {
+        if (!dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings.timelineChainEffects.value) return null
+        val originalTrack = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return null
+        val snappedStart = snapTimelineTime(startMs)
+        if (originalTrack.hasOneDimensionalBlockerAt(snappedStart)) return null
+
+        val nextStart = originalTrack.allOneDimensionalEntries()
+            .asSequence()
+            .map { it.startTimeMs }
+            .filter { it > snappedStart }
+            .minOrNull()
+        val placeholderDuration = minOf(
+            oneBeatMs() * 4L,
+            nextStart?.minus(snappedStart)?.coerceAtLeast(1L) ?: Long.MAX_VALUE,
+        )
+        val entry = ChainEffectEntry(
+            startTimeMs = snappedStart,
+            durationMs = placeholderDuration,
+        )
+
+        val before = originalTrack.deepCopy()
+        val after = originalTrack.deepCopy() as MidiTimelineTrack
+        after.chainEffectEntries[snappedStart] = entry
+        commitChainEffectTrackChange(trackIndex, before, after)
+        selectChainEffect(trackIndex, entry)
+        _openChainEffectClipId.value = entry.clipId
+        return entry
+    }
+
+    fun openChainEffect(trackIndex: Int, clipId: String) {
+        val entry = findChainEffect(trackIndex, clipId) ?: return
+        selectChainEffect(trackIndex, entry)
+        _openChainEffectClipId.value = clipId
+    }
+
+    fun selectChainEffectClip(trackIndex: Int, clipId: String) {
+        findChainEffect(trackIndex, clipId)?.let { selectChainEffect(trackIndex, it) }
+    }
+
+    fun closeChainEffect() {
+        _openChainEffectClipId.value = null
+    }
+
+    fun deleteChainEffect(trackIndex: Int, clipId: String) {
+        val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        val entry = track.chainEffectEntries.values.firstOrNull { it.clipId == clipId } ?: return
+        val before = track.deepCopy()
+        val after = track.deepCopy() as MidiTimelineTrack
+        after.chainEffectEntries.remove(entry.startTimeMs)
+        commitChainEffectTrackChange(trackIndex, before, after)
+        if (_openChainEffectClipId.value == clipId) closeChainEffect()
+    }
+
+    fun duplicateChainEffect(trackIndex: Int, clipId: String): ChainEffectEntry? {
+        val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return null
+        val entry = track.chainEffectEntries.values.firstOrNull { it.clipId == clipId } ?: return null
+        var candidate = entry.endTimeMs
+        val blockers = track.allOneDimensionalEntries().sortedBy { it.startTimeMs }
+        while (true) {
+            val blocker = blockers.firstOrNull { candidate >= it.startTimeMs && candidate < it.endTimeMs } ?: break
+            candidate = blocker.endTimeMs
+        }
+        val nextStart = blockers.map { it.startTimeMs }.filter { it > candidate }.minOrNull()
+        val copiedDuration = minOf(entry.durationMs, nextStart?.minus(candidate) ?: Long.MAX_VALUE).coerceAtLeast(1L)
+        val duplicate = entry.deepCopy(
+            clipId = dev.anthonyhfm.amethyst.core.util.UUID.randomUUID(),
+            startTimeMs = candidate,
+            durationMs = copiedDuration,
+            maxDurationMs = if (copiedDuration < entry.durationMs) copiedDuration else entry.maxDurationMs,
+        )
+        val before = track.deepCopy()
+        val after = track.deepCopy() as MidiTimelineTrack
+        after.chainEffectEntries[candidate] = duplicate
+        commitChainEffectTrackChange(trackIndex, before, after)
+        selectChainEffect(trackIndex, duplicate)
+        return duplicate
+    }
+
+    fun setChainEffectSource(trackIndex: Int, clipId: String, device: GenericChainDevice<*>?) {
+        require(device == null || device is TimelineTriggerable)
+        mutateChainEffectRuntime(trackIndex, clipId) { replaceSource(device) }
+    }
+
+    fun addChainEffectProcessor(
+        trackIndex: Int,
+        clipId: String,
+        device: GenericChainDevice<*>,
+        atIndex: Int? = null,
+    ) {
+        mutateChainEffectRuntime(trackIndex, clipId) { addProcessor(device, atIndex) }
+    }
+
+    fun removeChainEffectProcessor(trackIndex: Int, clipId: String, index: Int) {
+        mutateChainEffectRuntime(trackIndex, clipId) { removeProcessor(index) }
+    }
+
+    fun reorderChainEffectProcessor(trackIndex: Int, clipId: String, fromIndex: Int, toIndex: Int) {
+        mutateChainEffectRuntime(trackIndex, clipId) { moveProcessor(fromIndex, toIndex) }
+    }
+
+    fun moveChainEffect(trackIndex: Int, clipId: String, requestedStartMs: Long) {
+        val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        val entry = track.chainEffectEntries.values.firstOrNull { it.clipId == clipId } ?: return
+        val newStart = snapTimelineTime(requestedStartMs)
+        val blockers = track.allOneDimensionalEntries().filterNot { it is ChainEffectEntry && it.clipId == clipId }
+        if (blockers.any { newStart >= it.startTimeMs && newStart < it.endTimeMs }) return
+
+        val nextStart = blockers.map { it.startTimeMs }.filter { it > newStart }.minOrNull()
+        val available = nextStart?.minus(newStart)
+        val duration = minOf(entry.durationMs, available ?: Long.MAX_VALUE).coerceAtLeast(1L)
+        val moved = entry.copy(
+            startTimeMs = newStart,
+            durationMs = duration,
+            maxDurationMs = if (duration < entry.durationMs) duration else entry.maxDurationMs,
+        )
+        val before = track.deepCopy()
+        val after = track.deepCopy() as MidiTimelineTrack
+        after.chainEffectEntries.remove(entry.startTimeMs)
+        after.chainEffectEntries[newStart] = moved
+        commitChainEffectTrackChange(trackIndex, before, after)
+        selectChainEffect(trackIndex, moved)
+    }
+
+    fun resizeChainEffect(
+        trackIndex: Int,
+        clipId: String,
+        requestedStartMs: Long,
+        requestedDurationMs: Long,
+    ) {
+        val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
+        val entry = track.chainEffectEntries.values.firstOrNull { it.clipId == clipId } ?: return
+        val runtime = TimelineRepository.chainEffectRuntime(clipId) ?: return
+        val newStart = requestedStartMs.coerceAtLeast(0L)
+        val blockers = track.allOneDimensionalEntries().filterNot { it is ChainEffectEntry && it.clipId == clipId }
+        if (blockers.any { newStart >= it.startTimeMs && newStart < it.endTimeMs }) return
+        val nextStart = blockers.map { it.startTimeMs }.filter { it > newStart }.minOrNull()
+        val available = nextStart?.minus(newStart) ?: Long.MAX_VALUE
+        val natural = runtime.naturalDuration()
+        val minDurationMs = oneBeatMs() * 4L
+        val naturalLimit = when (natural) {
+            is TimelineDuration.Finite -> natural.milliseconds.coerceAtLeast(minDurationMs)
+            TimelineDuration.None -> oneBeatMs() * 4L
+            TimelineDuration.Unbounded -> Long.MAX_VALUE
+        }
+        val duration = requestedDurationMs.coerceAtLeast(minDurationMs).coerceAtMost(minOf(available, naturalLimit))
+        val cap = when {
+            natural is TimelineDuration.Unbounded -> duration
+            natural is TimelineDuration.Finite && duration >= naturalLimit && available >= naturalLimit -> null
+            else -> duration
+        }
+        val resized = runtime.snapshot(
+            startTimeMs = newStart,
+            durationMs = duration,
+            maxDurationMs = cap,
+        )
+        val before = track.deepCopy()
+        val after = track.deepCopy() as MidiTimelineTrack
+        after.chainEffectEntries.remove(entry.startTimeMs)
+        after.chainEffectEntries[newStart] = resized
+        commitChainEffectTrackChange(trackIndex, before, after)
+        selectChainEffect(trackIndex, resized)
+    }
+
+    private fun mutateChainEffectRuntime(
+        trackIndex: Int,
+        clipId: String,
+        mutate: ChainEffectRuntime.() -> Unit,
+    ) {
+        val before = (_tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack)?.deepCopy() ?: return
+        val runtime = TimelineRepository.chainEffectRuntime(clipId) ?: return
+        runtime.mutate()
+        _tracks.value = TimelineRepository.tracks.value
+        val after = (_tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack)?.deepCopy() ?: return
+        if (before != after) {
+            UndoManager.addAction(UndoableAction.TrackStateChange(trackIndex, before, after, mergeable = false))
+        }
+    }
+
+    private fun commitChainEffectTrackChange(
+        trackIndex: Int,
+        before: TimelineTrack<*>,
+        after: MidiTimelineTrack,
+    ) {
+        TimelineRepository.replaceTrack(trackIndex, after)
+        _tracks.value = TimelineRepository.tracks.value
+        UndoManager.addAction(UndoableAction.TrackStateChange(trackIndex, before, after.deepCopy(), mergeable = false))
+    }
+
+    private fun findChainEffect(trackIndex: Int, clipId: String): ChainEffectEntry? =
+        (_tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack)
+            ?.chainEffectEntries?.values?.firstOrNull { it.clipId == clipId }
+
+    private fun selectChainEffect(trackIndex: Int, entry: ChainEffectEntry) {
+        SelectionManager.select(
+            Selectable.TimelineEntryItem(
+                trackIndex = trackIndex,
+                entryStartMs = entry.startTimeMs,
+                clipId = entry.clipId,
+            )
+        )
+    }
+
+    private fun MidiTimelineTrack.hasOneDimensionalBlockerAt(timeMs: Long): Boolean =
+        allOneDimensionalEntries().any { timeMs >= it.startTimeMs && timeMs < it.endTimeMs }
+
+    private fun snapTimelineTime(timeMs: Long): Long {
+        val gridType = WorkspaceRepository.gridType.value
+        if (gridType is GridUtils.GridType.NoGrid) return timeMs.coerceAtLeast(0L)
+        val interval = GridUtils.computeWithGridType(
+            _viewport.value.zoomX,
+            WorkspaceRepository.bpm.value,
+            gridType,
+        ).intervalMs
+        return snapToGrid(timeMs, interval)
+    }
+
+    private fun oneBeatMs(): Long =
+        (60_000.0 / WorkspaceRepository.bpm.value.coerceAtLeast(1.0)).toLong().coerceAtLeast(1L)
+
+    override fun onCleared() {
+        TimelineKeyHandler.closeChainEffectPanel = null
+        TimelineKeyHandler.deleteChainEffectClip = null
+        TimelineKeyHandler.duplicateChainEffectClip = null
+        super.onCleared()
     }
 
     private fun enterPianoRollForEntry(clipContext: TimelineClipContext, entry: MidiEntry) {
@@ -792,7 +1054,7 @@ class TimelineViewModel : ViewModel() {
         
         if (track !is MidiTimelineTrack) return
         
-        val entry = track.entries.remove(oldStartMs) ?: return
+        val entry = track.entries[oldStartMs] ?: return
         
         val bpm = WorkspaceRepository.bpm.value
         val gridType = WorkspaceRepository.gridType.value
@@ -803,7 +1065,14 @@ class TimelineViewModel : ViewModel() {
             snapToGrid(newStartMs, intervals.intervalMs)
         }
         
-        val movedEntry = entry.copy(startTimeMs = snappedStart)
+        val blockers = track.allOneDimensionalEntries().filterNot { it is MidiEntry && it.startTimeMs == oldStartMs }
+        if (blockers.any { snappedStart >= it.startTimeMs && snappedStart < it.endTimeMs }) return
+        val nextStart = blockers.map { it.startTimeMs }.filter { it > snappedStart }.minOrNull()
+        val movedEntry = entry.copy(
+            startTimeMs = snappedStart,
+            durationMs = minOf(entry.durationMs, nextStart?.minus(snappedStart) ?: Long.MAX_VALUE).coerceAtLeast(1L),
+        )
+        track.entries.remove(oldStartMs)
         track.entries[snappedStart] = movedEntry
         
         val newTrack = track.copyWithEntries()
@@ -824,9 +1093,17 @@ class TimelineViewModel : ViewModel() {
         
         val entry = track.entries[entryStartMs] ?: return
         
-        // Place duplicate right after the original
-        val newStartMs = entry.endTimeMs
-        val duplicatedEntry = entry.copy(startTimeMs = newStartMs)
+        var newStartMs = entry.endTimeMs
+        val blockers = track.allOneDimensionalEntries()
+        while (true) {
+            val blocker = blockers.firstOrNull { newStartMs >= it.startTimeMs && newStartMs < it.endTimeMs } ?: break
+            newStartMs = blocker.endTimeMs
+        }
+        val nextStart = blockers.map { it.startTimeMs }.filter { it > newStartMs }.minOrNull()
+        val duplicatedEntry = entry.copy(
+            startTimeMs = newStartMs,
+            durationMs = minOf(entry.durationMs, nextStart?.minus(newStartMs) ?: Long.MAX_VALUE).coerceAtLeast(1L),
+        )
         track.entries[newStartMs] = duplicatedEntry
         
         // Update track
@@ -847,7 +1124,15 @@ class TimelineViewModel : ViewModel() {
         track.entries[entryStartMs] = updated
 
         val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.durationMs
-        val newDuration = maxEnd.coerceAtLeast(updated.durationMs)
+        val nextStart = track.allOneDimensionalEntries()
+            .filterNot { it is MidiEntry && it.startTimeMs == entryStartMs }
+            .map { it.startTimeMs }
+            .filter { it > entryStartMs }
+            .minOrNull()
+        val newDuration = minOf(
+            maxEnd.coerceAtLeast(updated.durationMs),
+            nextStart?.minus(entryStartMs) ?: Long.MAX_VALUE,
+        ).coerceAtLeast(1L)
         if (newDuration != updated.durationMs) {
             track.entries[entryStartMs] = updated.copy(durationMs = newDuration)
         }
@@ -885,7 +1170,14 @@ class TimelineViewModel : ViewModel() {
         val before = snapshotMidiEntries(track)
         val entry = track.entries[oldStartMs] ?: return
 
-        val clampedDuration = newDurationMs.coerceAtLeast(50L)
+        val blockers = track.allOneDimensionalEntries().filterNot { it is MidiEntry && it.startTimeMs == oldStartMs }
+        if (blockers.any { newStartMs >= it.startTimeMs && newStartMs < it.endTimeMs }) return
+        val nextStart = blockers.map { it.startTimeMs }.filter { it > newStartMs }.minOrNull()
+
+        val clampedDuration = minOf(
+            newDurationMs.coerceAtLeast(50L),
+            nextStart?.minus(newStartMs) ?: Long.MAX_VALUE,
+        ).coerceAtLeast(1L)
         val startChanged = newStartMs != oldStartMs
 
         val movedNotes = if (startChanged) {
@@ -898,8 +1190,11 @@ class TimelineViewModel : ViewModel() {
         track.entries[newStartMs] = updated
 
         val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.endTimeMs
-        val finalDuration = maxEnd - updated.startTimeMs
-        if (finalDuration > updated.durationMs) {
+        val finalDuration = minOf(
+            (maxEnd - updated.startTimeMs).coerceAtLeast(updated.durationMs),
+            nextStart?.minus(newStartMs) ?: Long.MAX_VALUE,
+        ).coerceAtLeast(1L)
+        if (finalDuration != updated.durationMs) {
             track.entries[newStartMs] = updated.copy(durationMs = finalDuration)
         }
 

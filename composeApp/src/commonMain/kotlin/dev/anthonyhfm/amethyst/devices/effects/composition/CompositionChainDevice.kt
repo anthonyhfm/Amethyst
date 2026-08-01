@@ -21,6 +21,9 @@ import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
+import dev.anthonyhfm.amethyst.devices.TimelineTriggerable
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphProcessor
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.defaultCompositionGraph
@@ -38,7 +41,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.rotateMidiUpdates
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
-class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
+class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), TimelineTriggerable {
     override val state = MutableStateFlow(CompositionChainDeviceState())
     override val helpRef = "Composition"
 
@@ -54,6 +57,19 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>() {
     init {
         renderAnimation()
     }
+
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        val options = state.value.playbackOptions
+        if (options.repeat) return TimelineDuration.Unbounded
+        val duration = options.timing.toMsValue(context.bpm.toDouble()) * options.gate.coerceIn(0.05f, 4f)
+        return TimelineDuration.Finite(duration.toLong().coerceAtLeast(0L))
+    }
+
+    override fun startTimelineTrigger() {
+        startPlayback(origin = this, repeat = state.value.playbackOptions.repeat)
+    }
+
+    override fun stopTimelineTrigger() = pause()
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
         if (workspacePreviewActive) return

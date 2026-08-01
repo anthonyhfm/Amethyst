@@ -484,6 +484,7 @@ object WorkspaceRepository {
                 )
             )
         }
+        TimelineRepository.refreshChainEffectDurations()
     }
 
     fun removeVirtualDevice(uuid: String) {
@@ -778,6 +779,7 @@ object WorkspaceRepository {
 
     private fun buildWorkspaceData(): SavableWorkspaceData {
         canonicalizeSampleSources(samplingChain)
+        TimelineRepository.flushChainEffectRuntimeState()
         return SavableWorkspaceData(
             path = workspaceMeta?.path,
             title = workspaceMeta?.title ?: "Untitled",

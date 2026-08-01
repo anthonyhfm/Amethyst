@@ -10,4 +10,10 @@ object ExperimentalSettings : SettingsGroup("Experimental Features", Res.string.
         titleRes = Res.string.settings_experimental_live_collab_title,
         default = false,
     )
+
+    val timelineChainEffects: Setting.Toggle = toggle(
+        key = "timelineChainEffects",
+        title = "Timeline Chain Clips",
+        default = false,
+    )
 }

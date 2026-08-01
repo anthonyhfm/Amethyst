@@ -52,7 +52,9 @@ interface Selectable {
     data class TimelineEntryItem(
         val trackIndex: Int,
         val entryStartMs: Long,
-        override val selectionUUID: String = UUID.randomUUID()
+        /** Stable identity for Chain Effect clips; null for audio and regular MIDI clips. */
+        val clipId: String? = null,
+        override val selectionUUID: String = clipId?.let { "timeline-chain-effect:$it" } ?: UUID.randomUUID()
     ) : Selectable
 
     data class PianoRollNote(

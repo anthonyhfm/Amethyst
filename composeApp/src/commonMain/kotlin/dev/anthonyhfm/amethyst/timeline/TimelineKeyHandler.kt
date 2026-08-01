@@ -21,6 +21,9 @@ import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 object TimelineKeyHandler {
+    internal var closeChainEffectPanel: (() -> Boolean)? = null
+    internal var deleteChainEffectClip: ((Int, String) -> Unit)? = null
+    internal var duplicateChainEffectClip: ((Int, String) -> Unit)? = null
     fun canCopySelection(
         selections: List<Selectable> = SelectionManager.selections.value
     ): Boolean {
@@ -80,6 +83,8 @@ object TimelineKeyHandler {
         if (WorkspaceRepository.isInputFocused) return false
 
         return when {
+            keyEvent.key == Key.Escape && keyEvent.hasNoShortcutModifier() ->
+                closeChainEffectPanel?.invoke() == true
             keyEvent.key == Key.Spacebar && keyEvent.hasNoShortcutModifier() -> handleTogglePlayPause()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.R -> renameSelection()
             keyEvent.key == Key.A && keyEvent.isAltPressed -> handleAutomappingTrigger()
@@ -218,14 +223,21 @@ object TimelineKeyHandler {
         val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
         if (entrySelections.isNotEmpty()) {
             ClipboardManager.copy(entrySelections)
-            TimelineCommandExecutor.execute(
-                entrySelections.groupBy { it.trackIndex }.map { (trackIndex, selections) ->
+            val chainSelections = entrySelections.filter { it.clipId != null }
+            chainSelections.forEach { selection ->
+                deleteChainEffectClip?.invoke(selection.trackIndex, selection.clipId!!)
+            }
+            val regularSelections = entrySelections.filter { it.clipId == null }
+            if (regularSelections.isNotEmpty()) {
+                TimelineCommandExecutor.execute(
+                    regularSelections.groupBy { it.trackIndex }.map { (trackIndex, selections) ->
                     TimelineEditCommand.DeleteEntries(
                         trackIndex = trackIndex,
                         entryStartTimes = selections.map { it.entryStartMs }
                     )
-                }
-            )
+                    }
+                )
+            }
             SelectionManager.clear()
             return true
         }
@@ -288,14 +300,21 @@ object TimelineKeyHandler {
 
         val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
         if (entrySelections.isNotEmpty()) {
-            TimelineCommandExecutor.execute(
-                entrySelections.groupBy { it.trackIndex }.map { (trackIndex, selections) ->
+            val chainSelections = entrySelections.filter { it.clipId != null }
+            chainSelections.forEach { selection ->
+                deleteChainEffectClip?.invoke(selection.trackIndex, selection.clipId!!)
+            }
+            val regularSelections = entrySelections.filter { it.clipId == null }
+            if (regularSelections.isNotEmpty()) {
+                TimelineCommandExecutor.execute(
+                    regularSelections.groupBy { it.trackIndex }.map { (trackIndex, selections) ->
                     TimelineEditCommand.DeleteEntries(
                         trackIndex = trackIndex,
                         entryStartTimes = selections.map { it.entryStartMs }
                     )
-                }
-            )
+                    }
+                )
+            }
             SelectionManager.clear()
             return true
         }
@@ -337,15 +356,22 @@ object TimelineKeyHandler {
 
         val entrySelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
         if (entrySelections.isNotEmpty()) {
-            val result = TimelineCommandExecutor.execute(
-                entrySelections.groupBy { it.trackIndex }.map { (trackIndex, selections) ->
-                    TimelineEditCommand.DuplicateEntries(
-                        trackIndex = trackIndex,
-                        entryStartTimes = selections.map { it.entryStartMs }
-                    )
-                }
-            )
-            selectCreatedEntries(result.createdEntries)
+            val chainSelections = entrySelections.filter { it.clipId != null }
+            chainSelections.forEach { selection ->
+                duplicateChainEffectClip?.invoke(selection.trackIndex, selection.clipId!!)
+            }
+            val regularSelections = entrySelections.filter { it.clipId == null }
+            if (regularSelections.isNotEmpty()) {
+                val result = TimelineCommandExecutor.execute(
+                    regularSelections.groupBy { it.trackIndex }.map { (trackIndex, selections) ->
+                        TimelineEditCommand.DuplicateEntries(
+                            trackIndex = trackIndex,
+                            entryStartTimes = selections.map { it.entryStartMs }
+                        )
+                    }
+                )
+                selectCreatedEntries(result.createdEntries)
+            }
             return true
         }
 

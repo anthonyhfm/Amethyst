@@ -32,11 +32,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
+import dev.anthonyhfm.amethyst.devices.parallelDuration
+import dev.anthonyhfm.amethyst.devices.timelineDuration
 
 
 class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChainDevice {
     override val state = MutableStateFlow(GroupChainDeviceState())
     override val helpRef = "Group"
+
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration =
+        state.value.groups
+            .map { it.chain.timelineDuration(context) }
+            .parallelDuration()
 
     private val actionLayer = GroupEditorActionLayer(
         device = this,

@@ -36,8 +36,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 
 class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>() {
+    override fun timelineDuration(context: TimelineDurationContext) =
+        TimelineDuration.None
     override val state = MutableStateFlow(MacroControlChainDeviceState())
     override val helpRef = "MacroControl"
 
@@ -168,7 +172,7 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
             }
 
             if (down) {
-                Heaven.schedule(1.0) {
+                Heaven.schedule(1.0, owner = this) {
                     WorkspaceRepository.setMacroValue(
                         index = state.value.macro,
                         macro = WorkspaceRepository.macros.value[state.value.macro].copy(

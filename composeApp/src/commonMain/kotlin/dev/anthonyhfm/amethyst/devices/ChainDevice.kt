@@ -69,6 +69,9 @@ class AudioRenderContext(
 abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalReceiver(), Selectable {
     override var selectionUUID: String = UUID.randomUUID()
 
+    /** False for devices owned by a private timeline clip. */
+    var collaborationSyncEnabled: Boolean = true
+
     abstract val state: MutableStateFlow<State>
 
     open val helpRef: String? = null
@@ -128,6 +131,9 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     @Composable
     abstract fun Content()
+
+    /** Returns the time this device adds to a timeline-owned chain execution. */
+    abstract fun timelineDuration(context: TimelineDurationContext): TimelineDuration
 
     abstract override fun signalEnter(n: List<Signal>)
 
@@ -229,7 +235,9 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
                 )
             )
 
-            ChainSyncCoordinator.onDeviceStateChanged(this, after)
+            if (collaborationSyncEnabled) {
+                ChainSyncCoordinator.onDeviceStateChanged(this, after)
+            }
         }
     }
 }
@@ -279,6 +287,10 @@ abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericCha
 
     open fun resetAudio() = Unit
     open fun releaseAudio() = Unit
+
+    /** Audio devices are intentionally outside Chain Effect duration calculation. */
+    final override fun timelineDuration(context: TimelineDurationContext): TimelineDuration =
+        TimelineDuration.None
 
     override fun signalEnter(n: List<Signal>) {
         if (n.isNotEmpty()) {

@@ -36,7 +36,7 @@ internal fun isPointInsideAnyEntry(track: TimelineTrack<*>, timeMs: Long): Boole
         val timeUs = msToUs(timeMs)
         track.entries.values.any { timeUs in it.startTimeUs..it.endTimeUs }
     }
-    is MidiTimelineTrack -> track.entries.values.any { timeMs in it.startTimeMs..it.endTimeMs }
+    is MidiTimelineTrack -> track.allOneDimensionalEntries().any { timeMs >= it.startTimeMs && timeMs < it.endTimeMs }
     else -> false
 }
 
@@ -100,6 +100,8 @@ internal fun findHeaderEntryHit(
             x.toDouble() in left..right
         }?.startTimeMs
 
+        // Chain Effect clips perform their own stable-id hit testing; this legacy
+        // helper intentionally resolves only regular MIDI entries by start key.
         is MidiTimelineTrack -> track.entries.values.firstOrNull { entry ->
             val left = entry.startTimeMs.toDouble() * zoom.toDouble()
             val right = left + entry.durationMs.toDouble() * zoom.toDouble()

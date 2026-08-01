@@ -34,17 +34,34 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
+import dev.anthonyhfm.amethyst.devices.TimelineTriggerable
 
 private const val MAX_PITCH_PER_DEVICE = 100
 private const val DEFAULT_DURATION_MS = 4000L
 private const val NO_TRACK_INDEX = -1
 
-class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>() {
+class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), TimelineTriggerable {
     override val state = MutableStateFlow(PianoRollChainDeviceState())
     override val helpRef = "PianoRoll"
 
     private val customMode: PianoRollWorkspaceMode = PianoRollWorkspaceMode()
     private var isStandalonePlaying = false
+
+    override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        val entry = state.value.midiEntry
+        return TimelineDuration.Finite(
+            maxOf(entry.durationMs, entry.notes.maxOfOrNull { it.endTimeMs } ?: 0L)
+        )
+    }
+
+    override fun startTimelineTrigger() = playStandaloneEntry()
+
+    override fun stopTimelineTrigger() {
+        Heaven.cancelJobsForOwner(this)
+        isStandalonePlaying = false
+    }
 
     init {
         customMode.onNoteAdd = { note ->
