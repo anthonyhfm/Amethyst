@@ -92,6 +92,45 @@ open class Chain : SignalReceiver() {
         reroute()
     }
 
+    open fun addAll(devicesToAdd: List<GenericChainDevice<*>>, atIndex: Int? = null, fromUser: Boolean = true) {
+        if (devicesToAdd.isEmpty()) return
+        if (devicesToAdd.size == 1) {
+            add(devicesToAdd.first(), atIndex = atIndex, fromUser = fromUser)
+            return
+        }
+
+        val current = devices.value.toMutableList()
+        val baseIndex = atIndex?.coerceIn(0, current.size) ?: current.size
+
+        val creations = mutableListOf<UndoableAction.ChainDeviceCreation>()
+        devicesToAdd.forEachIndexed { offset, device ->
+            val insertIndex = baseIndex + offset
+            current.add(insertIndex, device)
+            device.collaborationSyncEnabled = collaborationSyncEnabled
+            device.onAddedToChain(parentChain = this)
+            creations.add(
+                UndoableAction.ChainDeviceCreation(
+                    parent = this@Chain,
+                    device = device,
+                    creationIndex = insertIndex
+                )
+            )
+        }
+
+        replaceDevices(current)
+
+        if (fromUser) {
+            UndoManager.addAction(UndoableAction.MultiChainDeviceCreation(creations))
+
+            if (collaborationSyncEnabled) {
+                creations.forEach { creation ->
+                    ChainSyncCoordinator.onDevicePlaced(this, creation.device, creation.creationIndex)
+                }
+            }
+        }
+        reroute()
+    }
+
     fun remove(index: Int, fromUser: Boolean = true) {
         if (index >= 0 && index < devices.value.size) {
             val deviceToRemove = devices.value[index]

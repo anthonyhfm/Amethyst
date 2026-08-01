@@ -50,14 +50,41 @@ fun handleDuplicateShortcut(): Boolean {
     }
 
     // ChainDevice: duplicate selected devices
-    SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>().map { selection ->
-        val index = selection.parent.devices.value.indexOfFirst { it.selectionUUID == selection.selectionUUID }
+    val selectedChainDevices = selections.filterIsInstance<Selectable.ChainDevice>()
+    if (selectedChainDevices.isNotEmpty()) {
+        selectedChainDevices.groupBy { it.parent }.forEach { (parentChain, deviceSelections) ->
+            val sortedSelections = deviceSelections.map { sel ->
+                val index = parentChain.devices.value.indexOfFirst { it.selectionUUID == sel.device.selectionUUID }
+                index to sel.device
+            }.filter { it.first >= 0 }.sortedBy { it.first }
 
-        selection.parent.add(StateChain.unpackDevice(StateChain.packDevice(selection.device)), index)
+            if (sortedSelections.isEmpty()) return@forEach
 
-        return@map selection
-    }.apply {
-        if (isNotEmpty()) return true
+            if (sortedSelections.size == 1) {
+                val (index, device) = sortedSelections.first()
+                val duplicate = StateChain.unpackDevice(StateChain.packDevice(device))
+                parentChain.add(duplicate, index + 1)
+                SelectionManager.clear()
+                SelectionManager.select(
+                    Selectable.ChainDevice(parent = parentChain, device = duplicate),
+                    single = true
+                )
+            } else {
+                val duplicates = sortedSelections.map { (_, device) ->
+                    StateChain.unpackDevice(StateChain.packDevice(device))
+                }
+                val maxIndex = sortedSelections.maxOf { it.first }
+                parentChain.addAll(duplicates, atIndex = maxIndex + 1)
+                SelectionManager.clear()
+                duplicates.forEach { dup ->
+                    SelectionManager.select(
+                        Selectable.ChainDevice(parent = parentChain, device = dup),
+                        single = false
+                    )
+                }
+            }
+        }
+        return true
     }
 
     return false

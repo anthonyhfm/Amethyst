@@ -92,6 +92,19 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
+                is UndoableAction.MultiChainDeviceCreation -> {
+                    // Remove all created devices in descending index order to avoid shifting issues
+                    action.creations.sortedByDescending { it.creationIndex }.forEach { creation ->
+                        val deviceIndex = creation.parent.devices.value.indexOfFirst {
+                            it.selectionUUID == creation.device.selectionUUID
+                        }
+                        if (deviceIndex != -1) {
+                            creation.parent.remove(deviceIndex, fromUser = false)
+                        }
+                    }
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.ChainDeviceRemoval -> {
                     val safeIndex = action.originalIndex.coerceIn(0, action.parent.devices.value.size)
                     action.parent.add(action.device, atIndex = safeIndex, fromUser = false)
@@ -630,6 +643,14 @@ object UndoManager {
 
                 is UndoableAction.ChainDeviceCreation -> {
                     action.parent.add(action.device, atIndex = action.creationIndex, fromUser = false)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.MultiChainDeviceCreation -> {
+                    // Re-insert all created devices in ascending creationIndex order
+                    action.creations.sortedBy { it.creationIndex }.forEach { creation ->
+                        creation.parent.add(creation.device, atIndex = creation.creationIndex, fromUser = false)
+                    }
                     undoStack.add(action)
                 }
 

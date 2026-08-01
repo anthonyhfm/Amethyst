@@ -138,15 +138,10 @@ fun ChainDeviceContextMenu(
                 icon = Lucide.ClipboardPaste,
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
-
-                    (currentClipboard as ClipboardData.ChainDevice).states.map {
+                    val newDevices = (currentClipboard as ClipboardData.ChainDevice).states.map {
                         StateChain.unpackDevice(it)
-                    }.fastForEachReversed {
-                        chain.add(
-                            device = it,
-                            atIndex = index + 1
-                        )
                     }
+                    chain.addAll(newDevices, atIndex = index + 1)
                     onDismiss()
                 }
             )
@@ -156,17 +151,11 @@ fun ChainDeviceContextMenu(
                 icon = Lucide.Replace,
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
-
                     chain.remove(device.selectionUUID)
-
-                    (currentClipboard as ClipboardData.ChainDevice).states.map {
+                    val newDevices = (currentClipboard as ClipboardData.ChainDevice).states.map {
                         StateChain.unpackDevice(it)
-                    }.fastForEachReversed {
-                        chain.add(
-                            device = it,
-                            atIndex = index
-                        )
                     }
+                    chain.addAll(newDevices, atIndex = index)
                     onDismiss()
                 }
             )
@@ -178,15 +167,10 @@ fun ChainDeviceContextMenu(
                 icon = Lucide.ClipboardPaste,
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
-                    val entries = (currentClipboard as ClipboardData.TimelineChainEffects).entries
-                    var offset = 1
-                    entries.forEach { entry ->
-                        val devices = extractDevicesFromChainEffectEntry(entry)
-                        devices.forEach { dev ->
-                            chain.add(device = dev, atIndex = index + offset)
-                            offset++
-                        }
+                    val devicesToPaste = (currentClipboard as ClipboardData.TimelineChainEffects).entries.flatMap {
+                        extractDevicesFromChainEffectEntry(it)
                     }
+                    chain.addAll(devicesToPaste, atIndex = index + 1)
                     onDismiss()
                 }
             )
@@ -197,15 +181,10 @@ fun ChainDeviceContextMenu(
                 onClick = {
                     val index = chain.devices.value.indexOfFirst { it.selectionUUID == device.selectionUUID }
                     chain.remove(device.selectionUUID)
-                    val entries = (currentClipboard as ClipboardData.TimelineChainEffects).entries
-                    var offset = 0
-                    entries.forEach { entry ->
-                        val devices = extractDevicesFromChainEffectEntry(entry)
-                        devices.forEach { dev ->
-                            chain.add(device = dev, atIndex = index + offset)
-                            offset++
-                        }
+                    val devicesToPaste = (currentClipboard as ClipboardData.TimelineChainEffects).entries.flatMap {
+                        extractDevicesFromChainEffectEntry(it)
                     }
+                    chain.addAll(devicesToPaste, atIndex = index)
                     onDismiss()
                 }
             )

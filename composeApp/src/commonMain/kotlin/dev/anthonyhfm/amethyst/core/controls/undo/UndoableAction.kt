@@ -21,6 +21,10 @@ sealed interface UndoableAction {
         val creationIndex: Int,
     ) : UndoableAction
 
+    data class MultiChainDeviceCreation(
+        val creations: List<ChainDeviceCreation>
+    ) : UndoableAction
+
     data class ChainDeviceRemoval(
         val parent: Chain,
         val device: GenericChainDevice<*>,

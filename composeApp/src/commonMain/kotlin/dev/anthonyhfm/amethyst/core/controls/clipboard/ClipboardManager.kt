@@ -328,20 +328,24 @@ object ClipboardManager {
 
                     val selectedChainDevices = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>()
                     val parentChain = selectedChainDevices.firstOrNull()?.parent
-                    if (parentChain != null) {
+                    val targetChain = parentChain ?: if (mode is LightsChainWorkspaceMode) WorkspaceRepository.lightsChain else WorkspaceRepository.samplingChain
+
+                    val baseIndex = if (parentChain != null) {
                         val indices = selectedChainDevices.filter { it.parent == parentChain }.map { sel ->
                             parentChain.devices.value.indexOfFirst { it.selectionUUID == sel.device.selectionUUID }
                         }.filter { it >= 0 }
-                        val baseIndex = (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
-                        allExtractedDevices.forEachIndexed { offset, device ->
-                            parentChain.add(device = device, atIndex = baseIndex + offset)
-                        }
+                        (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
                     } else {
-                        val targetChain = if (mode is LightsChainWorkspaceMode) WorkspaceRepository.lightsChain else WorkspaceRepository.samplingChain
-                        val baseIndex = targetChain.devices.value.size
-                        allExtractedDevices.forEachIndexed { offset, device ->
-                            targetChain.add(device = device, atIndex = baseIndex + offset)
-                        }
+                        targetChain.devices.value.size
+                    }
+
+                    targetChain.addAll(allExtractedDevices, atIndex = baseIndex)
+                    SelectionManager.clear()
+                    allExtractedDevices.forEach { device ->
+                        SelectionManager.select(
+                            Selectable.ChainDevice(parent = targetChain, device = device),
+                            single = false
+                        )
                     }
                     return
                 }
@@ -379,45 +383,34 @@ object ClipboardManager {
                 val selectedChainDevices = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>()
                 val parentChain = selectedChainDevices.firstOrNull()?.parent
 
-                if (parentChain != null) {
+                val modeIsLights = WorkspaceRepository.mode.value is LightsChainWorkspaceMode
+                val modeIsSampling = WorkspaceRepository.mode.value is SamplingChainWorkspaceMode
+                if ((modeIsLights && clipData.type != ClipboardData.ChainDevice.ChainType.Lights) ||
+                    (modeIsSampling && clipData.type != ClipboardData.ChainDevice.ChainType.Sampling)) {
+                    return
+                }
+
+                val targetChain = parentChain
+                    ?: if (modeIsLights) WorkspaceRepository.lightsChain else WorkspaceRepository.samplingChain
+
+                val baseIndex = if (parentChain != null) {
                     val indices = selectedChainDevices.filter { it.parent == parentChain }.map { sel ->
                         sel.parent.devices.value.indexOfFirst { it.selectionUUID == sel.device.selectionUUID }
                     }.filter { it >= 0 }
-                    val baseIndex = (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
-
-                    val modeIsLights = WorkspaceRepository.mode.value is LightsChainWorkspaceMode
-                    val modeIsSampling = WorkspaceRepository.mode.value is SamplingChainWorkspaceMode
-                    if ((modeIsLights && clipData.type != ClipboardData.ChainDevice.ChainType.Lights) ||
-                        (modeIsSampling && clipData.type != ClipboardData.ChainDevice.ChainType.Sampling)) {
-                        return
-                    }
-
-                    clipData.states.forEachIndexed { offset, state ->
-                        parentChain.add(
-                            device = StateChain.unpackDevice(state),
-                            atIndex = baseIndex + offset
-                        )
-                    }
+                    (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
                 } else {
-                    if (WorkspaceRepository.mode.value is LightsChainWorkspaceMode) {
-                        if (clipData.type != ClipboardData.ChainDevice.ChainType.Lights) return
-                        val baseIndex = WorkspaceRepository.lightsChain.devices.value.size
-                        clipData.states.forEachIndexed { offset, state ->
-                            WorkspaceRepository.lightsChain.add(
-                                device = StateChain.unpackDevice(state),
-                                atIndex = baseIndex + offset
-                            )
-                        }
-                    } else if (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
-                        if (clipData.type != ClipboardData.ChainDevice.ChainType.Sampling) return
-                        val baseIndex = WorkspaceRepository.samplingChain.devices.value.size
-                        clipData.states.forEachIndexed { offset, state ->
-                            WorkspaceRepository.samplingChain.add(
-                                device = StateChain.unpackDevice(state),
-                                atIndex = baseIndex + offset
-                            )
-                        }
-                    }
+                    targetChain.devices.value.size
+                }
+
+                val newDevices = clipData.states.map { StateChain.unpackDevice(it) }
+                targetChain.addAll(newDevices, atIndex = baseIndex)
+
+                SelectionManager.clear()
+                newDevices.forEach { device ->
+                    SelectionManager.select(
+                        Selectable.ChainDevice(parent = targetChain, device = device),
+                        single = false
+                    )
                 }
             }
 
@@ -527,29 +520,26 @@ object ClipboardManager {
         val selectedChainDevices = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>()
         val parentChain = selectedChainDevices.firstOrNull()?.parent
 
-        if (parentChain != null) {
+        val targetChain = parentChain ?: WorkspaceRepository.samplingChain
+        val baseIndex = if (parentChain != null) {
             val indices = selectedChainDevices
                 .filter { it.parent == parentChain }
                 .map { selection ->
                     parentChain.devices.value.indexOfFirst { it.selectionUUID == selection.device.selectionUUID }
                 }
                 .filter { it >= 0 }
-            val baseIndex = (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
-
-            devices.forEachIndexed { offset, device ->
-                parentChain.add(
-                    device = device,
-                    atIndex = baseIndex + offset
-                )
-            }
-            return
+            (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
+        } else {
+            WorkspaceRepository.samplingChain.devices.value.size
         }
 
-        val baseIndex = WorkspaceRepository.samplingChain.devices.value.size
-        devices.forEachIndexed { offset, device ->
-            WorkspaceRepository.samplingChain.add(
-                device = device,
-                atIndex = baseIndex + offset
+        targetChain.addAll(devices, atIndex = baseIndex)
+
+        SelectionManager.clear()
+        devices.forEach { device ->
+            SelectionManager.select(
+                Selectable.ChainDevice(parent = targetChain, device = device),
+                single = false
             )
         }
     }
