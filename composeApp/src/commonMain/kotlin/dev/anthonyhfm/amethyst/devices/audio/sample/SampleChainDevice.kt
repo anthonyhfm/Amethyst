@@ -43,6 +43,7 @@ import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
 import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
@@ -103,7 +104,7 @@ private data class SampleRenderCache(
     val snapshot: SampleRenderSnapshot?,
 )
 
-class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
+class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable {
     override val state = MutableStateFlow(SampleChainDeviceState())
     override val helpRef = "Sample"
     override val title: String
@@ -332,6 +333,10 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>() {
         triggerQueue.clear()
         voicePool.stop()
         publishedPlayheadFrame.value = -1L
+    }
+
+    override fun onChoke() {
+        resetAudio()
     }
 
     override fun releaseAudio() {

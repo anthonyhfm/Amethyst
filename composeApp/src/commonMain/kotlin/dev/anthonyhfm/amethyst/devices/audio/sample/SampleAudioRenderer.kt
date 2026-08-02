@@ -409,21 +409,24 @@ internal class SampleVoicePool(
     }
 
     fun trigger(snapshot: SampleRenderSnapshot) {
-        var selectedIndex = -1
-        var offset = 0
-        while (offset < voices.size) {
-            val index = (nextVoiceIndex + offset) % voices.size
-            if (!voices[index].isActive) {
-                selectedIndex = index
-                break
+        var targetIndex = -1
+        for (i in voices.indices) {
+            if (voices[i].isActive) {
+                if (targetIndex < 0) {
+                    targetIndex = i
+                } else {
+                    voices[i].stop()
+                }
             }
-            offset++
         }
-        if (selectedIndex < 0) selectedIndex = nextVoiceIndex
 
-        voices[selectedIndex].trigger(snapshot)
-        latestVoiceIndex = selectedIndex
-        nextVoiceIndex = (selectedIndex + 1) % voices.size
+        if (targetIndex < 0) {
+            targetIndex = nextVoiceIndex
+        }
+
+        voices[targetIndex].trigger(snapshot)
+        latestVoiceIndex = targetIndex
+        nextVoiceIndex = (targetIndex + 1) % voices.size
     }
 
     fun render(block: AudioProcessingBlock) {
