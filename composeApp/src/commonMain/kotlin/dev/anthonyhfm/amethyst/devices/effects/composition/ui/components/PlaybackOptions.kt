@@ -16,7 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Pause
@@ -25,19 +30,30 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key as KeyboardKey
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.Text
@@ -47,6 +63,9 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevic
 import dev.anthonyhfm.amethyst.ui.components.primitives.Slider
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.Tooltip
+import dev.anthonyhfm.amethyst.ui.modifier.clickableWithDoubleTap
+import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.chainBorder
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.chainSurface
@@ -136,6 +155,28 @@ private fun TimingControl(
     LabeledStepControl(
         label = "Length",
         value = timing.displayText(),
+        onToggleMode = {
+            val current = timingState.value
+            val next = when (current) {
+                is Timing.Rythm -> Timing.Duration(250L.milliseconds)
+                is Timing.Duration -> Timing.Rythm(Timing.Rythm.RythmTiming._1_4)
+            }
+            onTimingChange(next)
+        },
+        onValueEdit = if (timingState.value is Timing.Duration) {
+            { text ->
+                val current = timingState.value
+                if (current is Timing.Duration) {
+                    val parsed = text.toLongOrNull()
+                    if (parsed != null) {
+                        val clamped = parsed.coerceIn(25L, 10_000L)
+                        onTimingChange(Timing.Duration(clamped.milliseconds))
+                    }
+                }
+            }
+        } else {
+            null
+        },
         onDecrease = {
             val current = timingState.value
             val next = when (current) {
@@ -229,6 +270,8 @@ private fun LabeledStepControl(
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     onDragSteps: (Int) -> Unit,
+    onToggleMode: (() -> Unit)? = null,
+    onValueEdit: ((String) -> Unit)? = null,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -246,6 +289,8 @@ private fun LabeledStepControl(
             onDecrease = onDecrease,
             onIncrease = onIncrease,
             onDragSteps = onDragSteps,
+            onToggleMode = onToggleMode,
+            onValueEdit = onValueEdit,
         )
     }
 }
@@ -258,44 +303,120 @@ private fun CompactStepControl(
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     onDragSteps: (Int) -> Unit,
+    onToggleMode: (() -> Unit)? = null,
+    onValueEdit: ((String) -> Unit)? = null,
 ) {
+    var isEditing by remember { mutableStateOf(false) }
+    val textValueState = remember { mutableStateOf(TextFieldValue(value)) }
+    var textValue by textValueState
+    val focusRequester = remember { FocusRequester() }
+
     Row(
         modifier = Modifier
             .height(32.dp)
-            .width(84.dp)
+            .widthIn(min = 84.dp)
             .clip(DefaultShape)
             .background(Theme[colors][secondary])
-            .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape),
+            .border(1.dp, Theme[chainColorTokens][chainBorder], DefaultShape)
+            .rightClickable { onToggleMode?.invoke() },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StepIconButton(Icons.Default.Remove, decreaseDescription, onDecrease)
         Box(
             modifier = Modifier
-                .width(36.dp)
-                .pointerInput(Unit) {
-                var accumulated = 0f
-                detectDragGestures(
-                    onDragStart = { accumulated = 0f },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        accumulated += -dragAmount.y / 8f
-                        val steps = accumulated.toInt()
-                        if (steps != 0) {
-                            onDragSteps(steps)
-                            accumulated -= steps
-                        }
-                    },
-                )
-            },
+                .wrapContentWidth()
+                .padding(horizontal = 4.dp)
+                .let { boxModifier ->
+                    if (isEditing) {
+                        boxModifier
+                    } else {
+                        boxModifier
+                            .pointerInput(Unit) {
+                                var accumulated = 0f
+                                detectDragGestures(
+                                    onDragStart = { accumulated = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        accumulated += -dragAmount.y / 8f
+                                        val steps = accumulated.toInt()
+                                        if (steps != 0) {
+                                            onDragSteps(steps)
+                                            accumulated -= steps
+                                        }
+                                    },
+                                )
+                            }
+                            .clickableWithDoubleTap(
+                                onSingleClick = {},
+                                onDoubleClick = {
+                                    if (onValueEdit != null) {
+                                        val editText = value.removeSuffix(" ms")
+                                        textValue = TextFieldValue(
+                                            text = editText,
+                                            selection = TextRange(0, editText.length),
+                                        )
+                                        isEditing = true
+                                    }
+                                },
+                            )
+                    }
+                },
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = value,
-                style = Theme[typography][small],
-                color = Theme[colors][foreground],
-            )
+            if (isEditing && onValueEdit != null) {
+                val customTextSelectionColors = TextSelectionColors(
+                    handleColor = Theme[colors][foreground],
+                    backgroundColor = Theme[colors][foreground].copy(alpha = 0.35f),
+                )
+
+                CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
+                    BasicTextField(
+                        value = textValue,
+                        onValueChange = { textValue = it },
+                        singleLine = true,
+                        modifier = Modifier
+                            .width(52.dp)
+                            .focusRequester(focusRequester)
+                            .onFocusSelectAll(textValueState)
+                            .onKeyEvent { ev ->
+                                if (ev.key == KeyboardKey.Enter) {
+                                    onValueEdit(textValue.text)
+                                    isEditing = false
+                                    return@onKeyEvent true
+                                }
+
+                                if (ev.key == KeyboardKey.Escape) {
+                                    isEditing = false
+                                    return@onKeyEvent true
+                                }
+
+                                false
+                            },
+                        textStyle = Theme[typography][small].copy(
+                            color = Theme[colors][foreground],
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        ),
+                        cursorBrush = SolidColor(Theme[colors][foreground]),
+                    )
+                }
+
+                LaunchedFocus(focusRequester)
+            } else {
+                Text(
+                    text = value,
+                    style = Theme[typography][small],
+                    color = Theme[colors][foreground],
+                )
+            }
         }
         StepIconButton(Icons.Default.Add, increaseDescription, onIncrease)
+    }
+}
+
+@Composable
+private fun LaunchedFocus(focusRequester: FocusRequester) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
     }
 }
 
