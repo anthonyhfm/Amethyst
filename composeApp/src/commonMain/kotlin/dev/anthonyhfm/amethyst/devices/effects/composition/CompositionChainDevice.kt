@@ -201,7 +201,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
             frames = if (effectiveLivePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
             repeat = repeat,
             livePreview = effectiveLivePreview,
-            triggerOrigin = if (effectiveLivePreview) (triggerOrigin ?: WORKSPACE_CENTER_ORIGIN) else null,
+            triggerOrigin = if (effectiveLivePreview) triggerOrigin else null,
         )
         playing.value = true
         schedulePlaybackFrame(playbackRun!!.firstFrameAtOrAfter(progress.coerceIn(0f, 1f)))
@@ -290,7 +290,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
                 graph = state.value.graph,
                 progress = progress,
                 outputOrigin = origin,
-                triggerOrigin = triggerOrigin ?: WORKSPACE_CENTER_ORIGIN,
+                triggerOrigin = triggerOrigin,
             )
         )
     }
@@ -475,7 +475,6 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         private const val PLAYBACK_IDENTIFIER = "composition-playback"
         private const val FRAME_INTERVAL_MS = 16.0
         private const val RENDER_FPS = 120
-        private val WORKSPACE_CENTER_ORIGIN = Vec2(0.5f, 0.5f)
         const val MIN_SPLIT_RATIO = 0.25f
         const val MAX_SPLIT_RATIO = 0.75f
 
