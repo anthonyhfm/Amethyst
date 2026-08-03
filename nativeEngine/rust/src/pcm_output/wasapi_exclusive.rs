@@ -6,11 +6,11 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
 use windows::Win32::Media::Audio::{
     AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, IAudioClient,
-    IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVE_FORMAT_PCM,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eConsole, eRender,
+    IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
+    WAVEFORMATEXTENSIBLE, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE};
-use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
+use windows::Win32::Media::Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 use windows::Win32::System::Com::{
     CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
     CoUninitialize,
@@ -128,9 +128,84 @@ impl Drop for WasapiState {
     }
 }
 
+#[derive(Clone, Copy)]
 enum HardwareFormat {
     Float32,
     Int16,
+}
+
+impl HardwareFormat {
+    fn bits_per_sample(self) -> u16 {
+        match self {
+            HardwareFormat::Float32 => 32,
+            HardwareFormat::Int16 => 16,
+        }
+    }
+
+    fn is_float(self) -> bool {
+        matches!(self, HardwareFormat::Float32)
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            HardwareFormat::Float32 => "F32",
+            HardwareFormat::Int16 => "I16",
+        }
+    }
+}
+
+/// Number of channels WASAPI exclusive mode is negotiated for (stereo only).
+const EXCLUSIVE_CHANNELS: u16 = 2;
+/// Stereo channel mask (front-left | front-right), matching `EXCLUSIVE_CHANNELS`.
+const STEREO_CHANNEL_MASK: u32 = 0x3;
+
+/// Builds a `WAVEFORMATEXTENSIBLE` candidate for the given sample rate and
+/// hardware format, deriving the dependent block-alignment fields.
+fn build_waveformatextensible(sample_rate: u32, format: HardwareFormat) -> Box<WAVEFORMATEXTENSIBLE> {
+    let bits_per_sample = format.bits_per_sample();
+    let channels = EXCLUSIVE_CHANNELS;
+    let block_align = channels * (bits_per_sample / 8);
+    let mut wave_format = WAVEFORMATEXTENSIBLE::default();
+    wave_format.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
+    wave_format.Format.nChannels = channels;
+    wave_format.Format.nSamplesPerSec = sample_rate;
+    wave_format.Format.nAvgBytesPerSec = sample_rate * block_align as u32;
+    wave_format.Format.nBlockAlign = block_align;
+    wave_format.Format.wBitsPerSample = bits_per_sample;
+    wave_format.Format.cbSize =
+        (std::mem::size_of::<WAVEFORMATEXTENSIBLE>() - std::mem::size_of::<WAVEFORMATEX>()) as u16;
+    wave_format.Samples.wValidBitsPerSample = bits_per_sample;
+    wave_format.dwChannelMask = STEREO_CHANNEL_MASK;
+    wave_format.SubFormat = if format.is_float() {
+        KSDATAFORMAT_SUBTYPE_IEEE_FLOAT
+    } else {
+        KSDATAFORMAT_SUBTYPE_PCM
+    };
+    Box::new(wave_format)
+}
+
+/// Builds an ordered, deduplicated list of candidate exclusive-mode formats
+/// to probe via `IsFormatSupported`: Float32 and PCM16 at the endpoint's mix
+/// sample rate first, then the same formats at common fallback rates.
+fn candidate_formats(mix_sample_rate: u32) -> Vec<(HardwareFormat, u32, Box<WAVEFORMATEXTENSIBLE>)> {
+    let mut sample_rates = vec![mix_sample_rate];
+    for rate in [48_000u32, 44_100u32] {
+        if !sample_rates.contains(&rate) {
+            sample_rates.push(rate);
+        }
+    }
+
+    let mut candidates = Vec::with_capacity(sample_rates.len() * 2);
+    for sample_rate in sample_rates {
+        for format in [HardwareFormat::Float32, HardwareFormat::Int16] {
+            candidates.push((
+                format,
+                sample_rate,
+                build_waveformatextensible(sample_rate, format),
+            ));
+        }
+    }
+    candidates
 }
 
 struct ComApartment;
@@ -169,10 +244,7 @@ fn run(
         channels: state.0.channels as u32,
         period_frames: state.0.buffer_frames,
         ring_capacity_frames: (state.0.buffer_frames as usize * RING_PERIODS) as u32,
-        sample_format: match state.0.format {
-            HardwareFormat::Float32 => "F32".to_owned(),
-            HardwareFormat::Int16 => "I16".to_owned(),
-        },
+        sample_format: state.0.format.label().to_owned(),
         backend: "WASAPI".to_owned(),
         requested_exclusive: true,
         active_exclusive: true,
@@ -295,32 +367,44 @@ fn initialize(
         let client: IAudioClient = device
             .Activate(CLSCTX_ALL, None)
             .map_err(|error| format!("Cannot activate WASAPI audio client: {error}"))?;
-        let format_ptr = client
+        let mix_format_ptr = client
             .GetMixFormat()
             .map_err(|error| format!("Cannot get WASAPI endpoint format: {error}"))?;
-        let format = &*format_ptr;
-        let channels = format.nChannels as usize;
-        let sample_rate = format.nSamplesPerSec;
-        if channels != 2 || sample_rate == 0 {
-            CoTaskMemFree(Some(format_ptr.cast()));
+        let mix_channels = (*mix_format_ptr).nChannels as usize;
+        let mix_sample_rate = (*mix_format_ptr).nSamplesPerSec;
+        CoTaskMemFree(Some(mix_format_ptr.cast()));
+        if mix_channels != 2 || mix_sample_rate == 0 {
             return Err(format!(
-                "WASAPI exclusive requires stereo output; endpoint reports {channels} channels"
+                "WASAPI exclusive requires stereo output; endpoint reports {mix_channels} channels"
             ));
         }
-        let hardware_format = match parse_format(format_ptr) {
-            Ok(value) => value,
-            Err(error) => {
-                CoTaskMemFree(Some(format_ptr.cast()));
-                return Err(error);
+
+        let mut attempts = Vec::new();
+        let mut negotiated = None;
+        for (hardware_format, sample_rate, candidate) in candidate_formats(mix_sample_rate) {
+            let candidate_ptr: *const WAVEFORMATEX = std::ptr::addr_of!(candidate.Format);
+            let supported = client
+                .IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, candidate_ptr, None)
+                .ok();
+            match supported {
+                Ok(()) => {
+                    negotiated = Some((hardware_format, sample_rate, candidate));
+                    break;
+                }
+                Err(error) => {
+                    attempts.push(format!(
+                        "{} @ {sample_rate}Hz: {error}",
+                        hardware_format.label()
+                    ));
+                }
             }
-        };
-        let supported = client.IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, format_ptr, None);
-        if supported.is_err() {
-            CoTaskMemFree(Some(format_ptr.cast()));
-            return Err(format!(
-                "Endpoint mix format is unsupported in WASAPI exclusive mode: {supported:?}"
-            ));
         }
+        let (hardware_format, sample_rate, candidate) = negotiated.ok_or_else(|| {
+            format!(
+                "No WASAPI exclusive format is supported by the endpoint (tried: {})",
+                attempts.join("; ")
+            )
+        })?;
 
         let mut minimum_period_hns = 0i64;
         client
@@ -329,17 +413,18 @@ fn initialize(
         let requested_hns = (preferred_period_frames.max(1) as i64 * HNS_PER_SECOND
             / sample_rate.max(1) as i64)
             .max(minimum_period_hns);
+        let candidate_ptr: *const WAVEFORMATEX = std::ptr::addr_of!(candidate.Format);
         client
             .Initialize(
                 AUDCLNT_SHAREMODE_EXCLUSIVE,
                 AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
                 requested_hns,
                 requested_hns,
-                format_ptr,
+                candidate_ptr,
                 None,
             )
             .map_err(|error| format!("Cannot initialize WASAPI exclusive stream: {error}"))?;
-        CoTaskMemFree(Some(format_ptr.cast()));
+        let channels = EXCLUSIVE_CHANNELS as usize;
 
         let event = CreateEventW(None, false, false, PCWSTR::null())
             .map_err(|error| format!("Cannot create WASAPI render event: {error}"))?;
@@ -388,32 +473,6 @@ fn select_device(
         None => unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }
             .map_err(|error| format!("No default WASAPI output endpoint: {error}")),
     }
-}
-
-fn parse_format(format: *const WAVEFORMATEX) -> Result<HardwareFormat, String> {
-    let value = unsafe { &*format };
-    let tag = value.wFormatTag as u32;
-    let bits = value.wBitsPerSample;
-    if tag == WAVE_FORMAT_IEEE_FLOAT && bits == 32 {
-        return Ok(HardwareFormat::Float32);
-    }
-    if tag == WAVE_FORMAT_PCM && bits == 16 {
-        return Ok(HardwareFormat::Int16);
-    }
-    if tag == WAVE_FORMAT_EXTENSIBLE {
-        let extensible = format.cast::<WAVEFORMATEXTENSIBLE>();
-        let sub_format =
-            unsafe { std::ptr::read_unaligned(std::ptr::addr_of!((*extensible).SubFormat)) };
-        if sub_format == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT && bits == 32 {
-            return Ok(HardwareFormat::Float32);
-        }
-        if sub_format == KSDATAFORMAT_SUBTYPE_PCM && bits == 16 {
-            return Ok(HardwareFormat::Int16);
-        }
-    }
-    Err(format!(
-        "Unsupported WASAPI exclusive hardware format: tag={tag}, bits={bits}"
-    ))
 }
 
 fn render_period(state: &mut WasapiState) -> Result<(), String> {
