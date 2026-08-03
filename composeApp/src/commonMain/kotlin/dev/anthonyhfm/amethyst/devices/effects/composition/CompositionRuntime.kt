@@ -8,9 +8,23 @@ data class EvaluationContext(
     val bounds: Pair<IntOffset, IntSize>,
     val outputOrigin: Any?,
     val progress: Float,
+    val triggerOrigin: Vec2? = null,
 )
 
 data class Vec2(val x: Float, val y: Float)
+
+/** Resolves the effective pixel-space origin for a bindable node, using the live trigger position when bound. */
+fun EvaluationContext.resolveOrigin(originX: Float, originY: Float, boundToOrigin: Boolean): Vec2 {
+    val (ox, oy) = if (boundToOrigin) {
+        triggerOrigin?.let { it.x to it.y } ?: (originX to originY)
+    } else {
+        originX to originY
+    }
+    return Vec2(
+        x = bounds.first.x + ox.coerceIn(0f, 1f) * (bounds.second.width - 1).coerceAtLeast(0),
+        y = bounds.first.y + oy.coerceIn(0f, 1f) * (bounds.second.height - 1).coerceAtLeast(0),
+    )
+}
 
 data class GeometryStroke(
     val points: List<Vec2>,

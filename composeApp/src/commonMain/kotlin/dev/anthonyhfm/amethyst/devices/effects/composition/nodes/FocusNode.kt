@@ -17,6 +17,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryPaint
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.distanceSquared
+import dev.anthonyhfm.amethyst.devices.effects.composition.resolveOrigin
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.WorkspaceOriginSelector
 import dev.anthonyhfm.amethyst.ui.components.DialType
@@ -33,7 +34,8 @@ data class FocusNodeState(
     val radius: Float = 0.25f,
     val feather: Float = 0f,
     val invert: Boolean = false,
-) : CompositionNodeState
+    override val boundToOrigin: Boolean = false,
+) : CompositionNodeState, OriginBindableState
 
 object FocusNode : TransformNode() {
     override val automationParameters = listOf(
@@ -56,10 +58,7 @@ object FocusNode : TransformNode() {
         inputFrames: List<GeometryFrame>,
     ): List<GeometryFrame> {
         val state = node.state as? FocusNodeState ?: return inputFrames
-        val center = Vec2(
-            x = context.bounds.first.x + state.originX.coerceIn(0f, 1f) * (context.bounds.second.width - 1),
-            y = context.bounds.first.y + state.originY.coerceIn(0f, 1f) * (context.bounds.second.height - 1),
-        )
+        val center = context.resolveOrigin(state.originX, state.originY, state.boundToOrigin)
         val radius = state.radius.coerceIn(0f, 1f) * min(
             (context.bounds.second.width - 1).coerceAtLeast(0),
             (context.bounds.second.height - 1).coerceAtLeast(0),
@@ -127,6 +126,8 @@ object FocusNode : TransformNode() {
                     weight = 1f,
                     fill = true,
                 ),
+                boundToOrigin = state.boundToOrigin,
+                onBoundToOriginChange = { onNodeChange(node.copy(state = state.copy(boundToOrigin = it))) },
             )
 
             Row(

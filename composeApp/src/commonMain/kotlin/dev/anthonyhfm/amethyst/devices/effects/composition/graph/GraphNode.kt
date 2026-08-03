@@ -7,6 +7,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.OutputNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionNodeState
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.OriginBindableState
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.CompositionAutomationLane
 import kotlinx.serialization.Serializable
 
@@ -116,3 +117,6 @@ fun CompositionGraph.withConnection(fromNodeId: String, toNodeId: String): Compo
 
 fun CompositionGraph.withoutConnection(connectionId: String): CompositionGraph =
     copy(connections = connections.filterNot { it.id == connectionId })
+
+fun CompositionGraph.hasOriginBinding(): Boolean =
+    nodes.any { (it.state as? OriginBindableState)?.boundToOrigin == true }

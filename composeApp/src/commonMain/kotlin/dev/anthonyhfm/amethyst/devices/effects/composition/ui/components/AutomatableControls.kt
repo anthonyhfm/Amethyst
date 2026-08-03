@@ -398,6 +398,8 @@ fun AutomatableWorkspaceOriginSelector(
     bounds: Pair<IntOffset, IntSize>,
     onOriginChange: (Offset, IntSize) -> Unit,
     modifier: Modifier = Modifier,
+    boundToOrigin: Boolean = false,
+    onBoundToOriginChange: ((Boolean) -> Unit)? = null,
 ) {
     val node = LocalCompositionNode.current
     val onAutomationAction = LocalAutomationHandler.current
@@ -409,41 +411,39 @@ fun AutomatableWorkspaceOriginSelector(
         emptyList()
     }
 
-    @Composable
-    fun RenderSelector(selectorModifier: Modifier) {
-        WorkspaceOriginSelector(
-            originX = originX,
-            originY = originY,
-            bounds = bounds,
-            onOriginChange = onOriginChange,
-            modifier = selectorModifier,
-        )
-    }
-
-    if (originParameters.isNotEmpty() && onAutomationAction != null) {
-        ContextMenu(
-            modifier = modifier,
-            trigger = { RenderSelector(Modifier.fillMaxSize()) }
-        ) {
-            originParameters.forEach { parameter ->
-                val automated = node?.lane(parameter.id) != null
-                AutomatableContextMenuItem(
-                    label = if (automated) "Edit ${parameter.label} Automation" else "Automate ${parameter.label}",
-                    icon = if (automated) Lucide.Pencil else Lucide.Plus,
-                    onClick = { onAutomationAction(parameter.id, automated, false) }
-                )
-                if (automated) {
+    val automationMenuContent: (@Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit)? =
+        if (!boundToOrigin && originParameters.isNotEmpty() && onAutomationAction != null) {
+            {
+                originParameters.forEach { parameter ->
+                    val automated = node?.lane(parameter.id) != null
                     AutomatableContextMenuItem(
-                        label = "Remove ${parameter.label} Automation",
-                        icon = Lucide.Trash2,
-                        onClick = { onAutomationAction(parameter.id, true, true) }
+                        label = if (automated) "Edit ${parameter.label} Automation" else "Automate ${parameter.label}",
+                        icon = if (automated) Lucide.Pencil else Lucide.Plus,
+                        onClick = { onAutomationAction(parameter.id, automated, false) }
                     )
+                    if (automated) {
+                        AutomatableContextMenuItem(
+                            label = "Remove ${parameter.label} Automation",
+                            icon = Lucide.Trash2,
+                            onClick = { onAutomationAction(parameter.id, true, true) }
+                        )
+                    }
                 }
             }
+        } else {
+            null
         }
-    } else {
-        RenderSelector(modifier)
-    }
+
+    WorkspaceOriginSelector(
+        originX = originX,
+        originY = originY,
+        bounds = bounds,
+        onOriginChange = onOriginChange,
+        modifier = modifier,
+        boundToOrigin = boundToOrigin,
+        onBoundToOriginChange = onBoundToOriginChange,
+        extraContextMenuContent = automationMenuContent,
+    )
 }
 
 @Composable

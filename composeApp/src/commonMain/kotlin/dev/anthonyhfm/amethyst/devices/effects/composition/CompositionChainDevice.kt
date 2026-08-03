@@ -27,6 +27,7 @@ import dev.anthonyhfm.amethyst.devices.TimelineTriggerable
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphProcessor
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.defaultCompositionGraph
+import dev.anthonyhfm.amethyst.devices.effects.composition.graph.hasOriginBinding
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
@@ -77,8 +78,18 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         val activeSignals = n.filter { it.color != Color.Black }
 
         activeSignals.forEach { trigger ->
-            startPlayback(origin = trigger.origin, repeat = false)
+            startPlayback(origin = trigger.origin, repeat = false, triggerOrigin = triggerOriginFor(trigger.x, trigger.y))
         }
+    }
+
+    private fun triggerOriginFor(x: Int, y: Int): Vec2 {
+        val bounds = GraphProcessor.resolveBounds()
+        val width = (bounds.second.width - 1).coerceAtLeast(1)
+        val height = (bounds.second.height - 1).coerceAtLeast(1)
+        return Vec2(
+            x = ((x - bounds.first.x).toFloat() / width).coerceIn(0f, 1f),
+            y = ((y - bounds.first.y).toFloat() / height).coerceIn(0f, 1f),
+        )
     }
 
     fun play() {
@@ -105,12 +116,13 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
     fun playbackDurationMs(): Long = state.value.playbackOptions.durationMs().toLong()
 
     /** Starts the editor-only preview from the beginning for a captured pad press. */
-    fun triggerWorkspacePreview() {
+    fun triggerWorkspacePreview(x: Int? = null, y: Int? = null) {
         if (!workspacePreviewActive) return
         startPlayback(
             origin = this,
-            repeat = false,
+            repeat = state.value.playbackOptions.repeat,
             livePreview = true,
+            triggerOrigin = if (x != null && y != null) triggerOriginFor(x, y) else null,
         )
     }
 
@@ -142,7 +154,11 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         playbackProgress.value = clampedProgress
         val run = playbackRun
         if (run?.livePreview != false) {
-            renderLivePlaybackFrame(progress = clampedProgress, origin = run?.origin ?: playbackOrigin)
+            renderLivePlaybackFrame(
+                progress = clampedProgress,
+                origin = run?.origin ?: playbackOrigin,
+                triggerOrigin = run?.triggerOrigin,
+            )
         } else {
             renderPlaybackFrame(progress = clampedProgress, origin = run.origin)
         }
@@ -174,15 +190,18 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         progress: Float = 0f,
         repeat: Boolean,
         livePreview: Boolean = false,
+        triggerOrigin: Vec2? = null,
     ) {
         Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-        if (!livePreview && state.value.renderedAnimation.isEmpty()) renderAnimation()
+        val effectiveLivePreview = livePreview || state.value.graph.hasOriginBinding()
+        if (!effectiveLivePreview && state.value.renderedAnimation.isEmpty()) renderAnimation()
         playbackOrigin = origin
         playbackRun = PlaybackRun(
             origin = origin,
-            frames = if (livePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
+            frames = if (effectiveLivePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
             repeat = repeat,
-            livePreview = livePreview,
+            livePreview = effectiveLivePreview,
+            triggerOrigin = if (effectiveLivePreview) (triggerOrigin ?: WORKSPACE_CENTER_ORIGIN) else null,
         )
         playing.value = true
         schedulePlaybackFrame(playbackRun!!.firstFrameAtOrAfter(progress.coerceIn(0f, 1f)))
@@ -197,7 +216,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
             val progress = frame.progress
             playbackProgress.value = progress
             if (run.livePreview) {
-                renderLivePlaybackFrame(progress = progress, origin = run.origin)
+                renderLivePlaybackFrame(progress = progress, origin = run.origin, triggerOrigin = run.triggerOrigin)
             } else {
                 emitFrame(frame.signals.map { it.copy(origin = run.origin) })
             }
@@ -225,6 +244,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
                             frames = if (run.livePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
                             repeat = true,
                             livePreview = run.livePreview,
+                            triggerOrigin = run.triggerOrigin,
                         )
                         schedulePlaybackFrame(0)
                     }
@@ -264,12 +284,13 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         }
     }
 
-    private fun renderLivePlaybackFrame(progress: Float, origin: Any?) {
+    private fun renderLivePlaybackFrame(progress: Float, origin: Any?, triggerOrigin: Vec2? = null) {
         emitFrame(
             GraphProcessor.renderFrame(
                 graph = state.value.graph,
                 progress = progress,
                 outputOrigin = origin,
+                triggerOrigin = triggerOrigin ?: WORKSPACE_CENTER_ORIGIN,
             )
         )
     }
@@ -444,6 +465,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         val frames: List<RenderedCompositionFrame>,
         val repeat: Boolean,
         val livePreview: Boolean,
+        val triggerOrigin: Vec2? = null,
     ) {
         fun firstFrameAtOrAfter(progress: Float): Int =
             frames.indexOfFirst { it.progress >= progress }.takeIf { it >= 0 } ?: frames.lastIndex
@@ -453,6 +475,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         private const val PLAYBACK_IDENTIFIER = "composition-playback"
         private const val FRAME_INTERVAL_MS = 16.0
         private const val RENDER_FPS = 120
+        private val WORKSPACE_CENTER_ORIGIN = Vec2(0.5f, 0.5f)
         const val MIN_SPLIT_RATIO = 0.25f
         const val MAX_SPLIT_RATIO = 0.75f
 

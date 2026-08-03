@@ -26,6 +26,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
+import dev.anthonyhfm.amethyst.devices.effects.composition.resolveOrigin
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
@@ -53,7 +54,8 @@ data class WaterdropNodeState(
     val originX: Float = 0.5f,
     val originY: Float = 0.5f,
     val curvature: Float = 2f,
-) : CompositionNodeState
+    override val boundToOrigin: Boolean = false,
+) : CompositionNodeState, OriginBindableState
 
 object WaterdropNode : CompositionNodeDefinition {
     override val automationParameters = listOf(
@@ -78,7 +80,7 @@ object WaterdropNode : CompositionNodeDefinition {
         context: EvaluationContext,
     ): List<GeometryFrame> {
         val state = node.state as? WaterdropNodeState ?: return emptyList()
-        val center = state.resolveOrigin(bounds = context.bounds)
+        val center = context.resolveOrigin(state.originX, state.originY, state.boundToOrigin)
         val radius = context.progress.coerceIn(0f, 1f) * RING_TRAVEL_SPAN
         val curvature = state.curvature.coerceIn(MIN_CURVATURE, MAX_CURVATURE)
         val circumference = max(0.01f, 2f * PI.toFloat() * max(0.5f, abs(radius)))
@@ -144,6 +146,8 @@ object WaterdropNode : CompositionNodeDefinition {
                     .padding(start = 12.dp)
                     .fillMaxHeight()
                     .aspectRatio(1f),
+                boundToOrigin = state.boundToOrigin,
+                onBoundToOriginChange = { onNodeChange(node.copy(state = state.copy(boundToOrigin = it))) },
             )
 
             Box(
@@ -183,14 +187,6 @@ object WaterdropNode : CompositionNodeDefinition {
             }
         }
     }
-}
-
-internal fun WaterdropNodeState.resolveOrigin(bounds: Pair<IntOffset, IntSize>): Vec2 {
-    val resolvedBounds = bounds.validOrFallbackBounds()
-    return Vec2(
-        x = resolvedBounds.first.x + originX.coerceIn(0f, 1f) * (resolvedBounds.second.width - 1).coerceAtLeast(0),
-        y = resolvedBounds.first.y + originY.coerceIn(0f, 1f) * (resolvedBounds.second.height - 1).coerceAtLeast(0),
-    )
 }
 
 internal fun Pair<IntOffset, IntSize>.validOrFallbackBounds(): Pair<IntOffset, IntSize> =

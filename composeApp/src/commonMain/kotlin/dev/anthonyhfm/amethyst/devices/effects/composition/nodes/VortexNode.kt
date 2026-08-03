@@ -15,6 +15,7 @@ import com.composables.icons.lucide.Tornado
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
+import dev.anthonyhfm.amethyst.devices.effects.composition.resolveOrigin
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
 import dev.anthonyhfm.amethyst.ui.components.DialType
@@ -42,7 +43,8 @@ data class VortexNodeState(
     val radius: Float = 1f,
     val falloff: Float = 1f,
     val direction: VortexDirection = VortexDirection.Clockwise,
-) : CompositionNodeState
+    override val boundToOrigin: Boolean = false,
+) : CompositionNodeState, OriginBindableState
 
 object VortexNode : TransformNode() {
     override val automationParameters = listOf(
@@ -74,10 +76,7 @@ object VortexNode : TransformNode() {
 
         val width = context.bounds.second.width.coerceAtLeast(1)
         val height = context.bounds.second.height.coerceAtLeast(1)
-        val center = Vec2(
-            x = context.bounds.first.x + state.originX.coerceIn(0f, 1f) * (width - 1),
-            y = context.bounds.first.y + state.originY.coerceIn(0f, 1f) * (height - 1),
-        )
+        val center = context.resolveOrigin(state.originX, state.originY, state.boundToOrigin)
         val radius = state.radius.coerceIn(0f, 1f) * min(width, height) / 2f
         if (radius <= 0f) {
             return inputFrames
@@ -147,6 +146,8 @@ object VortexNode : TransformNode() {
                     weight = 1f,
                     fill = true,
                 ),
+                boundToOrigin = state.boundToOrigin,
+                onBoundToOriginChange = { onNodeChange(node.copy(state = state.copy(boundToOrigin = it))) },
             )
 
             Row(

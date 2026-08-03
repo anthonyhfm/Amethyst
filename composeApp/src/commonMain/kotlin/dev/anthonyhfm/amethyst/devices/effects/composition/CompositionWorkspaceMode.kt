@@ -84,7 +84,9 @@ class CompositionWorkspaceMode(
 
     override fun onMidiInput(data: MidiInputData, offset: Offset) {
         if (data.velocity != 0) {
-            device.triggerWorkspacePreview()
+            val globalX: Int = data.pitch % 10 + offset.x.toInt()
+            val globalY: Int = (9 - (data.pitch / 10)) + offset.y.toInt()
+            device.triggerWorkspacePreview(globalX, globalY)
         }
     }
 

@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
@@ -22,6 +21,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
+import dev.anthonyhfm.amethyst.devices.effects.composition.resolveOrigin
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableWorkspaceOriginSelector
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
@@ -46,7 +46,8 @@ data class SpiralNodeState(
     val originX: Float = 0.5f,
     val originY: Float = 0.5f,
     val turns: Float = 2f,
-) : CompositionNodeState
+    override val boundToOrigin: Boolean = false,
+) : CompositionNodeState, OriginBindableState
 
 object SpiralNode : CompositionNodeDefinition {
     override val automationParameters = listOf(
@@ -71,7 +72,7 @@ object SpiralNode : CompositionNodeDefinition {
         context: EvaluationContext,
     ): List<GeometryFrame> {
         val state = node.state as? SpiralNodeState ?: return emptyList()
-        val center = state.resolveOrigin(bounds = context.bounds)
+        val center = context.resolveOrigin(state.originX, state.originY, state.boundToOrigin)
         val targetDistance = context.progress.coerceIn(0f, 1f) * SPIRAL_TRAVEL_SPAN
         val turns = state.turns.coerceIn(MIN_TURNS, MAX_TURNS)
         val angleSteps = max(
@@ -151,6 +152,8 @@ object SpiralNode : CompositionNodeDefinition {
                     .padding(start = 12.dp)
                     .fillMaxHeight()
                     .aspectRatio(1f),
+                boundToOrigin = state.boundToOrigin,
+                onBoundToOriginChange = { onNodeChange(node.copy(state = state.copy(boundToOrigin = it))) },
             )
 
             Box(
@@ -192,10 +195,3 @@ object SpiralNode : CompositionNodeDefinition {
     }
 }
 
-private fun SpiralNodeState.resolveOrigin(bounds: Pair<IntOffset, IntSize>): Vec2 {
-    val resolvedBounds = bounds.validOrFallbackBounds()
-    return Vec2(
-        x = resolvedBounds.first.x + originX.coerceIn(0f, 1f) * (resolvedBounds.second.width - 1).coerceAtLeast(0),
-        y = resolvedBounds.first.y + originY.coerceIn(0f, 1f) * (resolvedBounds.second.height - 1).coerceAtLeast(0),
-    )
-}
