@@ -107,7 +107,6 @@ fun CompositionGraph.withConnection(fromNodeId: String, toNodeId: String): Compo
     val candidate = CompositionConnection(fromNodeId = fromNodeId, toNodeId = toNodeId)
     val next = copy(
         connections = connections
-            .filterNot { it.toNodeId == toNodeId && !toDefinition.isOutput }
             .plus(candidate)
             .distinctBy { "${it.fromNodeId}:${it.fromPort}->${it.toNodeId}:${it.toPort}" },
     )
