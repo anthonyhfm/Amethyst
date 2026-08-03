@@ -395,6 +395,11 @@ sealed interface UndoableAction {
         val newName: String
     ) : UndoableAction
 
+    data class TrackReorder(
+        val fromIndex: Int,
+        val toIndex: Int
+    ) : UndoableAction
+
     data class TrackStateChange(
         val trackIndex: Int,
         val beforeTrack: TimelineTrack<*>,

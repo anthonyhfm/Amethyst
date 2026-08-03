@@ -8,6 +8,11 @@ import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.pointer.PointerKeyboardModifiers
+import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
 
 object ModifierKeysState {
     var isShiftPressed by mutableStateOf(false)
@@ -27,5 +32,12 @@ object ModifierKeysState {
         isCtrlPressed = event.isCtrlPressed
         isAltPressed = event.isAltPressed
         isMetaPressed = event.isMetaPressed
+    }
+
+    fun updateFromPointerModifiers(modifiers: PointerKeyboardModifiers) {
+        isShiftPressed = modifiers.isShiftPressed
+        isCtrlPressed = modifiers.isCtrlPressed
+        isAltPressed = modifiers.isAltPressed
+        isMetaPressed = modifiers.isMetaPressed
     }
 }

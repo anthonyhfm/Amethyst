@@ -460,6 +460,13 @@ class TimelineViewModel : ViewModel() {
         _tracks.value = TimelineRepository.tracks.value
     }
 
+    fun reorderTracks(fromIndex: Int, toIndex: Int) {
+        TimelineCommandExecutor.execute(
+            TimelineEditCommand.ReorderTracks(fromIndex = fromIndex, toIndex = toIndex)
+        )
+        _tracks.value = TimelineRepository.tracks.value
+    }
+
     fun renameTimelineEntry(trackIndex: Int, entryStartMs: Long, newName: String) {
         val normalizedName = newName.trim()
         val currentTracks = _tracks.value.toMutableList()

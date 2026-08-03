@@ -93,7 +93,7 @@ internal fun PianoRollHeader(
                         detectTapGestures { offset -> latestOnTap(offset) }
                     }
             ) {
-                TimelineRuler(
+                PianoRollRuler(
                     clipBeats = clipBeats,
                     metrics = metrics,
                     beatsPerBar = beatsPerBar,
@@ -522,7 +522,7 @@ internal fun PianoKeysColumn(
 }
 
 @Composable
-internal fun TimelineRuler(
+internal fun PianoRollRuler(
     clipBeats: Float,
     metrics: PianoRollMetrics,
     beatsPerBar: Int,

@@ -269,11 +269,12 @@ object TimelineTheme {
     @Composable
     fun trackHeaderColors(selected: Boolean): TimelineTrackHeaderColors {
         val palette = palette
+
         return if (selected) {
             TimelineTrackHeaderColors(
-                container = palette.trackHeaderSurfaceSelected,
-                content = palette.trackHeaderContentSelected,
-                border = palette.selectionStroke,
+                container = Theme[colors][selectionSurface],
+                content = Theme[colors][selectionForeground],
+                border = Theme[colors][selectionSurface],
             )
         } else {
             TimelineTrackHeaderColors(
@@ -288,10 +289,10 @@ object TimelineTheme {
     fun clipColors(role: TimelineClipRole, selected: Boolean): TimelineClipColors {
         return if (selected) {
             TimelineClipColors(
-                background = Theme[timelineColorTokens][timelineClipSelectedSurface],
-                header = Theme[timelineColorTokens][timelineClipSelectedHeader],
-                border = Theme[timelineColorTokens][timelineClipSelectedBorder],
-                content = Theme[timelineColorTokens][timelineClipSelectedContent],
+                background = Theme[colors][selectionSurface],
+                header = Theme[colors][selectionSurface],
+                border = Theme[colors][selectionSurface],
+                content = Theme[colors][selectionForeground],
             )
         } else {
             when (role) {

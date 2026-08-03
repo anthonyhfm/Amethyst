@@ -99,6 +99,9 @@ fun TimelineView(
                 onTrackMuteToggle = { trackIndex ->
                     viewModel.toggleTrackMute(trackIndex)
                 },
+                onTrackReorder = { fromIndex, toIndex ->
+                    viewModel.reorderTracks(fromIndex, toIndex)
+                },
                 onAddLightsTrack = { viewModel.addMidiTrack() },
                 onAddAudioTrack = { viewModel.addAudioTrack() }
             )

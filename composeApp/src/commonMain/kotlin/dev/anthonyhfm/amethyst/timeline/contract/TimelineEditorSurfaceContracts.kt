@@ -16,6 +16,9 @@ enum class GridResolution(val snapDivisionsPerBeat: Int, val subBeatsPerBeat: In
     SixtyFourth(snapDivisionsPerBeat = 64, subBeatsPerBeat = 16),
     OneTwentyEighth(snapDivisionsPerBeat = 128, subBeatsPerBeat = 32);
 
+    val label: String
+        get() = "1/$snapDivisionsPerBeat"
+
     companion object {
         fun fromZoomFactor(zoomFactor: Float): GridResolution = when {
             zoomFactor < 1.5f -> Quarter

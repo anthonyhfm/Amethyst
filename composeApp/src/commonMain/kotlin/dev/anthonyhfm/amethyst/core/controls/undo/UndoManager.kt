@@ -610,6 +610,11 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
+                is UndoableAction.TrackReorder -> {
+                    TimelineRepository.reorderTracks(action.toIndex, action.fromIndex)
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.TrackStateChange -> {
                     TimelineRepository.replaceTrack(action.trackIndex, action.beforeTrack)
                     redoStack.add(action)
@@ -1160,6 +1165,11 @@ object UndoManager {
 
                 is UndoableAction.TrackRename -> {
                     TimelineRepository.renameTrack(action.trackIndex, action.newName)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.TrackReorder -> {
+                    TimelineRepository.reorderTracks(action.fromIndex, action.toIndex)
                     undoStack.add(action)
                 }
 

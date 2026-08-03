@@ -24,6 +24,7 @@ object TimelineCommandExecutor {
             is TimelineEditCommand.DeleteTracks -> deleteTracks(command.trackIndices)
             is TimelineEditCommand.DuplicateTracks -> duplicateTracks(command.trackIndices)
             is TimelineEditCommand.RenameTrack -> renameTrack(command.trackIndex, command.newName)
+            is TimelineEditCommand.ReorderTracks -> reorderTracks(command.fromIndex, command.toIndex)
             is TimelineEditCommand.DeleteEntries -> deleteEntries(command.trackIndex, command.entryStartTimes)
             is TimelineEditCommand.DuplicateEntries -> duplicateEntries(command.trackIndex, command.entryStartTimes)
             is TimelineEditCommand.RenameEntry -> renameEntry(command.trackIndex, command.entryStartTime, command.newName)
@@ -141,6 +142,21 @@ object TimelineCommandExecutor {
         )
         TimelineRepository.renameTrack(trackIndex, newName)
 
+        return TimelineCommandResult(didChange = true)
+    }
+
+    private fun reorderTracks(fromIndex: Int, toIndex: Int): TimelineCommandResult {
+        if (fromIndex == toIndex) return TimelineCommandResult()
+        val tracks = TimelineRepository.tracks.value
+        if (fromIndex !in tracks.indices || toIndex !in tracks.indices) return TimelineCommandResult()
+
+        UndoManager.addAction(
+            UndoableAction.TrackReorder(
+                fromIndex = fromIndex,
+                toIndex = toIndex
+            )
+        )
+        TimelineRepository.reorderTracks(fromIndex, toIndex)
         return TimelineCommandResult(didChange = true)
     }
 

@@ -507,6 +507,14 @@ object TimelineRepository {
         refreshChainEffectDurations()
     }
 
+    fun reorderTracks(fromIndex: Int, toIndex: Int) {
+        if (fromIndex !in tracks.value.indices || toIndex !in tracks.value.indices || fromIndex == toIndex) return
+        val current = tracks.value.toMutableList()
+        val track = current.removeAt(fromIndex)
+        current.add(toIndex, track)
+        updateTracksSnapshot(current.toList())
+    }
+
     fun removeTrack(trackIndex: Int) {
         if (trackIndex !in tracks.value.indices) return
         val current = tracks.value.toMutableList()

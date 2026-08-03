@@ -18,6 +18,11 @@ sealed interface TimelineEditCommand {
         val newName: String
     ) : TimelineEditCommand
 
+    data class ReorderTracks(
+        val fromIndex: Int,
+        val toIndex: Int
+    ) : TimelineEditCommand
+
     data class DeleteEntries(
         val trackIndex: Int,
         val entryStartTimes: List<Long>

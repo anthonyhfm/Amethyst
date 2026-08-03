@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 
 @Composable
@@ -326,15 +327,19 @@ fun TimelineLane(
                             showContextMenu = false
                         }
                     )
-                    ContextMenuSeparator()
-                    ContextMenuItem(
-                        label = stringResource(Res.string.timeline_lane_create_chain_effect),
-                        icon = Lucide.Plus,
-                        onClick = {
-                            onCreateChainEffect(targetStartMs)
-                            showContextMenu = false
-                        }
-                    )
+
+                    if (ExperimentalSettings.timelineChainEffects.value) {
+                        ContextMenuSeparator()
+                        
+                        ContextMenuItem(
+                            label = stringResource(Res.string.timeline_lane_create_chain_effect),
+                            icon = Lucide.Plus,
+                            onClick = {
+                                onCreateChainEffect(targetStartMs)
+                                showContextMenu = false
+                            }
+                        )
+                    }
                 }
             }
         }

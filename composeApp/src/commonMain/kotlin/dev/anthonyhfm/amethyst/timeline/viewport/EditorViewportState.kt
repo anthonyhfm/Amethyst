@@ -130,6 +130,23 @@ data class EditorViewportState(
     fun setContentExtent(width: Float, height: Float): EditorViewportState =
         copy(contentWidth = width, contentHeight = height).clamp()
 
+    fun withConstrainedViewport(
+        zoomX: Float = this.zoomX,
+        scrollX: Float = this.scrollX,
+        viewportWidth: Float = this.viewportWidth,
+        contentWidth: Float = this.contentWidth
+    ): EditorViewportState {
+        val clampedZoomX = zoomX.coerceIn(minZoomX, maxZoomX)
+        val maxScroll = (contentWidth - viewportWidth).coerceAtLeast(0f)
+        val clampedScrollX = scrollX.coerceIn(0f, maxScroll)
+        return copy(
+            zoomX = clampedZoomX,
+            scrollX = clampedScrollX,
+            viewportWidth = viewportWidth,
+            contentWidth = contentWidth
+        )
+    }
+
     /**
      * Clamp scrollX/scrollY so the viewport never scrolls past the content bounds.
      * Safe to call even when contentWidth/viewportWidth are 0.
