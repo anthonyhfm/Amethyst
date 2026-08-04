@@ -4,12 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,10 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -52,15 +54,20 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.p
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/** Height of the "Pad N" header row rendered above each launchpad's keys/notes section. */
+private val PIANO_ROLL_DEVICE_HEADER_HEIGHT = 24.dp
+
 @Composable
 fun PianoRollEditorCanvas(
     entry: MidiEntry,
-    launchpads: List<*>,
+    launchpads: List<LaunchpadViewportElement>,
     trackIndex: Int,
     entryStartMs: Long,
     multiSelectModifierDown: Boolean,
@@ -85,8 +92,13 @@ fun PianoRollEditorCanvas(
 ) {
     val latestViewport by rememberUpdatedState(viewport)
     val latestOnViewportChange by rememberUpdatedState(onViewportChange)
+    val pianoRollVerticalScrollState = rememberScrollState()
+    val scrollCoroutineScope = rememberCoroutineScope()
+    val latestScrollOffsetPx by rememberUpdatedState(pianoRollVerticalScrollState.value.toFloat())
 
     val density = LocalDensity.current
+    val headerOffsetPx = with(density) { PIANO_ROLL_DEVICE_HEADER_HEIGHT.toPx() }
+    val latestHeaderOffsetPx by rememberUpdatedState(headerOffsetPx)
     val timelinePalette = TimelineTheme.palette
     val gridColors = PianoRollGridColors(
         canvasColor = timelinePalette.canvas,
@@ -178,6 +190,256 @@ fun PianoRollEditorCanvas(
         )
     }
 
+    fun handleNoteTap(offset: Offset) {
+        val contentX = latestViewport.screenToContentX(offset.x)
+        val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
+        val contentOffset = offset.copy(y = offset.y + latestScrollOffsetPx - latestHeaderOffsetPx)
+        val pitch = latestMetrics.yPxToPitch(contentOffset.y)
+
+        when (activeTool) {
+            TimelineEditorTool.SELECT -> {
+                val clickedRect = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                    .firstOrNull { it.contains(contentOffset) }
+
+                if (clickedRect != null) {
+                    val note = clickedRect.note
+                    val targetSelectable = Selectable.PianoRollNote(trackIndex, entryStartMs, note)
+                    val isSelected = selections.any {
+                        it is Selectable.PianoRollNote &&
+                            it.entryStartMs == entryStartMs &&
+                            it.trackIndex == trackIndex &&
+                            it.note == note
+                    }
+                    if (multiSelectModifierDown || shiftModifierDown) {
+                        if (isSelected) {
+                            SelectionManager.replaceSelections(SelectionManager.selections.value - targetSelectable)
+                        } else {
+                            SelectionManager.select(targetSelectable, single = false)
+                        }
+                    } else {
+                        SelectionManager.select(targetSelectable, single = true)
+                    }
+                } else {
+                    if (!multiSelectModifierDown && !shiftModifierDown) {
+                        SelectionManager.clear()
+                    }
+                    val snappedTimeMs = snapSelectedTimeMs(clipTimeMs, gridResolution)
+                    onSelectedTimeMsChange(snappedTimeMs.coerceAtLeast(0L).coerceAtMost(entry.durationMs))
+                }
+            }
+
+            TimelineEditorTool.DRAW -> {
+                val clickedNote = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                    .firstOrNull { it.contains(contentOffset) }?.note
+
+                if (clickedNote != null) {
+                    onDeleteNotes(listOf(clickedNote))
+                    notesState = notesState.filter { it != clickedNote }
+                } else {
+                    val startTimeMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
+                    val durationMs = currentCellDurationMs(gridResolution)
+
+                    val newNote = MidiNote.withPaint(
+                        device = 0,
+                        pitch = pitch,
+                        color = selectedColor,
+                        startTimeMs = startTimeMs,
+                        durationMs = durationMs,
+                        gradient = if (gradientMode) workingGradient else null
+                    )
+                    val result = onCreateNotes(listOf(newNote))
+                    if (result.didChange) {
+                        notesState = notesState + newNote
+                        SelectionManager.select(
+                            Selectable.PianoRollNote(trackIndex, entryStartMs, newNote),
+                            single = !multiSelectModifierDown && !shiftModifierDown
+                        )
+                    }
+                }
+            }
+
+            TimelineEditorTool.ERASE -> {
+                val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                    .firstOrNull { it.contains(contentOffset) }?.note
+
+                if (noteToErase != null) {
+                    val result = onDeleteNotes(listOf(noteToErase))
+                    if (result.didChange) {
+                        notesState = notesState.filter { it != noteToErase }
+                        SelectionManager.replaceSelections(
+                            SelectionManager.selections.value - Selectable.PianoRollNote(trackIndex, entryStartMs, noteToErase)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun handleNoteDragStart(offset: Offset) {
+        val contentX = latestViewport.screenToContentX(offset.x)
+        val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
+        val contentOffset = offset.copy(y = offset.y + latestScrollOffsetPx - latestHeaderOffsetPx)
+        val pitch = latestMetrics.yPxToPitch(contentOffset.y)
+
+        when (activeTool) {
+            TimelineEditorTool.SELECT -> {
+                val noteRects = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                val hitTarget = findPianoRollHitTarget(contentOffset, noteRects)
+
+                when (hitTarget) {
+                    is PianoRollHitTarget.NoteBody -> {
+                        val note = hitTarget.note
+                        activeDragNote = note
+                        val isSelected = selections.any {
+                            it is Selectable.PianoRollNote &&
+                                it.entryStartMs == entryStartMs &&
+                                it.trackIndex == trackIndex &&
+                                it.note == note
+                        }
+                        if (!isSelected) {
+                            SelectionManager.select(
+                                Selectable.PianoRollNote(trackIndex, entryStartMs, note),
+                                single = !multiSelectModifierDown && !shiftModifierDown
+                            )
+                        }
+                    }
+
+                    is PianoRollHitTarget.ResizeLeft -> {
+                        activeDragNote = hitTarget.note
+                    }
+
+                    is PianoRollHitTarget.ResizeRight -> {
+                        activeDragNote = hitTarget.note
+                    }
+
+                    is PianoRollHitTarget.Empty -> {
+                        marqueeStart = offset
+                        marqueeCurrent = offset
+                        marqueeGestureActive = true
+                        if (!multiSelectModifierDown && !shiftModifierDown) {
+                            SelectionManager.clear()
+                        }
+                    }
+                }
+            }
+
+            TimelineEditorTool.DRAW -> {
+                val anchorStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
+                val cellDurMs = currentCellDurationMs(gridResolution)
+                draftNote = buildDraftNote(
+                    device = 0,
+                    pitch = pitch,
+                    color = selectedColor,
+                    gradient = if (gradientMode) workingGradient else null,
+                    anchorCellStartMs = anchorStartMs,
+                    currentCellStartMs = anchorStartMs,
+                    cellDurationMs = cellDurMs,
+                )
+            }
+
+            TimelineEditorTool.ERASE -> {
+                val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                    .firstOrNull { it.contains(contentOffset) }?.note
+
+                if (noteToErase != null) {
+                    val result = onDeleteNotes(listOf(noteToErase))
+                    if (result.didChange) {
+                        notesState = notesState.filter { it != noteToErase }
+                    }
+                }
+            }
+        }
+    }
+
+    fun handleNoteDrag(change: PointerInputChange, dragAmount: Offset) {
+        change.consume()
+        val currentPos = change.position
+        val contentX = latestViewport.screenToContentX(currentPos.x)
+        val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
+
+        if (marqueeGestureActive) {
+            marqueeCurrent = currentPos
+            val start = marqueeStart ?: return
+            val left = min(start.x, currentPos.x)
+            val right = max(start.x, currentPos.x)
+            val top = min(start.y, currentPos.y) + latestScrollOffsetPx - latestHeaderOffsetPx
+            val bottom = max(start.y, currentPos.y) + latestScrollOffsetPx - latestHeaderOffsetPx
+
+            val newlySelected = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                .filter { rect ->
+                    rect.left <= right && rect.right >= left &&
+                        rect.top <= bottom && rect.bottom >= top
+                }
+                .map { it.note }
+
+            if (!multiSelectModifierDown && !shiftModifierDown) {
+                SelectionManager.clear()
+            }
+
+            newlySelected.forEach { note ->
+                SelectionManager.select(
+                    Selectable.PianoRollNote(trackIndex, entryStartMs, note),
+                    single = false
+                )
+            }
+        } else if (draftNote != null) {
+            val pitch = latestMetrics.yPxToPitch(currentPos.y + latestScrollOffsetPx - latestHeaderOffsetPx)
+            val currentCellStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
+            val cellDurMs = currentCellDurationMs(gridResolution)
+            draftNote = buildDraftNote(
+                device = draftNote!!.device,
+                pitch = pitch,
+                color = selectedColor,
+                gradient = if (gradientMode) workingGradient else null,
+                anchorCellStartMs = draftNote!!.startTimeMs,
+                currentCellStartMs = currentCellStartMs,
+                cellDurationMs = cellDurMs,
+            )
+        } else if (activeTool == TimelineEditorTool.ERASE) {
+            val contentPos = currentPos.copy(y = currentPos.y + latestScrollOffsetPx - latestHeaderOffsetPx)
+            val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                .firstOrNull { it.contains(contentPos) }?.note
+
+            if (noteToErase != null) {
+                val result = onDeleteNotes(listOf(noteToErase))
+                if (result.didChange) {
+                    notesState = notesState.filter { it != noteToErase }
+                }
+            }
+        }
+    }
+
+    fun handleNoteDragEnd() {
+        if (marqueeGestureActive) {
+            marqueeStart = null
+            marqueeCurrent = null
+            marqueeGestureActive = false
+        }
+
+        draftNote?.let { createdDraft ->
+            val result = onCreateNotes(listOf(createdDraft))
+            if (result.didChange) {
+                notesState = notesState + createdDraft
+                SelectionManager.select(
+                    Selectable.PianoRollNote(trackIndex, entryStartMs, createdDraft),
+                    single = !multiSelectModifierDown && !shiftModifierDown
+                )
+            }
+            draftNote = null
+        }
+    }
+
+    fun handleNoteDragCancel() {
+        marqueeStart = null
+        marqueeCurrent = null
+        marqueeGestureActive = false
+        draftNote = null
+        activeDragNote = null
+        dragOffset = Offset.Zero
+        resizeLeftDelta = 0f
+        resizeRightDelta = 0f
+    }
+
     Column(modifier = modifier.fillMaxSize().background(Theme[colors][background])) {
         PianoRollHeader(
             clipBeats = clipBeats,
@@ -235,33 +497,30 @@ fun PianoRollEditorCanvas(
                 }
             }
         } else {
-            val sharedVerticalScrollState = rememberScrollState()
-
             Row(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
+                Column(
                     modifier = Modifier
                         .width(100.dp)
-                        .fillMaxHeight(),
-                    userScrollEnabled = true
+                        .fillMaxHeight()
+                        .verticalScroll(pianoRollVerticalScrollState)
                 ) {
-                    itemsIndexed(launchpads) { index, _ ->
+                    launchpads.forEachIndexed { index, device ->
                         Column {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(24.dp)
+                                    .height(PIANO_ROLL_DEVICE_HEADER_HEIGHT)
                                     .background(Theme[colors][border]),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Pad ${index + 1}",
+                                    text = "Device #${index + 1}",
                                     style = Theme[typography][p].copy(color = Theme[colors][foreground])
                                 )
                             }
                             PianoKeysColumn(
                                 totalPitches = totalPitches,
                                 noteHeight = noteHeightDp,
-                                verticalScroll = sharedVerticalScrollState,
                                 deviceIndex = index,
                                 pressedPitches = pressedKeysPerDevice[index].orEmpty()
                             )
@@ -326,13 +585,19 @@ fun PianoRollEditorCanvas(
                                     } else if (event.type == PointerEventType.Scroll) {
                                         val scrollDeltaX = change.scrollDelta.x
                                         val scrollDeltaY = change.scrollDelta.y
-                                        if (scrollDeltaX != 0f || scrollDeltaY != 0f) {
+                                        if (scrollDeltaX != 0f) {
                                             val currentVP = latestViewport
-                                            val deltaPx = if (scrollDeltaX != 0f) scrollDeltaX * 20f else scrollDeltaY * 20f
+                                            val deltaPx = scrollDeltaX * 20f
                                             val newVP = currentVP.withConstrainedViewport(
                                                 scrollX = currentVP.scrollX + deltaPx
                                             )
                                             latestOnViewportChange(newVP)
+                                            change.consume()
+                                        } else if (scrollDeltaY != 0f) {
+                                            val deltaPx = scrollDeltaY * 20f
+                                            scrollCoroutineScope.launch {
+                                                pianoRollVerticalScrollState.scrollBy(deltaPx)
+                                            }
                                             change.consume()
                                         }
                                     }
@@ -342,274 +607,61 @@ fun PianoRollEditorCanvas(
                             }
                         }
                         .pointerInput(activeTool, notesState) {
-                            detectTapGestures(
-                                onTap = { offset ->
-                                    val contentX = latestViewport.screenToContentX(offset.x)
-                                    val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
-                                    val pitch = latestMetrics.yPxToPitch(offset.y)
-
-                                    when (activeTool) {
-                                        TimelineEditorTool.SELECT -> {
-                                            val clickedRect = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                                                .firstOrNull { it.contains(offset) }
-
-                                            if (clickedRect != null) {
-                                                val note = clickedRect.note
-                                                val targetSelectable = Selectable.PianoRollNote(trackIndex, entryStartMs, note)
-                                                val isSelected = selections.any {
-                                                    it is Selectable.PianoRollNote &&
-                                                        it.entryStartMs == entryStartMs &&
-                                                        it.trackIndex == trackIndex &&
-                                                        it.note == note
-                                                }
-                                                if (multiSelectModifierDown || shiftModifierDown) {
-                                                    if (isSelected) {
-                                                        SelectionManager.replaceSelections(SelectionManager.selections.value - targetSelectable)
-                                                    } else {
-                                                        SelectionManager.select(targetSelectable, single = false)
-                                                    }
-                                                } else {
-                                                    SelectionManager.select(targetSelectable, single = true)
-                                                }
-                                            } else {
-                                                if (!multiSelectModifierDown && !shiftModifierDown) {
-                                                    SelectionManager.clear()
-                                                }
-                                            }
-                                        }
-
-                                        TimelineEditorTool.DRAW -> {
-                                            val clickedNote = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                                                .firstOrNull { it.contains(offset) }?.note
-
-                                            if (clickedNote != null) {
-                                                onDeleteNotes(listOf(clickedNote))
-                                                notesState = notesState.filter { it != clickedNote }
-                                            } else {
-                                                val startTimeMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
-                                                val durationMs = currentCellDurationMs(gridResolution)
-
-                                                val newNote = MidiNote.withPaint(
-                                                    device = 0,
-                                                    pitch = pitch,
-                                                    color = selectedColor,
-                                                    startTimeMs = startTimeMs,
-                                                    durationMs = durationMs,
-                                                    gradient = if (gradientMode) workingGradient else null
-                                                )
-                                                val result = onCreateNotes(listOf(newNote))
-                                                if (result.didChange) {
-                                                    notesState = notesState + newNote
-                                                    SelectionManager.select(
-                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, newNote),
-                                                        single = !multiSelectModifierDown && !shiftModifierDown
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        TimelineEditorTool.ERASE -> {
-                                            val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                                                .firstOrNull { it.contains(offset) }?.note
-
-                                            if (noteToErase != null) {
-                                                val result = onDeleteNotes(listOf(noteToErase))
-                                                if (result.didChange) {
-                                                    notesState = notesState.filter { it != noteToErase }
-                                                    SelectionManager.replaceSelections(
-                                                        SelectionManager.selections.value - Selectable.PianoRollNote(trackIndex, entryStartMs, noteToErase)
-                                                    )
-                                                }
-                                            }
-                                        }
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                var overSlop = Offset.Zero
+                                var slopChange: PointerInputChange?
+                                do {
+                                    slopChange = awaitTouchSlopOrCancellation(down.id) { change, over ->
+                                        change.consume()
+                                        overSlop = over
                                     }
+                                } while (slopChange != null && !slopChange.isConsumed)
+
+                                val startedDrag = slopChange
+                                if (startedDrag != null) {
+                                    handleNoteDragStart(startedDrag.position)
+                                    handleNoteDrag(startedDrag, overSlop)
+                                    val dragEndedNormally = drag(startedDrag.id) { change ->
+                                        handleNoteDrag(change, change.positionChange())
+                                    }
+                                    if (dragEndedNormally) {
+                                        handleNoteDragEnd()
+                                    } else {
+                                        handleNoteDragCancel()
+                                    }
+                                } else {
+                                    handleNoteTap(down.position)
                                 }
-                            )
-                        }
-                        .pointerInput(activeTool, notesState) {
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    val contentX = latestViewport.screenToContentX(offset.x)
-                                    val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
-                                    val pitch = latestMetrics.yPxToPitch(offset.y)
-
-                                    when (activeTool) {
-                                        TimelineEditorTool.SELECT -> {
-                                            val noteRects = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                                            val hitTarget = findPianoRollHitTarget(offset, noteRects)
-
-                                            when (hitTarget) {
-                                                is PianoRollHitTarget.NoteBody -> {
-                                                    val note = hitTarget.note
-                                                    activeDragNote = note
-                                                    val isSelected = selections.any {
-                                                        it is Selectable.PianoRollNote &&
-                                                            it.entryStartMs == entryStartMs &&
-                                                            it.trackIndex == trackIndex &&
-                                                            it.note == note
-                                                    }
-                                                    if (!isSelected) {
-                                                        SelectionManager.select(
-                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, note),
-                                                            single = !multiSelectModifierDown && !shiftModifierDown
-                                                        )
-                                                    }
-                                                }
-
-                                                is PianoRollHitTarget.ResizeLeft -> {
-                                                    activeDragNote = hitTarget.note
-                                                }
-
-                                                is PianoRollHitTarget.ResizeRight -> {
-                                                    activeDragNote = hitTarget.note
-                                                }
-
-                                                is PianoRollHitTarget.Empty -> {
-                                                    marqueeStart = offset
-                                                    marqueeCurrent = offset
-                                                    marqueeGestureActive = true
-                                                    if (!multiSelectModifierDown && !shiftModifierDown) {
-                                                        SelectionManager.clear()
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        TimelineEditorTool.DRAW -> {
-                                            val anchorStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
-                                            val cellDurMs = currentCellDurationMs(gridResolution)
-                                            draftNote = buildDraftNote(
-                                                device = 0,
-                                                pitch = pitch,
-                                                color = selectedColor,
-                                                gradient = if (gradientMode) workingGradient else null,
-                                                anchorCellStartMs = anchorStartMs,
-                                                currentCellStartMs = anchorStartMs,
-                                                cellDurationMs = cellDurMs,
-                                            )
-                                        }
-
-                                        TimelineEditorTool.ERASE -> {
-                                            val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                                                .firstOrNull { it.contains(offset) }?.note
-
-                                            if (noteToErase != null) {
-                                                val result = onDeleteNotes(listOf(noteToErase))
-                                                if (result.didChange) {
-                                                    notesState = notesState.filter { it != noteToErase }
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                onDragEnd = {
-                                    if (marqueeGestureActive) {
-                                        marqueeStart = null
-                                        marqueeCurrent = null
-                                        marqueeGestureActive = false
-                                    }
-
-                                    draftNote?.let { createdDraft ->
-                                        val result = onCreateNotes(listOf(createdDraft))
-                                        if (result.didChange) {
-                                            notesState = notesState + createdDraft
-                                            SelectionManager.select(
-                                                Selectable.PianoRollNote(trackIndex, entryStartMs, createdDraft),
-                                                single = !multiSelectModifierDown && !shiftModifierDown
-                                            )
-                                        }
-                                        draftNote = null
-                                    }
-                                },
-                                onDragCancel = {
-                                    marqueeStart = null
-                                    marqueeCurrent = null
-                                    marqueeGestureActive = false
-                                    draftNote = null
-                                    activeDragNote = null
-                                    dragOffset = Offset.Zero
-                                    resizeLeftDelta = 0f
-                                    resizeRightDelta = 0f
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    val currentPos = change.position
-                                    val contentX = latestViewport.screenToContentX(currentPos.x)
-                                    val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
-
-                                    if (marqueeGestureActive) {
-                                        marqueeCurrent = currentPos
-                                        val start = marqueeStart ?: return@detectDragGestures
-                                        val left = min(start.x, currentPos.x)
-                                        val right = max(start.x, currentPos.x)
-                                        val top = min(start.y, currentPos.y)
-                                        val bottom = max(start.y, currentPos.y)
-
-                                        val newlySelected = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                                            .filter { rect ->
-                                                rect.left <= right && rect.right >= left &&
-                                                    rect.top <= bottom && rect.bottom >= top
-                                            }
-                                            .map { it.note }
-
-                                        if (!multiSelectModifierDown && !shiftModifierDown) {
-                                            SelectionManager.clear()
-                                        }
-
-                                        newlySelected.forEach { note ->
-                                            SelectionManager.select(
-                                                Selectable.PianoRollNote(trackIndex, entryStartMs, note),
-                                                single = false
-                                            )
-                                        }
-                                    } else if (draftNote != null) {
-                                        val pitch = latestMetrics.yPxToPitch(currentPos.y)
-                                        val currentCellStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
-                                        val cellDurMs = currentCellDurationMs(gridResolution)
-                                        draftNote = buildDraftNote(
-                                            device = draftNote!!.device,
-                                            pitch = pitch,
-                                            color = selectedColor,
-                                            gradient = if (gradientMode) workingGradient else null,
-                                            anchorCellStartMs = draftNote!!.startTimeMs,
-                                            currentCellStartMs = currentCellStartMs,
-                                            cellDurationMs = cellDurMs,
-                                        )
-                                    } else if (activeTool == TimelineEditorTool.ERASE) {
-                                        val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                                            .firstOrNull { it.contains(currentPos) }?.note
-
-                                        if (noteToErase != null) {
-                                            val result = onDeleteNotes(listOf(noteToErase))
-                                            if (result.didChange) {
-                                                notesState = notesState.filter { it != noteToErase }
-                                            }
-                                        }
-                                    }
-                                }
-                            )
+                            }
                         }
                 ) {
-                    LazyColumn(
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .pianoRollGridBackground(
-                                devicePitchRange = 0 until totalPitches,
-                                clipBeats = clipBeats,
-                                metrics = metrics,
-                                beatsPerBar = beatsPerBar,
-                                gridResolution = gridResolution,
-                                colors = gridColors,
-                                viewport = viewport
-                            ),
-                        userScrollEnabled = true
+                            .verticalScroll(pianoRollVerticalScrollState)
                     ) {
-                        itemsIndexed(launchpads) { index, _ ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(rowHeight)
-                            ) {
+                        launchpads.forEachIndexed { index, _ ->
+                            Column {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(PIANO_ROLL_DEVICE_HEADER_HEIGHT)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(rowHeight)
+                                        .pianoRollGridBackground(
+                                            devicePitchRange = 0 until totalPitches,
+                                            clipBeats = clipBeats,
+                                            metrics = metrics,
+                                            beatsPerBar = beatsPerBar,
+                                            gridResolution = gridResolution,
+                                            colors = gridColors,
+                                            viewport = viewport
+                                        )
+                                ) {
                                 notesState.forEach { note ->
                                     val selected = selections.any {
                                         it is Selectable.PianoRollNote &&
@@ -829,13 +881,14 @@ fun PianoRollEditorCanvas(
                                     rowHeight = rowHeight
                                 )
                             }
-
-                            PianoRollMarqueeOverlay(
-                                marqueeStart = marqueeStart,
-                                marqueeCurrent = marqueeCurrent
-                            )
+                            }
                         }
                     }
+
+                    PianoRollMarqueeOverlay(
+                        marqueeStart = marqueeStart,
+                        marqueeCurrent = marqueeCurrent
+                    )
                 }
             }
         }

@@ -1,14 +1,12 @@
 package dev.anthonyhfm.amethyst.timeline
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -466,7 +464,6 @@ internal fun DraftNoteBox(
 internal fun PianoKeysColumn(
     totalPitches: Int,
     noteHeight: Dp,
-    verticalScroll: ScrollState?,
     deviceIndex: Int,
     pressedPitches: Set<Int>
 ) {
@@ -479,9 +476,8 @@ internal fun PianoKeysColumn(
     Box(
         modifier = Modifier
             .width(100.dp)
-            .fillMaxHeight()
+            .height(noteHeight * totalPitches)
             .background(palette.rulerSurface)
-            .let { if (verticalScroll != null) it.verticalScroll(verticalScroll, enabled = false) else it }
     ) {
         val noteHeightPx = with(density) { noteHeight.toPx() }
         Canvas(

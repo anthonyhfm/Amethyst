@@ -19,7 +19,11 @@ internal class PianoRollMetrics(
 ) {
     val noteHeightPx: Float = with(density) { noteHeightDp.toPx() }
     val pixelsPerBeatPx: Float = zoomX * MS_PER_BEAT
-    val noteRenderHeightPx: Float = noteHeightPx - 4f
+
+    /** Hit-testing height for note rects — matches the actually rendered [NoteBox] height
+     *  (which uses the full row height) so tools relying on rect-based hit-testing
+     *  (e.g. ERASE, marquee-select) never miss the bottom band of a note. */
+    val noteRenderHeightPx: Float = noteHeightPx
 
     fun pitchToYPx(pitch: Int): Float = (totalPitches - 1 - pitch) * noteHeightPx
 

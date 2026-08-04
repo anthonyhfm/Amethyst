@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -113,6 +114,27 @@ internal fun cellDurationAt(cellStartMs: Long, resolution: GridResolution): Long
     val k = kotlin.math.round(currentBeatFraction * n)
     val nextCellStartMs = (((k + 1) * MS_PER_BEAT) / n.toDouble()).toLong()
     return nextCellStartMs - cellStartMs
+}
+
+/**
+ * Moves [clipTimeMs] by exactly one grid cell of [resolution] in the given [direction]
+ * (`+1` = forward/right, `-1` = backward/left), always landing exactly on a grid boundary —
+ * even if [clipTimeMs] itself was off-grid to begin with.
+ *
+ * Used to grid-align keyboard-driven (arrow key) playhead nudging in the piano roll,
+ * matching the same [MS_PER_BEAT]-based grid the renderer and note-drawing tools use.
+ */
+internal fun stepClipTimeOnGrid(clipTimeMs: Long, resolution: GridResolution, direction: Int): Long {
+    val n = resolution.snapDivisionsPerBeat
+    val beatFraction = clipTimeMs / MS_PER_BEAT.toDouble()
+    val k = beatFraction * n
+    val epsilon = 1e-6
+    val steppedK = if (direction >= 0) {
+        floor(k + epsilon) + 1
+    } else {
+        ceil(k - epsilon) - 1
+    }
+    return ((steppedK / n.toDouble()) * MS_PER_BEAT).toLong()
 }
 
 /**

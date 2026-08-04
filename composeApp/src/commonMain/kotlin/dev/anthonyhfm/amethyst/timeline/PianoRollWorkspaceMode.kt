@@ -1,10 +1,10 @@
 package dev.anthonyhfm.amethyst.timeline
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,13 +39,14 @@ import dev.anthonyhfm.amethyst.timeline.migration.LegacyPianoRollPath
 import dev.anthonyhfm.amethyst.timeline.migration.PianoRollCutoverSupport
 import dev.anthonyhfm.amethyst.timeline.ui.pianoroll.PianoRollEditorCanvas
 import dev.anthonyhfm.amethyst.timeline.ui.pianoroll.PianoRollInspectorSidebar
-import dev.anthonyhfm.amethyst.timeline.ui.pianoroll.PianoRollToolbar
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
-import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportPanBoundsPolicy
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.WorkspaceViewport
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -404,6 +405,18 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                     maxZoomX = 12f * initialZoomX,
                 )
             )
+        }
+
+        val applyViewportChange: (EditorViewportState) -> Unit = { newViewport ->
+            viewport = newViewport
+            val newZoomFactor = newViewport.zoomX * MS_PER_BEAT.toFloat() / basePixelsPerBeatPx
+            zoomFactor = newZoomFactor
+            if (!this@PianoRollWorkspaceMode.gridResolutionLocked) {
+                val targetRes = GridResolution.fromZoomFactor(newZoomFactor)
+                if (targetRes != this@PianoRollWorkspaceMode.gridResolution) {
+                    this@PianoRollWorkspaceMode.gridResolution = targetRes
+                }
+            }
         }
 
         LaunchedEffect(this@PianoRollWorkspaceMode.gridResolutionLocked) {
@@ -935,14 +948,31 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                     }
                 )
 
-                Box(
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .padding(bottom = 12.dp)
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.BottomCenter
                 ) {
+                    WorkspaceViewport(
+                        modifier = Modifier.weight(1f),
+                        viewportKey = "workspace-pianoroll",
+                        config = ViewportConfig(
+                            minZoom = 0.5f,
+                            maxZoom = 2f,
+                            enablePanning = true,
+                            enableZoom = true,
+                            draggableObjects = false,
+                            panBoundsPolicy = ViewportPanBoundsPolicy.ClampToContent(
+                                allowedOutOfBoundsFraction = 0.5f,
+                            ),
+                            showGrid = false,
+                            showOrigin = false,
+                            showActions = false,
+                            showRemoteCursors = true,
+                            contentPadding = 24.dp
+                        ),
+                    )
+
                     var notesPanelHeight by remember { mutableStateOf(350.dp) }
                     val minHeight = 250.dp
 
@@ -950,14 +980,11 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(notesPanelHeight)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Theme[colors][background].copy(alpha = 0.95f))
-                            .border(1.dp, Theme[colors][border], RoundedCornerShape(12.dp))
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(24.dp)
+                                .height(16.dp)
                                 .pointerInput(Unit) {
                                     detectDragGestures { change, dragAmount ->
                                         change.consume()
@@ -976,6 +1003,8 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                             )
                         }
 
+                        HorizontalDivider(color = Theme[colors][border])
+
                         Box(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp).padding(bottom = 12.dp)) {
                             PianoRollEditorCanvas(
                                 entry = entry,
@@ -993,17 +1022,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                                 onResizeNotes = resizeNotes,
                                 onDeleteNotes = deleteNotes,
                                 viewport = viewport,
-                                onViewportChange = { newViewport ->
-                                    viewport = newViewport
-                                    val newZoomFactor = newViewport.zoomX * MS_PER_BEAT.toFloat() / basePixelsPerBeatPx
-                                    zoomFactor = newZoomFactor
-                                    if (!this@PianoRollWorkspaceMode.gridResolutionLocked) {
-                                        val targetRes = GridResolution.fromZoomFactor(newZoomFactor)
-                                        if (targetRes != this@PianoRollWorkspaceMode.gridResolution) {
-                                            this@PianoRollWorkspaceMode.gridResolution = targetRes
-                                        }
-                                    }
-                                },
+                                onViewportChange = applyViewportChange,
                                 gridResolution = this@PianoRollWorkspaceMode.gridResolution,
                                 currentBpm = ::currentBpm,
                                 pressedKeysState = this@PianoRollWorkspaceMode.pressedKeysState,
@@ -1070,10 +1089,30 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                         activeTool = TimelineEditorTool.ERASE
                         return true
                     }
+                    Key.DirectionLeft -> return nudgePlayhead(-1)
+                    Key.DirectionRight -> return nudgePlayhead(1)
+                    Key.Escape -> {
+                        requestClose()
+                        return true
+                    }
                 }
             }
         }
         return false
+    }
+
+    private fun requestClose() {
+        modeClose?.invoke()
+        WorkspaceRepository.switchToPreviousMode()
+    }
+
+    private fun nudgePlayhead(direction: Int): Boolean {
+        val entry = currentEntry ?: return false
+        val currentMs = selectedTimeMs ?: 0L
+        val nextMs = stepClipTimeOnGrid(currentMs, gridResolution, direction)
+            .coerceIn(0L, entry.durationMs)
+        selectedTimeMs = nextMs
+        return true
     }
 
     override fun onMidiInput(data: MidiInputData, offset: androidx.compose.ui.geometry.Offset) {
