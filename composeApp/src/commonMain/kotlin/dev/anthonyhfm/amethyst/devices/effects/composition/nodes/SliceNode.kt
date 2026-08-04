@@ -2,45 +2,39 @@ package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberUpdatedState
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableAngleControl
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Scissors
-import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryFrame
 import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryPaint
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableAngleControl
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.secondary
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Scissors
+import com.composeunstyled.theme.Theme
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import kotlinx.serialization.Serializable
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.atan2
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -65,8 +59,8 @@ object SliceNode : TransformNode() {
     override val label = "Slice"
     override val icon = Lucide.Scissors
 
-    override val bodyWidth = 190.dp
-    override val bodyHeight = 142.dp
+    override val bodyWidth = 216.dp
+    override val bodyHeight = 128.dp
 
     override fun defaultState() = SliceNodeState()
 
@@ -121,11 +115,8 @@ object SliceNode : TransformNode() {
     ) {
         val state = node.state as? SliceNodeState ?: return
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            modifier = Modifier.fillMaxSize(),
         ) {
             SliceAngleControl(
                 angleDegrees = state.angleDegrees,
@@ -138,23 +129,52 @@ object SliceNode : TransformNode() {
                         )
                     )
                 },
+                modifier = Modifier
+                    .padding(12.dp)
+                    .aspectRatio(1f)
+                    .fillMaxHeight(),
+                description = "Slice angle",
             )
-            Dial(
-                type = DialType.Continuous,
-                value = state.width,
-                defaultValue = 0.2f,
-                title = "Width",
-                text = "${(state.width * 100).roundToInt()}%",
-                onValueChange = {
-                    onNodeChange(
-                        node.copy(
-                            state = state.copy(
-                                width = it,
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(top = 12.dp, end = 12.dp, bottom = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                AutomatableDial(
+                    parameterId = "width",
+                    type = DialType.Continuous,
+                    value = state.width,
+                    defaultValue = 0.2f,
+                    title = "Width",
+                    text = "${(state.width * 100).roundToInt()}%",
+                    onValueChange = {
+                        onNodeChange(
+                            node.copy(
+                                state = state.copy(
+                                    width = it.coerceIn(0f, 1f),
+                                )
                             )
                         )
-                    )
-                },
-            )
+                    },
+                    onResolveTextValue = { value ->
+                        value.removeSuffix("%")
+                            .trim()
+                            .toFloatOrNull()
+                            ?.let { width ->
+                                onNodeChange(
+                                    node.copy(
+                                        state = state.copy(
+                                            width = (width / 100f).coerceIn(0f, 1f),
+                                        )
+                                    )
+                                )
+                            }
+                    },
+                )
+            }
         }
     }
 }
@@ -163,6 +183,8 @@ object SliceNode : TransformNode() {
 private fun SliceAngleControl(
     angleDegrees: Float,
     onAngleChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    description: String,
 ) {
     val foregroundColor = Theme[colors][foreground]
 
@@ -170,11 +192,10 @@ private fun SliceAngleControl(
         parameterId = "angle",
         angleDegrees = angleDegrees,
         onAngleChange = onAngleChange,
-        modifier = Modifier
-            .size(80.dp)
+        modifier = modifier
             .clip(DefaultShape)
             .background(Theme[colors][secondary])
-            .semantics { contentDescription = "Slice angle" },
+            .semantics { this.contentDescription = description },
     ) {
         Canvas(
             modifier = Modifier.fillMaxSize()

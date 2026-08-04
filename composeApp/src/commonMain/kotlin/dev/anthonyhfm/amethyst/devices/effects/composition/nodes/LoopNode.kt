@@ -36,7 +36,7 @@ object LoopNode : CompositionNodeDefinition {
     override val hasOutput = true
     override val pickerCategory = CompositionNodePickerCategory.Time
 
-    override val bodyWidth = 160.dp
+    override val bodyWidth = 128.dp
     override val bodyHeight = 128.dp
 
     override fun defaultState() = LoopNodeState()

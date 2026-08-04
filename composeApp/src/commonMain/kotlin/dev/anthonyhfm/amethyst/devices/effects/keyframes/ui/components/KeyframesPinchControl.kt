@@ -99,14 +99,16 @@ fun PinchGraph(
     val surfaceHigh = Theme[colors][secondary]
     val curveColor = if (bilateral) Color(0xFFFF9800) else Color(0xFF3D6BFF)
     val pinchState = rememberUpdatedState(clampedPinch)
+    val onPinchChangeState = rememberUpdatedState(onPinchChange)
+    val onToggleBilateralState = rememberUpdatedState(onToggleBilateral)
 
     Canvas(
         modifier = modifier
             .clip(DefaultShape)
             .background(surfaceHigh)
             .rightClickable {
-                onPinchChange(0f)
-                onToggleBilateral()
+                onPinchChangeState.value(0f)
+                onToggleBilateralState.value()
             }
             .pointerInput(Unit) {
                 var baselinePinch = 0f
@@ -122,7 +124,7 @@ fun PinchGraph(
                         if (height > 0f) {
                             accumulated += (-dragAmount.y / height) * 4f
                             val newValue = (baselinePinch + accumulated).coerceIn(-2f, 2f)
-                            if (newValue != pinchState.value) onPinchChange(newValue)
+                            if (newValue != pinchState.value) onPinchChangeState.value(newValue)
                         }
                     }
                 )

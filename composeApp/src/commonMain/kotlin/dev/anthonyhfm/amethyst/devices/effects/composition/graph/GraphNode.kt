@@ -4,7 +4,6 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.OutputNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.RotateNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.ScannerNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionNodeState
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.OriginBindableState
@@ -57,22 +56,17 @@ const val OUTPUT_PORT = "out"
 fun defaultCompositionGraph(): CompositionGraph {
     val scanner = CompositionNode(
         type = ScannerNode.type,
-        position = NodePosition(48f, 120f),
-    )
-    val rotate = CompositionNode(
-        type = RotateNode.type,
-        position = NodePosition(300f, 120f),
+        position = NodePosition(48f, 96f),
     )
     val output = CompositionNode(
         type = OutputNode.type,
-        position = NodePosition(552f, 120f),
+        position = NodePosition(328f, 96f),
     )
 
     return CompositionGraph(
-        nodes = listOf(scanner, rotate, output),
+        nodes = listOf(scanner, output),
         connections = listOf(
-            CompositionConnection(fromNodeId = scanner.id, toNodeId = rotate.id),
-            CompositionConnection(fromNodeId = rotate.id, toNodeId = output.id),
+            CompositionConnection(fromNodeId = scanner.id, toNodeId = output.id),
         ),
         outputNodeId = output.id,
     )

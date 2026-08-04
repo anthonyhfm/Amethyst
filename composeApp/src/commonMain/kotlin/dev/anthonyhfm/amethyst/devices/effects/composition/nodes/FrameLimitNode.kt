@@ -1,9 +1,12 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.nodes
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableSlider
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Timer
 import dev.anthonyhfm.amethyst.devices.effects.composition.EvaluationContext
@@ -12,7 +15,6 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.Automat
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import kotlinx.serialization.Serializable
 import kotlin.math.floor
-import kotlin.math.roundToInt
 
 @Serializable
 data class FrameLimitNodeState(
@@ -54,14 +56,17 @@ object FrameLimitNode : TransformNode() {
     ) {
         val state = node.state as? FrameLimitNodeState ?: return
 
-        NodeControls {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
             AutomatableDial(
                 parameterId = "frames",
                 type = DialType.Steps(values = (1..120).toList()),
                 value = state.frames,
                 defaultValue = 0,
                 title = "FPS",
-                text = "${state.frames} FPS",
+                text = state.frames.toString(),
                 onValueChange = {
                     onNodeChange(
                         node.copy(

@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -56,6 +57,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CableTa
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.DataCableGeometry
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GRAPH_NODE_PORT_RADIUS
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GRAPH_NODE_TITLE_HEIGHT
+import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.DEFAULT_GRAPH_NODE_BODY_HEIGHT
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.DEFAULT_GRAPH_NODE_BODY_WIDTH
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.GraphNodeShell
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.CompositionNodePicker
@@ -109,6 +111,7 @@ fun GraphViewport(
     var contextMenuWorldPosition by remember { mutableStateOf(NodePosition(96f, 96f)) }
     val externalViewport = graph.viewport.normalized()
     var viewport by remember { mutableStateOf(externalViewport) }
+    val hasNodes = graph.nodes.isNotEmpty()
 
     LaunchedEffect(externalViewport) {
         viewport = externalViewport
@@ -271,6 +274,24 @@ fun GraphViewport(
     val highlightedOutputNodeId = cableDrag
         ?.takeIf { !it.grabbedInput }
         ?.let { outputNodeAt(it.start)?.id }
+
+    LaunchedEffect(viewportSize, externalViewport, hasNodes) {
+        if (viewportSize.width <= 0f || viewportSize.height <= 0f || !hasNodes) return@LaunchedEffect
+        if (externalViewport.offsetX != 0f || externalViewport.offsetY != 0f || externalViewport.zoom != 1f) return@LaunchedEffect
+
+        val contentBounds = contentBounds(graph.nodes)
+        if (contentBounds == null) return@LaunchedEffect
+
+        val centeredOffset = GraphViewportState(
+            offsetX = viewportSize.width / 2f - contentBounds.center.x * densityScale * externalViewport.zoom,
+            offsetY = viewportSize.height / 2f - contentBounds.center.y * densityScale * externalViewport.zoom,
+            zoom = externalViewport.zoom,
+        )
+
+        if (viewport != centeredOffset) {
+            updateViewport(centeredOffset)
+        }
+    }
 
     Box(
         modifier = modifier
@@ -629,6 +650,38 @@ private fun CableEndHandle(
 
 private fun GraphViewportState.normalized(): GraphViewportState =
     copy(zoom = 1f)
+
+private fun contentBounds(nodes: List<CompositionNode>): Rect? {
+    if (nodes.isEmpty()) return null
+
+    val first = nodes.first()
+    var minX = first.position.x
+    var minY = first.position.y
+    var maxX = first.position.x
+    var maxY = first.position.y
+
+    nodes.forEach { node ->
+        val definition = NodeRegistry.definitionFor(node)
+        val bodyWidth = definition?.bodyWidth?.value ?: DEFAULT_GRAPH_NODE_BODY_WIDTH
+        val bodyHeight = definition?.bodyHeight?.value ?: DEFAULT_GRAPH_NODE_BODY_HEIGHT
+        val left = node.position.x
+        val top = node.position.y
+        val right = left + bodyWidth
+        val bottom = top + GRAPH_NODE_TITLE_HEIGHT + bodyHeight
+
+        if (left < minX) minX = left
+        if (top < minY) minY = top
+        if (right > maxX) maxX = right
+        if (bottom > maxY) maxY = bottom
+    }
+
+    return Rect(
+        left = minX,
+        top = minY,
+        right = maxX,
+        bottom = maxY,
+    )
+}
 
 private fun isAdditiveSelection(): Boolean =
     ModifierKeysState.isShiftPressed || ModifierKeysState.isCtrlPressed || ModifierKeysState.isMetaPressed
