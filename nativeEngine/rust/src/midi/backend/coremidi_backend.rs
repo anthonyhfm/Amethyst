@@ -129,6 +129,8 @@ impl MidiBackend for CoreMidiBackend {
                 
                 let entity_count = coremidi_sys::MIDIDeviceGetNumberOfEntities(dev);
                 let mut ports = Vec::new();
+                let mut input_port_number = 0;
+                let mut output_port_number = 0;
                 
                 for j in 0..entity_count {
                     let entity = coremidi_sys::MIDIDeviceGetEntity(dev, j);
@@ -152,9 +154,10 @@ impl MidiBackend for CoreMidiBackend {
                             id: port_id,
                             name: port_name,
                             direction: MidiPortDirection::Input,
-                            port_number: k as u32,
+                            port_number: input_port_number,
                             is_available: true,
                         });
+                        input_port_number += 1;
                     }
                     
                     let dest_count = coremidi_sys::MIDIEntityGetNumberOfDestinations(entity);
@@ -175,9 +178,10 @@ impl MidiBackend for CoreMidiBackend {
                             id: port_id,
                             name: port_name,
                             direction: MidiPortDirection::Output,
-                            port_number: k as u32,
+                            port_number: output_port_number,
                             is_available: true,
                         });
+                        output_port_number += 1;
                     }
                 }
                 

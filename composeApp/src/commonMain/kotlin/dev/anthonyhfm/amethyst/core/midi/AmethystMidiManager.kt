@@ -198,12 +198,64 @@ class AmethystMidiManager(
                 }
             }
 
-            if (detected != null) {
-                return detected
+            val detection = detected ?: continue
+            return if (detection.firmware == LaunchpadFirmware.CoreFW) {
+                rebindCoreFwToSecondPorts(device, detection)
+            } else {
+                detection
             }
         }
 
         return null
+    }
+
+    private suspend fun rebindCoreFwToSecondPorts(
+        device: AmethystMidiDevice,
+        detection: DetectedTypeAndPorts,
+    ): DetectedTypeAndPorts? {
+        val access = midiAccess ?: return null
+        val inputPort = device.inputPorts.sortedBy { it.portNumber }.getOrNull(1)
+        val outputPort = device.outputPorts.sortedBy { it.portNumber }.getOrNull(1)
+
+        if (inputPort == null || outputPort == null) {
+            detection.inputConnection.close()
+            detection.outputConnection.close()
+            println("CoreFW device ${device.name} does not expose a second MIDI input and output")
+            return null
+        }
+
+        val inputConnection = if (detection.inputConnection.portId == inputPort.id) {
+            detection.inputConnection
+        } else {
+            runCatching { access.openInput(inputPort.id) }.getOrNull()
+        }
+        if (inputConnection == null) {
+            detection.inputConnection.close()
+            detection.outputConnection.close()
+            println("Could not open CoreFW second MIDI input ${inputPort.name}")
+            return null
+        }
+
+        val outputConnection = if (detection.outputConnection.portId == outputPort.id) {
+            detection.outputConnection
+        } else {
+            runCatching { access.openOutput(outputPort.id) }.getOrNull()
+        }
+        if (outputConnection == null) {
+            if (inputConnection !== detection.inputConnection) inputConnection.close()
+            detection.inputConnection.close()
+            detection.outputConnection.close()
+            println("Could not open CoreFW second MIDI output ${outputPort.name}")
+            return null
+        }
+
+        if (inputConnection !== detection.inputConnection) detection.inputConnection.close()
+        if (outputConnection !== detection.outputConnection) detection.outputConnection.close()
+
+        return detection.copy(
+            inputConnection = inputConnection,
+            outputConnection = outputConnection,
+        )
     }
 
     private fun updateDetectedDevicesList() {

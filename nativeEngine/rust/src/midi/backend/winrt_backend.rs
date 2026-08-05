@@ -81,12 +81,26 @@ impl MidiBackend for WinRtBackend {
             };
 
             let mut midi_ports = Vec::with_capacity(grouped_ports.len());
-            for (index, port) in grouped_ports.iter().enumerate() {
+            let mut input_port_number = 0;
+            let mut output_port_number = 0;
+            for port in &grouped_ports {
+                let port_number = match port.direction {
+                    MidiPortDirection::Input => {
+                        let number = input_port_number;
+                        input_port_number += 1;
+                        number
+                    }
+                    MidiPortDirection::Output => {
+                        let number = output_port_number;
+                        output_port_number += 1;
+                        number
+                    }
+                };
                 midi_ports.push(MidiPortInfo {
                     id: port.id.clone(),
                     name: port.name.clone(),
                     direction: port.direction,
-                    port_number: index as u32,
+                    port_number,
                     is_available: true,
                 });
             }
