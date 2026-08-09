@@ -22,14 +22,7 @@ class LaunchpadDeviceProMk3(
     }
 
     override fun encodeUpdate(updates: List<RawLEDUpdate>): List<ByteArray> {
-        val updatesWithTopButtonMirrors = updates.filter {
-            it.index in 1 until 8
-        }.map {
-            it.copy(
-                index = (100 + it.index).toByte()
-            )
-        }.plus(updates)
-        val addressableUpdates = prepareFastLedUpdates(updatesWithTopButtonMirrors)
+        val addressableUpdates = prepareFastLedUpdates(updates)
 
         return encodeFastLedUpdates(addressableUpdates)
             // Launchpad Pro MK3 Programmer's Reference: RGB LED SysEx supports up to 106 LEDs.
