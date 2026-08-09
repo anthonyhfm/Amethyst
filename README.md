@@ -1,3 +1,5 @@
+
+
 # Amethyst
 
 ![Amethyst Banner](logo.svg)
@@ -56,6 +58,7 @@ Amethyst is a Multiplatform App for creating and playing Launchpad Covers runnin
 - Integrated audio sample playback via the Echo engine
 
 ### Multi-Origin Import
+- **Amethyst** (`.ame`) — native project format
 - **Ableton Live** (`.als`) — including merged Apollo lighting data
 - **Apollo Studio** (`.approj`)
 - **UniPad** (zipped project)
@@ -77,4 +80,4 @@ Amethyst is a Multiplatform App for creating and playing Launchpad Covers runnin
 ### Credits
 
 - [Mat1jaczyyy](https://github.com/mat1jaczyyy) for creating the Heaven Engine that was ported to Amethyst
-- [Kaskobi](https://kaskobi.com) for allowing Amethyst to use MicroLight 3 graphics 
+- [Kaskobi](https://kaskobi.com) for allowing Amethyst to use MicroLight 3 graphics
