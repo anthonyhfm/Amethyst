@@ -30,6 +30,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.nameWithoutExtension
 
 class MxDeviceMidiEffectAdapter(
@@ -58,6 +59,10 @@ class MxDeviceMidiEffectAdapter(
                     computed
                 } else {
                     val maxFile = PlatformFile(path)
+                    if (!maxFile.exists()) {
+                        println("Max file not found: $maxFile")
+                        return emptyList()
+                    }
                     maxFile.getFileHash()
                 }
 
