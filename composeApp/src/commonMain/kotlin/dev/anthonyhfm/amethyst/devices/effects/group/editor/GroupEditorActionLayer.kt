@@ -355,6 +355,7 @@ internal class GroupEditorActionLayer<State : DeviceState>(
 
         stateFlow.value = afterState
         AutomappingManager.clearTargetIfMissing(device)
+        device.parentChain?.onDeviceRuntimeStateChanged()
         desiredSelectedGroupIds?.let { groupIds ->
             restoreGroupSelectionForDevice(
                 device = device,

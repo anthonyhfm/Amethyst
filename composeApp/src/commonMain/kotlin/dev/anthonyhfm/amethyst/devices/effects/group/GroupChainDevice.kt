@@ -144,6 +144,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
     override fun onStateRestored() {
         super.onStateRestored()
         AutomappingManager.clearTargetIfMissing(this)
+        parentChain?.onDeviceRuntimeStateChanged()
     }
 
     private fun moveGroup(fromIndex: Int, toIndex: Int) {
@@ -219,6 +220,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
         if (this.state.value.groups.isEmpty()) {
             createGroup()
         }
+        parentChain?.onDeviceRuntimeStateChanged()
     }
 
     // Internal methods for undo/redo operations without triggering UndoManager
@@ -235,6 +237,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
                 openedGroupIndex = index
             )
         }
+        parentChain?.onDeviceRuntimeStateChanged()
     }
 
     fun removeGroupInternal(index: Int) {
@@ -257,6 +260,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
             )
         }
         AutomappingManager.clearTargetIfMissing(this)
+        parentChain?.onDeviceRuntimeStateChanged()
     }
 
     fun duplicateGroups(selectedIndices: List<Int>) {

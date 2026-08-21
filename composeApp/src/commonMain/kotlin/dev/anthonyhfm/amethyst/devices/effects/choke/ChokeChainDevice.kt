@@ -75,6 +75,11 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
         chokeDevicesByChannel.getOrPut(state.value.target) { mutableListOf() }.add(this)
     }
 
+    override fun onStateRestored() {
+        super.onStateRestored()
+        parentChain?.onDeviceRuntimeStateChanged()
+    }
+
     companion object : ChainDeviceFactory<ChokeChainDeviceState> {
         override val stateClass = ChokeChainDeviceState::class
         override val serializer = ChokeChainDeviceState.serializer()
@@ -84,7 +89,11 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
 
         override fun unpack(state: ChokeChainDeviceState): ChokeChainDevice =
             ChokeChainDevice().apply {
-                this.state.update { state.copy(chain = state.stateChain.unpack()) }
+                val unpackedChain = state.stateChain.unpack()
+                unpackedChain.signalExit = {
+                    signalExit?.invoke(it)
+                }
+                this.state.update { state.copy(chain = unpackedChain) }
             }
 
         // Map of choke channel to list of choke devices on that channel

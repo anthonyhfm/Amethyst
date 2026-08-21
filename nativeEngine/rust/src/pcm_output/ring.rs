@@ -142,7 +142,7 @@ impl SpscFloatRing {
     }
 }
 
-fn float_to_i16(sample: f32) -> i16 {
+pub(crate) fn float_to_i16(sample: f32) -> i16 {
     let sample = sample.clamp(-1.0, 1.0);
     if sample <= -1.0 {
         i16::MIN
@@ -151,7 +151,7 @@ fn float_to_i16(sample: f32) -> i16 {
     }
 }
 
-fn float_to_u16(sample: f32) -> u16 {
+pub(crate) fn float_to_u16(sample: f32) -> u16 {
     let normalized = sample.clamp(-1.0, 1.0) * 0.5 + 0.5;
     (normalized * u16::MAX as f32).round() as u16
 }

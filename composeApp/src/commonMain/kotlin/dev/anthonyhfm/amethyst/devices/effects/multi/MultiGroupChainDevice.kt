@@ -212,6 +212,16 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
         Content(rememberDragAndDropState())
     }
 
+    override fun onRemovedFromChain() {
+        AutomappingManager.clearTargetForDevice(selectionUUID)
+    }
+
+    override fun onStateRestored() {
+        super.onStateRestored()
+        AutomappingManager.clearTargetIfMissing(this)
+        parentChain?.onDeviceRuntimeStateChanged()
+    }
+
     @Composable
     private fun MultiGroupModeFooter(
         deviceState: MultiGroupChainDeviceState,

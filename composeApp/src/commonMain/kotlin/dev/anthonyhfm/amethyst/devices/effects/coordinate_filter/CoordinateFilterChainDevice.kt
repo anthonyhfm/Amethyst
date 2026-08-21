@@ -261,6 +261,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         val signals = if (state.value.padFilters.isNotEmpty()) {
             state.value.padFilters.mapNotNull { filter ->
                 val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
+                    ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
                     ?: return@mapNotNull null
                 Signal.LED(
                     origin = this,
@@ -293,6 +294,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         val globalFilters: Set<Pair<Int, Int>> = if (state.value.padFilters.isNotEmpty()) {
             state.value.padFilters.mapNotNull { filter ->
                 val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
+                    ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
                     ?: return@mapNotNull null
                 Pair(
                     filter.localX + device.position.value.x.toInt(),
