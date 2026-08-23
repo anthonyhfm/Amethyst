@@ -23,6 +23,7 @@ windows = { version = "0.58.0", features = [
     "Foundation_Collections",
     "Storage_Streams",
     "Win32_System_Com",
+    "Win32_System_WinRT",
     "Win32_Foundation",
     "Win32_Devices_Properties",
     "Win32_Media",

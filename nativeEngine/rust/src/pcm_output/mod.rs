@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, mpsc};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use ring::{SpscFloatRing, float_to_i16, float_to_u16};
+use ring::SpscFloatRing;
 
 const DEFAULT_PERIOD_FRAMES: u32 = 128;
 #[cfg(target_os = "android")]
@@ -309,16 +309,17 @@ impl PcmOutputService {
         let default_id = host
             .default_output_device()
             .and_then(|device| device.id().ok())
-            .map(|id| id.id().to_owned());
+            .map(|id| id.to_string());
         host.output_devices()
             .map(|devices| {
                 devices
                     .filter_map(|device| {
-                        let id = device.id().ok()?.id().to_owned();
+                        let id = device.id().ok()?.to_string();
+                        let display_name = device.description().ok()?.name().to_owned();
                         Some(PcmOutputDevice {
                             is_default: default_id.as_deref() == Some(id.as_str()),
                             id,
-                            display_name: device.to_string(),
+                            display_name,
                         })
                     })
                     .collect()
@@ -474,27 +475,22 @@ fn build_cpal_stream(
     let mut fallback_reason = fallback_reason;
     let (device, device_name, device_id) = match preferred_output_device.as_deref() {
         Some(identifier) if !identifier.trim().is_empty() => {
-            let found = host
-                .output_devices()
-                .ok()
-                .and_then(|mut devices| {
-                    devices.find(|d| {
-                        d.id().ok().is_some_and(|id| id.id() == identifier)
-                            || d.to_string() == identifier
-                    })
-                });
+            let found = resolve_output_device(&host, identifier);
             match found {
                 Some(dev) => {
-                    let name = dev.to_string();
-                    let id = dev.id().map(|id| id.id().to_owned()).unwrap_or_default();
+                    let name = output_device_name(&dev);
+                    let id = dev.id().map(|id| id.to_string()).unwrap_or_default();
                     (dev, name, id)
                 }
                 None => {
                     let default_dev = host
                         .default_output_device()
                         .ok_or_else(|| "No default output device available".to_owned())?;
-                    let name = default_dev.to_string();
-                    let id = default_dev.id().map(|id| id.id().to_owned()).unwrap_or_default();
+                    let name = output_device_name(&default_dev);
+                    let id = default_dev
+                        .id()
+                        .map(|id| id.to_string())
+                        .unwrap_or_default();
                     fallback_reason = Some(format!(
                         "Configured device '{identifier}' unavailable; using default '{name}'"
                     ));
@@ -506,8 +502,11 @@ fn build_cpal_stream(
             let default_dev = host
                 .default_output_device()
                 .ok_or_else(|| "No default output device available".to_owned())?;
-            let name = default_dev.to_string();
-            let id = default_dev.id().map(|id| id.id().to_owned()).unwrap_or_default();
+            let name = output_device_name(&default_dev);
+            let id = default_dev
+                .id()
+                .map(|id| id.to_string())
+                .unwrap_or_default();
             (default_dev, name, id)
         }
     };
@@ -539,39 +538,28 @@ fn build_cpal_stream(
         stream_config.buffer_size = cpal::BufferSize::Fixed(period_frames);
     }
 
-    let stream = match supported_config.sample_format() {
-        cpal::SampleFormat::F32 => {
-            let ring = Arc::clone(&ring);
-            let telemetry = Arc::clone(&callback_telemetry);
-            device.build_output_stream(
-                stream_config,
-                move |output: &mut [f32], _| consume_f32(&ring, &telemetry, output, hardware_channels),
-                stream_error_callback(Arc::clone(&callback_telemetry)),
-                None,
-            )
-        }
-        cpal::SampleFormat::I16 => {
-            let ring = Arc::clone(&ring);
-            let telemetry = Arc::clone(&callback_telemetry);
-            device.build_output_stream(
-                stream_config,
-                move |output: &mut [i16], _| consume_i16(&ring, &telemetry, output, hardware_channels),
-                stream_error_callback(Arc::clone(&callback_telemetry)),
-                None,
-            )
-        }
-        cpal::SampleFormat::U16 => {
-            let ring = Arc::clone(&ring);
-            let telemetry = Arc::clone(&callback_telemetry);
-            device.build_output_stream(
-                stream_config,
-                move |output: &mut [u16], _| consume_u16(&ring, &telemetry, output, hardware_channels),
-                stream_error_callback(Arc::clone(&callback_telemetry)),
-                None,
-            )
-        }
+    let stream_builder = match supported_config.sample_format() {
+        cpal::SampleFormat::I8 => build_output_stream::<i8>,
+        cpal::SampleFormat::I16 => build_output_stream::<i16>,
+        cpal::SampleFormat::I24 => build_output_stream::<cpal::I24>,
+        cpal::SampleFormat::I32 => build_output_stream::<i32>,
+        cpal::SampleFormat::I64 => build_output_stream::<i64>,
+        cpal::SampleFormat::U8 => build_output_stream::<u8>,
+        cpal::SampleFormat::U16 => build_output_stream::<u16>,
+        cpal::SampleFormat::U24 => build_output_stream::<cpal::U24>,
+        cpal::SampleFormat::U32 => build_output_stream::<u32>,
+        cpal::SampleFormat::U64 => build_output_stream::<u64>,
+        cpal::SampleFormat::F32 => build_output_stream::<f32>,
+        cpal::SampleFormat::F64 => build_output_stream::<f64>,
         format => return Err(format!("Unsupported output sample format: {format:?}")),
-    }
+    };
+    let stream = stream_builder(
+        &device,
+        stream_config,
+        Arc::clone(&ring),
+        Arc::clone(&callback_telemetry),
+        hardware_channels,
+    )
     .map_err(|error| format!("Cannot build output stream: {error}"))?;
 
     let info = PcmOutputDeviceInfo {
@@ -604,6 +592,70 @@ fn build_cpal_stream(
     ))
 }
 
+fn resolve_output_device(host: &cpal::Host, identifier: &str) -> Option<cpal::Device> {
+    identifier
+        .parse::<cpal::DeviceId>()
+        .ok()
+        .and_then(|id| host.device_by_id(&id))
+        .filter(DeviceTrait::supports_output)
+        .or_else(|| {
+            host.output_devices()
+                .ok()?
+                .find(|device| output_device_matches(device, identifier))
+        })
+}
+
+fn output_device_matches(device: &cpal::Device, identifier: &str) -> bool {
+    let Some(id) = device.id().ok() else {
+        return false;
+    };
+    let display_name = device
+        .description()
+        .ok()
+        .map(|description| description.name().to_owned());
+    identifier_matches_device(
+        identifier,
+        &id.to_string(),
+        id.id(),
+        display_name.as_deref(),
+    )
+}
+
+fn identifier_matches_device(
+    identifier: &str,
+    canonical_id: &str,
+    legacy_id: &str,
+    display_name: Option<&str>,
+) -> bool {
+    identifier == canonical_id || identifier == legacy_id || display_name == Some(identifier)
+}
+
+fn output_device_name(device: &cpal::Device) -> String {
+    device
+        .description()
+        .map(|description| description.name().to_owned())
+        .unwrap_or_else(|_| "Unknown output device".to_owned())
+}
+
+fn build_output_stream<T>(
+    device: &cpal::Device,
+    config: cpal::StreamConfig,
+    ring: Arc<SpscFloatRing>,
+    telemetry: Arc<CallbackTelemetry>,
+    hardware_channels: usize,
+) -> Result<cpal::Stream, cpal::Error>
+where
+    T: cpal::SizedSample + cpal::FromSample<f32>,
+{
+    let error_telemetry = Arc::clone(&telemetry);
+    device.build_output_stream(
+        config,
+        move |output: &mut [T], _| consume_output(&ring, &telemetry, output, hardware_channels),
+        stream_error_callback(error_telemetry),
+        None,
+    )
+}
+
 fn stream_error_callback(
     telemetry: Arc<CallbackTelemetry>,
 ) -> impl FnMut(cpal::Error) + Send + 'static {
@@ -612,183 +664,47 @@ fn stream_error_callback(
     }
 }
 
-fn consume_f32(
+fn consume_output<T>(
     ring: &SpscFloatRing,
     telemetry: &CallbackTelemetry,
-    output: &mut [f32],
+    output: &mut [T],
     hardware_channels: usize,
-) {
-    if hardware_channels == 2 {
-        let consumed = ring.read_f32(output);
-        output[consumed..].fill(0.0);
-        telemetry.record_callback(consumed, output.len(), 2);
-    } else if hardware_channels == 1 {
-        let total_frames = output.len();
-        let mut consumed_samples = 0;
-        let mut stereo_buf = [0.0f32; 256];
-        let mut frame_idx = 0;
-        while frame_idx < total_frames {
-            let chunk_frames = (total_frames - frame_idx).min(128);
-            let requested_samples = chunk_frames * 2;
-            let read_samples = ring.read_f32(&mut stereo_buf[..requested_samples]);
-            consumed_samples += read_samples;
-            let read_frames = read_samples / 2;
-            for i in 0..read_frames {
-                output[frame_idx + i] = (stereo_buf[i * 2] + stereo_buf[i * 2 + 1]) * 0.5;
-            }
-            if read_frames < chunk_frames {
-                output[frame_idx + read_frames..].fill(0.0);
-                break;
-            }
-            frame_idx += chunk_frames;
-        }
-        telemetry.record_callback(consumed_samples, total_frames * 2, 2);
-    } else if hardware_channels > 2 {
-        let total_frames = output.len() / hardware_channels;
-        let mut consumed_samples = 0;
-        let mut stereo_buf = [0.0f32; 256];
-        let mut frame_idx = 0;
-        while frame_idx < total_frames {
-            let chunk_frames = (total_frames - frame_idx).min(128);
-            let requested_samples = chunk_frames * 2;
-            let read_samples = ring.read_f32(&mut stereo_buf[..requested_samples]);
-            consumed_samples += read_samples;
-            let read_frames = read_samples / 2;
-            for i in 0..read_frames {
-                let out_base = (frame_idx + i) * hardware_channels;
-                output[out_base] = stereo_buf[i * 2];
-                output[out_base + 1] = stereo_buf[i * 2 + 1];
-                output[out_base + 2..out_base + hardware_channels].fill(0.0);
-            }
-            if read_frames < chunk_frames {
-                let unfilled_start = (frame_idx + read_frames) * hardware_channels;
-                output[unfilled_start..].fill(0.0);
-                break;
-            }
-            frame_idx += chunk_frames;
-        }
-        telemetry.record_callback(consumed_samples, total_frames * 2, 2);
-    }
-}
+) where
+    T: cpal::Sample + cpal::FromSample<f32>,
+{
+    let total_frames = output.len() / hardware_channels;
+    let mut consumed_samples = 0;
+    let mut stereo_buffer = [0.0f32; 256];
+    let mut frame_offset = 0;
 
-fn consume_i16(
-    ring: &SpscFloatRing,
-    telemetry: &CallbackTelemetry,
-    output: &mut [i16],
-    hardware_channels: usize,
-) {
-    if hardware_channels == 2 {
-        let consumed = ring.read_i16(output);
-        output[consumed..].fill(0);
-        telemetry.record_callback(consumed, output.len(), 2);
-    } else if hardware_channels == 1 {
-        let total_frames = output.len();
-        let mut consumed_samples = 0;
-        let mut stereo_buf = [0.0f32; 256];
-        let mut frame_idx = 0;
-        while frame_idx < total_frames {
-            let chunk_frames = (total_frames - frame_idx).min(128);
-            let requested_samples = chunk_frames * 2;
-            let read_samples = ring.read_f32(&mut stereo_buf[..requested_samples]);
-            consumed_samples += read_samples;
-            let read_frames = read_samples / 2;
-            for i in 0..read_frames {
-                let mixed = (stereo_buf[i * 2] + stereo_buf[i * 2 + 1]) * 0.5;
-                output[frame_idx + i] = float_to_i16(mixed);
-            }
-            if read_frames < chunk_frames {
-                output[frame_idx + read_frames..].fill(0);
-                break;
-            }
-            frame_idx += chunk_frames;
-        }
-        telemetry.record_callback(consumed_samples, total_frames * 2, 2);
-    } else if hardware_channels > 2 {
-        let total_frames = output.len() / hardware_channels;
-        let mut consumed_samples = 0;
-        let mut stereo_buf = [0.0f32; 256];
-        let mut frame_idx = 0;
-        while frame_idx < total_frames {
-            let chunk_frames = (total_frames - frame_idx).min(128);
-            let requested_samples = chunk_frames * 2;
-            let read_samples = ring.read_f32(&mut stereo_buf[..requested_samples]);
-            consumed_samples += read_samples;
-            let read_frames = read_samples / 2;
-            for i in 0..read_frames {
-                let out_base = (frame_idx + i) * hardware_channels;
-                output[out_base] = float_to_i16(stereo_buf[i * 2]);
-                output[out_base + 1] = float_to_i16(stereo_buf[i * 2 + 1]);
-                output[out_base + 2..out_base + hardware_channels].fill(0);
-            }
-            if read_frames < chunk_frames {
-                let unfilled_start = (frame_idx + read_frames) * hardware_channels;
-                output[unfilled_start..].fill(0);
-                break;
-            }
-            frame_idx += chunk_frames;
-        }
-        telemetry.record_callback(consumed_samples, total_frames * 2, 2);
-    }
-}
+    while frame_offset < total_frames {
+        let chunk_frames = (total_frames - frame_offset).min(stereo_buffer.len() / 2);
+        let requested_samples = chunk_frames * 2;
+        let read_samples = ring.read_f32(&mut stereo_buffer[..requested_samples]);
+        let read_frames = read_samples / 2;
+        consumed_samples += read_samples;
 
-fn consume_u16(
-    ring: &SpscFloatRing,
-    telemetry: &CallbackTelemetry,
-    output: &mut [u16],
-    hardware_channels: usize,
-) {
-    if hardware_channels == 2 {
-        let consumed = ring.read_u16(output);
-        output[consumed..].fill(32_768);
-        telemetry.record_callback(consumed, output.len(), 2);
-    } else if hardware_channels == 1 {
-        let total_frames = output.len();
-        let mut consumed_samples = 0;
-        let mut stereo_buf = [0.0f32; 256];
-        let mut frame_idx = 0;
-        while frame_idx < total_frames {
-            let chunk_frames = (total_frames - frame_idx).min(128);
-            let requested_samples = chunk_frames * 2;
-            let read_samples = ring.read_f32(&mut stereo_buf[..requested_samples]);
-            consumed_samples += read_samples;
-            let read_frames = read_samples / 2;
-            for i in 0..read_frames {
-                let mixed = (stereo_buf[i * 2] + stereo_buf[i * 2 + 1]) * 0.5;
-                output[frame_idx + i] = float_to_u16(mixed);
+        for frame in 0..chunk_frames {
+            let output_offset = (frame_offset + frame) * hardware_channels;
+            if frame < read_frames {
+                let left = stereo_buffer[frame * 2];
+                let right = stereo_buffer[frame * 2 + 1];
+                if hardware_channels == 1 {
+                    output[output_offset] = T::from_sample((left + right) * 0.5);
+                } else {
+                    output[output_offset] = T::from_sample(left);
+                    output[output_offset + 1] = T::from_sample(right);
+                    output[output_offset + 2..output_offset + hardware_channels]
+                        .fill(T::EQUILIBRIUM);
+                }
+            } else {
+                output[output_offset..output_offset + hardware_channels].fill(T::EQUILIBRIUM);
             }
-            if read_frames < chunk_frames {
-                output[frame_idx + read_frames..].fill(32_768);
-                break;
-            }
-            frame_idx += chunk_frames;
         }
-        telemetry.record_callback(consumed_samples, total_frames * 2, 2);
-    } else if hardware_channels > 2 {
-        let total_frames = output.len() / hardware_channels;
-        let mut consumed_samples = 0;
-        let mut stereo_buf = [0.0f32; 256];
-        let mut frame_idx = 0;
-        while frame_idx < total_frames {
-            let chunk_frames = (total_frames - frame_idx).min(128);
-            let requested_samples = chunk_frames * 2;
-            let read_samples = ring.read_f32(&mut stereo_buf[..requested_samples]);
-            consumed_samples += read_samples;
-            let read_frames = read_samples / 2;
-            for i in 0..read_frames {
-                let out_base = (frame_idx + i) * hardware_channels;
-                output[out_base] = float_to_u16(stereo_buf[i * 2]);
-                output[out_base + 1] = float_to_u16(stereo_buf[i * 2 + 1]);
-                output[out_base + 2..out_base + hardware_channels].fill(32_768);
-            }
-            if read_frames < chunk_frames {
-                let unfilled_start = (frame_idx + read_frames) * hardware_channels;
-                output[unfilled_start..].fill(32_768);
-                break;
-            }
-            frame_idx += chunk_frames;
-        }
-        telemetry.record_callback(consumed_samples, total_frames * 2, 2);
+        frame_offset += chunk_frames;
     }
+
+    telemetry.record_callback(consumed_samples, total_frames * 2, 2);
 }
 
 /// Direct producer entry point for the JVM bridge.
@@ -833,7 +749,7 @@ pub unsafe extern "C" fn amethyst_pcm_output_queued_frames(handle: u64) -> u64 {
 mod tests {
     use super::{
         CallbackTelemetry, SpscFloatRing, amethyst_pcm_output_queued_frames,
-        amethyst_pcm_output_write_direct, consume_f32, consume_i16, consume_u16,
+        amethyst_pcm_output_write_direct, consume_output, identifier_matches_device,
     };
     use std::sync::Arc;
 
@@ -844,7 +760,7 @@ mod tests {
         ring.write_interleaved(&[0.25, -0.25]);
         let mut output = [99.0; 4];
 
-        consume_f32(&ring, &telemetry, &mut output, 2);
+        consume_output(&ring, &telemetry, &mut output, 2);
 
         assert_eq!(output, [0.25, -0.25, 0.0, 0.0]);
         assert_eq!(telemetry.consumed_frames.load(Ordering::Relaxed), 1);
@@ -860,8 +776,8 @@ mod tests {
 
         let mut first_period = [0.0; 4];
         let mut second_period = [0.0; 4];
-        consume_f32(&ring, &telemetry, &mut first_period, 2);
-        consume_f32(&ring, &telemetry, &mut second_period, 2);
+        consume_output(&ring, &telemetry, &mut first_period, 2);
+        consume_output(&ring, &telemetry, &mut second_period, 2);
 
         assert_eq!(first_period, primed[..4]);
         assert_eq!(second_period, primed[4..]);
@@ -875,7 +791,7 @@ mod tests {
         ring.write_interleaved(&[0.2, 0.8, -0.4, 0.4]);
         let mut output = [0.0; 2];
 
-        consume_f32(&ring, &telemetry, &mut output, 1);
+        consume_output(&ring, &telemetry, &mut output, 1);
 
         assert_eq!(output, [0.5, 0.0]);
         assert_eq!(telemetry.consumed_frames.load(Ordering::Relaxed), 2);
@@ -887,9 +803,9 @@ mod tests {
         let ring = SpscFloatRing::new(4, 2);
         let telemetry = CallbackTelemetry::new();
         ring.write_interleaved(&[0.3, -0.3, 0.6, -0.6]);
-        let mut output = [9.0; 8]; // 2 frames of 4 channels
+        let mut output = [9.0f32; 8]; // 2 frames of 4 channels
 
-        consume_f32(&ring, &telemetry, &mut output, 4);
+        consume_output(&ring, &telemetry, &mut output, 4);
 
         assert_eq!(output, [0.3, -0.3, 0.0, 0.0, 0.6, -0.6, 0.0, 0.0]);
         assert_eq!(telemetry.consumed_frames.load(Ordering::Relaxed), 2);
@@ -900,15 +816,51 @@ mod tests {
     fn integer_callbacks_use_format_correct_silence() {
         let signed_ring = SpscFloatRing::new(2, 2);
         let signed_telemetry = CallbackTelemetry::new();
-        let mut signed = [1; 2];
-        consume_i16(&signed_ring, &signed_telemetry, &mut signed, 2);
+        let mut signed = [1i16; 2];
+        consume_output(&signed_ring, &signed_telemetry, &mut signed, 2);
         assert_eq!(signed, [0, 0]);
 
         let unsigned_ring = SpscFloatRing::new(2, 2);
         let unsigned_telemetry = CallbackTelemetry::new();
-        let mut unsigned = [1; 2];
-        consume_u16(&unsigned_ring, &unsigned_telemetry, &mut unsigned, 2);
+        let mut unsigned = [1u16; 2];
+        consume_output(&unsigned_ring, &unsigned_telemetry, &mut unsigned, 2);
         assert_eq!(unsigned, [32_768, 32_768]);
+    }
+
+    #[test]
+    fn callbacks_support_additional_pcm_formats() {
+        let ring = SpscFloatRing::new(2, 2);
+        let telemetry = CallbackTelemetry::new();
+        ring.write_interleaved(&[-1.0, 1.0]);
+        let mut output = [0i32; 2];
+
+        consume_output(&ring, &telemetry, &mut output, 2);
+
+        assert_eq!(output, [i32::MIN, i32::MAX]);
+    }
+
+    #[test]
+    fn device_matching_accepts_canonical_and_legacy_preferences() {
+        let canonical = "coreaudio:BuiltInSpeakerDevice";
+        let legacy = "BuiltInSpeakerDevice";
+        let name = Some("MacBook Pro Speakers");
+
+        assert!(identifier_matches_device(
+            canonical, canonical, legacy, name
+        ));
+        assert!(identifier_matches_device(legacy, canonical, legacy, name));
+        assert!(identifier_matches_device(
+            "MacBook Pro Speakers",
+            canonical,
+            legacy,
+            name,
+        ));
+        assert!(!identifier_matches_device(
+            "BlackHole 2ch",
+            canonical,
+            legacy,
+            name,
+        ));
     }
 
     #[test]

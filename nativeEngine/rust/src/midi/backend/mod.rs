@@ -1,13 +1,25 @@
-use crate::midi::types::*;
 use crate::midi::error::MidiError;
+use crate::midi::types::*;
+use std::sync::OnceLock;
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+pub(super) fn monotonic_micros() -> u64 {
+    static ORIGIN: OnceLock<Instant> = OnceLock::new();
+    ORIGIN
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_micros()
+        .min(u64::MAX as u128) as u64
+}
 
 pub trait BackendPortHandle: Send + Sync {
     fn send(&self, data: &[u8]) -> Result<(), MidiError>;
     fn close(&self) -> Result<(), MidiError>;
     fn port_id(&self) -> &str;
-    fn is_open(&self) -> bool { true }
+    fn is_open(&self) -> bool {
+        true
+    }
 }
 
 pub trait MidiBackend: Send + Sync {
@@ -17,18 +29,15 @@ pub trait MidiBackend: Send + Sync {
         std::thread::sleep(Duration::from_millis(timeout_ms));
         false
     }
-    
+
     fn open_input(
         &self,
         port_id: &str,
-        sender: mpsc::Sender<MidiMessage>,
+        sender: mpsc::SyncSender<MidiMessage>,
     ) -> Result<Box<dyn BackendPortHandle>, MidiError>;
-    
-    fn open_output(
-        &self,
-        port_id: &str,
-    ) -> Result<Box<dyn BackendPortHandle>, MidiError>;
-    
+
+    fn open_output(&self, port_id: &str) -> Result<Box<dyn BackendPortHandle>, MidiError>;
+
     fn name(&self) -> &str;
 }
 

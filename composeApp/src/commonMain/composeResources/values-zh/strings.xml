@@ -351,6 +351,9 @@
     <string name="settings_audio_master_volume_title">主音量</string>
     <string name="settings_audio_buffer_size_title">缓冲区大小</string>
     <string name="settings_audio_output_device_title">输出设备</string>
+    <string name="settings_audio_output_active">当前使用：%1$s</string>
+    <string name="settings_audio_output_error">音频输出不可用：%1$s</string>
+    <string name="settings_audio_output_fallback">正在使用 %1$s：%2$s</string>
     <string name="settings_audio_exclusive_mode_title">WASAPI 独占模式</string>
     <string name="settings_audio_mode_shared">共享 · %1$d Hz · %2$d 帧</string>
     <string name="settings_audio_mode_exclusive">独占 · %1$d Hz · %2$d 帧</string>

@@ -1,9 +1,11 @@
-use crate::midi::types::*;
-use crate::midi::error::MidiError;
 use crate::midi::backend::BackendPortHandle;
+use crate::midi::error::MidiError;
 use crate::midi::event::{MidiEvent, midi_event_to_bytes};
-use std::sync::{Arc, Mutex};
+use crate::midi::parser::MidiStreamParser;
+use crate::midi::types::*;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub(crate) struct MidiConnectionInner {
@@ -11,7 +13,7 @@ pub(crate) struct MidiConnectionInner {
     direction: MidiPortDirection,
     handle: Box<dyn BackendPortHandle>,
     receiver: Option<Mutex<Receiver<MidiMessage>>>,
-    is_open: Mutex<bool>,
+    is_open: AtomicBool,
 }
 
 #[derive(uniffi::Object)]
@@ -31,22 +33,19 @@ impl MidiConnection {
                 direction: MidiPortDirection::Input,
                 handle,
                 receiver: Some(Mutex::new(receiver)),
-                is_open: Mutex::new(true),
+                is_open: AtomicBool::new(true),
             }),
         }
     }
 
-    pub(crate) fn new_output(
-        port_id: String,
-        handle: Box<dyn BackendPortHandle>,
-    ) -> Self {
+    pub(crate) fn new_output(port_id: String, handle: Box<dyn BackendPortHandle>) -> Self {
         Self {
             inner: Arc::new(MidiConnectionInner {
                 port_id,
                 direction: MidiPortDirection::Output,
                 handle,
                 receiver: None,
-                is_open: Mutex::new(true),
+                is_open: AtomicBool::new(true),
             }),
         }
     }
@@ -56,11 +55,20 @@ impl MidiConnection {
 impl MidiConnection {
     pub fn send(&self, data: Vec<u8>) -> Result<(), MidiError> {
         if !self.is_open() {
-            return Err(MidiError::PortNotOpen { port_id: self.port_id() });
+            return Err(MidiError::PortNotOpen {
+                port_id: self.port_id(),
+            });
         }
         if self.direction() != MidiPortDirection::Output {
             return Err(MidiError::SendFailed {
                 reason: "Cannot send to an input port".into(),
+            });
+        }
+        let mut validator = MidiStreamParser::new();
+        validator.push(&data);
+        if data.is_empty() || !validator.is_complete_and_valid() {
+            return Err(MidiError::SendFailed {
+                reason: "Output must contain complete, valid MIDI 1.0 messages".into(),
             });
         }
         self.inner.handle.send(&data)
@@ -98,13 +106,11 @@ impl MidiConnection {
     }
 
     pub fn is_open(&self) -> bool {
-        *self.inner.is_open.lock().unwrap() && self.inner.handle.is_open()
+        self.inner.is_open.load(Ordering::Acquire) && self.inner.handle.is_open()
     }
 
     pub fn disconnect(&self) -> Result<(), MidiError> {
-        let mut open = self.inner.is_open.lock().unwrap();
-        if *open {
-            *open = false;
+        if self.inner.is_open.swap(false, Ordering::AcqRel) {
             self.inner.handle.close()?;
         }
         Ok(())
@@ -113,9 +119,7 @@ impl MidiConnection {
 
 impl Drop for MidiConnectionInner {
     fn drop(&mut self) {
-        let mut open = self.is_open.lock().unwrap();
-        if *open {
-            *open = false;
+        if self.is_open.swap(false, Ordering::AcqRel) {
             let _ = self.handle.close();
         }
     }

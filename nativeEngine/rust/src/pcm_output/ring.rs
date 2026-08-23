@@ -45,10 +45,6 @@ impl SpscFloatRing {
         }
     }
 
-    pub(crate) fn channels(&self) -> usize {
-        self.channels
-    }
-
     pub(crate) fn available_read_frames(&self) -> usize {
         self.available_read_samples() / self.channels
     }
@@ -89,12 +85,14 @@ impl SpscFloatRing {
         self.read_mapped(output.len(), |index, sample| output[index] = sample)
     }
 
+    #[cfg(any(test, target_os = "windows"))]
     pub(crate) fn read_i16(&self, output: &mut [i16]) -> usize {
         self.read_mapped(output.len(), |index, sample| {
             output[index] = float_to_i16(sample);
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn read_u16(&self, output: &mut [u16]) -> usize {
         self.read_mapped(output.len(), |index, sample| {
             output[index] = float_to_u16(sample);
@@ -142,6 +140,7 @@ impl SpscFloatRing {
     }
 }
 
+#[cfg(any(test, target_os = "windows"))]
 pub(crate) fn float_to_i16(sample: f32) -> i16 {
     let sample = sample.clamp(-1.0, 1.0);
     if sample <= -1.0 {
@@ -151,6 +150,7 @@ pub(crate) fn float_to_i16(sample: f32) -> i16 {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn float_to_u16(sample: f32) -> u16 {
     let normalized = sample.clamp(-1.0, 1.0) * 0.5 + 0.5;
     (normalized * u16::MAX as f32).round() as u16

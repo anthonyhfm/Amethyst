@@ -1,18 +1,29 @@
 package dev.anthonyhfm.amethyst.nativeengine.midi
 
-import dev.anthonyhfm.amethyst.nativeengine.*
+import dev.anthonyhfm.amethyst.nativeengine.MidiConnection
+import dev.anthonyhfm.amethyst.nativeengine.MidiEvent
+import dev.anthonyhfm.amethyst.nativeengine.midiControlChange
+import dev.anthonyhfm.amethyst.nativeengine.midiDeviceInquiry
+import dev.anthonyhfm.amethyst.nativeengine.midiNoteOff
+import dev.anthonyhfm.amethyst.nativeengine.midiNoteOn
+import dev.anthonyhfm.amethyst.nativeengine.midiSysex
+import java.util.concurrent.atomic.AtomicBoolean
 
 class NativeMidiOutput internal constructor(
     private val connection: MidiConnection,
 ) : AutoCloseable {
+    private val closed = AtomicBoolean(false)
 
-    val portId: String get() = connection.portId()
+    val portId: String = connection.portId()
+    val isOpen: Boolean get() = !closed.get() && connection.isOpen()
 
     fun send(data: ByteArray) {
+        check(isOpen) { "MIDI output $portId is closed" }
         connection.send(data)
     }
 
     fun sendEvent(event: MidiEvent) {
+        check(isOpen) { "MIDI output $portId is closed" }
         connection.sendEvent(event)
     }
 
@@ -42,7 +53,12 @@ class NativeMidiOutput internal constructor(
     }
 
     override fun close() {
-        connection.disconnect()
-        connection.close()
+        if (closed.compareAndSet(false, true)) {
+            try {
+                connection.disconnect()
+            } finally {
+                connection.close()
+            }
+        }
     }
 }

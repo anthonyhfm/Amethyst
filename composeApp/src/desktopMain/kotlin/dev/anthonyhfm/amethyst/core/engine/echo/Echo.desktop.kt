@@ -98,7 +98,13 @@ actual object Echo {
             maximumBlockFrames = max(periodFrames, MAXIMUM_RENDER_BLOCK_FRAMES),
         )
         val nextPlayback = playback
-        nextPlayback.prepare(configuration)
+        val reusingPlayback = nextPlayback.configuration == configuration
+        if (!reusingPlayback) {
+            if (nextPlayback.configuration != null) {
+                nextPlayback.release()
+            }
+            nextPlayback.prepare(configuration)
+        }
         nextPlayback.setMasterGain(AudioSettings.masterVolume.value, rampFrames = 0)
 
         val directBuffer = NativePcmOutput.allocateBuffer(periodFrames, OUTPUT_CHANNELS)
@@ -122,8 +128,17 @@ actual object Echo {
                 allowWhenStopped = true,
             )
         }
-        if (nextOutput.start() != null) {
-            nextPlayback.release()
+        val startError = nextOutput.start()
+        if (startError != null) {
+            mutableOutputStatus.value = AudioOutputStatus(
+                requestedMode = if (exclusiveMode) AudioOutputMode.Exclusive else AudioOutputMode.Shared,
+                error = startError,
+                underrunCount = totalUnderruns,
+                streamErrorCount = totalStreamErrors,
+            )
+            if (!reusingPlayback) {
+                nextPlayback.release()
+            }
             nextOutput.close()
             return false
         }
@@ -131,6 +146,8 @@ actual object Echo {
         output = nextOutput
         mutableOutputStatus.value = AudioOutputStatus(
             available = true,
+            deviceId = info.deviceId,
+            deviceName = info.deviceName,
             backend = info.backend,
             requestedMode = if (info.requestedExclusive) {
                 AudioOutputMode.Exclusive
@@ -354,11 +371,11 @@ actual object Echo {
 
     private fun restartIfRunning() {
         if (!initialized) return
-        stopOutput()
+        stopOutput(releasePlayback = false)
         initializeOnControlThread()
     }
 
-    private fun stopOutput() {
+    private fun stopOutput(releasePlayback: Boolean = true) {
         initialized = false
         stopHealthMonitor()
         renderRunning.set(false)
@@ -370,7 +387,9 @@ actual object Echo {
         renderThread = null
         output?.close()
         output = null
-        playback.release()
+        if (releasePlayback) {
+            playback.release()
+        }
     }
 
     private fun <T> onControlThread(block: () -> T): T {

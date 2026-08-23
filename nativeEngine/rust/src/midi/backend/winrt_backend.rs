@@ -1,7 +1,6 @@
-use crate::midi::backend::{BackendPortHandle, MidiBackend};
+use crate::midi::backend::{BackendPortHandle, MidiBackend, monotonic_micros};
 use crate::midi::error::MidiError;
 use crate::midi::grouping::sort_ports;
-use crate::midi::parser::split_midi_messages;
 use crate::midi::types::*;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -18,7 +17,8 @@ use windows::Win32::Devices::Properties::{
     DEVPKEY_Device_ContainerId, DEVPKEY_Device_InstanceId, DEVPROP_TYPE_GUID, DEVPROP_TYPE_STRING,
     DEVPROPKEY, DEVPROPTYPE,
 };
-use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
+use windows::Win32::Foundation::RO_E_CLOSED;
+use windows::Win32::System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize};
 use windows::core::{GUID, HSTRING, IInspectable, Interface, PCWSTR, RuntimeType};
 
 const BACKEND_PREFIX: &str = "winrt1";
@@ -26,8 +26,8 @@ const CONTAINER_ID_PROPERTY: &str = "System.Devices.ContainerId";
 const FRIENDLY_NAME_PROPERTY: &str = "System.ItemNameDisplay";
 const MANUFACTURER_PROPERTY: &str = "System.Devices.Manufacturer";
 const MODEL_PROPERTY: &str = "System.Devices.ModelName";
-const SNAPSHOT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const WINRT_ASYNC_TIMEOUT: Duration = Duration::from_secs(5);
+const WINRT_WORKER_REPLY_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[link(name = "cfgmgr32")]
 unsafe extern "system" {
@@ -83,11 +83,11 @@ impl PortKey {
 
 struct ConnectionState {
     open: AtomicBool,
-    input_sender: Mutex<Option<mpsc::Sender<MidiMessage>>>,
+    input_sender: Mutex<Option<mpsc::SyncSender<MidiMessage>>>,
 }
 
 impl ConnectionState {
-    fn input(sender: mpsc::Sender<MidiMessage>) -> Self {
+    fn input(sender: mpsc::SyncSender<MidiMessage>) -> Self {
         Self {
             open: AtomicBool::new(true),
             input_sender: Mutex::new(Some(sender)),
@@ -107,8 +107,7 @@ impl ConnectionState {
 
     fn invalidate(&self) -> bool {
         let was_open = self.open.swap(false, Ordering::AcqRel);
-        // The callback owns no separate sender clone. Taking this sender wakes a
-        // thread blocked in MidiConnection::receive when an input disappears.
+        // Dropping the only sender wakes a blocked receiver.
         self.input_sender.lock().unwrap().take();
         was_open
     }
@@ -120,10 +119,12 @@ impl ConnectionState {
 
         let result = {
             let sender = self.input_sender.lock().unwrap();
-            sender
-                .as_ref()
-                .ok_or(())
-                .and_then(|sender| sender.send(message).map_err(|_| ()))
+            match sender.as_ref().ok_or(())?.try_send(message) {
+                Ok(()) => Ok(()),
+                Err(mpsc::TrySendError::Full(_)) | Err(mpsc::TrySendError::Disconnected(_)) => {
+                    Err(())
+                }
+            }
         };
         if result.is_err() {
             self.invalidate();
@@ -216,19 +217,20 @@ impl WinRtWorker {
         let thread = thread::Builder::new()
             .name("amethyst-winrt-midi".into())
             .spawn(move || {
-                let apartment_result = initialize_worker_mta();
-                if let Err(error) = apartment_result {
-                    let _ = startup_sender.send(Err(error));
-                    return;
-                }
+                let _apartment = match WinRtApartment::initialize_mta() {
+                    Ok(apartment) => apartment,
+                    Err(error) => {
+                        let _ = startup_sender.send(Err(error));
+                        return;
+                    }
+                };
 
                 match WorkerRuntime::new(device_change_sender, connections, worker_commands) {
                     Ok((mut runtime, initial_ports)) => {
                         if startup_sender.send(Ok(initial_ports)).is_ok() {
                             runtime.run(command_receiver);
                         }
-                        // All WinRT objects must be released before uninitializing
-                        // the apartment that created and owns them.
+                        // Release WinRT objects before their apartment.
                         runtime.shutdown();
                         drop(runtime);
                     }
@@ -236,8 +238,6 @@ impl WinRtWorker {
                         let _ = startup_sender.send(Err(error));
                     }
                 }
-
-                unsafe { CoUninitialize() };
             })
             .map_err(|error| MidiError::BackendError {
                 reason: format!("Could not start WinRT MIDI worker: {error}"),
@@ -248,9 +248,9 @@ impl WinRtWorker {
             thread: Mutex::new(Some(thread)),
         });
         let initial_ports = startup_receiver
-            .recv()
-            .map_err(|_| MidiError::BackendError {
-                reason: "WinRT MIDI worker stopped during initialization".into(),
+            .recv_timeout(WINRT_WORKER_REPLY_TIMEOUT)
+            .map_err(|error| MidiError::BackendError {
+                reason: format!("WinRT MIDI worker did not initialize: {error}"),
             })??;
         Ok((worker, initial_ports))
     }
@@ -332,9 +332,11 @@ impl Drop for WinRtWorker {
 }
 
 fn receive_worker_reply<T>(receiver: mpsc::Receiver<Result<T, MidiError>>) -> Result<T, MidiError> {
-    receiver.recv().map_err(|_| MidiError::BackendError {
-        reason: "WinRT MIDI worker stopped before completing the request".into(),
-    })?
+    receiver
+        .recv_timeout(WINRT_WORKER_REPLY_TIMEOUT)
+        .map_err(|error| MidiError::BackendError {
+            reason: format!("WinRT MIDI worker did not complete the request: {error}"),
+        })?
 }
 
 enum WorkerOpenPort {
@@ -482,6 +484,7 @@ impl WorkerRuntime {
         device_id: &str,
         state: Arc<ConnectionState>,
     ) -> Result<u64, MidiError> {
+        let port_timestamp_origin_us = monotonic_micros();
         let device_id_hstring = HSTRING::from(device_id);
         let operation = MidiInPort::FromIdAsync(&device_id_hstring).map_err(to_connection_error)?;
         let input_port = wait_for_async(
@@ -503,18 +506,17 @@ impl WorkerRuntime {
 
                 if let Some(args) = args {
                     match read_midi_message(args) {
-                        Ok((data, timestamp_us)) => {
-                            for message_data in split_midi_messages(&data) {
-                                if callback_state
-                                    .send_input(MidiMessage {
-                                        data: message_data,
-                                        timestamp_us,
-                                        port_id: port_id_clone.clone(),
-                                    })
-                                    .is_err()
-                                {
-                                    break;
-                                }
+                        Ok((data, relative_timestamp_us)) => {
+                            if callback_state
+                                .send_input(MidiMessage {
+                                    data,
+                                    timestamp_us: port_timestamp_origin_us
+                                        .saturating_add(relative_timestamp_us),
+                                    port_id: port_id_clone.clone(),
+                                })
+                                .is_err()
+                            {
+                                return Ok(());
                             }
                         }
                         Err(error) => {
@@ -603,20 +605,29 @@ impl WorkerRuntime {
                 let writer = DataWriter::new().map_err(to_send_error)?;
                 writer.WriteBytes(data).map_err(to_send_error)?;
                 let buffer = writer.DetachBuffer().map_err(to_send_error)?;
-                port.SendBuffer(&buffer).map_err(to_send_error)
+                port.SendBuffer(&buffer)
             }
-            Some(WorkerOpenPort::Output { .. }) | None => Err(MidiError::PortNotOpen {
-                port_id: format!("WinRT handle {handle_id}"),
-            }),
-            Some(WorkerOpenPort::Input { .. }) => Err(MidiError::SendFailed {
-                reason: "Port is not opened for output".into(),
-            }),
+            Some(WorkerOpenPort::Output { .. }) | None => {
+                return Err(MidiError::PortNotOpen {
+                    port_id: format!("WinRT handle {handle_id}"),
+                });
+            }
+            Some(WorkerOpenPort::Input { .. }) => {
+                return Err(MidiError::SendFailed {
+                    reason: "Port is not opened for output".into(),
+                });
+            }
         };
 
-        if result.is_err() {
-            let _ = self.close_port(handle_id);
+        if let Err(error) = result {
+            // Other HRESULTs may be transient and leave the port usable.
+            if error.code() == RO_E_CLOSED {
+                let _ = self.close_port(handle_id);
+            }
+            return Err(to_send_error(error));
         }
-        result
+
+        Ok(())
     }
 
     fn close_port(&mut self, handle_id: u64) -> Result<(), MidiError> {
@@ -698,11 +709,6 @@ impl WinRtBackend {
         }
         changed
     }
-
-    fn refresh_snapshot(&self) -> Result<bool, MidiError> {
-        let ports = self.worker.discover()?;
-        Ok(self.reconcile_snapshot(port_snapshot(&ports)))
-    }
 }
 
 impl MidiBackend for WinRtBackend {
@@ -719,7 +725,8 @@ impl MidiBackend for WinRtBackend {
         }
 
         let mut devices = Vec::new();
-        for (container_id, grouped_ports) in grouped {
+        for (container_id, mut grouped_ports) in grouped {
+            grouped_ports.sort_by(|left, right| left.id.cmp(&right.id));
             let first = match grouped_ports.first() {
                 Some(port) => port,
                 None => continue,
@@ -769,49 +776,19 @@ impl MidiBackend for WinRtBackend {
 
     fn wait_for_device_change(&self, timeout_ms: u64) -> bool {
         let timeout = Duration::from_millis(timeout_ms);
-        let started = Instant::now();
         let receiver = self.device_changes.lock().unwrap();
-
-        loop {
-            let remaining = timeout.saturating_sub(started.elapsed());
-            let wait_time = remaining.min(SNAPSHOT_POLL_INTERVAL);
-
-            match receiver.recv_timeout(wait_time) {
-                Ok(()) => {
-                    while receiver.try_recv().is_ok() {}
-                    // The watcher is the fast path. A rescan both confirms its
-                    // view and invalidates any handles whose Removed event was
-                    // missed by one of the WinRT MIDI providers.
-                    let _ = self.refresh_snapshot();
-                    return true;
-                }
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    if self.refresh_snapshot().unwrap_or(false) {
-                        return true;
-                    }
-                }
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    // Watchers normally keep the channel connected. If WinRT
-                    // tears them down, retain useful wait semantics by polling.
-                    if !wait_time.is_zero() {
-                        std::thread::sleep(wait_time);
-                    }
-                    if self.refresh_snapshot().unwrap_or(false) {
-                        return true;
-                    }
-                }
-            }
-
-            if started.elapsed() >= timeout {
-                return false;
-            }
+        if receiver.recv_timeout(timeout).is_err() {
+            return false;
         }
+
+        while receiver.try_recv().is_ok() {}
+        true
     }
 
     fn open_input(
         &self,
         port_id: &str,
-        sender: mpsc::Sender<MidiMessage>,
+        sender: mpsc::SyncSender<MidiMessage>,
     ) -> Result<Box<dyn BackendPortHandle>, MidiError> {
         let decoded = decode_port_id(port_id)?;
         if decoded.direction != MidiPortDirection::Input {
@@ -929,13 +906,7 @@ impl BackendPortHandle for WinRtOutputPortHandle {
             });
         }
 
-        match self.worker.send_output(self.handle_id, data) {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                self.connection_state.invalidate();
-                Err(error)
-            }
-        }
+        self.worker.send_output(self.handle_id, data)
     }
 
     fn close(&self) -> Result<(), MidiError> {
@@ -1009,8 +980,7 @@ impl WinRtDeviceWatcher {
                     state.enumeration_complete
                 };
                 if notify {
-                    // Added after bootstrap can be a reconnect with the same
-                    // endpoint ID. Retire the old incarnation before notifying.
+                    // Reconnects may reuse the same endpoint ID.
                     let key = PortKey::new(direction, &device_id);
                     added_connections.invalidate(&key);
                     let _ = added_worker_commands.send(WorkerCommand::InvalidateEndpoint(key));
@@ -1056,8 +1026,6 @@ impl WinRtDeviceWatcher {
                     return Ok(());
                 };
 
-                // Invalidate immediately in the callback. This does not depend
-                // on anyone currently waiting for a device-change notification.
                 let key = PortKey::new(direction, &device_id);
                 removed_connections.invalidate(&key);
                 let _ = removed_worker_commands.send(WorkerCommand::InvalidateEndpoint(key));
@@ -1103,9 +1071,10 @@ impl WinRtDeviceWatcher {
             .map_err(to_backend_error)?;
 
         let stopped_handler =
-            TypedEventHandler::<DeviceWatcher, IInspectable>::new(move |_watcher, _args| {
-                // A stopped watcher cannot be restarted reliably in-place. Wake
-                // the caller once; wait_for_device_change continues by polling.
+            TypedEventHandler::<DeviceWatcher, IInspectable>::new(move |watcher, _args| {
+                if let Some(watcher) = watcher {
+                    let _ = watcher.Start();
+                }
                 let _ = sender.send(());
                 Ok(())
             });
@@ -1139,17 +1108,25 @@ impl Drop for WinRtDeviceWatcher {
     }
 }
 
-fn initialize_worker_mta() -> Result<(), MidiError> {
-    let result = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-    if result.is_err() {
-        return Err(MidiError::BackendError {
-            reason: format!(
-                "Could not initialize the WinRT MIDI MTA: {}",
-                windows::core::Error::from(result).message()
-            ),
-        });
+struct WinRtApartment;
+
+impl WinRtApartment {
+    fn initialize_mta() -> Result<Self, MidiError> {
+        unsafe { RoInitialize(RO_INIT_MULTITHREADED) }
+            .map(|()| Self)
+            .map_err(|error| MidiError::BackendError {
+                reason: format!(
+                    "Could not initialize the WinRT MIDI MTA: {}",
+                    error.message()
+                ),
+            })
     }
-    Ok(())
+}
+
+impl Drop for WinRtApartment {
+    fn drop(&mut self) {
+        unsafe { RoUninitialize() };
+    }
 }
 
 fn wait_for_async<T>(
@@ -1413,14 +1390,18 @@ fn infer_transport(ports: &[WinRtPort]) -> MidiTransportType {
         .map(|port| format!("{} {}", port.device_id, port.name).to_ascii_lowercase())
         .collect::<Vec<_>>()
         .join(" ");
+    let tokens = haystack
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .collect::<BTreeSet<_>>();
 
-    if haystack.contains("bluetooth") || haystack.contains("ble") {
+    if tokens.contains("bluetooth") || tokens.contains("ble") {
         MidiTransportType::Bluetooth
-    } else if haystack.contains("network") || haystack.contains("rtp") {
+    } else if tokens.contains("network") || tokens.contains("rtp") {
         MidiTransportType::Network
-    } else if haystack.contains("loopback") || haystack.contains("virtual") {
+    } else if tokens.contains("loopback") || tokens.contains("virtual") {
         MidiTransportType::Virtual
-    } else if haystack.contains("usb") || haystack.contains("ks") {
+    } else if tokens.contains("usb") {
         MidiTransportType::Usb
     } else {
         MidiTransportType::Unknown

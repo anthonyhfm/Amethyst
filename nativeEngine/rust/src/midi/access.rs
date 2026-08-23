@@ -1,15 +1,17 @@
-use crate::midi::types::*;
-use crate::midi::error::MidiError;
-use crate::midi::backend::{create_platform_backend, MidiBackend};
+use crate::midi::backend::{MidiBackend, create_platform_backend};
 use crate::midi::connection::MidiConnection;
-use std::sync::{Arc, Mutex, RwLock};
+use crate::midi::error::MidiError;
+use crate::midi::types::*;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock, Weak};
+
+const INPUT_QUEUE_CAPACITY: usize = 4096;
 
 #[derive(uniffi::Object)]
 pub struct MidiAccess {
     backend: Box<dyn MidiBackend>,
     devices_cache: RwLock<Vec<MidiDeviceInfo>>,
-    open_connections: Mutex<HashMap<String, Arc<MidiConnection>>>,
+    open_connections: Mutex<HashMap<String, Weak<MidiConnection>>>,
 }
 
 #[uniffi::export]
@@ -60,24 +62,24 @@ impl MidiAccess {
 
     pub fn open_input(&self, port_id: String) -> Result<Arc<MidiConnection>, MidiError> {
         let mut conns = self.open_connections.lock().unwrap();
-        if let Some(conn) = conns.get(&port_id) {
+        if let Some(conn) = conns.get(&port_id).and_then(Weak::upgrade) {
             if conn.is_open() {
                 return Err(MidiError::PortAlreadyOpen { port_id });
             }
         }
         conns.remove(&port_id);
 
-        let (sender, receiver) = std::sync::mpsc::channel();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(INPUT_QUEUE_CAPACITY);
         let handle = self.backend.open_input(&port_id, sender)?;
-        
+
         let conn = Arc::new(MidiConnection::new_input(port_id.clone(), handle, receiver));
-        conns.insert(port_id, conn.clone());
+        conns.insert(port_id, Arc::downgrade(&conn));
         Ok(conn)
     }
 
     pub fn open_output(&self, port_id: String) -> Result<Arc<MidiConnection>, MidiError> {
         let mut conns = self.open_connections.lock().unwrap();
-        if let Some(conn) = conns.get(&port_id) {
+        if let Some(conn) = conns.get(&port_id).and_then(Weak::upgrade) {
             if conn.is_open() {
                 return Err(MidiError::PortAlreadyOpen { port_id });
             }
@@ -85,15 +87,15 @@ impl MidiAccess {
         conns.remove(&port_id);
 
         let handle = self.backend.open_output(&port_id)?;
-        
+
         let conn = Arc::new(MidiConnection::new_output(port_id.clone(), handle));
-        conns.insert(port_id, conn.clone());
+        conns.insert(port_id, Arc::downgrade(&conn));
         Ok(conn)
     }
 
     pub fn close_port(&self, port_id: String) -> Result<(), MidiError> {
         let mut conns = self.open_connections.lock().unwrap();
-        if let Some(conn) = conns.remove(&port_id) {
+        if let Some(conn) = conns.remove(&port_id).and_then(|conn| conn.upgrade()) {
             conn.disconnect()?;
         }
         Ok(())
@@ -101,11 +103,16 @@ impl MidiAccess {
 
     pub fn close_all(&self) -> Result<(), MidiError> {
         let mut conns = self.open_connections.lock().unwrap();
-        for conn in conns.values() {
-            let _ = conn.disconnect();
+        let mut first_error = None;
+        for conn in conns.values().filter_map(Weak::upgrade) {
+            if let Err(error) = conn.disconnect() {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
         }
         conns.clear();
-        Ok(())
+        first_error.map_or(Ok(()), Err)
     }
 
     pub fn backend_name(&self) -> String {

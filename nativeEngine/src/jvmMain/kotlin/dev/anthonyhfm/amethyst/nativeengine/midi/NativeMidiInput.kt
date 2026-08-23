@@ -1,33 +1,49 @@
 package dev.anthonyhfm.amethyst.nativeengine.midi
 
-import dev.anthonyhfm.amethyst.nativeengine.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import dev.anthonyhfm.amethyst.nativeengine.MidiConnection
+import dev.anthonyhfm.amethyst.nativeengine.MidiEvent
+import dev.anthonyhfm.amethyst.nativeengine.MidiMessage
+import dev.anthonyhfm.amethyst.nativeengine.parseMidiEvent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
+import java.util.concurrent.atomic.AtomicBoolean
 
 class NativeMidiInput internal constructor(
     private val connection: MidiConnection,
     private val scope: CoroutineScope,
 ) : AutoCloseable {
+    private val closed = AtomicBoolean(false)
 
-    val portId: String get() = connection.portId()
+    val portId: String = connection.portId()
+    val isOpen: Boolean get() = !closed.get() && connection.isOpen()
 
-    val messages: Flow<ByteArray> = flow {
-        while (connection.isOpen()) {
-            val msg = withContext(Dispatchers.IO) {
-                connection.receiveTimeout(100uL)
-            }
-            if (msg != null) {
-                emit(msg.data)
-            }
+    private val nativeMessageStream = flow {
+        while (isOpen) {
+            connection.receiveTimeout(100uL)?.let { emit(it) }
         }
-    }.flowOn(Dispatchers.IO)
+    }
+        .shareIn(scope, SharingStarted.WhileSubscribed(), replay = 0)
+
+    /** Messages with their normalized timestamp and originating port. */
+    val messageRecords: Flow<MidiMessage> get() = nativeMessageStream
+
+    val messages: Flow<ByteArray> = messageRecords.map { it.data }
 
     val events: Flow<MidiEvent> = messages.map { bytes ->
         parseMidiEvent(bytes)
     }
 
     override fun close() {
-        connection.disconnect()
-        connection.close()
+        if (closed.compareAndSet(false, true)) {
+            try {
+                connection.disconnect()
+            } finally {
+                connection.close()
+            }
+        }
     }
 }

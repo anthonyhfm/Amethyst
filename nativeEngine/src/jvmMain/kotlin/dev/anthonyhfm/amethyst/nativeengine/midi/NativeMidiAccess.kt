@@ -1,27 +1,39 @@
 package dev.anthonyhfm.amethyst.nativeengine.midi
 
-import dev.anthonyhfm.amethyst.nativeengine.*
-import kotlinx.coroutines.*
+import dev.anthonyhfm.amethyst.nativeengine.MidiAccess
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 class NativeMidiAccess : AutoCloseable {
     private val access = MidiAccess()
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scopeJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + scopeJob)
+    private val closed = AtomicBoolean(false)
 
     val backendName: String get() = access.backendName()
 
-    val deviceChanges: Flow<Unit> = flow {
+    private val deviceChangeStream = flow {
         while (currentCoroutineContext().isActive) {
-            val changed = withContext(Dispatchers.IO) {
-                access.waitForDeviceChange(500uL)
-            }
+            val changed = access.waitForDeviceChange(500uL)
             if (changed) {
                 emit(Unit)
             }
         }
-    }.flowOn(Dispatchers.IO)
+    }
+        .shareIn(scope, SharingStarted.WhileSubscribed(), replay = 0)
+
+    val deviceChanges: Flow<Unit> get() = deviceChangeStream
 
     suspend fun discoverDevices(): List<NativeMidiDevice> = withContext(Dispatchers.IO) {
         access.discoverDevices().map { it.toNativeMidiDevice() }
@@ -42,8 +54,14 @@ class NativeMidiAccess : AutoCloseable {
     }
 
     override fun close() {
-        scope.cancel()
-        access.closeAll()
-        access.close()
+        if (closed.compareAndSet(false, true)) {
+            // Native jobs must leave FFI before MidiAccess is destroyed.
+            runBlocking { scopeJob.cancelAndJoin() }
+            try {
+                access.closeAll()
+            } finally {
+                access.close()
+            }
+        }
     }
 }

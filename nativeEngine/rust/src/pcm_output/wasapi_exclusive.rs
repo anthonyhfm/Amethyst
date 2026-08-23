@@ -19,7 +19,7 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::PCWSTR;
 
 use super::ring::SpscFloatRing;
-use super::{CallbackTelemetry, PcmOutputDeviceInfo, StartedOutput};
+use super::{CallbackTelemetry, PcmOutputDeviceInfo, StartedOutput, output_device_matches};
 
 const RING_PERIODS: usize = 4;
 const HNS_PER_SECOND: i64 = 10_000_000;
@@ -100,10 +100,7 @@ fn resolve_endpoint_id(identifier: String) -> String {
         .ok()
         .and_then(|devices| {
             devices
-                .filter(|device| {
-                    device.id().ok().is_some_and(|id| id.id() == identifier)
-                        || device.to_string() == identifier
-                })
+                .filter(|device| output_device_matches(device, &identifier))
                 .find_map(|device| device.id().ok().map(|id| id.id().to_owned()))
         })
         .unwrap_or(identifier)
@@ -161,7 +158,10 @@ const STEREO_CHANNEL_MASK: u32 = 0x3;
 
 /// Builds a `WAVEFORMATEXTENSIBLE` candidate for the given sample rate and
 /// hardware format, deriving the dependent block-alignment fields.
-fn build_waveformatextensible(sample_rate: u32, format: HardwareFormat) -> Box<WAVEFORMATEXTENSIBLE> {
+fn build_waveformatextensible(
+    sample_rate: u32,
+    format: HardwareFormat,
+) -> Box<WAVEFORMATEXTENSIBLE> {
     let bits_per_sample = format.bits_per_sample();
     let channels = EXCLUSIVE_CHANNELS;
     let block_align = channels * (bits_per_sample / 8);
@@ -187,7 +187,9 @@ fn build_waveformatextensible(sample_rate: u32, format: HardwareFormat) -> Box<W
 /// Builds an ordered, deduplicated list of candidate exclusive-mode formats
 /// to probe via `IsFormatSupported`: Float32 and PCM16 at the endpoint's mix
 /// sample rate first, then the same formats at common fallback rates.
-fn candidate_formats(mix_sample_rate: u32) -> Vec<(HardwareFormat, u32, Box<WAVEFORMATEXTENSIBLE>)> {
+fn candidate_formats(
+    mix_sample_rate: u32,
+) -> Vec<(HardwareFormat, u32, Box<WAVEFORMATEXTENSIBLE>)> {
     let mut sample_rates = vec![mix_sample_rate];
     for rate in [48_000u32, 44_100u32] {
         if !sample_rates.contains(&rate) {

@@ -31,6 +31,7 @@ import dev.anthonyhfm.amethyst.settings.data.Setting
 internal fun <T> SelectSettingContent(setting: Setting.Select<T>) {
     var expanded by remember { mutableStateOf(false) }
     val current by setting.flow.collectAsState()
+    val options by setting.optionsFlow.collectAsState()
 
     Row(
         modifier = Modifier
@@ -68,7 +69,7 @@ internal fun <T> SelectSettingContent(setting: Setting.Select<T>) {
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
             ) {
-                setting.options.forEach { option ->
+                options.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(setting.label(option)) },
                         onClick = {

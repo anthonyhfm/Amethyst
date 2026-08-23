@@ -352,6 +352,9 @@
     <string name="settings_audio_master_volume_title">Master Volume</string>
     <string name="settings_audio_buffer_size_title">Puffergröße</string>
     <string name="settings_audio_output_device_title">Ausgabegerät</string>
+    <string name="settings_audio_output_active">Aktiv: %1$s</string>
+    <string name="settings_audio_output_error">Audioausgabe nicht verfügbar: %1$s</string>
+    <string name="settings_audio_output_fallback">Verwende %1$s: %2$s</string>
     <string name="settings_audio_exclusive_mode_title">WASAPI Exclusive Mode</string>
     <string name="settings_audio_mode_shared">Shared · %1$d Hz · %2$d Frames</string>
     <string name="settings_audio_mode_exclusive">Exclusive · %1$d Hz · %2$d Frames</string>

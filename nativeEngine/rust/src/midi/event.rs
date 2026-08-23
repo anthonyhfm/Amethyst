@@ -1,4 +1,3 @@
-
 #[derive(uniffi::Enum, Clone, Debug, PartialEq, Eq)]
 pub enum MidiEvent {
     NoteOn {
@@ -103,7 +102,7 @@ pub fn parse_midi_event(data: Vec<u8>) -> MidiEvent {
             channel,
             value: ((data[2] as u16 & 0x7F) << 7) | (data[1] as u16 & 0x7F),
         },
-        _ if status == 0xF0 => MidiEvent::SystemExclusive { data },
+        _ if status == 0xF0 && data.last() == Some(&0xF7) => MidiEvent::SystemExclusive { data },
         _ => MidiEvent::Raw { data },
     }
 }
@@ -111,13 +110,25 @@ pub fn parse_midi_event(data: Vec<u8>) -> MidiEvent {
 #[uniffi::export]
 pub fn midi_event_to_bytes(event: MidiEvent) -> Vec<u8> {
     match event {
-        MidiEvent::NoteOn { channel, note, velocity } => {
+        MidiEvent::NoteOn {
+            channel,
+            note,
+            velocity,
+        } => {
             vec![0x90 | (channel & 0x0F), note & 0x7F, velocity & 0x7F]
         }
-        MidiEvent::NoteOff { channel, note, velocity } => {
+        MidiEvent::NoteOff {
+            channel,
+            note,
+            velocity,
+        } => {
             vec![0x80 | (channel & 0x0F), note & 0x7F, velocity & 0x7F]
         }
-        MidiEvent::ControlChange { channel, controller, value } => {
+        MidiEvent::ControlChange {
+            channel,
+            controller,
+            value,
+        } => {
             vec![0xB0 | (channel & 0x0F), controller & 0x7F, value & 0x7F]
         }
         MidiEvent::ProgramChange { channel, program } => {
@@ -134,10 +145,14 @@ pub fn midi_event_to_bytes(event: MidiEvent) -> Vec<u8> {
         MidiEvent::ChannelPressure { channel, pressure } => {
             vec![0xD0 | (channel & 0x0F), pressure & 0x7F]
         }
-        MidiEvent::PolyPressure { channel, note, pressure } => {
+        MidiEvent::PolyPressure {
+            channel,
+            note,
+            pressure,
+        } => {
             vec![0xA0 | (channel & 0x0F), note & 0x7F, pressure & 0x7F]
         }
-        MidiEvent::SystemExclusive { data } => data,
+        MidiEvent::SystemExclusive { data } => midi_sysex(data),
         MidiEvent::Raw { data } => data,
     }
 }
@@ -193,14 +208,20 @@ pub fn midi_device_inquiry() -> Vec<u8> {
 #[uniffi::export]
 pub fn parse_device_inquiry_response(data: Vec<u8>) -> Option<DeviceInquiryResponse> {
     // Expected inquiry response: F0 7E <device_id> 06 02 <manufacturer_id(s)> <family_id> <model_number> <version> F7
-    // Minimum length is 15 bytes if manufacturer ID is 3 bytes, or 13 if 1 byte.
-    if data.len() < 13 || data[0] != 0xF0 || data[1] != 0x7E || data[3] != 0x06 || data[4] != 0x02 {
+    if data.len() < 15
+        || data[0] != 0xF0
+        || data[1] != 0x7E
+        || data[3] != 0x06
+        || data[4] != 0x02
+        || data.last() != Some(&0xF7)
+    {
         return None;
     }
 
     // Manufacturer ID starts at index 5. It can be 1 byte (not 0x00) or 3 bytes (starts with 0x00).
     let manufacturer_len = if data[5] == 0x00 { 3 } else { 1 };
-    if data.len() < 10 + manufacturer_len {
+    let expected_len = 5 + manufacturer_len + 2 + 2 + 4 + 1;
+    if data.len() != expected_len {
         return None;
     }
 
@@ -208,10 +229,9 @@ pub fn parse_device_inquiry_response(data: Vec<u8>) -> Option<DeviceInquiryRespo
     let family_idx = 5 + manufacturer_len;
     let family = (data[family_idx] as u16) | ((data[family_idx + 1] as u16) << 8);
     let model = (data[family_idx + 2] as u16) | ((data[family_idx + 3] as u16) << 8);
-    
+
     let version_start = family_idx + 4;
-    let version_end = data.len() - 1; // excluding F7
-    let version = data[version_start..version_end].to_vec();
+    let version = data[version_start..version_start + 4].to_vec();
 
     Some(DeviceInquiryResponse {
         manufacturer,
@@ -282,7 +302,10 @@ mod tests {
         assert_eq!(midi_note_off(0, 60, 64), vec![0x80, 60, 64]);
         assert_eq!(midi_control_change(0, 7, 100), vec![0xB0, 7, 100]);
         assert_eq!(midi_program_change(0, 42), vec![0xC0, 42]);
-        assert_eq!(midi_device_inquiry(), vec![0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]);
+        assert_eq!(
+            midi_device_inquiry(),
+            vec![0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]
+        );
     }
 
     #[test]
@@ -295,5 +318,44 @@ mod tests {
     fn test_sysex_wrapping() {
         assert_eq!(midi_sysex(vec![0x7E, 0x7F]), vec![0xF0, 0x7E, 0x7F, 0xF7]);
         assert_eq!(midi_sysex(vec![0xF0, 0x7E, 0xF7]), vec![0xF0, 0x7E, 0xF7]);
+        assert_eq!(
+            midi_event_to_bytes(MidiEvent::SystemExclusive {
+                data: vec![0x7E, 0x7F],
+            }),
+            vec![0xF0, 0x7E, 0x7F, 0xF7],
+        );
+        assert!(matches!(
+            parse_midi_event(vec![0xF0, 0x7E]),
+            MidiEvent::Raw { .. }
+        ));
+    }
+
+    #[test]
+    fn parses_complete_device_inquiry_reply() {
+        let raw = vec![
+            0xF0, 0x7E, 0x7F, 0x06, 0x02, 0x00, 0x20, 0x29, 0x02, 0x00, 0x0C, 0x00, 0x01, 0x02,
+            0x03, 0x04, 0xF7,
+        ];
+        let response = parse_device_inquiry_response(raw.clone()).unwrap();
+        assert_eq!(response.manufacturer, vec![0x00, 0x20, 0x29]);
+        assert_eq!(response.family, 2);
+        assert_eq!(response.model, 12);
+        assert_eq!(response.version, vec![1, 2, 3, 4]);
+        assert_eq!(response.raw, raw);
+    }
+
+    #[test]
+    fn rejects_truncated_or_unterminated_device_inquiry_reply() {
+        let truncated = vec![
+            0xF0, 0x7E, 0x7F, 0x06, 0x02, 0x29, 0x02, 0x00, 0x0C, 0x00, 0x01, 0x02, 0x03, 0xF7,
+        ];
+        assert!(parse_device_inquiry_response(truncated).is_none());
+
+        let mut unterminated = vec![
+            0xF0, 0x7E, 0x7F, 0x06, 0x02, 0x29, 0x02, 0x00, 0x0C, 0x00, 0x01, 0x02, 0x03, 0x04,
+            0xF7,
+        ];
+        *unterminated.last_mut().unwrap() = 0;
+        assert!(parse_device_inquiry_response(unterminated).is_none());
     }
 }

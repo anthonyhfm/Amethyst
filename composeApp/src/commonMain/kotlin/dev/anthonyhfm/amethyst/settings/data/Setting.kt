@@ -47,11 +47,19 @@ sealed class Setting<T>(
         title: String,
         titleRes: StringResource? = null,
         default: T,
-        val options: List<T>,
+        options: List<T>,
         codec: SettingCodec<T>,
         val label: (T) -> String = { it.toString() },
         onUpdate: (T) -> Unit = {},
-    ) : Setting<T>(key, title, titleRes, default, codec, onUpdate)
+    ) : Setting<T>(key, title, titleRes, default, codec, onUpdate) {
+        private val _options = MutableStateFlow(options)
+        val optionsFlow: StateFlow<List<T>> = _options.asStateFlow()
+        val options: List<T> get() = _options.value
+
+        fun updateOptions(options: List<T>) {
+            _options.value = options
+        }
+    }
 
     class Slider(
         key: String,

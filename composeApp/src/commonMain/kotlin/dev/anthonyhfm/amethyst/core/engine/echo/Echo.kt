@@ -17,6 +17,8 @@ enum class AudioOutputMode {
 
 data class AudioOutputStatus(
     val available: Boolean = false,
+    val deviceId: String = "",
+    val deviceName: String = "",
     val backend: String = "",
     val requestedMode: AudioOutputMode = AudioOutputMode.Shared,
     val activeMode: AudioOutputMode = AudioOutputMode.Shared,

@@ -6,11 +6,12 @@ import dev.anthonyhfm.amethyst.core.util.platform
 
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_title) {
     const val SystemDefaultOutputDevice = "System Default"
-    private val availableOutputDevices = Echo.outputDevices()
-    private val outputDeviceLabels = availableOutputDevices.associate { it.id to it.displayName }
+    private var outputDeviceLabels = emptyMap<String, String>()
     val masterVolume: Setting.Slider = slider(
         key = "masterVolume",
         title = "Master Volume",
@@ -36,7 +37,7 @@ object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_ti
         title = "Output Device",
         titleRes = Res.string.settings_audio_output_device_title,
         default = SystemDefaultOutputDevice,
-        options = listOf(SystemDefaultOutputDevice) + availableOutputDevices.map { it.id }.distinct(),
+        options = listOf(SystemDefaultOutputDevice),
         codec = SettingCodec.String,
         label = { id -> outputDeviceLabels[id] ?: id },
         onUpdate = { device -> Echo.setPreferredOutputDevice(device.takeUnless { it == SystemDefaultOutputDevice }) },
@@ -52,5 +53,19 @@ object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_ti
         )
     } else {
         null
+    }
+
+    suspend fun refreshOutputDevices() {
+        val devices = withContext(Dispatchers.Default) { Echo.outputDevices() }
+        outputDeviceLabels = buildMap {
+            devices.forEach { device ->
+                put(device.id, device.displayName)
+                put(device.id.substringAfter(':'), device.displayName)
+                put(device.displayName, device.displayName)
+            }
+        }
+        outputDevice.updateOptions(
+            listOf(SystemDefaultOutputDevice) + devices.map { it.id }.distinct()
+        )
     }
 }

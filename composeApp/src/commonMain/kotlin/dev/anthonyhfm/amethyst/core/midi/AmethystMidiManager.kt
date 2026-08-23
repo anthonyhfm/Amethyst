@@ -3,27 +3,34 @@ package dev.anthonyhfm.amethyst.core.midi
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
-import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
-import dev.anthonyhfm.amethyst.core.midi.data.getMidiInputData
 import dev.anthonyhfm.amethyst.core.midi.devices.*
 import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
+import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.rotateMidiCoordinate
+import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class AmethystMidiDeviceDetails(
     val id: String,
@@ -38,13 +45,15 @@ data class LaunchpadDeviceIdentification(
 
 class AmethystMidiManager(
     private val midiAccess: AmethystMidiAccess? = platformMidiAccess,
+    private val closeMidiAccessOnClose: Boolean = false,
 ) {
 
-    val midiInScope = CoroutineScope(Dispatchers.IO.limitedParallelism(4))
+    val midiInScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(4))
     private var monitorJob: Job? = null
     private val rescanMutex = Mutex()
     private val elementCollectorJobs = mutableMapOf<String, Job>()
     private val activeConnections = mutableMapOf<String, ActiveDeviceConnection>()
+    private val pendingSingleCoverUuid = atomic<String?>(null)
 
     private class ActiveDeviceConnection(
         val device: AmethystMidiDevice,
@@ -56,9 +65,14 @@ class AmethystMidiManager(
     )
 
     companion object {
+        private const val RESCAN_INTERVAL_MS = 1_000L
+
         private val _detectedDevices = MutableStateFlow<List<AmethystMidiDeviceDetails>>(emptyList())
         val detectedDevices: StateFlow<List<AmethystMidiDeviceDetails>> = _detectedDevices.asStateFlow()
     }
+
+    private fun workspaceDevices(): List<LaunchpadViewportElement> =
+        ViewportRepository.devices.value
 
     fun close() {
         stopAutoDetectLoop()
@@ -69,7 +83,9 @@ class AmethystMidiManager(
             conn.output?.close()
         }
         activeConnections.clear()
-        midiAccess?.close()
+        if (closeMidiAccessOnClose) {
+            midiAccess?.close()
+        }
         midiInScope.cancel()
     }
 
@@ -148,11 +164,10 @@ class AmethystMidiManager(
         val outputs = device.outputPorts
         if (inputs.isEmpty() || outputs.isEmpty()) return null
 
-        var detected: DetectedTypeAndPorts? = null
-
         for (outputPort in outputs) {
             val openedInputs = mutableListOf<AmethystMidiInput>()
             val outputConnection = runCatching { midiAccess?.openOutput(outputPort.id) }.getOrNull() ?: continue
+            var detected: DetectedTypeAndPorts? = null
 
             try {
                 for (inputPort in inputs) {
@@ -160,31 +175,35 @@ class AmethystMidiManager(
                     openedInputs.add(inputConnection)
                 }
 
-                val jobs = openedInputs.map { conn ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        conn.messages.collect { msg ->
-                            val identification = getDeviceIdentificationByInquiry(msg)
-                            if (identification != null && detected == null) {
-                                detected = DetectedTypeAndPorts(
-                                    identification.type,
-                                    identification.firmware,
-                                    conn,
-                                    outputConnection,
-                                )
+                detected = coroutineScope {
+                    val response = CompletableDeferred<DetectedTypeAndPorts>()
+                    val jobs = openedInputs.map { conn ->
+                        launch(start = CoroutineStart.UNDISPATCHED) {
+                            conn.messages.collect { msg ->
+                                val identification = getDeviceIdentificationByInquiry(msg)
+                                if (identification != null) {
+                                    response.complete(
+                                        DetectedTypeAndPorts(
+                                            identification.type,
+                                            identification.firmware,
+                                            conn,
+                                            outputConnection,
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                outputConnection.sendDeviceInquiry()
-
-                withTimeoutOrNull(1000) {
-                    while (detected == null && isActive) {
-                        delay(10)
+                    try {
+                        outputConnection.sendDeviceInquiry()
+                        withTimeoutOrNull(1000) { response.await() }
+                    } finally {
+                        jobs.forEach { it.cancelAndJoin() }
                     }
                 }
-
-                jobs.forEach { it.cancel() }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 println("Error during shotgun detection on output ${outputPort.name}: ${e.message}")
             } finally {
@@ -280,8 +299,11 @@ class AmethystMidiManager(
         _detectedDevices.value = list
     }
 
-    private fun autoConnectDevice(active: ActiveDeviceConnection) {
-        val element = Heaven.devices.find {
+    private fun autoConnectDevice(
+        active: ActiveDeviceConnection,
+        elements: List<LaunchpadViewportElement> = workspaceDevices(),
+    ) {
+        val element = elements.find {
             it.savedMidiDeviceId == active.device.id ||
                 it.savedInputPortId == active.device.id ||
                 it.savedInputPortId == active.input?.portId ||
@@ -291,8 +313,8 @@ class AmethystMidiManager(
                         it.savedInputPortId == null &&
                         it.savedInputPortName == active.friendlyName
                 )
-        } ?: if (Heaven.devices.size == 1 && activeConnections.size == 1) {
-            val single = Heaven.devices.first()
+        } ?: if (elements.size == 1 && activeConnections.size == 1) {
+            val single = elements.first()
             if (
                 single.savedMidiDeviceId == null &&
                 single.savedInputPortId == null &&
@@ -303,7 +325,16 @@ class AmethystMidiManager(
         } else null
 
         if (element == null) return
-        if (element.launchpadDevice?.connection?.input?.portId == active.input?.portId) return
+        val current = element.launchpadDevice?.connection
+        if (
+            current != null &&
+            current.input === active.input &&
+            current.output === active.output &&
+            current.input.isOpen &&
+            current.output.isOpen
+        ) {
+            return
+        }
 
         connectElement(element, active)
     }
@@ -332,13 +363,20 @@ class AmethystMidiManager(
             element.savedOutputPortId = output.portId
             element.savedInputPortName = active.friendlyName
             element.savedOutputPortName = active.friendlyName
+            if (workspaceDevices().singleOrNull() === element) {
+                pendingSingleCoverUuid.value = null
+            }
             element.sendFullMidiSnapshot()
         }
     }
 
     fun changeDeviceConfig(uuid: String, deviceId: String?) {
-        val element = Heaven.devices.find { it.selectionUUID == uuid } ?: return
+        val elements = workspaceDevices()
+        val element = elements.find { it.selectionUUID == uuid } ?: return
 
+        if (elements.singleOrNull() === element) {
+            pendingSingleCoverUuid.value = null
+        }
         detachElement(element)
 
         if (deviceId == null) {
@@ -363,13 +401,17 @@ class AmethystMidiManager(
     }
 
     fun detachElement(element: LaunchpadViewportElement) {
+        if (pendingSingleCoverUuid.value == element.selectionUUID) {
+            pendingSingleCoverUuid.value = null
+        }
         elementCollectorJobs.remove(element.selectionUUID)?.cancel()
         element.launchpadDevice?.close()
         element.launchpadDevice = null
     }
 
     fun detachAllWorkspaceDevices() {
-        Heaven.devices.forEach(::detachElement)
+        pendingSingleCoverUuid.value = null
+        workspaceDevices().forEach(::detachElement)
         elementCollectorJobs.values.forEach { it.cancel() }
         elementCollectorJobs.clear()
     }
@@ -377,8 +419,7 @@ class AmethystMidiManager(
     fun refreshConnections() {
         if (!midiInScope.isActive) return
         midiInScope.launch {
-            runCatching { rescanDevicesSerially() }
-                .onFailure { println("MIDI rescan failed: ${it.message}") }
+            rescanAndReport("MIDI rescan failed")
         }
     }
 
@@ -387,24 +428,28 @@ class AmethystMidiManager(
 
         val access = midiAccess ?: return
         monitorJob = midiInScope.launch {
-            val nativeChangeJob = launch {
-                access.deviceChanges.collect {
-                    runCatching { rescanDevicesSerially() }
-                        .onFailure { println("MIDI hotplug rescan failed: ${it.message}") }
+            val nativeChangeJob = launch(start = CoroutineStart.UNDISPATCHED) {
+                while (isActive) {
+                    try {
+                        access.deviceChanges.conflate().collect {
+                            rescanAndReport("MIDI hotplug rescan failed")
+                        }
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        println("MIDI hotplug monitor failed: ${exception.message}")
+                    }
+                    if (isActive) delay(RESCAN_INTERVAL_MS)
                 }
             }
 
             try {
-                runCatching { rescanDevicesSerially() }
-                    .onFailure { println("Initial MIDI rescan failed: ${it.message}") }
-
                 while (isActive) {
-                    delay(2000)
-                    runCatching { rescanDevicesSerially() }
-                        .onFailure { println("MIDI health-check failed: ${it.message}") }
+                    rescanAndReport("MIDI health-check failed")
+                    delay(RESCAN_INTERVAL_MS)
                 }
             } finally {
-                nativeChangeJob.cancel()
+                nativeChangeJob.cancelAndJoin()
             }
         }
     }
@@ -420,25 +465,55 @@ class AmethystMidiManager(
         }
     }
 
+    private suspend fun rescanAndReport(failureMessage: String) {
+        try {
+            rescanDevicesSerially()
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            println("$failureMessage: ${exception.message}")
+        }
+    }
+
     private suspend fun rescanDevices() {
         val access = midiAccess ?: return
+        val elements = workspaceDevices()
         val discovered = access.discoverDevices()
-        val discoveredIds = discovered.map { it.id }.toSet()
+        val discoveredById = discovered.associateBy { it.id }
+        val discoveredIds = discoveredById.keys
         val connectedDevices = mutableListOf<ActiveDeviceConnection>()
 
-        val deadDeviceIds = activeConnections.filter { it.value.input?.isOpen == false || it.value.output?.isOpen == false }.keys
+        val deadDeviceIds = activeConnections.filter { (id, active) ->
+            val current = discoveredById[id]
+            val activePortIds = active.device.ports.map { it.id }.toSet()
+            val currentPortIds = current?.ports?.map { it.id }?.toSet()
+            active.input?.isOpen == false ||
+                active.output?.isOpen == false ||
+                currentPortIds != null && currentPortIds != activePortIds
+        }.keys
         val disconnectedIds = activeConnections.keys.filter { it !in discoveredIds } + deadDeviceIds
         for (id in disconnectedIds.distinct()) {
             val conn = activeConnections.remove(id)
             if (conn != null) {
-                printConnectionState("Disconnected", conn)
-                conn.input?.close()
-                conn.output?.close()
-                Heaven.devices.forEach { element ->
-                    if (element.launchpadDevice?.connection?.input?.portId == conn.input?.portId) {
-                        detachElement(element)
-                    }
+                val attachedElements = elements.filter { element ->
+                    val connection = element.launchpadDevice?.connection
+                    connection?.device?.id == conn.device.id ||
+                        connection?.input?.portId == conn.input?.portId ||
+                        connection?.output?.portId == conn.output?.portId
                 }
+                val waitForSingleCoverReplacement =
+                    elements.size == 1 &&
+                    attachedElements.singleOrNull() === elements.first()
+
+                printConnectionState("Disconnected", conn)
+                attachedElements.forEach(::detachElement)
+                if (waitForSingleCoverReplacement) {
+                    pendingSingleCoverUuid.value = elements.first().selectionUUID
+                }
+                runCatching { conn.input?.close() }
+                    .onFailure { println("MIDI input close failed: ${it.message}") }
+                runCatching { conn.output?.close() }
+                    .onFailure { println("MIDI output close failed: ${it.message}") }
             }
         }
 
@@ -463,7 +538,18 @@ class AmethystMidiManager(
         connectedDevices.forEach { printConnectionState("Connected", it) }
 
         for (conn in activeConnections.values) {
-            autoConnectDevice(conn)
+            autoConnectDevice(conn, elements)
+        }
+
+        val singleCover = elements.singleOrNull()
+        val replacement = connectedDevices.firstOrNull()
+        if (
+            singleCover != null &&
+            pendingSingleCoverUuid.value == singleCover.selectionUUID &&
+            singleCover.launchpadDevice == null &&
+            replacement != null
+        ) {
+            connectElement(singleCover, replacement)
         }
     }
 
@@ -474,70 +560,55 @@ class AmethystMidiManager(
         println("[$state] ${connection.friendlyName} - ${connection.detectedFirmware.label}")
     }
 
-    fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray) {
-        midiInScope.launch {
-            val data = getMidiInputData(msg)
+    suspend fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray) {
+        val input = launchpadDevice?.handleMidiInput(msg) ?: return
+        val offset = position.value.copy(
+            x = position.value.x - layout.offsetX,
+            y = position.value.y,
+        )
 
-            data?.let {
-                if (WorkspaceRepository.mode.value.claimMidiInputs) {
-                    val offset = position.value.copy(
-                        x = position.value.x - layout.offsetX,
-                        y = position.value.y
-                    )
-
-                    WorkspaceRepository.mode.value.onMidiInput(it, offset)
-                } else {
-                    val offset = position.value.copy(
-                        x = position.value.x - layout.offsetX,
-                        y = position.value.y
-                    )
-
-                    val x = it.pitch % 10
-                    val y = it.pitch / 10
-
-                    val (visX, visY) = rotateMidiCoordinate(x, y, layout, rotationDegrees.floatValue)
-
-                    val posX = offset.x.toInt()
-                    val posY = offset.y.toInt()
-
-                    val globalX = posX + visX
-                    val globalY = posY + (9 - visY)
-
-                    if (AutomappingManager.isMappingActive()) {
-                        if (it.velocity != 0) {
-                            AutomappingManager.tryCommitPadMapping(
-                                device = this@onMidiMessage,
-                                globalX = globalX,
-                                globalY = globalY,
-                            )
-                        }
-                        return@let
-                    }
-
-                    val midiSignals = listOf(
-                        Signal.Midi(
-                            origin = null,
-                            x = globalX,
-                            y = globalY,
-                            velocity = it.velocity
-                        )
-                    )
-
-                    WorkspaceRepository.samplingChain.signalEnter(midiSignals)
-                    AutoPlayRepository.onMidiInput(midiSignals)
-
-                    WorkspaceRepository.lightsChain.signalEnter(
-                        Signal.LED(
-                            origin = null,
-                            x = globalX,
-                            y = globalY,
-                            color = if (it.velocity == 0) Color.Black else Color.White,
-                            layer = 0
-                        )
-                    )
-                }
-            }
+        if (WorkspaceRepository.mode.value.claimMidiInputs) {
+            WorkspaceRepository.mode.value.onMidiInput(input, offset)
+            return
         }
+
+        val x = input.pitch % 10
+        val y = input.pitch / 10
+        val (visX, visY) = rotateMidiCoordinate(x, y, layout, rotationDegrees.floatValue)
+        val globalX = offset.x.toInt() + visX
+        val globalY = offset.y.toInt() + (9 - visY)
+
+        if (AutomappingManager.isMappingActive()) {
+            if (input.velocity != 0) {
+                AutomappingManager.tryCommitPadMapping(
+                    device = this,
+                    globalX = globalX,
+                    globalY = globalY,
+                )
+            }
+            return
+        }
+
+        val midiSignals = listOf(
+            Signal.Midi(
+                origin = null,
+                x = globalX,
+                y = globalY,
+                velocity = input.velocity,
+            )
+        )
+
+        WorkspaceRepository.samplingChain.signalEnter(midiSignals)
+        AutoPlayRepository.onMidiInput(midiSignals)
+        WorkspaceRepository.lightsChain.signalEnter(
+            Signal.LED(
+                origin = null,
+                x = globalX,
+                y = globalY,
+                color = if (input.velocity == 0) Color.Black else Color.White,
+                layer = 0,
+            )
+        )
     }
 
     private fun LaunchpadDeviceType.mapLaunchpadDevice(

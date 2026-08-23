@@ -38,6 +38,7 @@ pub struct MidiDeviceInfo {
 #[derive(uniffi::Record, Clone, Debug, PartialEq, Eq)]
 pub struct MidiMessage {
     pub data: Vec<u8>,
+    /// Monotonic microseconds since the native engine's process-local MIDI epoch.
     pub timestamp_us: u64,
     pub port_id: String,
 }

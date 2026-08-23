@@ -1,6 +1,6 @@
 use crate::midi::types::*;
 
-pub fn deduplicate_device_names(devices: &mut Vec<MidiDeviceInfo>) {
+pub fn deduplicate_device_names(devices: &mut [MidiDeviceInfo]) {
     use std::collections::HashMap;
     let mut name_counts = HashMap::new();
 
@@ -23,7 +23,11 @@ pub fn deduplicate_device_names(devices: &mut Vec<MidiDeviceInfo>) {
     }
 }
 
-pub fn generate_port_id(device_id: &str, direction: &MidiPortDirection, port_number: u32) -> String {
+pub fn generate_port_id(
+    device_id: &str,
+    direction: &MidiPortDirection,
+    port_number: u32,
+) -> String {
     let dir_str = match direction {
         MidiPortDirection::Input => "in",
         MidiPortDirection::Output => "out",
@@ -31,7 +35,7 @@ pub fn generate_port_id(device_id: &str, direction: &MidiPortDirection, port_num
     format!("{}:{}:{}", device_id, dir_str, port_number)
 }
 
-pub fn sort_ports(ports: &mut Vec<MidiPortInfo>) {
+pub fn sort_ports(ports: &mut [MidiPortInfo]) {
     ports.sort_by(|a, b| {
         // Inputs first, then outputs
         let dir_order_a = match a.direction {

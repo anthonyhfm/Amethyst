@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +24,7 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Lucide
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.settings.data.SettingsRepository
+import dev.anthonyhfm.amethyst.settings.data.AudioSettings
 import dev.anthonyhfm.amethyst.settings.ui.SettingRenderer
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsCategory
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
@@ -39,6 +41,10 @@ import org.jetbrains.compose.resources.stringResource
 fun Settings(
     onBack: (() -> Unit)? = null
 ) {
+    LaunchedEffect(Unit) {
+        AudioSettings.refreshOutputDevices()
+    }
+
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -112,4 +118,3 @@ private fun SettingsHeader(
         }
     }
 }
-

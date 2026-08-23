@@ -48,10 +48,8 @@ class DesktopMidiPort(private val delegate: NativeMidiPort) : AmethystMidiPort {
 class DesktopMidiInput(private val delegate: NativeMidiInput) : AmethystMidiInput {
     override val portId: String get() = delegate.portId
     override val messages: Flow<ByteArray> get() = delegate.messages
-    private var _isOpen = true
-    override val isOpen: Boolean get() = _isOpen
+    override val isOpen: Boolean get() = delegate.isOpen
     override fun close() {
-        _isOpen = false
         delegate.close()
     }
 }
@@ -61,10 +59,8 @@ class DesktopMidiOutput(private val delegate: NativeMidiOutput) : AmethystMidiOu
     override fun send(data: ByteArray) = delegate.send(data)
     override fun sendSysEx(data: ByteArray) = delegate.sendSysEx(data)
     override fun sendDeviceInquiry() = delegate.sendDeviceInquiry()
-    private var _isOpen = true
-    override val isOpen: Boolean get() = _isOpen
+    override val isOpen: Boolean get() = delegate.isOpen
     override fun close() {
-        _isOpen = false
         delegate.close()
     }
 }

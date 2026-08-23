@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.AudioOutputMode
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.settings.ui.components.SettingsItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Slider
 import dev.anthonyhfm.amethyst.ui.components.primitives.Switch
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -30,6 +31,9 @@ import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.settings_audio_mode_exclusive
 import amethyst.composeapp.generated.resources.settings_audio_mode_fallback
 import amethyst.composeapp.generated.resources.settings_audio_mode_shared
+import amethyst.composeapp.generated.resources.settings_audio_output_active
+import amethyst.composeapp.generated.resources.settings_audio_output_error
+import amethyst.composeapp.generated.resources.settings_audio_output_fallback
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -76,16 +80,37 @@ private fun ToggleSettingItem(setting: Setting.Toggle) {
 @Composable
 private fun <T : Any> SelectSettingItem(setting: Setting.Select<T>) {
     val selected by setting.flow.collectAsState()
-    SettingsItem(title = setting.title) {
+    val options by setting.optionsFlow.collectAsState()
+    val outputStatus by Echo.outputStatus.collectAsState()
+    val subtitle = if (setting.key == "echoOutputDevice") {
+        outputStatus.error?.let {
+            stringResource(Res.string.settings_audio_output_error, it)
+        } ?: outputStatus.fallbackReason?.let {
+            stringResource(
+                Res.string.settings_audio_output_fallback,
+                outputStatus.deviceName,
+                it,
+            )
+        } ?: outputStatus.deviceName.takeIf { outputStatus.available }?.let {
+            stringResource(Res.string.settings_audio_output_active, it)
+        }
+    } else {
+        null
+    }
+    SettingsItem(title = setting.title, subtitle = subtitle) {
         Select(
             value = setting.label(selected),
-            onValueChange = { label ->
-                setting.options.firstOrNull { setting.label(it) == label }
-                    ?.let { setting.update(it) }
-            },
-            options = setting.options.map { setting.label(it) },
+            onValueChange = {},
             modifier = Modifier.width(160.dp),
-        )
+        ) {
+            options.forEach { option ->
+                SelectItem(
+                    text = setting.label(option),
+                    selected = option == selected,
+                    onClick = { setting.update(option) },
+                )
+            }
+        }
     }
 }
 
