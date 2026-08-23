@@ -12,6 +12,8 @@ import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.determineFormat
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.chain.data.findMaxMacroIndex
+import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import io.github.vinceglb.filekit.PlatformFile
@@ -236,7 +238,22 @@ object HomeRepository {
                         apolloProjPath,
                         palettePath = null,
                     )
-                    abletonWorkspace.copy(lights = apolloWorkspace.lights)
+                    val maxMacroIndex = maxOf(
+                        apolloWorkspace.lights.findMaxMacroIndex(),
+                        abletonWorkspace.sampling.findMaxMacroIndex(),
+                        abletonWorkspace.lights.findMaxMacroIndex()
+                    )
+                    val macroCount = maxOf(maxMacroIndex + 1, apolloWorkspace.macros.size, abletonWorkspace.macros.size, 1)
+                    val mergedMacros = List(macroCount) { idx ->
+                        apolloWorkspace.macros.getOrNull(idx)
+                            ?: abletonWorkspace.macros.getOrNull(idx)
+                            ?: Macro(0)
+                    }
+                    abletonWorkspace.copy(
+                        lights = apolloWorkspace.lights,
+                        launchpadDevices = apolloWorkspace.launchpadDevices.ifEmpty { abletonWorkspace.launchpadDevices },
+                        macros = mergedMacros
+                    )
                 }
 
                 importedFile.extension.equals("zip", ignoreCase = true) -> {

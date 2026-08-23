@@ -188,9 +188,11 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
     }
 
     private fun resolveBounds(signal: Signal.LED, isolate: Boolean): Pair<IntOffset, IntSize> {
-        if (!isolate) return WorkspaceRepository.bounds
+        val workspaceBounds = WorkspaceRepository.bounds.takeIf { it.second.width > 0 && it.second.height > 0 }
+            ?: (IntOffset.Zero to IntSize(10, 10))
+        if (!isolate) return workspaceBounds
 
-        val device = signal.origin as? LaunchpadViewportElement ?: return WorkspaceRepository.bounds
+        val device = signal.origin as? LaunchpadViewportElement ?: return workspaceBounds
         return Pair(
             first = IntOffset(
                 x = device.position.value.x.toInt(),

@@ -13,8 +13,8 @@ class ApolloFlipAdapter(
             mode = when (model.mode) {
                 0 -> FlipChainDeviceState.FlipMode.HORIZONTAL
                 1 -> FlipChainDeviceState.FlipMode.VERTICAL
-                2 -> FlipChainDeviceState.FlipMode.DIAGONAL_PLUS
-                3 -> FlipChainDeviceState.FlipMode.DIAGONAL_MINUS
+                2 -> FlipChainDeviceState.FlipMode.DIAGONAL_MINUS
+                3 -> FlipChainDeviceState.FlipMode.DIAGONAL_PLUS
                 else -> FlipChainDeviceState.FlipMode.HORIZONTAL
             },
             bypass = model.bypass

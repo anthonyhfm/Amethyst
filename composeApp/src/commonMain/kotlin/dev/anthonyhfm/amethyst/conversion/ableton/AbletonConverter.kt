@@ -26,7 +26,9 @@ import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilte
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.chain.data.findMaxMacroIndex
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
+import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import io.github.vinceglb.filekit.PlatformFile
@@ -189,9 +191,21 @@ object AbletonConverter : AmethystConverter {
                     val apolloLightMsg = runCatching { runBlocking { getString(Res.string.home_loading_apollo_light_chains) } }.getOrDefault("Loading Apollo light chains...")
                     reporter?.update(0.92f, statusText = apolloLightMsg, detailText = approjEntry.path.substringAfterLast("/"))
                     val apolloWorkspace = ApolloConverter.convertBytesToWorkspace(approjEntry.data)
+                    val maxMacroIndex = maxOf(
+                        apolloWorkspace.lights.findMaxMacroIndex(),
+                        abletonWorkspace.sampling.findMaxMacroIndex(),
+                        abletonWorkspace.lights.findMaxMacroIndex()
+                    )
+                    val macroCount = maxOf(maxMacroIndex + 1, apolloWorkspace.macros.size, abletonWorkspace.macros.size, 1)
+                    val mergedMacros = List(macroCount) { idx ->
+                        apolloWorkspace.macros.getOrNull(idx)
+                            ?: abletonWorkspace.macros.getOrNull(idx)
+                            ?: Macro(0)
+                    }
                     abletonWorkspace.copy(
                         lights = apolloWorkspace.lights,
-                        launchpadDevices = apolloWorkspace.launchpadDevices.ifEmpty { abletonWorkspace.launchpadDevices }
+                        launchpadDevices = apolloWorkspace.launchpadDevices.ifEmpty { abletonWorkspace.launchpadDevices },
+                        macros = mergedMacros
                     )
                 } catch (e: Exception) {
                     println("Apollo conversion failed, falling back to Ableton lights: ${e.message}")
@@ -414,6 +428,13 @@ object AbletonConverter : AmethystConverter {
         MxDeviceInstrumentAdapter.fileHashMap.clear()
         projectLayout = null
 
+        val maxMacroIndex = maxOf(
+            rawLights.findMaxMacroIndex(),
+            rawSamples.findMaxMacroIndex()
+        )
+        val macroCount = maxOf(maxMacroIndex + 1, 1)
+        val macros = List(macroCount) { Macro(0) }
+
         return SavableWorkspaceData(
             title = name,
             lights = rawLights,
@@ -423,6 +444,7 @@ object AbletonConverter : AmethystConverter {
                 bpm = bpm
             ),
             launchpadDevices = launchpadLayout.launchpads,
+            macros = macros,
         ).also {
             this.launchpadLayout = null
         }

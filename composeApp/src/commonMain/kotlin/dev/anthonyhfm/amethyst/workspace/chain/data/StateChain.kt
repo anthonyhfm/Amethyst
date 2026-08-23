@@ -57,3 +57,22 @@ data class StateChain(
         }
     }
 }
+
+fun StateChain.findMaxMacroIndex(): Int {
+    var maxIndex = -1
+    fun traverse(devices: List<DeviceState>) {
+        for (device in devices) {
+            when (device) {
+                is dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState -> maxIndex = maxOf(maxIndex, device.macro)
+                is dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState -> maxIndex = maxOf(maxIndex, device.macro)
+                is dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState -> device.groups.forEach { traverse(it.stateChain.devices) }
+                is dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState -> device.groups.forEach { traverse(it.stateChain.devices) }
+                is dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState -> traverse(device.stateChain.devices)
+                else -> {}
+            }
+        }
+    }
+    traverse(this.devices)
+    return maxIndex
+}
+

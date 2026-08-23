@@ -86,7 +86,7 @@ class InstrumentGroupAdapter(
                                 if (maxMacro - minMacro == 0) {
                                     add(
                                         MacroFilterChainDeviceState(
-                                            macro = 0,
+                                            macro = chainDepth,
                                             allowedValues = setOf(minMacro),
                                         )
                                     )
@@ -99,7 +99,7 @@ class InstrumentGroupAdapter(
                                                     stateChain = StateChain(
                                                         devices = listOf(
                                                             MacroFilterChainDeviceState(
-                                                                macro = 0,
+                                                                macro = chainDepth,
                                                                 allowedValues = setOf(key),
                                                             )
                                                         )

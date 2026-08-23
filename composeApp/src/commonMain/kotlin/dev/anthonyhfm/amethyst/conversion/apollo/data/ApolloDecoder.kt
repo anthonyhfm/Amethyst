@@ -4,6 +4,8 @@ import dev.anthonyhfm.amethyst.conversion.apollo.ApolloConverter
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.chain.data.findMaxMacroIndex
+import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 
@@ -67,12 +69,18 @@ class ApolloDecoder(
             )
         }
 
+        val maxMacroIndex = lights.findMaxMacroIndex()
+        val apolloMacros = project.macros.map { Macro(value = maxOf(0, it - 1)) }
+        val macroCount = maxOf(apolloMacros.size, maxMacroIndex + 1, 1)
+        val macros = List(macroCount) { apolloMacros.getOrElse(it) { Macro(0) } }
+
         return SavableWorkspaceData(
             title = "Apollo converted project",
             author = project.author,
             settings = WorkspaceSettings(bpm = project.bpm.toDouble()),
             lights = lights,
-            launchpadDevices = launchpadDevices
+            launchpadDevices = launchpadDevices,
+            macros = macros
         )
     }
 }

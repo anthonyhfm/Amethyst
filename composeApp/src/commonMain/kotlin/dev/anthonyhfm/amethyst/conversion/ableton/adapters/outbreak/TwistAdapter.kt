@@ -25,7 +25,7 @@ class TwistAdapter (
 
         val deviceGroups = mutableListOf<Group>()
 
-        dataObj.macroEnabledStates.withIndex().map { (index, num) ->
+        dataObj.macroEnabledStates.withIndex().forEach { (index, num) ->
             if (num == 1) {
                 val groupDevices = mutableListOf<DeviceState>()
 
@@ -78,11 +78,17 @@ class TwistAdapter (
             }
         }
 
-        return listOf(
-            GroupChainDeviceState(
-                groups = deviceGroups,
+        return if (deviceGroups.size == 1) {
+            deviceGroups.first().stateChain.devices
+        } else if (deviceGroups.size > 1) {
+            listOf(
+                GroupChainDeviceState(
+                    groups = deviceGroups,
+                )
             )
-        )
+        } else {
+            emptyList()
+        }
     }
 
     fun twistRateIndexToTiming(index: Int): String? {
