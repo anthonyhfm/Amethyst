@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
+import androidx.compose.runtime.snapshotFlow
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
-import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.util.Timing
@@ -38,8 +38,12 @@ import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
-import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.rotateMidiUpdates
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), TimelineTriggerable {
@@ -53,10 +57,28 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
     private val playing = mutableStateOf(false)
     private val playbackProgress = mutableStateOf(0f)
     private var workspacePreviewActive = false
-    private val workspacePreviewCoordinates = mutableMapOf<String, Set<Int>>()
+    private val stateObserverScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     init {
         renderAnimation()
+
+        // Re-render the animation whenever workspace bounds or device placement changes
+        stateObserverScope.launch {
+            snapshotFlow {
+                val currentBounds = WorkspaceRepository.bounds
+                val devices = ViewportRepository.devices.value.map { it.selectionUUID to it.position.value }
+                currentBounds to devices
+            }.drop(1).collect {
+                renderAnimation()
+            }
+        }
+
+        // Re-render whenever BPM changes
+        stateObserverScope.launch {
+            WorkspaceRepository.bpm.drop(1).collect {
+                renderAnimation()
+            }
+        }
     }
 
     override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
@@ -127,7 +149,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
     }
 
     /**
-     * Starts an editor-only preview session. Frames are written to virtual launchpad previews
+     * Starts an editor-only preview session. Frames are written to devices via Heaven
      * directly and never leave this device through the lights chain.
      */
     fun startWorkspacePreview() {
@@ -136,15 +158,16 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
         playing.value = false
         Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
         activeFrame = null
-        clearWorkspacePreview()
+        Heaven.clear()
     }
 
-    /** Stops the editor-only preview and leaves every virtual launchpad preview black. */
+    /** Stops the editor-only preview and leaves every device black. */
     fun stopWorkspacePreview() {
         playbackRun = null
         playing.value = false
         Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-        clearWorkspacePreview()
+        clearActiveFrame()
+        Heaven.clear()
         activeFrame = null
         workspacePreviewActive = false
     }
@@ -326,15 +349,6 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
     }
 
     private fun emitFrame(signals: List<Signal.LED>) {
-        if (workspacePreviewActive) {
-            renderWorkspacePreview(signals)
-            activeFrame = ActiveFrame(
-                coordinates = signals.map { it.x to it.y }.toSet(),
-                origin = null,
-            )
-            return
-        }
-
         val previousFrame = activeFrame
         val previous = previousFrame?.coordinates.orEmpty()
         val current = signals.map { it.x to it.y }.toSet()
@@ -343,70 +357,30 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ti
             .filterNot { it in current }
             .map { (x, y) -> Signal.LED(origin = outputOrigin, x = x, y = y, color = Color.Black) }
 
+        val allSignals = offSignals + signals
         activeFrame = ActiveFrame(coordinates = current, origin = outputOrigin)
-        signalExit?.invoke(offSignals + signals)
+
+        if (workspacePreviewActive) {
+            Heaven.midiEnter(allSignals)
+        } else {
+            signalExit?.invoke(allSignals)
+        }
     }
 
     private fun clearActiveFrame() {
-        if (workspacePreviewActive) {
-            activeFrame = null
-            clearWorkspacePreview()
-            return
-        }
-
         val previousFrame = activeFrame ?: return
         activeFrame = null
         if (previousFrame.coordinates.isEmpty()) return
 
-        signalExit?.invoke(
-            previousFrame.coordinates.map { (x, y) ->
-                Signal.LED(origin = previousFrame.origin, x = x, y = y, color = Color.Black)
-            }
-        )
-    }
-
-    private fun renderWorkspacePreview(signals: List<Signal.LED>) {
-        ViewportRepository.devices.value.forEach { launchpad ->
-            val deviceX = launchpad.position.value.x.toInt()
-            val deviceY = launchpad.position.value.y.toInt()
-            val current = linkedMapOf<Int, Color>()
-
-            signals.forEach { signal ->
-                if (signal.color == Color.Black ||
-                    signal.x !in deviceX until deviceX + launchpad.layout.cols ||
-                    signal.y !in deviceY until deviceY + launchpad.layout.rows
-                ) {
-                    return@forEach
-                }
-
-                val localX = signal.x - deviceX
-                val localY = signal.y - deviceY
-                val previewX = localX + launchpad.layout.offsetX
-                val previewY = (launchpad.layout.rows - 1 - localY) + launchpad.layout.offsetY
-                if (previewX in 0..9 && previewY in 0..9) {
-                    current[previewX + previewY * 10] = signal.color
-                }
-            }
-
-            val previous = workspacePreviewCoordinates[launchpad.selectionUUID].orEmpty()
-            val updates = buildList {
-                previous
-                    .filterNot(current::containsKey)
-                    .forEach { index -> add(RawLEDUpdate(index.toByte(), Color.Black)) }
-                current.forEach { (index, color) -> add(RawLEDUpdate(index.toByte(), color)) }
-            }
-            if (updates.isNotEmpty()) {
-                launchpad.previewState.sendToPreview(
-                    rotateMidiUpdates(updates, launchpad.layout, launchpad.rotationDegrees.floatValue),
-                )
-            }
-            workspacePreviewCoordinates[launchpad.selectionUUID] = current.keys
+        val offSignals = previousFrame.coordinates.map { (x, y) ->
+            Signal.LED(origin = previousFrame.origin, x = x, y = y, color = Color.Black)
         }
-    }
 
-    private fun clearWorkspacePreview() {
-        ViewportRepository.devices.value.forEach { it.previewState.clear() }
-        workspacePreviewCoordinates.clear()
+        if (workspacePreviewActive) {
+            Heaven.midiEnter(offSignals)
+        } else {
+            signalExit?.invoke(offSignals)
+        }
     }
 
     fun updateGraph(undoable: Boolean = true, transform: (CompositionGraph) -> CompositionGraph): Boolean {

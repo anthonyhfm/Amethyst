@@ -593,8 +593,6 @@ object WorkspaceRepository {
             return rendered
         }
 
-        renderAnimationsInChain(lightsChain)
-
         if (fromRemote) {
             syncMacrosSize(workspaceData.macros, fromRemote = true)
         } else {
@@ -641,7 +639,9 @@ object WorkspaceRepository {
         _bpm.update {
             workspaceData.settings.bpm
         }
-        
+
+        renderAnimationsInChain(lightsChain)
+
         _projectName.update {
             workspaceData.title
         }
