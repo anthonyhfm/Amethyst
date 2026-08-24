@@ -164,6 +164,7 @@ object AutoPlayRepository {
         // Calculate how far into the playback we are
         playbackOffset = currentPlaybackPosition()
         Heaven.cancelJobsForOwner(this)
+        Echo.stopAll()
         progressJob?.cancel()
         progressJob = null
         _state.value = AutoPlayState.PAUSED
@@ -200,6 +201,7 @@ object AutoPlayRepository {
         progressJob?.cancel()
         progressJob = null
         Heaven.clear()
+        Echo.stopAll()
         
         _state.value = AutoPlayState.LEARNING
         sortedActionTimes = autoplay.actions.keys.sorted()
@@ -322,6 +324,7 @@ object AutoPlayRepository {
         val targetMs = (fraction.coerceIn(0f, 1f) * totalDuration)
         playbackOffset = targetMs
         _progress.value = fraction.coerceIn(0f, 1f)
+        Echo.stopAll()
 
         val currentState = _state.value
         if (currentState == AutoPlayState.PLAYING) {

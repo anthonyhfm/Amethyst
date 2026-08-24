@@ -132,6 +132,7 @@ class AudioRenderer(
         val blockStartFrame = renderedFrame.value
         if (commandQueue.consumeEmergencyStop()) {
             stopAllVoices(fadeOutFrames = 0)
+            chain.resetAudio()
         }
         drainCommandQueue()
 
@@ -345,7 +346,10 @@ class AudioRenderer(
                     rampFrames = command.rampFrames,
                 )
 
-            is AudioRenderCommand.StopAll -> stopAllVoices(command.fadeOutFrames)
+            is AudioRenderCommand.StopAll -> {
+                stopAllVoices(command.fadeOutFrames)
+                chain.resetAudio()
+            }
             is AudioRenderCommand.ResetAll -> {
                 stopAllVoices(fadeOutFrames = 0)
                 chain.resetAudio()
