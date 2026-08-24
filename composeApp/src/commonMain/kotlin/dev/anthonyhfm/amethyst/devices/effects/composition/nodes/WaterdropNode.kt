@@ -44,7 +44,6 @@ import kotlin.math.sign
 import kotlin.math.sin
 import kotlinx.serialization.Serializable
 
-private const val RING_TRAVEL_SPAN = 18f
 private const val MIN_CURVATURE = 0.5f
 private const val MAX_CURVATURE = 8f
 private const val POLYLINE_STEP = 1f
@@ -81,8 +80,9 @@ object WaterdropNode : CompositionNodeDefinition {
     ): List<GeometryFrame> {
         val state = node.state as? WaterdropNodeState ?: return emptyList()
         val center = context.resolveOrigin(state.originX, state.originY, state.boundToOrigin)
-        val radius = context.progress.coerceIn(0f, 1f) * RING_TRAVEL_SPAN
         val curvature = state.curvature.coerceIn(MIN_CURVATURE, MAX_CURVATURE)
+        val travelSpan = calculateTravelSpan(center, curvature, context.bounds)
+        val radius = context.progress.coerceIn(0f, 1f) * travelSpan
         val circumference = max(0.01f, 2f * PI.toFloat() * max(0.5f, abs(radius)))
         val segmentCount = max(12, ceil(circumference / POLYLINE_STEP).toInt())
         val points = (0 until segmentCount).map { index ->
@@ -189,6 +189,24 @@ object WaterdropNode : CompositionNodeDefinition {
     }
 }
 
+internal fun calculateTravelSpan(
+    center: Vec2,
+    curvature: Float,
+    bounds: Pair<IntOffset, IntSize>,
+): Float {
+    val minX = bounds.first.x.toFloat()
+    val minY = bounds.first.y.toFloat()
+    val maxX = minX + (bounds.second.width - 1).coerceAtLeast(0).toFloat()
+    val maxY = minY + (bounds.second.height - 1).coerceAtLeast(0).toFloat()
+    val maxDx = max(abs(center.x - minX), abs(center.x - maxX))
+    val maxDy = max(abs(center.y - minY), abs(center.y - maxY))
+
+    if (maxDx <= 0f && maxDy <= 0f) return 0f
+
+    val c = curvature.toDouble()
+    return (maxDx.toDouble().pow(c) + maxDy.toDouble().pow(c)).pow(1.0 / c).toFloat()
+}
+
 internal fun Pair<IntOffset, IntSize>.validOrFallbackBounds(): Pair<IntOffset, IntSize> =
     takeIf { it.second.width > 0 && it.second.height > 0 } ?: (IntOffset.Zero to IntSize(10, 10))
 
@@ -206,3 +224,4 @@ private fun superellipsePoint(
         y = center.y + sine.sign * abs(sine).pow(exponent) * radius,
     )
 }
+
