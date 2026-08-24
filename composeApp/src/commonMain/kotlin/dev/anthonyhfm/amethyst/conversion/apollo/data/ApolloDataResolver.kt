@@ -217,9 +217,11 @@ class ApolloDataResolver {
 
             ApolloTypes.Layer -> {
                 val target = reader.readInt32()
-                var mode = reader.readInt32()
-                if (ApolloConverter.version == 5) {
-                    mode = when (mode) { 0 -> 0; 1 -> 3; else -> 0 }
+                val mode = if (ApolloConverter.version >= 5) {
+                    val rawMode = reader.readInt32()
+                    if (ApolloConverter.version == 5 && rawMode == 2) 3 else rawMode
+                } else {
+                    0
                 }
                 val range = if (ApolloConverter.version >= 21) reader.readInt32() else 200
                 ApolloModel.Device.Layer(target = target, mode = mode, range = range)

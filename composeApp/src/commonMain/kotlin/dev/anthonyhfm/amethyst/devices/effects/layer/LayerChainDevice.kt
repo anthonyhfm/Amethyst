@@ -62,7 +62,7 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
             override val id = "layer"
             override val label = "Layer"
             override val curveMode = CurveMode.Bipolar
-            override val displayRange = -20f..20f
+            override val displayRange = -100f..100f
             override val displayDecimals = 0
         }
 
@@ -70,7 +70,7 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
             override val id = "range"
             override val label = "Range"
             override val curveMode = CurveMode.Unipolar
-            override val displayRange = 0f..20f
+            override val displayRange = 1f..200f
             override val displayDecimals = 0
         }
     }
@@ -106,13 +106,13 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                         automationParameter = Params.Layer,
                         title = "Layer",
                         value = deviceState.layer,
-                        type = DialType.Steps(IntArray(41) { -20 + it }.toList()),
+                        type = DialType.Steps(IntArray(201) { -100 + it }.toList()),
                         text = "${deviceState.layer}",
                         onResolveTextValue = {
                             val layerText = it.trim().toIntOrNull()
 
                             layerText?.let { layer ->
-                                if (layer in -20..20) {
+                                if (layer in -100..100) {
                                     state.update {
                                         it.copy(layer = layer)
                                     }
@@ -143,13 +143,13 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
                         automationParameter = Params.Range,
                         title = "Range",
                         value = deviceState.range,
-                        type = DialType.Steps(IntArray(21) { it }.toList()),
+                        type = DialType.Steps(IntArray(200) { it + 1 }.toList()),
                         text = "${deviceState.range}",
                         enabled = deviceState.mode != Signal.LED.BlendingMode.Normal,
                         onResolveTextValue = {
                             val rangeText = it.trim().toIntOrNull()
                             rangeText?.let { range ->
-                                if (range in 0..20) {
+                                if (range in 1..200) {
                                     state.update { it.copy(range = range) }
                                 }
                             }
@@ -226,8 +226,8 @@ class LayerChainDevice : LEDChainDevice<LayerChainDeviceState>() {
             triggerDialAutomations()
         }
 
-        val autoLayer = ((evaluateAutomatedDialValue(Params.Layer.id, (rawS.layer + 20f) / 40f) * 40f) - 20f).toInt()
-        val autoRange = (evaluateAutomatedDialValue(Params.Range.id, rawS.range / 20f) * 20f).toInt()
+        val autoLayer = ((evaluateAutomatedDialValue(Params.Layer.id, (rawS.layer + 100f) / 200f) * 200f) - 100f).toInt()
+        val autoRange = (1f + evaluateAutomatedDialValue(Params.Range.id, (rawS.range - 1f) / 199f) * 199f).toInt()
 
         signalExit?.invoke(
             n.map {
@@ -256,7 +256,7 @@ data class LayerChainDeviceState(
     val mode: Signal.LED.BlendingMode = Signal.LED.BlendingMode.Normal,
 
     @Automatable(LayerChainDevice.Params.Range::class)
-    val range: Int = 1,
+    val range: Int = 200,
 
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     override val automations: Map<String, DialAutomationLane> = emptyMap(),

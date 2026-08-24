@@ -50,7 +50,7 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
             override val id = "layer"
             override val label = "Target"
             override val curveMode = CurveMode.Bipolar
-            override val displayRange = -20f..20f
+            override val displayRange = -100f..100f
             override val displayDecimals = 0
         }
 
@@ -58,7 +58,7 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
             override val id = "range"
             override val label = "Range"
             override val curveMode = CurveMode.Unipolar
-            override val displayRange = 0f..20f
+            override val displayRange = 0f..200f
             override val displayDecimals = 0
         }
     }
@@ -94,13 +94,13 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
                         automationParameter = Params.Target,
                         title = "Target",
                         value = deviceState.layer,
-                        type = DialType.Steps(IntArray(41) { -20 + it }.toList()),
+                        type = DialType.Steps(IntArray(201) { -100 + it }.toList()),
                         text = "${deviceState.layer}",
                         onResolveTextValue = {
                             val layerText = it.trim().toIntOrNull()
 
                             layerText?.let { layer ->
-                                if (layer in -20..20) {
+                                if (layer in -100..100) {
                                     state.update {
                                         it.copy(layer = layer)
                                     }
@@ -131,12 +131,12 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
                         automationParameter = Params.Range,
                         title = "Range",
                         value = deviceState.range,
-                        type = DialType.Steps(IntArray(21) { it }.toList()),
+                        type = DialType.Steps(IntArray(201) { it }.toList()),
                         text = "${deviceState.range}",
                         onResolveTextValue = {
                             val rangeText = it.trim().toIntOrNull()
                             rangeText?.let { range ->
-                                if (range in 0..20) {
+                                if (range in 0..200) {
                                     state.update { it.copy(range = range) }
                                 }
                             }
@@ -168,15 +168,13 @@ class LayerFilterChainDevice : LEDChainDevice<LayerFilterChainDeviceState>() {
             triggerDialAutomations()
         }
 
-        val target = ((evaluateAutomatedDialValue(Params.Target.id, (rawS.layer + 20f) / 40f) * 40f) - 20f).toInt()
-        val range = (evaluateAutomatedDialValue(Params.Range.id, rawS.range / 20f) * 20f).toInt()
+        val target = ((evaluateAutomatedDialValue(Params.Target.id, (rawS.layer + 100f) / 200f) * 200f) - 100f).toInt()
+        val range = (evaluateAutomatedDialValue(Params.Range.id, rawS.range / 200f) * 200f).toInt()
 
         signalExit?.invoke(
             n.filter {
                 if (!it.color.isLit()) {
                     true
-                } else if (range == 0) {
-                    it.layer == target
                 } else {
                     kotlin.math.abs(it.layer - target) <= range
                 }

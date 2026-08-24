@@ -17,6 +17,10 @@ class Screen : AutoCloseable {
         private val locker = Mutex()
         private val isDirty = atomic(false)
 
+        init {
+            signals[10000] = Signal.LED(null, x = index % 10, y = index / 10, color = Color.Black, layer = -100)
+        }
+
         suspend fun clear() = locker.withLock {
             signals.clear()
             signals[10000] = Signal.LED(null, x = index % 10, y = index / 10, color = Color.Black, layer = -100)
@@ -26,64 +30,54 @@ class Screen : AutoCloseable {
 
         private fun recomputeColorLocked(): Color {
             var ret = Color.Black
-            var remainingOpacity = 1f
 
-            var i = 0
-            while (i < signals.size && remainingOpacity > 0f) {
+            for (i in 0 until signals.size) {
                 val signal = signals.getValueAt(i)
                 val opacity = signal.opacity.coerceIn(0f, 1f)
-
-                if (signal.blendingMode != Signal.LED.BlendingMode.Normal) {
-                    val nextSignal = if (i + 1 < signals.size) signals.getValueAt(i + 1) else null
-
-                    if (nextSignal == null || abs(signal.layer - nextSignal.layer) > signal.blendingRange) {
-                        i++
-                        continue
-                    }
+                val sigColor = if (opacity < 1f) {
+                    Color(
+                        (signal.color.red * opacity).coerceIn(0f, 1f),
+                        (signal.color.green * opacity).coerceIn(0f, 1f),
+                        (signal.color.blue * opacity).coerceIn(0f, 1f),
+                        1f
+                    )
+                } else {
+                    signal.color
                 }
 
-                val contribution = opacity * remainingOpacity
+                if (signal.blendingMode != Signal.LED.BlendingMode.Normal &&
+                    (if (i == signals.size - 1) true else signal.layer - signals.getValueAt(i + 1).layer > signal.blendingRange)
+                ) {
+                    continue
+                }
 
-                when (signal.blendingMode) {
-                    Signal.LED.BlendingMode.Normal -> {
-                        ret = Color(
-                            (ret.red + signal.color.red * contribution).coerceIn(0f, 1f),
-                            (ret.green + signal.color.green * contribution).coerceIn(0f, 1f),
-                            (ret.blue + signal.color.blue * contribution).coerceIn(0f, 1f),
-                            1f
-                        )
-                        remainingOpacity *= (1f - opacity)
-                        i++
-                    }
-                    Signal.LED.BlendingMode.Mask -> {
-                        ret = Color.Black
-                        remainingOpacity = 0f
-                        i++
-                    }
-                    Signal.LED.BlendingMode.Multiply -> {
-                        val nextSignal = signals.getValueAt(i + 1)
-                        val blended = nextSignal.color.mix(signal.color, signal.blendingMode)
-                        ret = Color(
-                            (ret.red + blended.red * contribution).coerceIn(0f, 1f),
-                            (ret.green + blended.green * contribution).coerceIn(0f, 1f),
-                            (ret.blue + blended.blue * contribution).coerceIn(0f, 1f),
-                            1f
-                        )
-                        remainingOpacity *= (1f - opacity)
-                        i += 2
-                    }
-                    Signal.LED.BlendingMode.Screen -> {
-                        val nextSignal = signals.getValueAt(i + 1)
-                        val blended = nextSignal.color.mix(signal.color, signal.blendingMode)
-                        ret = Color(
-                            (ret.red + blended.red * contribution).coerceIn(0f, 1f),
-                            (ret.green + blended.green * contribution).coerceIn(0f, 1f),
-                            (ret.blue + blended.blue * contribution).coerceIn(0f, 1f),
-                            1f
-                        )
-                        remainingOpacity *= (1f - opacity)
-                        i += 2
-                    }
+                if (signal.blendingMode == Signal.LED.BlendingMode.Mask) {
+                    break
+                }
+
+                val multiply = if (i == 0) false else (
+                    signals.getValueAt(i - 1).blendingMode == Signal.LED.BlendingMode.Multiply &&
+                    signals.getValueAt(i - 1).layer - signal.layer <= signals.getValueAt(i - 1).blendingRange
+                )
+
+                ret = if (multiply) {
+                    Color(
+                        (ret.red * sigColor.red).coerceIn(0f, 1f),
+                        (ret.green * sigColor.green).coerceIn(0f, 1f),
+                        (ret.blue * sigColor.blue).coerceIn(0f, 1f),
+                        1f
+                    )
+                } else {
+                    Color(
+                        (1f - (1f - ret.red) * (1f - sigColor.red)).coerceIn(0f, 1f),
+                        (1f - (1f - ret.green) * (1f - sigColor.green)).coerceIn(0f, 1f),
+                        (1f - (1f - ret.blue) * (1f - sigColor.blue)).coerceIn(0f, 1f),
+                        1f
+                    )
+                }
+
+                if (signal.blendingMode == Signal.LED.BlendingMode.Normal) {
+                    break
                 }
             }
 

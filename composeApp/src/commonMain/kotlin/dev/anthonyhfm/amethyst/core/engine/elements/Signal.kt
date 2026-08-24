@@ -14,7 +14,7 @@ sealed interface Signal {
         val color: Color,
         val layer: Int = 0,
         val blendingMode: BlendingMode = BlendingMode.Normal,
-        val blendingRange: Int = 1,
+        val blendingRange: Int = 200,
         val opacity: Float = 1f,
         override val extras: Map<String, Int> = mapOf()
     ) : Signal {
