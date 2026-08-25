@@ -1,12 +1,15 @@
 package dev.anthonyhfm.amethyst.devices.audio.sample
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.twotone.AudioFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.composeunstyled.Icon
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
@@ -49,7 +52,9 @@ fun SampleEmptyState(
     ) {
         EmptyIcon(imageVector = Icons.TwoTone.AudioFile)
         EmptyTitle(text = "No sample loaded")
-        EmptyDescription(text = "Choose an audio file to view and edit waveform")
+
+        Spacer(Modifier.weight(1f))
+
         EmptyActions {
             Button(
                 onClick = {
