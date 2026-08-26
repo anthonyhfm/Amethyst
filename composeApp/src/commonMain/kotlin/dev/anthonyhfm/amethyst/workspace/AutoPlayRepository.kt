@@ -183,6 +183,12 @@ object AutoPlayRepository {
         learningIndex = 0
         sortedActionTimes = emptyList()
         totalDuration = 0.0
+        if (previousLearningActions.isNotEmpty()) {
+            val clearSignals = previousLearningActions.map {
+                Signal.LED(origin = this, x = it.x, y = it.y, color = Color.Black, layer = 101)
+            }
+            Heaven.midiEnter(clearSignals)
+        }
         previousLearningActions = emptyList()
     }
 
@@ -204,24 +210,31 @@ object AutoPlayRepository {
         Echo.stopAll()
         
         _state.value = AutoPlayState.LEARNING
-        sortedActionTimes = autoplay.actions.keys.sorted()
+        sortedActionTimes = autoplay.actions.filter { (_, actions) ->
+            actions.any { it.down }
+        }.keys.sorted()
         
         // Find the next step to learn based on current position
-        learningIndex = sortedActionTimes.indexOfFirst { it >= currentPos }.coerceAtLeast(0)
+        learningIndex = sortedActionTimes.indexOfFirst { it >= currentPos }.let {
+            if (it == -1) (sortedActionTimes.size - 1).coerceAtLeast(0) else it
+        }
 
-        totalDuration = sortedActionTimes.lastOrNull() ?: 0.0
+        totalDuration = autoplay.actions.keys.maxOrNull() ?: 0.0
         
         showCurrentLearningStep()
     }
 
     private fun executeActions(actions: List<AutoPlayData.Action>) {
+        val downActions = actions.filter { it.down }
+        if (downActions.isEmpty()) return
+
         WorkspaceRepository.samplingChain.signalEnter(
-            actions.map {
+            downActions.map {
                 Signal.Midi(
                     origin = this,
                     x = it.x,
                     y = it.y,
-                    velocity = if (it.down) 127 else 0,
+                    velocity = 127,
                 )
             }
         )
@@ -229,12 +242,12 @@ object AutoPlayRepository {
         val settings = WorkspaceRepository.workspaceMeta?.settings
         if (settings?.autoPlayShowLights == true) {
             WorkspaceRepository.lightsChain.signalEnter(
-                actions.map {
+                downActions.map {
                     Signal.LED(
                         origin = this,
                         x = it.x,
                         y = it.y,
-                        color = if (it.down) Color.White else Color.Black,
+                        color = Color.White,
                     )
                 }
             )
@@ -249,8 +262,6 @@ object AutoPlayRepository {
         val expectedDown = actions.filter { it.down }
         
         if (expectedDown.isEmpty()) {
-            // Only releases here (no green lights to show), so auto-advance to the next press.
-            executeActions(actions)
             learningIndex++
             if (learningIndex < sortedActionTimes.size) {
                 _progress.value = (learningIndex.toFloat() / sortedActionTimes.size).coerceIn(0f, 1f)
@@ -265,18 +276,18 @@ object AutoPlayRepository {
             Signal.LED(origin = this, x = it.x, y = it.y, color = Color.Black, layer = 101)
         }
         
-        val showSignals = actions.map {
+        val showSignals = expectedDown.map {
             Signal.LED(
                 origin = this,
                 x = it.x,
                 y = it.y,
-                color = if (it.down) Color.Green else Color.Black,
+                color = Color.Green,
                 layer = 101
             )
         }
 
         Heaven.midiEnter(clearSignals + showSignals)
-        previousLearningActions = actions
+        previousLearningActions = expectedDown
     }
 
     fun onMidiInput(signals: List<Signal.Midi>) {
@@ -294,7 +305,7 @@ object AutoPlayRepository {
             // Move autoplay according to keys what the user just hit.
             val inputCoords = signals.map { it.x to it.y }.toSet()
             val filteredActions = expectedActions.filter {
-                (it.x to it.y) !in inputCoords
+                it.down && (it.x to it.y) !in inputCoords
             }
             executeActions(filteredActions)
 
@@ -330,6 +341,11 @@ object AutoPlayRepository {
         if (currentState == AutoPlayState.PLAYING) {
             _state.value = AutoPlayState.PAUSED
             startAutoPlay()
+        } else if (currentState == AutoPlayState.LEARNING) {
+            learningIndex = sortedActionTimes.indexOfFirst { it >= targetMs }.let {
+                if (it == -1) (sortedActionTimes.size - 1).coerceAtLeast(0) else it
+            }
+            showCurrentLearningStep()
         }
     }
 }
