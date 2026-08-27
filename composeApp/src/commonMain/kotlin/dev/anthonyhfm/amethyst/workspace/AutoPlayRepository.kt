@@ -220,8 +220,15 @@ object AutoPlayRepository {
         }
 
         totalDuration = autoplay.actions.keys.maxOrNull() ?: 0.0
+        _progress.value = if (sortedActionTimes.isNotEmpty()) {
+            (learningIndex.toFloat() / sortedActionTimes.size).coerceIn(0f, 1f)
+        } else 0f
         
-        showCurrentLearningStep()
+        Heaven.clear {
+            if (_state.value == AutoPlayState.LEARNING) {
+                showCurrentLearningStep()
+            }
+        }
     }
 
     private fun executeActions(actions: List<AutoPlayData.Action>) {
