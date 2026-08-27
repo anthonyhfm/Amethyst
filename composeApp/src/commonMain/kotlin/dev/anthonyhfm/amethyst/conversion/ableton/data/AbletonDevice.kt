@@ -111,21 +111,21 @@ data class OriginalSimpler(
 
     @Serializable
     data class VolumeAndPan(
-        val oneShotEnvelope: OneShotEnvelope
+        val oneShotEnvelope: OneShotEnvelope = OneShotEnvelope()
     ) {
         @Serializable
         data class OneShotEnvelope(
             @XmlElement
             @XmlSerialName("FadeInTime")
-            val fadeInTime: FadeData,
+            val fadeInTime: FadeData = FadeData(),
 
             @XmlElement
             @XmlSerialName("FadeOutTime")
-            val fadeOutTime: FadeData
+            val fadeOutTime: FadeData = FadeData()
         ) {
             @Serializable
             data class FadeData(
-                val manual: AbletonManual<Float>
+                val manual: AbletonManual<Float> = AbletonManual(0f)
             )
         }
     }

@@ -141,12 +141,17 @@ class OriginalSimplerPrerenderer {
             return@withContext null
         }
 
+        val frameSizeBytes = (audioSignal.channels * (audioSignal.bitDepth / 8))
+        val totalFrames = if (frameSizeBytes > 0) (audioSignal.rawData?.size ?: 0) / frameSizeBytes else 0
+        val durationMs = if (audioSignal.sampleRate > 0) (totalFrames.toLong() * 1000L) / audioSignal.sampleRate else 0L
+
         SampleChainDeviceState(
             fileName = filePath,
             rawData = audioSignal.rawData,
             sampleRate = audioSignal.sampleRate,
             channels = audioSignal.channels,
             bitDepth = audioSignal.bitDepth,
+            totalDurationMs = durationMs,
             isLoaded = true
         )
     }
@@ -223,6 +228,7 @@ class OriginalSimplerPrerenderer {
                 sampleRate = full.sampleRate,
                 channels = full.channels,
                 bitDepth = full.bitDepth,
+                totalDurationMs = 0L,
                 isLoaded = false
             )
         }
@@ -234,7 +240,8 @@ class OriginalSimplerPrerenderer {
         }
         val safeEndByte = endByte.coerceAtMost(full.rawData.size)
         val slice = full.rawData.copyOfRange(startByte, safeEndByte)
-
+        val sliceFrames = (endF - startF).coerceAtLeast(0L)
+        val durationMs = if (full.sampleRate > 0) (sliceFrames * 1000L) / full.sampleRate else 0L
 
         return SampleChainDeviceState(
             fileName = filePath,
@@ -242,6 +249,7 @@ class OriginalSimplerPrerenderer {
             sampleRate = full.sampleRate,
             channels = full.channels,
             bitDepth = full.bitDepth,
+            totalDurationMs = durationMs,
             isLoaded = true
         )
     }

@@ -51,6 +51,8 @@ class MidiChainReader(
                     chainDevices += getMidiGroupWeight(it)
                 } else if (it is InstrumentGroupDevice) {
                     chainDevices += getInstrumentGroupWeight(it)
+                } else if (it is DrumGroupDevice) {
+                    chainDevices += getDrumGroupWeight(it)
                 }
             }
 

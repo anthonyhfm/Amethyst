@@ -27,7 +27,8 @@ class MidiEffectGroupAdapter(
     private val device: MidiEffectGroupDevice,
     private val offset: IntOffset = IntOffset.Zero,
     private val outputOffset: IntOffset = IntOffset.Zero,
-    private val chainDepth: Int = 0
+    private val chainDepth: Int = 0,
+    private val isInsideDrumRack: Boolean = false,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<MidiEffectGroupDevice.Branches.MidiEffectBranch> = device.branches.branches
@@ -36,7 +37,7 @@ class MidiEffectGroupAdapter(
             it.branchSelectorRange.min.value != 0 || (it.branchSelectorRange.max.value != 0 && it.branchSelectorRange.max.value != 127)
         }
 
-        val hasPageSwitching = chainDepth == 0 && (
+        val hasPageSwitching = !isInsideDrumRack && chainDepth == 0 && (
             device.chainSelector.keyMidi != null || branches.any {
                 it.branchSelectorRange.min.value > 0 || it.branchSelectorRange.max.value > 0
             }
@@ -91,29 +92,11 @@ class MidiEffectGroupAdapter(
                             val maxKey = branch.zoneSettings.keyRange.max.value
 
                             if (hasMacroFilter) {
-                                if (maxMacro - minMacro == 0) {
+                                if (maxMacro - minMacro != 127) {
                                     add(
                                         MacroFilterChainDeviceState(
                                             macro = chainDepth,
-                                            allowedValues = setOf(minMacro),
-                                        )
-                                    )
-                                } else if (maxMacro - minMacro != 127) {
-                                    add(
-                                        GroupChainDeviceState(
-                                            groups = (minMacro..maxMacro).map { key ->
-                                                Group(
-                                                    name = "Key $key",
-                                                    stateChain = StateChain(
-                                                        devices = listOf(
-                                                            MacroFilterChainDeviceState(
-                                                                macro = chainDepth,
-                                                                allowedValues = setOf(key),
-                                                            )
-                                                        )
-                                                    )
-                                                )
-                                            }
+                                            allowedValues = (minMacro..maxMacro).toSet(),
                                         )
                                     )
                                 }

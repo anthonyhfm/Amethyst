@@ -50,6 +50,7 @@ abstract class AbletonAdapter {
             offset: IntOffset = IntOffset.Zero,
             outputOffset: IntOffset = IntOffset.Zero,
             chainDepth: Int = 0,
+            isInsideDrumRack: Boolean = false,
         ): AbletonAdapter? {
             try {
                 return when (device) {
@@ -64,14 +65,16 @@ abstract class AbletonAdapter {
                         device = device,
                         offset = offset,
                         outputOffset = outputOffset,
-                        chainDepth = chainDepth
+                        chainDepth = chainDepth,
+                        isInsideDrumRack = isInsideDrumRack,
                     )
 
                     is MidiEffectGroupDevice -> MidiEffectGroupAdapter(
                         device = device,
                         offset = offset,
                         outputOffset = outputOffset,
-                        chainDepth = chainDepth
+                        chainDepth = chainDepth,
+                        isInsideDrumRack = isInsideDrumRack,
                     )
 
                     is MxDeviceMidiEffect -> MxDeviceMidiEffectAdapter(

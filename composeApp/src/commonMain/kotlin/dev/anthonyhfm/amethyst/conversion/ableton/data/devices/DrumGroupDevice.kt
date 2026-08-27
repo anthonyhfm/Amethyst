@@ -1,11 +1,14 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AutomationTarget
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonMidiControllerRange
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import nl.adaptivity.xmlutil.serialization.XmlElement
 import nl.adaptivity.xmlutil.serialization.XmlSerialName
 
@@ -21,12 +24,91 @@ data class DrumGroupDevice(
     val branches: Branches,
 
     @XmlElement
-    val chainSelector: ChainSelector,
+    val chainSelector: ChainSelector = ChainSelector(),
+
+    @XmlElement
+    @XmlSerialName("MacroControls.0")
+    val macro0: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.1")
+    val macro1: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.2")
+    val macro2: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.3")
+    val macro3: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.4")
+    val macro4: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.5")
+    val macro5: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.6")
+    val macro6: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.7")
+    val macro7: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.8")
+    val macro8: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.9")
+    val macro9: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.10")
+    val macro10: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.11")
+    val macro11: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.12")
+    val macro12: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.13")
+    val macro13: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.14")
+    val macro14: Macro? = null,
+    @XmlElement
+    @XmlSerialName("MacroControls.15")
+    val macro15: Macro? = null,
+
+    @Transient
+    val macros: List<Macro> = listOfNotNull(
+        macro0, macro1, macro2, macro3, macro4, macro5, macro6, macro7,
+        macro8, macro9, macro10, macro11, macro12, macro13, macro14, macro15
+    )
 ) : AbletonDevice {
+    fun getPageMacro(liveVersion: dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion?): Macro? {
+        return when (liveVersion) {
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_11,
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_12 -> macro15 ?: macro7 ?: macro0
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_9,
+            dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter.LiveVersion.LIVE_10 -> macro7 ?: macro15 ?: macro0
+            else -> macro15 ?: macro7 ?: macro0
+        }
+    }
+
+    @Serializable
+    data class Macro(
+        @XmlElement
+        val manual: AbletonManual<Float> = AbletonManual(0f),
+        @XmlElement
+        @XmlSerialName("AutomationTarget")
+        val automationTarget: AutomationTarget? = null
+    )
+
     @Serializable
     data class ChainSelector(
         @XmlElement
-        val keyMidi: ChainSelector.KeyMidi? = null
+        val keyMidi: ChainSelector.KeyMidi? = null,
+        @XmlElement
+        val midiControllerRange: AbletonMidiControllerRange? = null,
+        @XmlElement
+        @XmlSerialName("AutomationTarget")
+        val automationTarget: AutomationTarget? = null
     ) {
         /**
          * This data model does NOT exist. It is a placeholder to detect if a element is existing in the ChainSelector element

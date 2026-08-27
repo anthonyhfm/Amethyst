@@ -301,10 +301,13 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable 
             return
         }
 
-        val snapshot = renderSnapshot(deviceState) ?: return
-        repeat(triggerCount) {
-            triggerQueue.offer(snapshot)
+        val snapshot = renderSnapshot(deviceState)
+        if (snapshot != null) {
+            repeat(triggerCount) {
+                triggerQueue.offer(snapshot)
+            }
         }
+        signalExit?.invoke(n)
     }
 
     override fun prepareAudio(configuration: AudioConfiguration) {

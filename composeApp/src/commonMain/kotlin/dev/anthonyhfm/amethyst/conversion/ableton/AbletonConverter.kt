@@ -62,7 +62,7 @@ object AbletonConverter : AmethystConverter {
         private set
 
     internal var launchpadLayout: AbletonLaunchpadLayout? = null
-        private set
+        internal set
 
     var palette: Array<Triple<Int, Int, Int>> = Palettes.novation
         private set

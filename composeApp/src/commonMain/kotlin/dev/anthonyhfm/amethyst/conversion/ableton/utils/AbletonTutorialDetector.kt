@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AutomationEnvelopes
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiClip
 import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
@@ -328,6 +329,13 @@ object AbletonTutorialDetector {
                             macro.automationTarget?.id?.let { targetIds.add(it) }
                         }
                     }
+                    is DrumGroupDevice -> {
+                        device.chainSelector.automationTarget?.id?.let { targetIds.add(it) }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targetIds.add(it) }
+                        device.macros.forEach { macro ->
+                            macro.automationTarget?.id?.let { targetIds.add(it) }
+                        }
+                    }
                     else -> {}
                 }
             }
@@ -346,6 +354,11 @@ object AbletonTutorialDetector {
                     }
                 }
                 is MidiEffectGroupDevice -> {
+                    for (branch in device.branches.branches) {
+                        result.addAll(collectAllDevices(branch.deviceChain.deviceChain.devices.devices))
+                    }
+                }
+                is DrumGroupDevice -> {
                     for (branch in device.branches.branches) {
                         result.addAll(collectAllDevices(branch.deviceChain.deviceChain.devices.devices))
                     }
