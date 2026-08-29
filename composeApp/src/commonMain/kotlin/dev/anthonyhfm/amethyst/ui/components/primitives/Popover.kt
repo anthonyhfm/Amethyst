@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.ui.components.primitives
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,7 @@ import dev.anthonyhfm.amethyst.ui.theme.popover
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 
 @Composable
 fun Popover(
@@ -41,6 +44,7 @@ fun Popover(
     trigger: @Composable () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val reducedMotion = rememberReducedMotion()
     UnstyledDropdownMenu(
         onExpandRequest = onExpandRequest,
         modifier = modifier,
@@ -55,8 +59,8 @@ fun Popover(
             contentColor = Theme[colors][popoverForeground],
             contentPadding = PaddingValues(16.dp),
             anchor = anchor,
-            enter = fadeIn(tween(150)),
-            exit = fadeOut(tween(100)),
+            enter = if (reducedMotion) EnterTransition.None else fadeIn(tween(150)),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut(tween(100)),
             modifier = Modifier
                 .width(IntrinsicSize.Max)
                 .widthIn(min = 200.dp)

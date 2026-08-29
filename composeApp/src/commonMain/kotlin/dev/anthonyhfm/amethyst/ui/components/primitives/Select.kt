@@ -5,6 +5,8 @@ import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -62,6 +64,7 @@ import dev.anthonyhfm.amethyst.ui.theme.popover
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 
 private val LocalSelectDismissRequest = staticCompositionLocalOf<() -> Unit> { {} }
 
@@ -85,6 +88,7 @@ fun Select(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val reducedMotion = rememberReducedMotion()
     val interactionSource = remember { MutableInteractionSource() }
     val density = LocalDensity.current
     var triggerWidth by remember { mutableStateOf(0.dp) }
@@ -143,8 +147,8 @@ fun Select(
                 backgroundColor = Theme[colors][popover],
                 contentColor = Theme[colors][popoverForeground],
                 contentPadding = PaddingValues(4.dp),
-                enter = fadeIn(tween(150)),
-                exit = fadeOut(tween(100)),
+                enter = if (reducedMotion) EnterTransition.None else fadeIn(tween(150)),
+                exit = if (reducedMotion) ExitTransition.None else fadeOut(tween(100)),
                 modifier = Modifier
                     .then(if (triggerWidth > 0.dp) Modifier.width(triggerWidth) else Modifier)
                     .shadow(8.dp, shape)

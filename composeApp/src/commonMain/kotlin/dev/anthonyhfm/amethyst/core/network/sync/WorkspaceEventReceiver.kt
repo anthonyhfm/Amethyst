@@ -68,6 +68,16 @@ class WorkspaceEventReceiver(
                         WorkspaceSyncCoordinator.triggerVerification()
                     }
 
+                    is ConnectEvent.ParameterMappingsChanged -> {
+                        log("event ParameterMappingsChanged count=${event.mappings.size}")
+                        WorkspaceRepository.setParameterMappings(
+                            event.mappings,
+                            fromRemote = true,
+                            undoable = false,
+                        )
+                        WorkspaceSyncCoordinator.triggerVerification()
+                    }
+
                     is ConnectEvent.GridTypeChanged -> {
                         log("event GridTypeChanged key=${event.gridTypeKey}")
                         WorkspaceRepository.setGridType(
@@ -269,4 +279,4 @@ class WorkspaceEventReceiver(
 private fun SavableWorkspaceData.withLocalMacroValuesStripped(): SavableWorkspaceData =
     copy(macros = macros.asMacroStructure())
 
-private fun List<Macro>.asMacroStructure(): List<Macro> = List(size) { Macro(0) }
+private fun List<Macro>.asMacroStructure(): List<Macro> = map(Macro::withoutLocalValue)

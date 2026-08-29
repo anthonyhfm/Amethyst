@@ -16,12 +16,12 @@ class WorkspaceEventBroadcaster(
 ) {
     private val jobs = mutableListOf<Job>()
     private var verificationJob: Job? = null
-    private var lastBroadcastMacroCount: Int = WorkspaceRepository.macros.value.size
+    private var lastBroadcastMacroStructure: List<Macro> = WorkspaceRepository.macros.value.asMacroStructure()
 
     fun start() {
         if (jobs.isNotEmpty()) return
 
-        lastBroadcastMacroCount = WorkspaceRepository.macros.value.size
+        lastBroadcastMacroStructure = WorkspaceRepository.macros.value.asMacroStructure()
 
         jobs += scope.launch {
             WorkspaceRepository.bpm
@@ -56,13 +56,24 @@ class WorkspaceEventBroadcaster(
                 .collect { macros ->
                     if (WorkspaceRepository.isApplyingRemoteMacrosUpdate) {
                         WorkspaceRepository.markRemoteMacrosUpdateConsumed()
-                        lastBroadcastMacroCount = macros.size
-                    } else if (macros.size != lastBroadcastMacroCount) {
-                        lastBroadcastMacroCount = macros.size
-                        provider.send(ConnectEvent.MacrosChanged(macros.asMacroStructure()))
+                        lastBroadcastMacroStructure = macros.asMacroStructure()
+                    } else if (macros.asMacroStructure() != lastBroadcastMacroStructure) {
+                        lastBroadcastMacroStructure = macros.asMacroStructure()
+                        provider.send(ConnectEvent.MacrosChanged(lastBroadcastMacroStructure))
                         triggerVerification()
+                    }
+                }
+        }
+
+        jobs += scope.launch {
+            WorkspaceRepository.parameterMappings
+                .drop(1)
+                .collect { mappings ->
+                    if (WorkspaceRepository.isApplyingRemoteParameterMappingsUpdate) {
+                        WorkspaceRepository.markRemoteParameterMappingsUpdateConsumed()
                     } else {
-                        lastBroadcastMacroCount = macros.size
+                        provider.send(ConnectEvent.ParameterMappingsChanged(mappings))
+                        triggerVerification()
                     }
                 }
         }
@@ -96,10 +107,11 @@ class WorkspaceEventBroadcaster(
     }
 
     fun onMacrosChanged(macros: List<Macro>) {
-        if (macros.size == lastBroadcastMacroCount) return
-        lastBroadcastMacroCount = macros.size
+        val structure = macros.asMacroStructure()
+        if (structure == lastBroadcastMacroStructure) return
+        lastBroadcastMacroStructure = structure
         scope.launch {
-            provider.send(ConnectEvent.MacrosChanged(macros.asMacroStructure()))
+            provider.send(ConnectEvent.MacrosChanged(structure))
             triggerVerification()
         }
     }
@@ -116,4 +128,4 @@ class WorkspaceEventBroadcaster(
     }
 }
 
-private fun List<Macro>.asMacroStructure(): List<Macro> = List(size) { Macro(0) }
+private fun List<Macro>.asMacroStructure(): List<Macro> = map(Macro::withoutLocalValue)

@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.TimelineDuration
 import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.devices.parallelDuration
@@ -41,6 +42,7 @@ import dev.anthonyhfm.amethyst.devices.timelineDuration
 class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChainDevice {
     override val state = MutableStateFlow(GroupChainDeviceState())
     override val helpRef = "Group"
+    override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.Container)
 
     override fun timelineDuration(context: TimelineDurationContext): TimelineDuration =
         state.value.groups
@@ -326,6 +328,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
     override fun nestedChains() = state.value.groups.map { it.chain }
 
     companion object : ChainDeviceFactory<GroupChainDeviceState> {
+        override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.Container)
         override val stateClass = GroupChainDeviceState::class
         override val serializer = GroupChainDeviceState.serializer()
         override fun create() = GroupChainDevice()

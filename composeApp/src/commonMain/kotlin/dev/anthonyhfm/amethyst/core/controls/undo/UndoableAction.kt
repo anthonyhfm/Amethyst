@@ -13,6 +13,7 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.workspace.data.Macro
+import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
 
 sealed interface UndoableAction {
     data class ChainDeviceCreation(
@@ -293,6 +294,18 @@ sealed interface UndoableAction {
     data class WorkspaceMacrosChange(
         val beforeMacros: List<Macro>,
         val afterMacros: List<Macro>
+    ) : UndoableAction
+
+    data class WorkspaceParameterMappingsChange(
+        val beforeMappings: List<ParameterMapping>,
+        val afterMappings: List<ParameterMapping>,
+    ) : UndoableAction
+
+    data class WorkspaceMacroRemoval(
+        val beforeMacros: List<Macro>,
+        val afterMacros: List<Macro>,
+        val beforeMappings: List<ParameterMapping>,
+        val afterMappings: List<ParameterMapping>,
     ) : UndoableAction
 
     data class PianoRollNoteMove(

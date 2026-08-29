@@ -38,8 +38,10 @@ import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.TimelineDuration
 import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
+import dev.anthonyhfm.amethyst.devices.DeviceCapability
 
 class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>() {
+    override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.Modulation)
     override fun timelineDuration(context: TimelineDurationContext) =
         TimelineDuration.None
     override val state = MutableStateFlow(MacroControlChainDeviceState())
@@ -49,6 +51,7 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
     override fun Content() {
         val deviceState by state.collectAsState()
         val macros by WorkspaceRepository.macros.collectAsState()
+        val mappings by WorkspaceRepository.parameterMappings.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
 
         ChainDeviceShell(
@@ -67,20 +70,23 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (macros.isNotEmpty()) {
+                    val selectedIndex = macros.indexOfFirst { it.id == deviceState.macroId }
+                        .takeIf { it >= 0 } ?: deviceState.macro.coerceIn(0, macros.lastIndex)
+                    val selectedMacro = macros[selectedIndex]
                     if (macros.size > 1) {
                         var beforeMacro = deviceState.copy().macro
                         Dial(
                             title = "Macro",
-                            value = deviceState.macro,
+                            value = selectedIndex,
                             type = DialType.Steps(IntArray(macros.size) { it }.toList()),
-                            text = "${deviceState.macro + 1}",
+                            text = selectedMacro.name.ifBlank { "Macro ${selectedIndex + 1}" },
                             onResolveTextValue = {
                                 val macroText = it.trim().toIntOrNull()
 
                                 macroText?.let { macro ->
                                     if (macro in 1..macros.size) {
                                         state.update {
-                                            it.copy(macro = macro - 1)
+                                            it.copy(macro = macro - 1, macroId = macros[macro - 1].id)
                                         }
                                     }
                                 }
@@ -96,7 +102,7 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                             },
                             onValueChange = { value ->
                                 state.update {
-                                    it.copy(macro = value)
+                                    it.copy(macro = value, macroId = macros[value].id)
                                 }
                             }
                         )
@@ -107,7 +113,7 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Macro 1",
+                                text = selectedMacro.name.ifBlank { "Macro 1" },
                                 textAlign = TextAlign.Center,
                                 style = Theme[typography][small],
                                 color = Theme[colors][foreground]
@@ -147,6 +153,12 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                             )
                         }
                     )
+                    Text(
+                        text = "${mappings.count { it.macroId == selectedMacro.id }} mappings · ${selectedMacro.value}/127",
+                        textAlign = TextAlign.Center,
+                        style = Theme[typography][small],
+                        color = Theme[colors][mutedForeground],
+                    )
                 } else {
                     Text(
                         text = "No macros available",
@@ -173,9 +185,13 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
 
             if (down) {
                 Heaven.schedule(1.0, owner = this) {
+                    val selectedIndex = WorkspaceRepository.macros.value
+                        .indexOfFirst { macro -> macro.id == state.value.macroId }
+                        .takeIf { index -> index >= 0 }
+                        ?: state.value.macro
                     WorkspaceRepository.setMacroValue(
-                        index = state.value.macro,
-                        macro = WorkspaceRepository.macros.value[state.value.macro].copy(
+                        index = selectedIndex,
+                        macro = WorkspaceRepository.macros.value[selectedIndex].copy(
                             value = state.value.value
                         )
                     )
@@ -185,6 +201,7 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
     }
 
     companion object : ChainDeviceFactory<MacroControlChainDeviceState> {
+        override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.Modulation)
         override val stateClass = MacroControlChainDeviceState::class
         override val serializer = MacroControlChainDeviceState.serializer()
         override fun create() = MacroControlChainDevice()
@@ -194,5 +211,6 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
 @Serializable
 data class MacroControlChainDeviceState(
     val macro: Int = 0,
-    val value: Int = 0
+    val value: Int = 0,
+    val macroId: String? = null,
 ) : DeviceState()

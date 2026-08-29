@@ -27,6 +27,8 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.Macro
+import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
+import dev.anthonyhfm.amethyst.workspace.data.mergeMacroStructure
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceSettings
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
@@ -119,6 +121,9 @@ object WorkspaceRepository {
 
     private val _macros: MutableStateFlow<List<Macro>> = MutableStateFlow(listOf(Macro(1)))
     val macros: StateFlow<List<Macro>> = _macros.asStateFlow()
+
+    private val _parameterMappings = MutableStateFlow<List<ParameterMapping>>(emptyList())
+    val parameterMappings: StateFlow<List<ParameterMapping>> = _parameterMappings.asStateFlow()
 
     private val _mode: MutableStateFlow<WorkspaceMode> = MutableStateFlow(LayoutWorkspaceMode())
     val mode: StateFlow<WorkspaceMode> = _mode.asStateFlow()
@@ -281,12 +286,15 @@ object WorkspaceRepository {
         private set
     @Volatile var isApplyingRemoteMacrosUpdate: Boolean = false
         private set
+    @Volatile var isApplyingRemoteParameterMappingsUpdate: Boolean = false
+        private set
     @Volatile var isApplyingRemoteGridTypeUpdate: Boolean = false
         private set
 
     fun markRemoteBpmUpdateConsumed() { isApplyingRemoteBpmUpdate = false }
     fun markRemoteProjectNameUpdateConsumed() { isApplyingRemoteProjectNameUpdate = false }
     fun markRemoteMacrosUpdateConsumed() { isApplyingRemoteMacrosUpdate = false }
+    fun markRemoteParameterMappingsUpdateConsumed() { isApplyingRemoteParameterMappingsUpdate = false }
     fun markRemoteGridTypeUpdateConsumed() { isApplyingRemoteGridTypeUpdate = false }
 
     fun setBpm(bpm: Double, fromRemote: Boolean = false, undoable: Boolean = true) {
@@ -376,15 +384,10 @@ object WorkspaceRepository {
      */
     fun syncMacrosSize(remoteMacros: List<Macro>, fromRemote: Boolean = true) {
         val current = _macros.value
-        if (current.size == remoteMacros.size) {
+        val newMacros = mergeMacroStructure(current, remoteMacros)
+        if (current == newMacros) {
             if (fromRemote) isApplyingRemoteMacrosUpdate = false
             return
-        }
-
-        val newMacros = if (remoteMacros.size > current.size) {
-            current + List(remoteMacros.size - current.size) { Macro(0) }
-        } else {
-            current.take(remoteMacros.size)
         }
         setMacros(newMacros, fromRemote = fromRemote, undoable = false)
     }
@@ -398,7 +401,48 @@ object WorkspaceRepository {
             println("Macro index out of bounds: $index")
             return
         }
-        setMacros(_macros.value.toMutableList().apply { removeAt(index) })
+        val beforeMacros = _macros.value
+        val beforeMappings = _parameterMappings.value
+        val removedId = beforeMacros[index].id
+        val afterMacros = beforeMacros.toMutableList().apply { removeAt(index) }
+        val afterMappings = beforeMappings.filterNot { it.macroId == removedId }
+        UndoManager.addAction(
+            UndoableAction.WorkspaceMacroRemoval(
+                beforeMacros = beforeMacros,
+                afterMacros = afterMacros,
+                beforeMappings = beforeMappings,
+                afterMappings = afterMappings,
+            ),
+        )
+        setMacros(afterMacros, undoable = false)
+        setParameterMappings(afterMappings, undoable = false)
+    }
+
+    fun affectedMappingsForMacro(macroId: String): Int =
+        _parameterMappings.value.count { it.macroId == macroId }
+
+    fun setParameterMappings(
+        mappings: List<ParameterMapping>,
+        fromRemote: Boolean = false,
+        undoable: Boolean = true,
+    ) {
+        val orderedMappings = mappings.sortedBy(ParameterMapping::id)
+        val before = _parameterMappings.value
+        if (before == orderedMappings) {
+            if (fromRemote) isApplyingRemoteParameterMappingsUpdate = false
+            return
+        }
+        if (undoable && !fromRemote) {
+            UndoManager.addAction(
+                UndoableAction.WorkspaceParameterMappingsChange(
+                    beforeMappings = before,
+                    afterMappings = orderedMappings,
+                ),
+            )
+        }
+        isApplyingRemoteParameterMappingsUpdate = fromRemote
+        _parameterMappings.value = orderedMappings
+        if (!fromRemote) isApplyingRemoteParameterMappingsUpdate = false
     }
 
     suspend fun addVirtualDevice(
@@ -575,6 +619,11 @@ object WorkspaceRepository {
         } else {
             _macros.update { workspaceData.macros }
         }
+        setParameterMappings(
+            workspaceData.parameterMappings,
+            fromRemote = fromRemote,
+            undoable = false,
+        )
 
         TimelineRepository.loadTracks(workspaceData.timelineData)
         AudioSourceLibrary.load(workspaceData.audioSources)
@@ -766,6 +815,7 @@ object WorkspaceRepository {
             autoPlay = workspaceMeta?.autoPlay ?: AutoPlayData(emptyMap()),
             timelineData = TimelineRepository.tracks.value,
             macros = _macros.value,
+            parameterMappings = _parameterMappings.value,
             settings = WorkspaceSettings(
                 bpm = _bpm.value,
                 autoPlayShowButtonPresses = workspaceMeta?.settings?.autoPlayShowButtonPresses ?: true,
@@ -918,6 +968,7 @@ object WorkspaceRepository {
         bounds = Pair(IntOffset(0, 0), IntSize(0, 0))
         workspaceMeta = null
         _macros.update { listOf(Macro(1)) }
+        _parameterMappings.value = emptyList()
         replaceMode(LayoutWorkspaceMode())
         _bpm.update { 120.00 }
         _projectName.update { null }
@@ -929,7 +980,7 @@ object WorkspaceRepository {
     fun getVerificationHash(): Int {
         val data = saveWorkspace()
         val hashableData = data.copy(
-            macros = data.macros.map { Macro(0) }
+            macros = data.macros.map(Macro::withoutLocalValue),
         )
         val bytes = dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf.encodeToByteArray(
             SavableWorkspaceData.serializer(),

@@ -57,7 +57,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.anthonyhfm.amethyst.devices.LocalChainDevice
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
-import dev.anthonyhfm.amethyst.ui.components.automation.DialAutomationPopover
+import dev.anthonyhfm.amethyst.ui.components.automation.ParameterAutomationPopover
+import dev.anthonyhfm.amethyst.ui.components.automation.ParameterMappingDialog
+import dev.anthonyhfm.amethyst.core.parameter.ParameterAddress
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
+import dev.anthonyhfm.amethyst.workspace.data.ParameterMappingMode
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
@@ -66,6 +71,8 @@ import androidx.compose.runtime.withFrameNanos
 import kotlin.math.roundToInt
 
 import dev.anthonyhfm.amethyst.ui.components.FlatDial
+import dev.anthonyhfm.amethyst.devices.AudioChainDevice
+import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
 
 @Composable
 fun <T> AutomatableDial(
@@ -87,6 +94,23 @@ fun <T> AutomatableDial(
     val onAutomationAction = LocalAutomationHandler.current
     val nodeChangeCallbacks = LocalNodeChangeCallbacks.current
     val chainDevice = LocalChainDevice.current
+    val descriptor = (chainDevice as? ParameterOwner)?.parameterDescriptors
+        ?.firstOrNull { it.id == parameterId }
+    val resolvedAutomationParameter = automationParameter ?: descriptor
+        ?.takeIf { it.automatable }
+        ?.let { parameterDescriptor ->
+            object : dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter {
+                override val id = parameterDescriptor.id
+                override val label = parameterDescriptor.label
+            }
+        }
+    val workspaceMacros by WorkspaceRepository.macros.collectAsState()
+    val workspaceMappings by WorkspaceRepository.parameterMappings.collectAsState()
+    val parameterAddress = chainDevice?.let { ParameterAddress(it.selectionUUID, parameterId) }
+    val parameterMappings = parameterAddress?.let { address ->
+        workspaceMappings.filter { it.target == address }
+    }.orEmpty()
+    var editingMapping by remember { mutableStateOf<ParameterMapping?>(null) }
 
     val automations by chainDevice?.dialAutomations?.collectAsState() ?: remember { mutableStateOf(emptyMap()) }
     val dialLane: DialAutomationLane? = automations[parameterId]
@@ -97,7 +121,15 @@ fun <T> AutomatableDial(
             while (true) {
                 withFrameNanos {
                     val manualNorm = getManualNormalizedValue(type, value)
-                    val autoNorm = chainDevice.evaluateAutomatedDialValue(parameterId, manualNorm)
+                    val autoNorm = if (chainDevice is AudioChainDevice<*>) {
+                        chainDevice.evaluateAutomatedDialValueAtFrame(
+                            parameterId,
+                            manualNorm,
+                            chainDevice.audioTriggerRuntime?.currentFrame ?: 0L,
+                        )
+                    } else {
+                        chainDevice.evaluateAutomatedDialValue(parameterId, manualNorm)
+                    }
                     currentDisplayValue = computeAutomatedDisplayValue(type, value, autoNorm)
                 }
             }
@@ -112,7 +144,8 @@ fun <T> AutomatableDial(
 
     @Composable
     fun RenderDial(renderValue: T = currentDisplayValue) {
-        val hasAutomation = dialLane != null || (parameter != null && node?.lane(parameter.id) != null)
+        val hasAutomation = dialLane != null || parameterMappings.isNotEmpty() ||
+            (parameter != null && node?.lane(parameter.id) != null)
         if (isFlat) {
             FlatDial(
                 type = type,
@@ -168,7 +201,7 @@ fun <T> AutomatableDial(
                 )
             }
         }
-    } else if (chainDevice != null && (automationParameter != null || dialLane != null)) {
+    } else if (chainDevice != null && (resolvedAutomationParameter != null || dialLane != null)) {
         var showPopover by remember { mutableStateOf(false) }
 
         val triggerContent: @Composable () -> Unit = {
@@ -216,15 +249,51 @@ fun <T> AutomatableDial(
                         }
                     )
                 }
+                if (parameterAddress != null && descriptor?.macroMappable != false) {
+                    workspaceMacros.filter { macro -> parameterMappings.none { it.macroId == macro.id } }
+                        .forEachIndexed { index, macro ->
+                            AutomatableContextMenuItem(
+                                label = "Map to Macro… · ${macro.name.ifBlank { "Macro ${index + 1}" }}",
+                                icon = Lucide.Plus,
+                                onClick = {
+                                    WorkspaceRepository.setParameterMappings(
+                                        workspaceMappings + ParameterMapping(
+                                            macroId = macro.id,
+                                            target = parameterAddress,
+                                        ),
+                                    )
+                                },
+                            )
+                        }
+                    parameterMappings.forEach { mapping ->
+                        val macroLabel = workspaceMacros.firstOrNull { it.id == mapping.macroId }
+                            ?.name?.ifBlank { null }
+                            ?: "Missing macro"
+                        AutomatableContextMenuItem(
+                            label = "Edit mapping… · $macroLabel · ${mapping.mode.name}",
+                            icon = Lucide.Pencil,
+                            onClick = { editingMapping = mapping },
+                        )
+                        AutomatableContextMenuItem(
+                            label = "Remove mapping · $macroLabel",
+                            icon = Lucide.Trash2,
+                            onClick = {
+                                WorkspaceRepository.setParameterMappings(
+                                    workspaceMappings.filterNot { it.id == mapping.id },
+                                )
+                            },
+                        )
+                    }
+                }
             }
         }
 
         if (dialLane != null) {
-            val resolvedParameter = automationParameter ?: object : dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter {
+            val resolvedParameter = resolvedAutomationParameter ?: object : dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter {
                 override val id: String = parameterId
                 override val label: String = title
             }
-            DialAutomationPopover(
+            ParameterAutomationPopover(
                 expanded = showPopover,
                 parameter = resolvedParameter,
                 lane = dialLane,
@@ -252,6 +321,23 @@ fun <T> AutomatableDial(
         }
     } else {
         RenderDial()
+    }
+
+    editingMapping?.let { mapping ->
+        val macroLabel = workspaceMacros.firstOrNull { it.id == mapping.macroId }
+            ?.name?.ifBlank { null }
+            ?: "Missing macro"
+        ParameterMappingDialog(
+            mapping = mapping,
+            macroLabel = macroLabel,
+            targetLabel = "$title (${mapping.target.parameterId})",
+            onSave = { updated ->
+                WorkspaceRepository.setParameterMappings(
+                    workspaceMappings.map { if (it.id == updated.id) updated else it },
+                )
+            },
+            onDismiss = { editingMapping = null },
+        )
     }
 }
 

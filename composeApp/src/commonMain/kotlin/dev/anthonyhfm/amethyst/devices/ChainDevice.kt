@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntime
+import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntimeAware
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 val LocalChainDevice = staticCompositionLocalOf<GenericChainDevice<*>?> { null }
 
@@ -75,6 +78,8 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
     abstract val state: MutableStateFlow<State>
 
     open val helpRef: String? = null
+
+    open val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.TriggerTool)
 
     open val title: String
         get() = helpRef ?: this::class.simpleName?.removeSuffix("ChainDevice") ?: "Device"
@@ -191,6 +196,10 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
         startAutomationTicker()
     }
 
+    fun triggerDialAutomationsAtFrame(frame: Long, sampleRate: Int, bpm: Float) {
+        dialAutomationRuntimes.values.forEach { it.trigger(frame, sampleRate, bpm) }
+    }
+
     open fun onAutomationTick() {
         // Subclasses override to re-evaluate parameters during active signal processing
     }
@@ -225,6 +234,19 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
         }
     }
 
+    fun evaluateAutomatedDialValueAtFrame(
+        parameterId: String,
+        manualNormalizedValue: Float,
+        frame: Long,
+    ): Float {
+        val runtime = dialAutomationRuntimes[parameterId] ?: return manualNormalizedValue
+        if (!runtime.isRunning) return manualNormalizedValue
+        val automated = runtime.valueAtFrame(frame, manualNormalizedValue * 2f - 1f)
+        return if (runtime.lane.settings.isAdditive) {
+            (manualNormalizedValue + automated * 0.5f).coerceIn(0f, 1f)
+        } else ((automated + 1f) * 0.5f).coerceIn(0f, 1f)
+    }
+
     protected fun pushStateChange(before: State, after: State) {
         if (before != after) {
             UndoManager.addAction(
@@ -243,6 +265,7 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 }
 
 abstract class LEDChainDevice <State : @Serializable DeviceState> : GenericChainDevice<State>() {
+    override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.TriggerTool)
     private val deviceLock = SynchronizedObject()
 
     @Composable
@@ -270,10 +293,21 @@ abstract class LEDChainDevice <State : @Serializable DeviceState> : GenericChain
     }
 }
 
-abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericChainDevice<State>() {
+abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericChainDevice<State>(),
+    AudioTriggerRuntimeAware {
+    override var audioTriggerRuntime: AudioTriggerRuntime? = null
     open val audioRole: AudioChainDeviceRole = AudioChainDeviceRole.Effect
     open val latencyFrames: Int = 0
     open val tailFrames: Long = 0L
+
+    override val capabilities: Set<DeviceCapability>
+        get() = setOf(
+            if (audioRole == AudioChainDeviceRole.Generator) {
+                DeviceCapability.Source
+            } else {
+                DeviceCapability.AudioEffect
+            },
+        )
 
     @Composable
     abstract override fun Content()
@@ -293,8 +327,12 @@ abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericCha
         TimelineDuration.None
 
     override fun signalEnter(n: List<Signal>) {
-        if (n.isNotEmpty()) {
-            triggerDialAutomations()
+        if (n.any { it.isOn() }) {
+            triggerDialAutomationsAtFrame(
+                frame = audioTriggerRuntime?.currentFrame ?: 0L,
+                sampleRate = audioTriggerRuntime?.sampleRate ?: 44_100,
+                bpm = WorkspaceRepository.bpm.value.toFloat(),
+            )
         }
         signalExit?.invoke(n)
     }

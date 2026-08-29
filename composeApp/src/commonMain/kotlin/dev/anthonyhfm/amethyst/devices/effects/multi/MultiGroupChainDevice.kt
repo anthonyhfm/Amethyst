@@ -71,6 +71,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.TimelineDuration
 import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.devices.parallelDuration
@@ -80,6 +81,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 
 class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), NestedChainDevice {
     override val helpRef = "Multi"
+    override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.Container)
     override val state = MutableStateFlow(MultiGroupChainDeviceState())
 
     override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
@@ -384,16 +386,11 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
 
                 MultiGroupChainDeviceState.TYPE.RANDOM -> {
                     if (state.value.groups.isNotEmpty()) {
-                        val randomIndex =
-                            (state.value.currentMultiIndex + (0..state.value.groups.size - 1).random()) % state.value.groups.size
-                        routeThroughPreprocess(it, randomIndex)
-
                         if (down) {
+                            val randomIndex =
+                                (state.value.currentMultiIndex + (0..state.value.groups.size - 1).random()) % state.value.groups.size
                             multiMap[coords] = randomIndex
-
-                            multiMap[coords]?.let { index ->
-                                routeThroughPreprocess(it, index)
-                            }
+                            routeThroughPreprocess(it, randomIndex)
                         } else {
                             multiMap[coords]?.let { index ->
                                 routeThroughPreprocess(it, index)
@@ -578,7 +575,10 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
 
     override fun nestedChains() = state.value.groups.map { it.chain } + listOf(preprocessChain)
 
+    override fun audioNestedChains() = state.value.groups.map { it.chain }
+
     companion object : ChainDeviceFactory<MultiGroupChainDeviceState> {
+        override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.Container)
         override val stateClass = MultiGroupChainDeviceState::class
         override val serializer = MultiGroupChainDeviceState.serializer()
         override fun create() = MultiGroupChainDevice()

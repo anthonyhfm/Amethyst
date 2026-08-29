@@ -52,7 +52,7 @@ fun Input(
         onValueChange = onValueChange,
         modifier = modifier
             .alpha(if (enabled) 1f else 0.5f)
-            .height(40.dp)
+            .height(44.dp)
             .clip(shape)
             .background(Theme[colors][background])
             .border(borderWidth, borderColor, shape)

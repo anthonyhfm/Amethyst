@@ -41,6 +41,8 @@ data class SavableWorkspaceData(
     val macros: List<Macro> = listOf(Macro(0)),
     @ProtoNumber(11)
     val audioSources: List<AudioSource> = emptyList(),
+    @ProtoNumber(12)
+    val parameterMappings: List<ParameterMapping> = emptyList(),
 
     @Transient
     var path: String? = null, // This is not serialized, used for file operations

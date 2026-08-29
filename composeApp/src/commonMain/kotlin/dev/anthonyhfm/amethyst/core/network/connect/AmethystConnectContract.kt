@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.network.connect
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.data.Macro
+import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
@@ -174,6 +175,11 @@ object AmethystConnectContract {
 
         @Serializable
         data class MacrosChanged(val macros: List<Macro>) : ConnectEvent
+
+        @Serializable
+        data class ParameterMappingsChanged(
+            val mappings: List<ParameterMapping>,
+        ) : ConnectEvent
 
         @Serializable
         data class GridTypeChanged(val gridTypeKey: String) : ConnectEvent

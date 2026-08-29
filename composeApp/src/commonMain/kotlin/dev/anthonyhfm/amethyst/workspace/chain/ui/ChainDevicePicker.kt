@@ -33,7 +33,16 @@ import androidx.compose.material.icons.twotone._123
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.EqThreeChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.FilterChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.AudioDelayChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.ReverbChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.DuckerChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.SaturatorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.opacity.OpacityChainDevice
@@ -42,6 +51,7 @@ import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.reverb.LightReverbChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.flip.FlipChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -80,6 +90,13 @@ fun ChainDevicePicker(
     onDismiss: () -> Unit,
     isDeviceTypeEnabled: (KClass<out GenericChainDevice<*>>) -> Boolean = { true },
 ) {
+    data class SamplingPickerEntry(
+        val label: String,
+        val icon: ImageVector,
+        val type: KClass<out GenericChainDevice<*>>,
+        val factory: ChainDeviceFactory<*>,
+    )
+
     @Composable
     fun pickerItem(
         label: String,
@@ -92,6 +109,7 @@ fun ChainDevicePicker(
             label = label,
             icon = icon,
             enabled = enabled,
+            supportingText = if (enabled) null else "Not available in this chain",
             onClick = { if (enabled) onPickComponent(create()) },
         )
     }
@@ -99,6 +117,59 @@ fun ChainDevicePicker(
         expanded = visible,
         onDismissRequest = onDismiss
     ) { onNavigate, _, level ->
+        val samplingEntries = if (sampling) {
+            listOf(
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_sample), Icons.TwoTone.AudioFile, SampleChainDevice::class, SampleChainDevice),
+                SamplingPickerEntry("Live Automation", Icons.TwoTone.Tune, AutomationChainDevice::class, AutomationChainDevice),
+                SamplingPickerEntry("EQ Three", Icons.TwoTone.Tune, EqThreeChainDevice::class, EqThreeChainDevice),
+                SamplingPickerEntry("Filter", Icons.TwoTone.Filter, FilterChainDevice::class, FilterChainDevice),
+                SamplingPickerEntry("Delay", Icons.TwoTone.Timer, AudioDelayChainDevice::class, AudioDelayChainDevice),
+                SamplingPickerEntry("Reverb", Icons.TwoTone.BlurOn, ReverbChainDevice::class, ReverbChainDevice),
+                SamplingPickerEntry("Ducker", Icons.TwoTone.Contrast, DuckerChainDevice::class, DuckerChainDevice),
+                SamplingPickerEntry("Saturator", Icons.TwoTone.Science, SaturatorChainDevice::class, SaturatorChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_coordinate_filter), Icons.TwoTone.MyLocation, CoordinateFilterChainDevice::class, CoordinateFilterChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_macro_filter), Icons.TwoTone.FilterTiltShift, MacroFilterChainDevice::class, MacroFilterChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_hold), Icons.TwoTone.Pause, HoldChainDevice::class, HoldChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_loop), Icons.TwoTone.Loop, LoopChainDevice::class, LoopChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_clear), Icons.TwoTone.LayersClear, ClearChainDevice::class, ClearChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_macro_control), Icons.TwoTone.Adjust, MacroControlChainDevice::class, MacroControlChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_group), Icons.TwoTone.Group, GroupChainDevice::class, GroupChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_multi), Icons.TwoTone._123, MultiGroupChainDevice::class, MultiGroupChainDevice),
+            )
+        } else {
+            emptyList()
+        }
+
+        @Composable
+        fun samplingCategory(
+            label: String,
+            icon: ImageVector,
+            destination: String,
+            capability: DeviceCapability,
+        ) {
+            val entries = samplingEntries.filter { capability in it.factory.capabilities }
+            ChainContextMenuSubmenuItem(
+                label = label,
+                icon = icon,
+                enabled = entries.any { isDeviceTypeEnabled(it.type) },
+                onClick = { if (entries.isNotEmpty()) onNavigate(destination) },
+            )
+        }
+
+        @Composable
+        fun samplingEntries(capability: DeviceCapability) {
+            samplingEntries
+                .filter { capability in it.factory.capabilities }
+                .forEach { entry ->
+                    pickerItem(
+                        label = entry.label,
+                        icon = entry.icon,
+                        type = entry.type,
+                        create = { entry.factory.create() },
+                    )
+                }
+        }
+
         @Composable
         fun submenuItem(
             label: String,
@@ -123,7 +194,7 @@ fun ChainDevicePicker(
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_filter), Icons.TwoTone.Filter, "filter", CoordinateFilterChainDevice::class, LayerFilterChainDevice::class, MacroFilterChainDevice::class, ColorFilterChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_color), Icons.TwoTone.ColorLens, "color", ColorChainDevice::class, GradientChainDevice::class, ShiftChainDevice::class, AdjustChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_shape), Icons.TwoTone.ShapeLine, "shape", CopyChainDevice::class, CompositionChainDevice::class, KeyframesChainDevice::class, PianoRollChainDevice::class)
-                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, HoldChainDevice::class, LoopChainDevice::class)
+                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, LightReverbChainDevice::class, HoldChainDevice::class, LoopChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_transform), Icons.TwoTone.Transform, "transform", OffsetChainDevice::class, LayerChainDevice::class, FlipChainDevice::class, RotateChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_effects), Icons.TwoTone.Science, "effects", BlurChainDevice::class, MaskChainDevice::class, OpacityChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_misc), Icons.TwoTone.Adjust, "misc", ClearChainDevice::class, MacroControlChainDevice::class, PreviewChainDevice::class, TransmitChainDevice::class)
@@ -153,6 +224,7 @@ fun ChainDevicePicker(
                 }
                 "timing" -> {
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_delay), Icons.TwoTone.Timer, DelayChainDevice::class, ::DelayChainDevice)
+                    pickerItem("Light Reverb", Icons.TwoTone.BlurOn, LightReverbChainDevice::class, ::LightReverbChainDevice)
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_hold), Icons.TwoTone.Pause, HoldChainDevice::class, ::HoldChainDevice)
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_loop), Icons.TwoTone.Loop, LoopChainDevice::class, ::LoopChainDevice)
                 }
@@ -178,29 +250,17 @@ fun ChainDevicePicker(
             // Sampling Menu
             when (level) {
                 "main" -> {
-                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_container), Icons.TwoTone.Group, "container", GroupChainDevice::class, MultiGroupChainDevice::class)
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_sample), icon = Icons.TwoTone.AudioFile, onClick = { onPickComponent(SampleChainDevice()) })
-                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_filter), Icons.TwoTone.Filter, "filter", CoordinateFilterChainDevice::class, MacroFilterChainDevice::class)
-                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, HoldChainDevice::class, LoopChainDevice::class)
-                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_misc), Icons.TwoTone.Adjust, "misc", ClearChainDevice::class, MacroControlChainDevice::class)
+                    samplingCategory("Sources", Icons.TwoTone.AudioFile, "sources", DeviceCapability.Source)
+                    samplingCategory("Audio Effects", Icons.TwoTone.Science, "audio-effects", DeviceCapability.AudioEffect)
+                    samplingCategory("Trigger", Icons.TwoTone.Timer, "trigger", DeviceCapability.TriggerTool)
+                    samplingCategory("Modulation", Icons.TwoTone.Tune, "modulation", DeviceCapability.Modulation)
+                    samplingCategory("Containers", Icons.TwoTone.Group, "containers", DeviceCapability.Container)
                 }
-                "container" -> {
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_group), icon = Icons.TwoTone.Group, onClick = { onPickComponent(GroupChainDevice()) })
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_multi), icon = Icons.TwoTone._123, onClick = { onPickComponent(MultiGroupChainDevice()) })
-                }
-                "filter" -> {
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_coordinate_filter), icon = Icons.TwoTone.MyLocation, onClick = { onPickComponent(CoordinateFilterChainDevice()) })
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_macro_filter), icon = Icons.TwoTone.FilterTiltShift, onClick = { onPickComponent(MacroFilterChainDevice()) })
-                }
-                "timing" -> {
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_delay), icon = Icons.TwoTone.Timer, onClick = { onPickComponent(DelayChainDevice()) })
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_hold), icon = Icons.TwoTone.Pause, onClick = { onPickComponent(HoldChainDevice()) })
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_loop), icon = Icons.TwoTone.Loop, onClick = { onPickComponent(LoopChainDevice()) })
-                }
-                "misc" -> {
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_clear), icon = Icons.TwoTone.LayersClear, onClick = { onPickComponent(ClearChainDevice()) })
-                    ChainContextMenuItem(stringResource(Res.string.workspace_chain_devicepicker_macro_control), icon = Icons.TwoTone.Adjust, onClick = { onPickComponent(MacroControlChainDevice()) })
-                }
+                "sources" -> samplingEntries(DeviceCapability.Source)
+                "audio-effects" -> samplingEntries(DeviceCapability.AudioEffect)
+                "trigger" -> samplingEntries(DeviceCapability.TriggerTool)
+                "modulation" -> samplingEntries(DeviceCapability.Modulation)
+                "containers" -> samplingEntries(DeviceCapability.Container)
             }
         }
     }

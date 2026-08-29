@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
@@ -25,6 +27,7 @@ import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.roundToInt
 
 import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
+import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
 import dev.anthonyhfm.amethyst.devices.LocalChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
@@ -53,21 +56,38 @@ fun <T> FlatDial(
 ) {
     val chainDevice = LocalChainDevice.current
     val node = LocalCompositionNode.current
+    val resolvedAutomationParameter = automationParameter ?: (chainDevice as? ParameterOwner)
+        ?.parameterDescriptors
+        ?.firstOrNull { descriptor -> descriptor.label == title && descriptor.automatable }
+        ?.let { descriptor ->
+            object : AutomationParameter {
+                override val id = descriptor.id
+                override val label = descriptor.label
+            }
+        }
+    val accessibilityText = listOfNotNull(title, text).joinToString(": ")
+    val accessibleModifier = if (accessibilityText.isNotBlank()) {
+        modifier.semantics(mergeDescendants = true) {
+            contentDescription = accessibilityText
+        }
+    } else {
+        modifier
+    }
 
-    if (isAutomatable && !isAutomated && automationParameter != null && chainDevice != null) {
+    if (isAutomatable && !isAutomated && resolvedAutomationParameter != null && chainDevice != null) {
         AutomatableDial(
-            parameterId = automationParameter.id,
-            automationParameter = automationParameter,
+            parameterId = resolvedAutomationParameter.id,
+            automationParameter = resolvedAutomationParameter,
             type = type,
             value = value,
             defaultValue = defaultValue ?: value,
-            title = title ?: automationParameter.label,
+            title = title ?: resolvedAutomationParameter.label,
             text = text ?: "",
             onValueChange = onValueChange,
             onResolveTextValue = onResolveTextValue,
             containerColor = containerColor,
             dialColor = dialColor,
-            modifier = modifier,
+            modifier = accessibleModifier,
             isFlat = true,
         )
         return
@@ -88,7 +108,7 @@ fun <T> FlatDial(
                 onResolveTextValue = onResolveTextValue,
                 containerColor = containerColor,
                 dialColor = dialColor,
-                modifier = modifier,
+                modifier = accessibleModifier,
                 isFlat = true,
             )
             return
@@ -108,7 +128,7 @@ fun <T> FlatDial(
             onResolveTextValue = onResolveTextValue,
             containerColor = containerColor,
             dialColor = dialColor,
-            modifier = modifier,
+            modifier = accessibleModifier,
             enabled = enabled,
             isAutomated = hasAutomation,
         )
@@ -125,7 +145,7 @@ fun <T> FlatDial(
             onResolveTextValue = onResolveTextValue,
             containerColor = containerColor,
             dialColor = dialColor,
-            modifier = modifier,
+            modifier = accessibleModifier,
             enabled = enabled,
             isAutomated = hasAutomation,
         )
@@ -142,7 +162,7 @@ fun <T> FlatDial(
             onResolveTextValue = onResolveTextValue,
             containerColor = containerColor,
             dialColor = dialColor,
-            modifier = modifier,
+            modifier = accessibleModifier,
             enabled = enabled,
             isAutomated = hasAutomation,
         )

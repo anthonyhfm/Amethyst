@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -40,6 +39,10 @@ import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.popover
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
+import dev.anthonyhfm.amethyst.ui.theme.chart2
+import dev.anthonyhfm.amethyst.ui.theme.chart4
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -50,15 +53,16 @@ private enum class DragTarget {
     Body,
     FadeInNode,
     FadeOutNode,
+    LoopStart,
+    LoopEnd,
     PanView
 }
 
 /**
- * Modern, Ableton Live-styled interactive waveform editor tailored for Amethyst.
+ * Theme-aware interactive waveform editor tailored for Amethyst.
  *
  * Features:
- * - Clean Light Slate-Gray (`#CBD5E1`) solid filled waveform display
- * - Ableton Slate Teal (`#5BB5DA`) for interactive handles, trimming lines, and fade controls
+ * - Semantic theme colors for waveform, selection, loops, and playhead
  * - Top node caps centered at y = 0, overflowing 50% above the top boundary
  * - Maximized vertical space without minimap or time ruler
  */
@@ -81,6 +85,12 @@ fun SimplerWaveformEditor(
     onFadeOutChange: (Float) -> Unit,
     onFadeInFinishChange: (() -> Unit)? = null,
     onFadeOutFinishChange: (() -> Unit)? = null,
+    loopStartPosition: Float? = null,
+    loopEndPosition: Float? = null,
+    onLoopStartPositionChange: ((Float) -> Unit)? = null,
+    onLoopEndPositionChange: ((Float) -> Unit)? = null,
+    onLoopStartPositionFinishChange: (() -> Unit)? = null,
+    onLoopEndPositionFinishChange: (() -> Unit)? = null,
     playheadPosition: Float? = null,
     modifier: Modifier = Modifier
 ) {
@@ -105,6 +115,8 @@ fun SimplerWaveformEditor(
     val currentFadeInMs by rememberUpdatedState(fadeInMs)
     val currentFadeOutMs by rememberUpdatedState(fadeOutMs)
     val currentDurationMs by rememberUpdatedState(totalDurationMs)
+    val currentLoopStart by rememberUpdatedState(loopStartPosition)
+    val currentLoopEnd by rememberUpdatedState(loopEndPosition)
 
     // Drag interaction states & initial values
     var activeDragTarget by remember { mutableStateOf(DragTarget.None) }
@@ -114,6 +126,8 @@ fun SimplerWaveformEditor(
     var initialEndFrac by remember { mutableStateOf(0f) }
     var initialFadeInMs by remember { mutableStateOf(0f) }
     var initialFadeOutMs by remember { mutableStateOf(0f) }
+    var initialLoopStartFrac by remember { mutableStateOf(0f) }
+    var initialLoopEndFrac by remember { mutableStateOf(1f) }
     var initialViewStartFrac by remember { mutableStateOf(0f) }
     var accumulatedDragPx by remember { mutableStateOf(0f) }
 
@@ -121,17 +135,19 @@ fun SimplerWaveformEditor(
     var canvasHeightPx by remember { mutableStateOf(0f) }
 
     // Theme color palette references
-    val colors = Theme[colors]
-    val darkSlateBg = Color(0xFF141619) // Authentic Dark Slate Surface
-    val borderColor = colors[border]
-    val mutedForegroundColor = colors[mutedForeground]
-    val lightGrayWaveform = Color(0xFFCBD5E1) // Clean Light Slate-Gray
-    val popoverColor = colors[popover]
-    val popoverForegroundColor = colors[popoverForeground]
+    val palette = Theme[colors]
+    val darkSlateBg = palette[background]
+    val borderColor = palette[border]
+    val mutedForegroundColor = palette[mutedForeground]
+    val lightGrayWaveform = palette[mutedForeground]
+    val popoverColor = palette[popover]
+    val popoverForegroundColor = palette[popoverForeground]
 
     // Ableton Slate Teal Accent for Interactive Controls & Handles
-    val abletonTeal = Color(0xFF5BB5DA)
-    val handleCoreColor = Color(0xFF141619)
+    val abletonTeal = palette[selectionSurface]
+    val handleCoreColor = palette[background]
+    val loopColor = palette[chart2]
+    val playheadColor = palette[chart4]
 
     // Compute high-res envelope for visible zoomed viewport
     val visibleStartSample = (samples.size * viewStart).toLong().coerceIn(0L, samples.size.toLong())
@@ -203,6 +219,8 @@ fun SimplerWaveformEditor(
                         initialEndFrac = currentEnd
                         initialFadeInMs = currentFadeInMs
                         initialFadeOutMs = currentFadeOutMs
+                        initialLoopStartFrac = currentLoopStart ?: currentStart
+                        initialLoopEndFrac = currentLoopEnd ?: currentEnd
                         initialViewStartFrac = viewStart
                         accumulatedDragPx = 0f
 
@@ -224,9 +242,24 @@ fun SimplerWaveformEditor(
                         val isNearFadeOut = abs(offset.x - fadeOutX) <= hitSlopPx
                         val isNearStart = abs(offset.x - sX) <= hitSlopPx
                         val isNearEnd = abs(offset.x - eX) <= hitSlopPx
+                        val loopStartX = currentLoopStart?.let {
+                            ((it - viewStart) / currentViewSpan) * w
+                        }
+                        val loopEndX = currentLoopEnd?.let {
+                            ((it - viewStart) / currentViewSpan) * w
+                        }
+                        val isBottomZone = offset.y >= h - 36f
 
                         when {
                             isCmdOrCtrl -> activeDragTarget = DragTarget.PanView
+                            isBottomZone && loopStartX != null && abs(offset.x - loopStartX) <= hitSlopPx -> {
+                                activeDragTarget = DragTarget.LoopStart
+                                dragTooltipText = "Loop Start: ${formatRulerTime(totalDurationMs * currentLoopStart!!)}"
+                            }
+                            isBottomZone && loopEndX != null && abs(offset.x - loopEndX) <= hitSlopPx -> {
+                                activeDragTarget = DragTarget.LoopEnd
+                                dragTooltipText = "Loop End: ${formatRulerTime(totalDurationMs * currentLoopEnd!!)}"
+                            }
                             // Top zone priority for Fade nodes
                             isTopZone && isNearFadeIn -> {
                                 activeDragTarget = DragTarget.FadeInNode
@@ -307,6 +340,20 @@ fun SimplerWaveformEditor(
                                 onFadeOutChange(newFadeOut)
                                 dragTooltipText = "Fade Out: ${newFadeOut.roundToInt()} ms"
                             }
+                            DragTarget.LoopStart -> {
+                                val upper = (currentLoopEnd ?: currentEnd) - 0.001f
+                                val value = (initialLoopStartFrac + totalDeltaFrac)
+                                    .coerceIn(currentStart, upper)
+                                onLoopStartPositionChange?.invoke(value)
+                                dragTooltipText = "Loop Start: ${formatRulerTime(totalDurationMs * value)}"
+                            }
+                            DragTarget.LoopEnd -> {
+                                val lower = (currentLoopStart ?: currentStart) + 0.001f
+                                val value = (initialLoopEndFrac + totalDeltaFrac)
+                                    .coerceIn(lower, currentEnd)
+                                onLoopEndPositionChange?.invoke(value)
+                                dragTooltipText = "Loop End: ${formatRulerTime(totalDurationMs * value)}"
+                            }
                             DragTarget.PanView -> {
                                 val panDelta = -totalDeltaFrac
                                 val newStart = (initialViewStartFrac + panDelta).coerceIn(0f, 1f - currentViewSpan)
@@ -323,6 +370,8 @@ fun SimplerWaveformEditor(
                             DragTarget.EndFlag -> onEndPositionFinishChange?.invoke()
                             DragTarget.FadeInNode -> onFadeInFinishChange?.invoke()
                             DragTarget.FadeOutNode -> onFadeOutFinishChange?.invoke()
+                            DragTarget.LoopStart -> onLoopStartPositionFinishChange?.invoke()
+                            DragTarget.LoopEnd -> onLoopEndPositionFinishChange?.invoke()
                             else -> {}
                         }
                         activeDragTarget = DragTarget.None
@@ -366,6 +415,8 @@ fun SimplerWaveformEditor(
 
             val sX = fracToX(startPosition)
             val eX = fracToX(endPosition)
+            val loopStartX = loopStartPosition?.let(::fracToX)
+            val loopEndX = loopEndPosition?.let(::fracToX)
 
             // Render High-Res Waveform in Clean Light Slate-Gray
             if (visibleAmps.isNotEmpty()) {
@@ -418,12 +469,47 @@ fun SimplerWaveformEditor(
                 ?.let { position ->
                     val playheadX = fracToX(position)
                     drawLine(
-                        color = Color(0xFFFFC857),
+                        color = playheadColor,
                         start = Offset(playheadX, 0f),
                         end = Offset(playheadX, h),
                         strokeWidth = 2.dp.toPx(),
                     )
                 }
+
+            if (loopStartX != null && loopEndX != null && loopEndX > loopStartX) {
+                drawRect(
+                    color = loopColor.copy(alpha = 0.10f),
+                    topLeft = Offset(loopStartX, 0f),
+                    size = Size(loopEndX - loopStartX, h),
+                )
+                drawLine(
+                    color = loopColor,
+                    start = Offset(loopStartX, 0f),
+                    end = Offset(loopStartX, h),
+                    strokeWidth = 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f)),
+                )
+                drawLine(
+                    color = loopColor,
+                    start = Offset(loopEndX, 0f),
+                    end = Offset(loopEndX, h),
+                    strokeWidth = 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f)),
+                )
+                val loopHandleRadius = 7.dp.toPx()
+                drawCircle(
+                    color = loopColor,
+                    radius = if (activeDragTarget == DragTarget.LoopStart) loopHandleRadius + 1.5.dp.toPx() else loopHandleRadius,
+                    center = Offset(loopStartX, h),
+                )
+                drawCircle(color = handleCoreColor, radius = 2.5.dp.toPx(), center = Offset(loopStartX, h))
+                drawCircle(
+                    color = loopColor,
+                    radius = if (activeDragTarget == DragTarget.LoopEnd) loopHandleRadius + 1.5.dp.toPx() else loopHandleRadius,
+                    center = Offset(loopEndX, h),
+                )
+                drawCircle(color = handleCoreColor, radius = 2.5.dp.toPx(), center = Offset(loopEndX, h))
+            }
 
             // Fade Calculations
             val activeSpanMs = (totalDurationMs * (endPosition - startPosition)).coerceAtLeast(1f)

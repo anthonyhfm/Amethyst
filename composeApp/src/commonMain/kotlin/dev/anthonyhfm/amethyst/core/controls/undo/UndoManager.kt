@@ -82,6 +82,21 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
+                is UndoableAction.WorkspaceParameterMappingsChange -> {
+                    WorkspaceRepository.setParameterMappings(
+                        action.beforeMappings,
+                        fromRemote = true,
+                        undoable = false,
+                    )
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.WorkspaceMacroRemoval -> {
+                    WorkspaceRepository.setMacros(action.beforeMacros, fromRemote = true, undoable = false)
+                    WorkspaceRepository.setParameterMappings(action.beforeMappings, fromRemote = true, undoable = false)
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.ChainDeviceCreation -> {
                     val deviceIndex = action.parent.devices.value.indexOfFirst {
                         it.selectionUUID == action.device.selectionUUID
@@ -671,6 +686,21 @@ object UndoManager {
 
                 is UndoableAction.WorkspaceMacrosChange -> {
                     WorkspaceRepository.setMacros(action.afterMacros, fromRemote = true, undoable = false)
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.WorkspaceParameterMappingsChange -> {
+                    WorkspaceRepository.setParameterMappings(
+                        action.afterMappings,
+                        fromRemote = true,
+                        undoable = false,
+                    )
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.WorkspaceMacroRemoval -> {
+                    WorkspaceRepository.setMacros(action.afterMacros, fromRemote = true, undoable = false)
+                    WorkspaceRepository.setParameterMappings(action.afterMappings, fromRemote = true, undoable = false)
                     undoStack.add(action)
                 }
 

@@ -6,6 +6,8 @@ import org.jetbrains.compose.resources.stringResource
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -18,8 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
@@ -50,6 +52,7 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.p
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 
 internal val LocalDialogDismiss = staticCompositionLocalOf<() -> Unit> { {} }
 
@@ -59,6 +62,7 @@ fun Dialog(
     onDismiss: () -> Unit = { state.visible = false },
     content: @Composable () -> Unit,
 ) {
+    val reducedMotion = rememberReducedMotion()
     UnstyledDialog(
         state = state,
         onDismiss = onDismiss,
@@ -66,8 +70,8 @@ fun Dialog(
         CompositionLocalProvider(LocalDialogDismiss provides onDismiss) {
             UnstyledScrim(
                 scrimColor = Color.Black.copy(alpha = 0.6f),
-                enter = fadeIn(),
-                exit = fadeOut(),
+                enter = if (reducedMotion) EnterTransition.None else fadeIn(),
+                exit = if (reducedMotion) ExitTransition.None else fadeOut(),
             )
             content()
         }
@@ -80,12 +84,13 @@ fun DialogContent(
     showCloseButton: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val reducedMotion = rememberReducedMotion()
     UnstyledDialogPanel(
         shape = DefaultShape,
         backgroundColor = Theme[colors][background],
         contentColor = Theme[colors][foreground],
-        enter = fadeIn(),
-        exit = fadeOut(),
+        enter = if (reducedMotion) EnterTransition.None else fadeIn(),
+        exit = if (reducedMotion) ExitTransition.None else fadeOut(),
         modifier = modifier
             .widthIn(max = 512.dp)
             .border(1.dp, Theme[colors][border], DefaultShape),
@@ -177,7 +182,7 @@ fun DialogClose(
         interactionSource = interactionSource,
         indication = null,
         contentPadding = PaddingValues(0.dp),
-        modifier = modifier.alpha(if (hovered) 1f else 0.7f),
+        modifier = modifier.size(44.dp).alpha(if (hovered) 1f else 0.7f),
     ) {
         Icon(
             imageVector = Icons.Default.Close,

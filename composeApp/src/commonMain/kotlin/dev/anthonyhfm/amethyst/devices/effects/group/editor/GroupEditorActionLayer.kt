@@ -459,7 +459,7 @@ internal class GroupEditorActionLayer<State : DeviceState>(
     private fun duplicateGroup(group: Group): Group {
         return Group(
             name = group.name,
-            chain = StateChain.pack(group.chain).unpack().apply {
+            chain = StateChain.pack(group.chain).unpackCopy().apply {
                 signalExit = { signal ->
                     device.signalExit?.invoke(signal)
                 }

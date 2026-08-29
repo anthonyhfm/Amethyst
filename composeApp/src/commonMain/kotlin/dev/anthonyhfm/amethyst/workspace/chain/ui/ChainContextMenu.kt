@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -182,6 +183,7 @@ internal fun ChainContextMenuItem(
     enabled: Boolean = true,
     variant: ContextMenuItemVariant = ContextMenuItemVariant.Default,
     dismissOnClick: Boolean = false,
+    supportingText: String? = null,
 ) {
     val contentColor = when {
         !enabled -> Theme[colors][mutedForeground]
@@ -206,11 +208,16 @@ internal fun ChainContextMenuItem(
             Spacer(modifier = Modifier.size(16.dp))
         }
 
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            color = contentColor,
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, color = contentColor)
+            if (supportingText != null) {
+                Text(
+                    text = supportingText,
+                    color = Theme[colors][mutedForeground],
+                    fontSize = 11.sp,
+                )
+            }
+        }
     }
 }
 

@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,15 +68,29 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Trash2
+import com.composables.icons.lucide.Pencil
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.card
 import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
+import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
+import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
+import kotlinx.coroutines.delay
+import com.composeunstyled.rememberDialogState
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialog
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogAction
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogCancel
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogDescription
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
+import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
+import dev.anthonyhfm.amethyst.ui.components.primitives.Input
+import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
 
 private val MacroControlsButtonWidth = 136.dp
-private val MacroControlsButtonHeight = 32.dp
+private val MacroControlsButtonHeight = 44.dp
 private val MacroControlsListHeight = 132.dp
 private val MacroControlsAddButtonWidth = 56.dp
 private val MacroControlsHorizontalPadding = 24.dp
@@ -204,6 +219,24 @@ fun BoxScope.MacroControls(
 fun MacroList(
     macros: List<Macro>,
 ) {
+    val mappings by WorkspaceRepository.parameterMappings.collectAsState()
+    val automationDevices by WorkspaceRepository.samplingChain.devices
+    val automatedMacroValues by produceState(emptyMap<String, Float>(), automationDevices) {
+        while (true) {
+            value = WorkspaceRepository.samplingChain.devicesDepthFirst()
+                .filterIsInstance<AutomationChainDevice>()
+                .mapNotNull { device ->
+                    val macroId = (device.target as? LiveAutomationTarget.Macro)?.macroId
+                    val current = device.currentNormalizedValue
+                    if (macroId != null && current != null) macroId to current else null
+                }.toMap()
+            delay(50)
+        }
+    }
+    var pendingDeletion by remember { mutableStateOf<Pair<Int, Macro>?>(null) }
+    var pendingRename by remember { mutableStateOf<Pair<Int, Macro>?>(null) }
+    var renameDraft by remember { mutableStateOf("") }
+    val deleteDialog = rememberDialogState(initiallyVisible = false)
     Row(
         modifier = Modifier
             .padding(horizontal = 12.dp)
@@ -216,8 +249,13 @@ fun MacroList(
             ContextMenu(
                 trigger = {
                     Dial(
-                        title = "Macro ${index + 1}",
-                        text = macro.value.toString(),
+                        title = macro.name.ifBlank { "Macro ${index + 1}" },
+                        text = buildString {
+                            automatedMacroValues[macro.id]?.let { automated ->
+                                append("AUTO ${((automated * 127f).toInt()).coerceIn(0, 127)} · base ")
+                            }
+                            append("${macro.value} · ${mappings.count { it.macroId == macro.id }} map")
+                        },
                         type = DialType.Steps(IntArray(128) { it }.toList()),
                         value = macro.value,
                         containerColor = Theme[colors][secondary],
@@ -246,9 +284,23 @@ fun MacroList(
                 }
             ) {
                 ContextMenuItem(
+                    onClick = {
+                        pendingRename = index to macro
+                        renameDraft = macro.name.ifBlank { "Macro ${index + 1}" }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Lucide.Pencil,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text("Rename macro", modifier = Modifier.weight(1f))
+                }
+                ContextMenuItem(
                     variant = ContextMenuItemVariant.Destructive,
                     onClick = {
-                        WorkspaceRepository.removeMacro(index)
+                        pendingDeletion = index to macro
+                        deleteDialog.visible = true
                     }
                 ) {
                     Icon(
@@ -290,6 +342,61 @@ fun MacroList(
                     imageVector = Icons.Default.Add,
                     contentDescription = stringResource(Res.string.workspace_chain_macrocontrols_add_macro),
                 )
+            }
+        }
+    }
+
+    pendingDeletion?.let { (index, macro) ->
+        val mappingCount = mappings.count { it.macroId == macro.id }
+        AlertDialog(
+            state = deleteDialog,
+            onDismiss = {
+                deleteDialog.visible = false
+                pendingDeletion = null
+            },
+        ) {
+            AlertDialogHeader {
+                AlertDialogTitle("Delete ${macro.name.ifBlank { "Macro ${index + 1}" }}?")
+                AlertDialogDescription("This also removes $mappingCount parameter mappings. The action can be undone.")
+            }
+            AlertDialogFooter {
+                AlertDialogCancel(onClick = {
+                    deleteDialog.visible = false
+                    pendingDeletion = null
+                }) { Text("Cancel") }
+                AlertDialogAction(
+                    onClick = {
+                        WorkspaceRepository.removeMacro(index)
+                        deleteDialog.visible = false
+                        pendingDeletion = null
+                    },
+                    variant = ButtonVariant.Destructive,
+                ) { Text("Delete") }
+            }
+        }
+    }
+
+    pendingRename?.let { (index, macro) ->
+        val renameDialog = rememberDialogState(initiallyVisible = true)
+        AlertDialog(
+            state = renameDialog,
+            onDismiss = { pendingRename = null },
+        ) {
+            AlertDialogHeader {
+                AlertDialogTitle("Rename macro")
+                AlertDialogDescription("Choose a short name that identifies this performance control.")
+            }
+            Input(
+                value = renameDraft,
+                onValueChange = { renameDraft = it.take(40) },
+                placeholder = "Macro ${index + 1}",
+            )
+            AlertDialogFooter {
+                AlertDialogCancel(onClick = { pendingRename = null }) { Text("Cancel") }
+                AlertDialogAction(onClick = {
+                    WorkspaceRepository.setMacroValue(index, macro.copy(name = renameDraft.trim()))
+                    pendingRename = null
+                }) { Text("Save") }
             }
         }
     }

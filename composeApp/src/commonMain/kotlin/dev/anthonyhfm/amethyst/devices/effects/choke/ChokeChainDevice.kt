@@ -55,6 +55,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.devices.timelineDuration
 import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
@@ -62,6 +63,10 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChainDevice {
     override val state = MutableStateFlow(ChokeChainDeviceState())
     override val helpRef = "Choke"
+    override val capabilities: Set<DeviceCapability> = setOf(
+        DeviceCapability.Container,
+        DeviceCapability.TriggerTool,
+    )
 
     override fun timelineDuration(context: TimelineDurationContext) =
         state.value.chain.timelineDuration(context)

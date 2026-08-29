@@ -3,6 +3,13 @@ package dev.anthonyhfm.amethyst.devices
 import dev.anthonyhfm.amethyst.devices.ableton.AbletonArpeggiatorChainDevice
 import dev.anthonyhfm.amethyst.devices.ableton.AbletonPitcherChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.EqThreeChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.FilterChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.AudioDelayChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.ReverbChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.DuckerChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.SaturatorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
@@ -12,6 +19,7 @@ import dev.anthonyhfm.amethyst.devices.effects.color_filter.ColorFilterChainDevi
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.reverb.LightReverbChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.flip.FlipChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -54,6 +62,7 @@ object DeviceRegistry {
         register(CoordinateFilterChainDevice)
         register(CopyChainDevice)
         register(DelayChainDevice)
+        register(LightReverbChainDevice)
         register(FlipChainDevice)
         register(GradientChainDevice)
         register(GroupChainDevice)
@@ -72,6 +81,13 @@ object DeviceRegistry {
         register(PreviewChainDevice)
         register(RotateChainDevice)
         register(SampleChainDevice)
+        register(AutomationChainDevice)
+        register(EqThreeChainDevice)
+        register(FilterChainDevice)
+        register(AudioDelayChainDevice)
+        register(ReverbChainDevice)
+        register(DuckerChainDevice)
+        register(SaturatorChainDevice)
         register(ShiftChainDevice)
         register(TransmitChainDevice)
 

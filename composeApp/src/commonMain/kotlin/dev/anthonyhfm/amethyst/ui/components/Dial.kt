@@ -57,6 +57,10 @@ import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -439,6 +443,20 @@ internal fun DialSurface(
                     }
                 )
                 .focusRequester(focusRequester)
+                .semantics {
+                    progressBarRangeInfo = ProgressBarRangeInfo(currentProgress, 0f..1f)
+                    setProgress { requested ->
+                        if (!enabled) {
+                            false
+                        } else {
+                            val next = requested.coerceIn(0f, 1f)
+                            currentOnDragStart()
+                            currentOnDragProgressChange(next)
+                            currentOnDragEnd()
+                            true
+                        }
+                    }
+                }
                 .focusable(enabled = enabled, interactionSource = interactionSource)
                 .onKeyEvent { event ->
                     if (enabled && event.type == KeyEventType.KeyDown) {

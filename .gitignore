@@ -24,6 +24,8 @@ CLAUDE.md
 iosApp/Gemfile.lock
 specs/*
 !specs/roadmap.md
+!specs/adr/
+!specs/adr/**
 docs/
 skills-lock.json
 *_ml.png

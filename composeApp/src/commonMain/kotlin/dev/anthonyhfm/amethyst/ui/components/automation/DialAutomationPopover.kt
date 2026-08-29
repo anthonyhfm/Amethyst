@@ -127,7 +127,7 @@ private sealed interface AutomationDragTarget {
 }
 
 @Composable
-fun DialAutomationPopover(
+fun ParameterAutomationPopover(
     expanded: Boolean,
     parameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter,
     lane: DialAutomationLane,
@@ -150,35 +150,12 @@ fun DialAutomationPopover(
                 onDismissRequest = onDismissRequest,
                 properties = PopupProperties(focusable = true),
             ) {
-                val rawPopoverBg = Theme[colors][popover]
+                val popoverBg = Theme[colors][popover]
                 val borderCol = Theme[colors][border]
-                val isDark = rawPopoverBg.red < 0.5f
-
-                val popoverBg = if (isDark) {
-                    Color(0xFF141822)
-                } else {
-                    rawPopoverBg
-                }
-                val popoverBorder = if (isDark) {
-                    Color(0xFF3B475D)
-                } else {
-                    borderCol
-                }
-                val editorPanelBg = if (isDark) {
-                    Color(0xFF0D111A)
-                } else {
-                    Theme[colors][secondary]
-                }
-                val editorPanelBorder = if (isDark) {
-                    Color(0xFF263042)
-                } else {
-                    borderCol.copy(alpha = 0.6f)
-                }
-                val dividerColor = if (isDark) {
-                    Color(0xFF1F2837)
-                } else {
-                    borderCol.copy(alpha = 0.3f)
-                }
+                val popoverBorder = borderCol
+                val editorPanelBg = Theme[colors][secondary]
+                val editorPanelBorder = borderCol.copy(alpha = 0.6f)
+                val dividerColor = borderCol.copy(alpha = 0.3f)
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -413,7 +390,7 @@ fun DialAutomationPopover(
                                 )
 
                                 // Retrigger Mode Tabs (shadcn style)
-                                val isGated = lane.settings.retriggerMode == DialAutomationRetriggerMode.GatedOneShot
+                                val isGated = lane.settings.retriggerMode == DialAutomationRetriggerMode.IgnoreWhileRunning
                                 val selectedTabKey = if (isGated) "Gated" else "Trigger"
                                 Tabs(
                                     selectedTab = selectedTabKey,
@@ -428,7 +405,7 @@ fun DialAutomationPopover(
                                             key = "Gated",
                                             selected = isGated,
                                             onSelected = {
-                                                if (!isGated) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.GatedOneShot)))
+                                                if (!isGated) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.IgnoreWhileRunning)))
                                             },
                                             modifier = Modifier.weight(1f),
                                         ) {
@@ -445,7 +422,7 @@ fun DialAutomationPopover(
                                             key = "Trigger",
                                             selected = !isGated,
                                             onSelected = {
-                                                if (isGated) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.AlwaysRetrigger)))
+                                                if (isGated) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.Restart)))
                                             },
                                             modifier = Modifier.weight(1f),
                                         ) {
@@ -493,6 +470,26 @@ fun DialAutomationPopover(
         }
     }
 }
+
+@Deprecated("Use ParameterAutomationPopover")
+@Composable
+fun DialAutomationPopover(
+    expanded: Boolean,
+    parameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter,
+    lane: DialAutomationLane,
+    onUpdateLane: (DialAutomationLane) -> Unit,
+    onRemoveAutomation: () -> Unit,
+    onDismissRequest: () -> Unit,
+    trigger: @Composable () -> Unit,
+) = ParameterAutomationPopover(
+    expanded = expanded,
+    parameter = parameter,
+    lane = lane,
+    onUpdateLane = onUpdateLane,
+    onRemoveAutomation = onRemoveAutomation,
+    onDismissRequest = onDismissRequest,
+    trigger = trigger,
+)
 
 @Composable
 private fun AutomationCanvas(

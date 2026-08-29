@@ -50,7 +50,7 @@ class AudioRenderer(
         get() = renderedFrame.value
 
     val latencyFrames: Int
-        get() = if (limiterEnabled) limiter.lookaheadFrames else 0
+        get() = chain.latencyFrames + if (limiterEnabled) limiter.lookaheadFrames else 0
 
     val activeVoiceCount: Int
         get() {

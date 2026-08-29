@@ -7,6 +7,8 @@ import kotlin.reflect.KClass
 interface ChainDeviceFactory<S : DeviceState> {
     val stateClass: KClass<S>
     val serializer: KSerializer<S>
+    val capabilities: Set<DeviceCapability>
+        get() = setOf(DeviceCapability.TriggerTool)
 
     fun create(): GenericChainDevice<S>
 

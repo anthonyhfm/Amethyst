@@ -98,11 +98,11 @@ jobs:
         shell: bash
         run: sudo apt-get update && sudo apt-get install --yes libasound2-dev rpm
 
-      - name: Build
+      - name: Test and build
         shell: bash
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:${{ matrix.task }} -Pamethyst.native.variant=release
+        run: ./gradlew :composeApp:desktopTest :composeApp:${{ matrix.task }} -Pamethyst.native.variant=release
 
       - name: Rename artifact
         shell: bash
