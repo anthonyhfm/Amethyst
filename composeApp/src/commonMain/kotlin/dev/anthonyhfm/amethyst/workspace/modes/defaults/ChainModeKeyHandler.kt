@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
 object ChainModeKeyHandler {
@@ -43,6 +44,24 @@ object ChainModeKeyHandler {
     }
 
     private fun handleGroup(): Boolean {
+        val groupItems = SelectionManager.selections.value.filterIsInstance<Selectable.GroupChainItem>()
+        if (groupItems.size > 1) {
+            val parent = groupItems.first().parent
+            if (groupItems.all { it.parent == parent }) {
+                val indices = groupItems.map { it.groupIndex }.distinct().sorted()
+                when (parent) {
+                    is GroupChainDevice -> {
+                        parent.combineGroups(indices)
+                        return true
+                    }
+                    is MultiGroupChainDevice -> {
+                        parent.combineGroups(indices)
+                        return true
+                    }
+                }
+            }
+        }
+
         val selections = SelectionManager.selections.value.filter { it is Selectable.ChainDevice }
 
         if (selections.isNotEmpty()) {

@@ -135,6 +135,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
                 onDeleteGroup = ::removeGroup,
                 onDeleteGroups = ::removeGroups,
                 onPasteDevicesAsGroup = ::pasteChainClipboardAsGroup,
+                onCombineGroups = ::combineGroups,
             )
         }
         val openedGroup = deviceState.groups.getOrNull(deviceState.openedGroupIndex)
@@ -537,6 +538,10 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
 
     fun duplicateGroups(selectedIndices: List<Int>) {
         actionLayer.duplicateGroups(selectedIndices)
+    }
+
+    fun combineGroups(selectedIndices: List<Int>) {
+        actionLayer.combineGroups(selectedIndices)
     }
 
     fun pasteGroups(groups: List<Group>, targetIndex: Int?) {

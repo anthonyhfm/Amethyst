@@ -10,9 +10,12 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -269,6 +272,69 @@ internal class GroupEditorActionLayer<State : DeviceState>(
             newGroups = pastedGroups,
             insertIndex = (targetIndex ?: groupsOf(stateFlow.value).size).coerceIn(0, groupsOf(stateFlow.value).size),
             desiredSelectedGroupIds = pastedGroups.map(Group::id),
+            undoable = true,
+        )
+    }
+
+    fun combineGroups(selectedIndices: List<Int>) {
+        val beforeState = stateFlow.value
+        val beforeGroups = groupsOf(beforeState)
+        val normalizedIndices = selectedIndices
+            .mapNotNull { index -> index.takeIf { it in beforeGroups.indices } }
+            .distinct()
+            .sorted()
+
+        if (normalizedIndices.size <= 1) return
+
+        val groupsToCombine = normalizedIndices.map { beforeGroups[it] }
+        val insertIndex = normalizedIndices.first()
+
+        val nestedGroups = groupsToCombine.map { group ->
+            Group(
+                name = group.name,
+                chain = StateChain.pack(group.chain).unpack(),
+                stateChain = StateChain.pack(group.chain),
+                id = UUID.randomUUID(),
+            )
+        }
+
+        val nestedGroupDevice = GroupChainDevice().apply {
+            loadFromState(
+                GroupChainDeviceState(
+                    openedGroupIndex = 0,
+                    groups = nestedGroups,
+                )
+            )
+        }
+
+        val combinedGroupChain = Chain().apply {
+            add(nestedGroupDevice, fromUser = false)
+            signalExit = { signal ->
+                this@GroupEditorActionLayer.device.signalExit?.invoke(signal)
+            }
+        }
+
+        val combinedGroup = Group(
+            name = DEFAULT_GROUP_NAME,
+            chain = combinedGroupChain,
+            stateChain = StateChain(
+                devices = listOf(StateChain.packDevice(nestedGroupDevice))
+            ),
+            id = UUID.randomUUID(),
+        )
+
+        val removedIndexSet = normalizedIndices.toSet()
+        val remainingGroups = beforeGroups.filterIndexed { index, _ -> index !in removedIndexSet }
+        val safeInsertIndex = insertIndex.coerceIn(0, remainingGroups.size)
+        val afterGroups = remainingGroups.toMutableList().apply {
+            add(safeInsertIndex, combinedGroup)
+        }
+
+        commitGroupState(
+            beforeState = beforeState,
+            afterGroups = afterGroups,
+            afterOpenedGroupIndex = safeInsertIndex,
+            desiredSelectedGroupIds = listOf(combinedGroup.id),
             undoable = true,
         )
     }

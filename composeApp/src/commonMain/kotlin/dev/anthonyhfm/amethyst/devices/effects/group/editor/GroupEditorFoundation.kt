@@ -36,6 +36,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.Group
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -153,6 +155,7 @@ internal data class GroupEditorActions(
     val onDeleteGroup: (Int) -> Unit,
     val onDeleteGroups: (List<Int>) -> Unit,
     val onPasteDevicesAsGroup: (Int?) -> Unit,
+    val onCombineGroups: (List<Int>) -> Unit,
 )
 
 internal class GroupEditorUiState(
@@ -474,6 +477,12 @@ private fun ReorderableItemScope.GroupEditorListItem(
             it.parent == parentDevice &&
             it.groupIndex == index
     }
+    val selectedGroupIndices = selections
+        .filterIsInstance<Selectable.GroupChainItem>()
+        .filter { it.parent == parentDevice }
+        .map { it.groupIndex }
+        .distinct()
+        .sorted()
 
     val clipboard by ClipboardManager.clipboardData.collectAsState()
     val hasGroupsInClipboard = clipboard is ClipboardData.GroupChainItem
@@ -644,6 +653,16 @@ private fun ReorderableItemScope.GroupEditorListItem(
             }
         }
     ) {
+        if (isSelectedInManager && selectedGroupIndices.size > 1) {
+            GroupEditorContextMenuItem(
+                label = "Combine to Group",
+                icon = Icons.TwoTone.Group,
+                onClick = { actions.onCombineGroups(selectedGroupIndices) },
+            )
+
+            ContextMenuSeparator()
+        }
+
         GroupEditorContextMenuItem(
             label = "Copy",
             icon = Lucide.Copy,
@@ -975,6 +994,13 @@ private fun handleGroupListKeyEvent(
         isCommandPressed && keyEvent.key == Key.D -> {
             actions.onDuplicateGroups(selectedIndices.ifEmpty { listOf(targetIndex) })
             return true
+        }
+
+        isCommandPressed && keyEvent.key == Key.G -> {
+            if (selectedIndices.size > 1) {
+                actions.onCombineGroups(selectedIndices)
+                return true
+            }
         }
 
         isCommandPressed && keyEvent.key == Key.V -> {

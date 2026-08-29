@@ -85,6 +85,7 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
                 onDeleteGroup = ::removeGroup,
                 onDeleteGroups = ::removeGroups,
                 onPasteDevicesAsGroup = ::pasteChainClipboardAsGroup,
+                onCombineGroups = ::combineGroups,
             )
         }
 
@@ -265,6 +266,10 @@ class GroupChainDevice : GenericChainDevice<GroupChainDeviceState>(), NestedChai
 
     fun duplicateGroups(selectedIndices: List<Int>) {
         actionLayer.duplicateGroups(selectedIndices)
+    }
+
+    fun combineGroups(selectedIndices: List<Int>) {
+        actionLayer.combineGroups(selectedIndices)
     }
 
     fun pasteGroups(groups: List<Group>, targetIndex: Int?) {

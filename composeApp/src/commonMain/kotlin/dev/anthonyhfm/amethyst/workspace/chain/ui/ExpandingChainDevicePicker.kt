@@ -58,6 +58,8 @@ import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
@@ -230,12 +232,14 @@ fun ExpandingChainDevicePicker(
             .rightClickable {
                 if (!allowClipboardPaste) return@rightClickable
                 val isDevice = clipboard is ClipboardData.ChainDevice
+                val isGroup = clipboard is ClipboardData.GroupChainItem
                 val isTimelineAudio =
                     (clipboard is ClipboardData.TimelineAudioEntries || clipboard is ClipboardData.TimelineAudioRange) &&
                         WorkspaceRepository.mode.value is SamplingChainWorkspaceMode
                 val isMidiEntries = clipboard is ClipboardData.TimelineMidiEntries && WorkspaceRepository.mode.value is LightsChainWorkspaceMode
+                val isTimelineChainEffects = clipboard is ClipboardData.TimelineChainEffects
 
-                if (isDevice || isTimelineAudio || isMidiEntries) {
+                if (isDevice || isGroup || isTimelineAudio || isMidiEntries || isTimelineChainEffects) {
                     showRightClickMenu = true
                 }
 
@@ -254,6 +258,7 @@ fun ExpandingChainDevicePicker(
     ) {
         if (
             clipboard is ClipboardData.ChainDevice ||
+            clipboard is ClipboardData.GroupChainItem ||
             clipboard is ClipboardData.TimelineAudioEntries ||
             clipboard is ClipboardData.TimelineAudioRange ||
             clipboard is ClipboardData.TimelineMidiEntries ||
@@ -281,6 +286,34 @@ fun ExpandingChainDevicePicker(
                             showRightClickMenu = false
                         }
                     )
+                } else if (clipboard is ClipboardData.GroupChainItem) {
+                    val groupData = clipboard as ClipboardData.GroupChainItem
+                    if (groupData.groups.isNotEmpty()) {
+                        ChainContextMenuItem(
+                            label = "Paste Chains as Group",
+                            icon = Icons.Default.ContentPaste,
+                            onClick = {
+                                val packedState = GroupChainDeviceState(
+                                    openedGroupIndex = 0,
+                                    groups = groupData.groups.map { group ->
+                                        Group(
+                                            name = group.name,
+                                            stateChain = StateChain.pack(group.chain),
+                                            id = UUID.randomUUID(),
+                                        )
+                                    }
+                                )
+                                val groupDevice = GroupChainDevice().apply {
+                                    loadFromState(packedState)
+                                }
+                                destinationChain.add(
+                                    device = groupDevice,
+                                    atIndex = slotIndex
+                                )
+                                showRightClickMenu = false
+                            }
+                        )
+                    }
                 } else if (clipboard is ClipboardData.TimelineAudioEntries && WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
                     ChainContextMenuItem(
                         label = "Paste Audio from Timeline",
