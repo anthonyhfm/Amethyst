@@ -7,6 +7,7 @@ import com.composables.icons.lucide.Cable
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Move
 import com.composables.icons.lucide.Palette
+import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Timer
 import com.composables.icons.lucide.Trash2
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionNode
@@ -71,4 +72,5 @@ private fun categoryIcon(category: CompositionNodePickerCategory): ImageVector =
     CompositionNodePickerCategory.Transform -> Lucide.Move
     CompositionNodePickerCategory.Color -> Lucide.Palette
     CompositionNodePickerCategory.Time -> Lucide.Timer
+    CompositionNodePickerCategory.Effects -> Lucide.Sparkles
 }

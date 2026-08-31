@@ -69,4 +69,5 @@ enum class CompositionNodePickerCategory(val label: String) {
     Transform("Transform"),
     Color("Color"),
     Time("Time"),
+    Effects("Effects"),
 }

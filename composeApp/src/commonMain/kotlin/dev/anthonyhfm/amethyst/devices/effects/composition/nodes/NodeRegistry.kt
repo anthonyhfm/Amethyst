@@ -29,6 +29,10 @@ object NodeRegistry {
         register(SliceNode)
         register(FrameLimitNode)
         register(TrimNode)
+        register(RadarNode)
+        register(JitterNode)
+        register(MagnetNode)
+        register(GlitchNode)
         register(OutputNode)
     }
 
