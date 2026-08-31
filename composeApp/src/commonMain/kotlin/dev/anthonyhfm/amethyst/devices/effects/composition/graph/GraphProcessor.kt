@@ -39,13 +39,16 @@ object GraphProcessor {
             .map { (_, samples) -> samples.reduce(::over) }
     }
 
-    private fun evaluateNode(
+    internal fun evaluateNode(
         graph: CompositionGraph,
         nodeId: String,
         context: EvaluationContext,
     ): List<GeometryFrame> {
         val node = (graph.node(nodeId) ?: return emptyList()).automatedAt(context.progress)
         val definition = NodeRegistry.definitionFor(node) ?: return emptyList()
+        val custom = definition.evaluate(graph, node, context)
+        if (custom != null) return custom
+
         val inputContext = definition.inputContext(node, context)
         val inputFrames = graph.connections
             .filter { it.toNodeId == node.id }
@@ -58,7 +61,46 @@ object GraphProcessor {
         }
     }
 
-    private fun rasterizeStroke(
+    internal fun hasVisiblePixels(
+        stroke: GeometryStroke,
+        bounds: Pair<IntOffset, IntSize>,
+    ): Boolean {
+        if (stroke.points.isEmpty()) return false
+
+        val minX = bounds.first.x
+        val minY = bounds.first.y
+        val maxX = minX + bounds.second.width - 1
+        val maxY = minY + bounds.second.height - 1
+        if (stroke.points.size == 1 && stroke.thickness <= 0f) {
+            val point = stroke.points.first()
+            val x = point.x.roundToInt()
+            val y = point.y.roundToInt()
+            if (x in minX..maxX && y in minY..maxY) {
+                val sample = Vec2(x.toFloat(), y.toFloat())
+                val color = stroke.paint.colorAt(sample, bounds)
+                val opacity = (color.alpha * stroke.paint.opacityAt(sample, bounds)).coerceIn(0f, 1f)
+                return opacity > 0f
+            }
+            return false
+        }
+        val maxDistanceSquared = stroke.thickness * stroke.thickness
+
+        for (x in minX..maxX) {
+            for (y in minY..maxY) {
+                val point = Vec2(x.toFloat(), y.toFloat())
+                val distanceSquared = distanceToPolylineSquared(point, stroke.points)
+                if (distanceSquared <= maxDistanceSquared) {
+                    val pointColor = stroke.paint.colorAt(point, bounds)
+                    val opacity = (pointColor.alpha * stroke.paint.opacityAt(point, bounds)).coerceIn(0f, 1f)
+                    if (opacity > 0f) return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    internal fun rasterizeStroke(
         stroke: GeometryStroke,
         bounds: Pair<IntOffset, IntSize>,
     ): List<Signal.LED> {

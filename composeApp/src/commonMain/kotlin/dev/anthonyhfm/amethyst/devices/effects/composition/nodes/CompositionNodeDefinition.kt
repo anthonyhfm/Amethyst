@@ -50,6 +50,12 @@ interface CompositionNodeDefinition {
     ): List<GeometryFrame> = inputFrames
 
     fun inputContext(node: CompositionNode, context: EvaluationContext): EvaluationContext = context
+
+    fun evaluate(
+        graph: dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGraph,
+        node: CompositionNode,
+        context: EvaluationContext,
+    ): List<GeometryFrame>? = null
     
     @Composable
     fun NodeBody(

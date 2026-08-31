@@ -28,6 +28,7 @@ object NodeRegistry {
         register(TimeWrapNode)
         register(SliceNode)
         register(FrameLimitNode)
+        register(TrimNode)
         register(OutputNode)
     }
 
