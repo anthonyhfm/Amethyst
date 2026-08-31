@@ -35,7 +35,6 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.serialization.Serializable
 
-private const val SPIRAL_TRAVEL_SPAN = 18f
 private const val SPIRAL_STRIDE = 4.5f
 private const val MIN_TURNS = 0.25f
 private const val MAX_TURNS = 8f
@@ -73,8 +72,9 @@ object SpiralNode : CompositionNodeDefinition {
     ): List<GeometryFrame> {
         val state = node.state as? SpiralNodeState ?: return emptyList()
         val center = context.resolveOrigin(state.originX, state.originY, state.boundToOrigin)
-        val targetDistance = context.progress.coerceIn(0f, 1f) * SPIRAL_TRAVEL_SPAN
         val turns = state.turns.coerceIn(MIN_TURNS, MAX_TURNS)
+        val travelSpan = calculateSpiralTravelSpan(center, turns, context.bounds)
+        val targetDistance = context.progress.coerceIn(0f, 1f) * travelSpan
         val angleSteps = max(
             24,
             ceil((2f * PI.toFloat() * max(0.5f, targetDistance)) / POLYLINE_STEP).toInt(),
@@ -194,4 +194,22 @@ object SpiralNode : CompositionNodeDefinition {
         }
     }
 }
+
+internal fun calculateSpiralTravelSpan(
+    center: Vec2,
+    turns: Float,
+    bounds: Pair<androidx.compose.ui.unit.IntOffset, IntSize>,
+): Float {
+    val minX = bounds.first.x.toFloat()
+    val minY = bounds.first.y.toFloat()
+    val maxX = minX + (bounds.second.width - 1).coerceAtLeast(0).toFloat()
+    val maxY = minY + (bounds.second.height - 1).coerceAtLeast(0).toFloat()
+    val maxDx = max(kotlin.math.abs(center.x - minX), kotlin.math.abs(center.x - maxX))
+    val maxDy = max(kotlin.math.abs(center.y - minY), kotlin.math.abs(center.y - maxY))
+    val maxDistance = kotlin.math.sqrt(maxDx * maxDx + maxDy * maxDy)
+
+    val tailLength = turns * SPIRAL_STRIDE
+    return maxDistance + tailLength + 1f
+}
+
 
