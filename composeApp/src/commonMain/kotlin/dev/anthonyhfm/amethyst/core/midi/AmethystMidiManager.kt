@@ -97,6 +97,7 @@ class AmethystMidiManager(
         LaunchpadDeviceType.LAUNCHPAD_PRO to { LaunchpadDevicePro.identify(it) },
         LaunchpadDeviceType.LAUNCHPAD_MK2 to { LaunchpadDeviceMK2.identify(it) },
         LaunchpadDeviceType.MYSTRIX to { LaunchpadDeviceMystrix.identify(it) },
+        LaunchpadDeviceType.MIDI_FIGHTER_64 to { LaunchpadDeviceMidiFighter.identify(it) },
     )
 
     @OptIn(ExperimentalUnsignedTypes::class)
@@ -142,6 +143,7 @@ class AmethystMidiManager(
                 revision.contentEquals(ubyteArrayOf(0u, 1u, 7u, 2u))
             LaunchpadDeviceType.LAUNCHPAD_PRO ->
                 revision.contentEquals(ubyteArrayOf(0u, 99u, 102u, 121u))
+            LaunchpadDeviceType.MIDI_FIGHTER_64 -> true
             else -> false
         }
 
@@ -622,6 +624,7 @@ class AmethystMidiManager(
             LaunchpadDeviceType.LAUNCHPAD_PRO -> LaunchpadDevicePro(connection, firmware)
             LaunchpadDeviceType.LAUNCHPAD_MK2 -> LaunchpadDeviceMK2(connection, firmware)
             LaunchpadDeviceType.MYSTRIX -> LaunchpadDeviceMystrix(connection, firmware)
+            LaunchpadDeviceType.MIDI_FIGHTER_64 -> LaunchpadDeviceMidiFighter(connection, firmware)
         }
     }
 }

@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.core.midi.devices
 
-import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
 

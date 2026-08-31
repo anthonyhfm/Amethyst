@@ -111,7 +111,7 @@ abstract class LaunchpadDevice(
         updates: List<RawLEDUpdate>,
     ): List<RawLEDUpdate> = updates
 
-    private fun getFastLedSysEx(payload: ByteArray): ByteArray {
+    protected fun getFastLedSysEx(payload: ByteArray): ByteArray {
         return FAST_LED_HEADER + payload + SYSEX_END
     }
 
@@ -126,14 +126,14 @@ abstract class LaunchpadDevice(
         get() = firmware == LaunchpadFirmware.Mat1jaczyyy ||
             firmware == LaunchpadFirmware.CoreFW
 
-    private val fastLedMaxPayloadSize: Int
+    protected val fastLedMaxPayloadSize: Int
         get() = when (firmware) {
             LaunchpadFirmware.Mat1jaczyyy -> MAT1JACZYYY_FAST_LED_MAX_PAYLOAD_SIZE
             LaunchpadFirmware.CoreFW -> CORE_FW_FAST_LED_MAX_PAYLOAD_SIZE
             LaunchpadFirmware.Original -> error("Original firmware does not support FastLED")
         }
 
-    private companion object {
+    protected companion object {
         // F0 5F <payload> F7: Mat1jaczyyy allows 320 total bytes; CoreFW uses
         // 256-byte SysEx buffers on most supported Launchpad targets.
         const val MAT1JACZYYY_FAST_LED_MAX_PAYLOAD_SIZE = 317
@@ -168,4 +168,7 @@ enum class LaunchpadDeviceType(val label: String) {
     MYSTRIX(
         label = "Mystrix"
     ),
+    MIDI_FIGHTER_64(
+        label = "Midi Fighter 64"
+    )
 }
