@@ -199,13 +199,53 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        val rawS = state.value
-        val autoNorm = evaluateAutomatedDialValue(Params.Angle.id, (rawS.angleDegrees % 360f + 360f) % 360f / 360f)
-        val angle = ((autoNorm * 360f) % 360f + 360f) % 360f
+        synchronized(lock) {
+            val rawS = state.value
+            val autoNorm = evaluateAutomatedDialValue(
+                Params.Angle.id,
+                (rawS.angleDegrees % 360f + 360f) % 360f / 360f,
+            )
+            val angle = ((autoNorm * 360f) % 360f + 360f) % 360f
 
-        val rotatedSignals = mutableListOf<Signal.LED>()
-        for (signal in n) {
-            val bounds = resolveBounds(signal, rawS.isolate)
+            for (signal in n) {
+                val position = signal.x to signal.y
+                if (signal.color.isLit() && signal.opacity > 0f) {
+                    activePads[position] = signal
+                } else {
+                    activePads.remove(position)
+                }
+            }
+
+            val newOutput = computeRotatedOutput(rawS, angle)
+            val output = newOutput.values.toMutableList()
+
+            previousOutput.forEach { (position, signal) ->
+                if (position !in newOutput) {
+                    output.add(signal.copy(color = Color.Black, opacity = 1f))
+                }
+            }
+
+            previousOutput.clear()
+            newOutput.forEach { (position, signal) ->
+                if (signal.color.isLit() && signal.opacity > 0f) {
+                    previousOutput[position] = signal
+                }
+            }
+
+            signalExit?.invoke(output)
+        }
+    }
+
+    private fun computeRotatedOutput(
+        deviceState: RotateChainDeviceState,
+        angle: Float,
+    ): Map<Pair<Int, Int>, Signal.LED> {
+        if (deviceState.bypass) return activePads.toMap()
+
+        val result = mutableMapOf<Pair<Int, Int>, Signal.LED>()
+
+        for (signal in activePads.values) {
+            val bounds = resolveBounds(signal, deviceState.isolate)
             val cx = bounds.first.x + (bounds.second.width - 1) / 2f
             val cy = bounds.first.y + (bounds.second.height - 1) / 2f
 
@@ -219,11 +259,11 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
             val fx = cx + rx * cos + ry * sin
             val fy = cy - rx * sin + ry * cos
 
-            if (!rawS.antiAlias || (angle % 90f == 0f)) {
+            if (!deviceState.antiAlias || angle % 90f == 0f) {
                 val gx = fx.roundToInt()
                 val gy = fy.roundToInt()
                 if (isInBounds(gx, gy, bounds)) {
-                    rotatedSignals.add(signal.copy(x = gx, y = gy))
+                    combineSignal(result, gx to gy, signal.copy(x = gx, y = gy))
                 }
             } else {
                 val x0 = floor(fx).toInt()
@@ -240,19 +280,41 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
 
                 for ((gx, gy, w) in weights) {
                     if (w > 0.01f && isInBounds(gx, gy, bounds)) {
-                        rotatedSignals.add(signal.copy(x = gx, y = gy, opacity = signal.opacity * w))
+                        combineSignal(
+                            result,
+                            gx to gy,
+                            signal.copy(x = gx, y = gy, opacity = signal.opacity * w),
+                        )
                     }
                 }
             }
         }
 
-        val output = mutableListOf<Signal.LED>()
-        if (rawS.bypass) {
-            output.addAll(n)
-        }
-        output.addAll(rotatedSignals)
-        signalExit?.invoke(output)
+        return result
     }
+
+    private fun combineSignal(
+        signals: MutableMap<Pair<Int, Int>, Signal.LED>,
+        position: Pair<Int, Int>,
+        signal: Signal.LED,
+    ) {
+        val existing = signals[position]
+        if (existing == null) {
+            signals[position] = signal
+            return
+        }
+
+        signals[position] = existing.copy(
+            color = addColors(existing.color, signal.color),
+            opacity = (existing.opacity + signal.opacity).coerceIn(0f, 1f),
+        )
+    }
+
+    private fun addColors(first: Color, second: Color) = Color(
+        red = (first.red + second.red).coerceIn(0f, 1f),
+        green = (first.green + second.green).coerceIn(0f, 1f),
+        blue = (first.blue + second.blue).coerceIn(0f, 1f),
+    )
 
     private fun isInBounds(x: Int, y: Int, bounds: Pair<IntOffset, IntSize>): Boolean {
         val minX = bounds.first.x
