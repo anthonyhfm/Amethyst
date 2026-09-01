@@ -31,7 +31,13 @@ struct ProjectCreationSheet: View {
             Form {
                 // Project name
                 Section {
-                    TextField("My next performance", text: $name)
+                    TextField(
+                        "Project name",
+                        text: $name,
+                        prompt: Text("My next performance")
+                            .foregroundStyle(theme.mutedForeground.opacity(0.72))
+                    )
+                        .foregroundStyle(theme.foreground)
                         .autocorrectionDisabled()
                         .onChange(of: name) { _, _ in
                             if nameErrorVisible && !name.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -52,7 +58,13 @@ struct ProjectCreationSheet: View {
 
                 // Author
                 Section {
-                    TextField("Your name", text: $author)
+                    TextField(
+                        "Author",
+                        text: $author,
+                        prompt: Text("Your name")
+                            .foregroundStyle(theme.mutedForeground.opacity(0.72))
+                    )
+                        .foregroundStyle(theme.foreground)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.words)
                 } header: {
@@ -61,6 +73,8 @@ struct ProjectCreationSheet: View {
                     Text("Saved as your default. Leave blank to fall back to \"Unknown Author\".")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(theme.background.ignoresSafeArea())
             .navigationTitle(isEditing ? "Edit Project" : "New Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -75,6 +89,7 @@ struct ProjectCreationSheet: View {
                 }
             }
         }
+        .tint(theme.glassForeground)
         .onAppear {
             if isEditing {
                 // Pre-fill fields are set via task below

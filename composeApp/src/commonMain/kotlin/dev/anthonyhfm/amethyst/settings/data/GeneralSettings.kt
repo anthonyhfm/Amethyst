@@ -44,6 +44,7 @@ object GeneralSettings : SettingsGroup("General", Res.string.settings_general_gr
         title = "Simplified Graphics",
         titleRes = Res.string.settings_general_simplified_graphics_title,
         default = false,
+        platformQuery = { it is Platform.Desktop },
     )
 
     val reducedMotion: Setting.Toggle = toggle(
@@ -51,6 +52,7 @@ object GeneralSettings : SettingsGroup("General", Res.string.settings_general_gr
         title = "Reduced Motion",
         titleRes = Res.string.settings_general_reduced_motion_title,
         default = false,
+        platformQuery = { it is Platform.Desktop },
     )
 
     val alwaysShowGrid: Setting.Toggle = toggle(
@@ -58,6 +60,7 @@ object GeneralSettings : SettingsGroup("General", Res.string.settings_general_gr
         title = "Always show grid",
         titleRes = Res.string.settings_general_always_show_grid_title,
         default = false,
+        platformQuery = { it is Platform.Desktop },
     )
 
     val hoverTime: Setting.Select<Int> = select(
@@ -68,6 +71,7 @@ object GeneralSettings : SettingsGroup("General", Res.string.settings_general_gr
         options = listOf(0, 100, 250, 500),
         codec = SettingCodec.Int,
         label = { "${it.toInt()} ms" },
+        platformQuery = { it is Platform.Desktop },
     )
 
     // Not in the settings list — accessed programmatically by HomeRepository

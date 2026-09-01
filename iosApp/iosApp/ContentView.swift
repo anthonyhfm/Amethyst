@@ -85,6 +85,12 @@ private struct WorkspaceView: UIViewControllerRepresentable {
 // MARK: - Root content
 
 struct ContentView: View {
+    private enum HomeTab: Hashable {
+        case projects
+        case browser
+        case settings
+    }
+
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme)  private var colorScheme
 
@@ -92,6 +98,7 @@ struct ContentView: View {
     @State private var settingsViewModel = SettingsViewModel()
     @State private var showSettingsSheet = false
     @State private var showSplashScreen = true
+    @State private var selectedHomeTab: HomeTab = .projects
 
     private var theme: AmethystTheme {
         AmethystTheme(darkMode: colorScheme == .dark)
@@ -188,42 +195,46 @@ struct ContentView: View {
     // MARK: - Home tab bar
 
     private var homeTabView: some View {
-        TabView {
-            // Projects tab
+        TabView(selection: $selectedHomeTab) {
             ProjectsTabView(viewModel: viewModel)
+                .tag(HomeTab.projects)
                 .tabItem {
                     Label("Projects", systemImage: "folder")
                 }
 
-            // Browser tab (work in progress)
             NavigationStack {
                 ZStack {
                     theme.background.ignoresSafeArea()
                     VStack(spacing: 12) {
                         Image(systemName: "globe")
                             .font(.largeTitle)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.mutedForeground)
                         Text("Work in Progress")
                             .font(.headline)
+                            .foregroundStyle(theme.foreground)
                         Text("Nothing to see here yet.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.mutedForeground)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .navigationTitle("Browser")
                 }
             }
+            .tint(theme.glassForeground)
+            .tag(HomeTab.browser)
             .tabItem {
                 Label("Browser", systemImage: "globe")
             }
 
-            // Settings tab
             SettingsTabView(viewModel: settingsViewModel)
+                .tag(HomeTab.settings)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
         }
         .tint(theme.primary)
+        .toolbarBackground(theme.glassSurface, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .amethystThemed()
     }
 }

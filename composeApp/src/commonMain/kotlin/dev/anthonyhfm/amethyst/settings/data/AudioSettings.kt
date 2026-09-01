@@ -18,6 +18,7 @@ object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_ti
         titleRes = Res.string.settings_audio_master_volume_title,
         default = 1f,
         range = 0f..1f,
+        platformQuery = { it is Platform.Desktop },
         onUpdate = Echo::setMasterGain,
     )
 
@@ -40,6 +41,7 @@ object AudioSettings : SettingsGroup("Audio", Res.string.settings_audio_group_ti
         options = listOf(SystemDefaultOutputDevice),
         codec = SettingCodec.String,
         label = { id -> outputDeviceLabels[id] ?: id },
+        platformQuery = { it is Platform.Desktop },
         onUpdate = { device -> Echo.setPreferredOutputDevice(device.takeUnless { it == SystemDefaultOutputDevice }) },
     )
 

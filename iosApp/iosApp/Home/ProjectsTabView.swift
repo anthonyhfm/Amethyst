@@ -52,6 +52,7 @@ struct ProjectsTabView: View {
                 }
             }
         }
+        .tint(theme.glassForeground)
         // ── File picker ────────────────────────────────────────────────
         .fileImporter(
             isPresented: $viewModel.showingFilePicker,
@@ -118,21 +119,52 @@ struct ProjectsTabView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Recent Projects", systemImage: "folder")
-        } description: {
-            Text("Open an existing workspace or create a new project to get started.")
-        } actions: {
-            Button(action: { viewModel.activeSheet = .createProject }) {
-                Label("New Project", systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
+        VStack(spacing: 0) {
+            Spacer()
 
-            Button(action: { viewModel.showingFilePicker = true }) {
-                Label("Open File", systemImage: "folder.badge.plus")
+            VStack(spacing: 12) {
+                Image(systemName: "folder")
+                    .font(.system(size: 56))
+                    .foregroundStyle(theme.mutedForeground.opacity(0.6))
+                    .padding(.bottom, 4)
+
+                Text("No Recent Projects")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(theme.foreground)
+
+                Text("Open an existing workspace or create a new project to get started.")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.mutedForeground)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
             }
-            .buttonStyle(.bordered)
+
+            VStack(spacing: 8) {
+                Button(action: { viewModel.activeSheet = .createProject }) {
+                    Label("New Project", systemImage: "plus")
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(theme.primary)
+
+                Button(action: { viewModel.showingFilePicker = true }) {
+                    Label("Open File", systemImage: "folder.badge.plus")
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .tint(theme.primary)
+            }
+            .padding(.top, 24)
+            .padding(.horizontal, 16)
+
+            Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(theme.background)
     }
 
     // MARK: - Helpers

@@ -47,6 +47,7 @@ struct SettingsTabView: View {
                 }
             }
         }
+        .tint(theme.glassForeground)
     }
 }
 
@@ -127,8 +128,9 @@ struct SettingSliderRow: View {
                 ), in: rangeStart...rangeEnd)
                 .tint(theme.primary)
                 
-                Text("\(Int(value * 100))%")
-                    .frame(width: 40, alignment: .trailing)
+                Text("\(Int((value * 100).rounded()))%")
+                    .frame(minWidth: 48, alignment: .trailing)
+                    .lineLimit(1)
                     .foregroundStyle(theme.mutedForeground)
                     .monospacedDigit()
             }

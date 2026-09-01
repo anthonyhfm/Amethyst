@@ -25,6 +25,13 @@ struct AmethystTheme {
     let border: Color
     let destructive: Color
 
+    /// Accent used for controls that sit on translucent system chrome.
+    /// The regular brand purple is intentionally darker because it is meant
+    /// to carry white foreground content, as on the primary CTA.
+    let glassForeground: Color
+    let tabBarMutedForeground: Color
+    let glassSurface: Color
+
     init(darkMode: Bool) {
         let palette = AmethystSwiftThemeBridge.shared.palette(darkMode: darkMode)
         background      = Color(argb: palette.backgroundArgb)
@@ -39,6 +46,16 @@ struct AmethystTheme {
         secondaryForeground = Color(argb: palette.secondaryForegroundArgb)
         border          = Color(argb: palette.borderArgb)
         destructive     = Color(argb: palette.destructiveArgb)
+
+        if darkMode {
+            glassForeground       = Color(red: 0.72, green: 0.42, blue: 1.00)
+            tabBarMutedForeground = Color(red: 0.43, green: 0.45, blue: 0.50)
+            glassSurface          = Color(red: 0.02, green: 0.025, blue: 0.055, opacity: 0.86)
+        } else {
+            glassForeground       = Color(argb: palette.primaryArgb)
+            tabBarMutedForeground = Color(red: 0.38, green: 0.40, blue: 0.45)
+            glassSurface          = Color.white.opacity(0.78)
+        }
     }
 }
 

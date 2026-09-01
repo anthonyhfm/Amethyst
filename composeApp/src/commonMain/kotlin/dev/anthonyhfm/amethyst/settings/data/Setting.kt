@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.settings.data
 
 import androidx.compose.runtime.Composable
+import dev.anthonyhfm.amethyst.core.util.Platform
+import dev.anthonyhfm.amethyst.core.util.platform
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,10 +15,14 @@ sealed class Setting<T>(
     val titleRes: StringResource? = null,
     val default: T,
     private val codec: SettingCodec<T>,
+    val platformQuery: (Platform) -> Boolean = { true },
     private val onUpdate: (T) -> Unit = {},
 ) {
     val title: String @Composable get() = titleRes?.let { stringResource(it) } ?: rawTitle
     val displayTitle: String get() = rawTitle
+
+    val isSupportedOnCurrentPlatform: Boolean
+        get() = platformQuery(platform)
 
     private val _flow: MutableStateFlow<T> = MutableStateFlow(
         SettingsRepository.platformSettings.getStringOrNull(key)
@@ -39,8 +45,9 @@ sealed class Setting<T>(
         title: String,
         titleRes: StringResource? = null,
         default: Boolean,
+        platformQuery: (Platform) -> Boolean = { true },
         onUpdate: (Boolean) -> Unit = {},
-    ) : Setting<Boolean>(key, title, titleRes, default, SettingCodec.Boolean, onUpdate)
+    ) : Setting<Boolean>(key, title, titleRes, default, SettingCodec.Boolean, platformQuery, onUpdate)
 
     class Select<T>(
         key: String,
@@ -50,8 +57,9 @@ sealed class Setting<T>(
         options: List<T>,
         codec: SettingCodec<T>,
         val label: (T) -> String = { it.toString() },
+        platformQuery: (Platform) -> Boolean = { true },
         onUpdate: (T) -> Unit = {},
-    ) : Setting<T>(key, title, titleRes, default, codec, onUpdate) {
+    ) : Setting<T>(key, title, titleRes, default, codec, platformQuery, onUpdate) {
         private val _options = MutableStateFlow(options)
         val optionsFlow: StateFlow<List<T>> = _options.asStateFlow()
         val options: List<T> get() = _options.value
@@ -67,14 +75,16 @@ sealed class Setting<T>(
         titleRes: StringResource? = null,
         default: Float,
         val range: ClosedFloatingPointRange<Float> = 0f..1f,
+        platformQuery: (Platform) -> Boolean = { true },
         onUpdate: (Float) -> Unit = {},
-    ) : Setting<Float>(key, title, titleRes, default, SettingCodec.Float, onUpdate)
+    ) : Setting<Float>(key, title, titleRes, default, SettingCodec.Float, platformQuery, onUpdate)
 
     class TextField(
         key: String,
         title: String,
         titleRes: StringResource? = null,
         default: String = "",
+        platformQuery: (Platform) -> Boolean = { true },
         onUpdate: (String) -> Unit = {},
-    ) : Setting<String>(key, title, titleRes, default, SettingCodec.String, onUpdate)
+    ) : Setting<String>(key, title, titleRes, default, SettingCodec.String, platformQuery, onUpdate)
 }

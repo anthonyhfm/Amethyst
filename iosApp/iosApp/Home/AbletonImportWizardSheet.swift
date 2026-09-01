@@ -18,6 +18,7 @@ struct AbletonImportWizardSheet: View {
     let viewModel: HomeViewModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.amethystTheme) private var theme
 
     private enum ActivePicker: Identifiable {
         case palette
@@ -65,8 +66,8 @@ struct AbletonImportWizardSheet: View {
                         LabeledContent("File") {
                             Text(paletteName)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                         }
                         Button("Change…") {
                             activePicker = .palette
@@ -99,8 +100,8 @@ struct AbletonImportWizardSheet: View {
                         LabeledContent("File") {
                             Text(apolloName)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                         }
                         Button("Change…") {
                             activePicker = .apollo
@@ -121,6 +122,8 @@ struct AbletonImportWizardSheet: View {
                     Text("Optional. If set, the lights chain will be taken from the Apollo project instead.")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(theme.background.ignoresSafeArea())
             .navigationTitle("Ableton Import Wizard")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -135,6 +138,7 @@ struct AbletonImportWizardSheet: View {
                 }
             }
         }
+        .tint(theme.glassForeground)
         .fileImporter(
             isPresented: Binding(
                 get: { activePicker != nil },

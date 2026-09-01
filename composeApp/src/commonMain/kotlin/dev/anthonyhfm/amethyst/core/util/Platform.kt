@@ -17,3 +17,6 @@ sealed interface Platform {
         data object MacOS : Desktop
     }
 }
+
+val Platform.isMobile: Boolean get() = this is Platform.Android || this is Platform.iOS
+val Platform.isDesktop: Boolean get() = this is Platform.Desktop

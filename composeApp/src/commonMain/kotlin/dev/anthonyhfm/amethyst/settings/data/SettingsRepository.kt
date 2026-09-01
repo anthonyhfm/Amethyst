@@ -8,16 +8,19 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.TypographyLead
 object SettingsRepository {
     val platformSettings = Settings()
 
-    val settingsGroups: MutableList<SettingsGroup> = mutableListOf()
+    private val allSettingsGroups: MutableList<SettingsGroup> = mutableListOf()
+
+    val settingsGroups: List<SettingsGroup>
+        get() = allSettingsGroups.filter { it.settings.isNotEmpty() }
 
     init {
-        settingsGroups.add(GeneralSettings)
-        settingsGroups.add(AudioSettings)
+        allSettingsGroups.add(GeneralSettings)
+        allSettingsGroups.add(AudioSettings)
 
         if (platform is Platform.Desktop) {
-            settingsGroups.add(DiscordSettings)
+            allSettingsGroups.add(DiscordSettings)
         }
 
-        settingsGroups.add(ExperimentalSettings)
+        allSettingsGroups.add(ExperimentalSettings)
     }
 }
