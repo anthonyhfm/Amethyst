@@ -22,6 +22,7 @@ import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.opacity.OpacityChainDevice
@@ -63,6 +64,7 @@ object DeviceRegistry {
         register(LoopChainDevice)
         register(MacroControlChainDevice)
         register(MacroFilterChainDevice)
+        register(MaskChainDevice)
         register(MultiGroupChainDevice)
         register(OffsetChainDevice)
         register(OpacityChainDevice)

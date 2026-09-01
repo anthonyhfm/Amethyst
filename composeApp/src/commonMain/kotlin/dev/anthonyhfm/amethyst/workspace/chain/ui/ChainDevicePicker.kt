@@ -51,6 +51,7 @@ import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.pianoroll.PianoRollChainDevice
@@ -124,7 +125,7 @@ fun ChainDevicePicker(
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_shape), Icons.TwoTone.ShapeLine, "shape", CopyChainDevice::class, CompositionChainDevice::class, KeyframesChainDevice::class, PianoRollChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, HoldChainDevice::class, LoopChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_transform), Icons.TwoTone.Transform, "transform", OffsetChainDevice::class, LayerChainDevice::class, FlipChainDevice::class, RotateChainDevice::class)
-                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_effects), Icons.TwoTone.Science, "effects", BlurChainDevice::class, OpacityChainDevice::class)
+                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_effects), Icons.TwoTone.Science, "effects", BlurChainDevice::class, MaskChainDevice::class, OpacityChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_misc), Icons.TwoTone.Adjust, "misc", ClearChainDevice::class, MacroControlChainDevice::class, PreviewChainDevice::class, TransmitChainDevice::class)
                 }
                 "container" -> {
@@ -163,6 +164,7 @@ fun ChainDevicePicker(
                 }
                 "effects" -> {
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_blur), Icons.TwoTone.BlurOn, BlurChainDevice::class, ::BlurChainDevice)
+                    pickerItem(stringResource(Res.string.workspace_chain_devicepicker_mask), Icons.TwoTone.Layers, MaskChainDevice::class, ::MaskChainDevice)
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_opacity), Icons.TwoTone.Opacity, OpacityChainDevice::class, ::OpacityChainDevice)
                 }
                 "misc" -> {

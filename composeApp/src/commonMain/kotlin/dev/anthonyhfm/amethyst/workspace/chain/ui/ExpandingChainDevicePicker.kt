@@ -56,11 +56,9 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
-import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
@@ -447,27 +445,17 @@ private fun isDroppingIntoSelf(
     dragged: GenericChainDevice<*>,
     destinationChain: Chain
 ): Boolean {
-    return when (dragged) {
-        is GroupChainDevice -> dragged.state.value.groups.any { it.chain.containsChain(destinationChain) }
-        is MultiGroupChainDevice -> {
-            dragged.state.value.groups.any { it.chain.containsChain(destinationChain) } ||
-            dragged.preprocessChain.containsChain(destinationChain)
-        }
-        is ChokeChainDevice -> dragged.state.value.chain.containsChain(destinationChain)
-        else -> false
-    }
+    return (dragged as? dev.anthonyhfm.amethyst.devices.NestedChainDevice)
+        ?.nestedChains()
+        ?.any { it.containsChain(destinationChain) }
+        ?: false
 }
 
 private fun Chain.containsChain(target: Chain): Boolean {
     if (this === target) return true
     for (device in this.devices.value) {
-        when (device) {
-            is GroupChainDevice -> if (device.state.value.groups.any { it.chain.containsChain(target) }) return true
-            is MultiGroupChainDevice -> {
-                if (device.state.value.groups.any { it.chain.containsChain(target) }) return true
-                if (device.preprocessChain.containsChain(target)) return true
-            }
-            is ChokeChainDevice -> if (device.state.value.chain.containsChain(target)) return true
+        if (device is dev.anthonyhfm.amethyst.devices.NestedChainDevice) {
+            if (device.nestedChains().any { it.containsChain(target) }) return true
         }
     }
     return false

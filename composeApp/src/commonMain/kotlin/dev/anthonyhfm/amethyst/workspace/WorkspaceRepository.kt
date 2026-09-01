@@ -11,8 +11,6 @@ import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
-import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
@@ -505,20 +503,10 @@ object WorkspaceRepository {
                                 } else { 0 }
                             )
                         }
-                        device.state.value.groups.forEach { group ->
-                            recursiveResetMulti(group.chain)
-                        }
                     }
-
-                    is GroupChainDevice -> {
-                        device.state.value.groups.forEach { group ->
-                            recursiveResetMulti(group.chain)
-                        }
-                    }
-
-                    is ChokeChainDevice -> {
-                        recursiveResetMulti(device.state.value.chain)
-                    }
+                }
+                if (device is NestedChainDevice) {
+                    device.nestedChains().forEach(::recursiveResetMulti)
                 }
             }
         }
@@ -572,21 +560,10 @@ object WorkspaceRepository {
                         device.renderAnimation()
                         rendered += 1
                     }
-
-                    is GroupChainDevice -> {
-                        device.state.value.groups.forEach {
-                            rendered += renderAnimationsInChain(it.chain)
-                        }
-                    }
-
-                    is MultiGroupChainDevice -> {
-                        device.state.value.groups.forEach {
-                            rendered += renderAnimationsInChain(it.chain)
-                        }
-                    }
-
-                    is ChokeChainDevice -> {
-                        rendered += renderAnimationsInChain(device.state.value.chain)
+                }
+                if (device is NestedChainDevice) {
+                    device.nestedChains().forEach {
+                        rendered += renderAnimationsInChain(it)
                     }
                 }
             }
@@ -965,18 +942,7 @@ object WorkspaceRepository {
         if (root === target) return true
 
         return root.devices.value.any { device ->
-            when (device) {
-                is GroupChainDevice -> device.state.value.groups.any { group ->
-                    chainContainsChain(group.chain, target)
-                }
-
-                is MultiGroupChainDevice -> device.state.value.groups.any { group ->
-                    chainContainsChain(group.chain, target)
-                }
-
-                is ChokeChainDevice -> chainContainsChain(device.state.value.chain, target)
-                else -> false
-            }
+            device is NestedChainDevice && device.nestedChains().any { chainContainsChain(it, target) }
         }
     }
 
@@ -984,18 +950,7 @@ object WorkspaceRepository {
         if (root.devices.value.any { it.selectionUUID == deviceSelectionUUID }) return true
 
         return root.devices.value.any { device ->
-            when (device) {
-                is GroupChainDevice -> device.state.value.groups.any { group ->
-                    chainContainsDevice(group.chain, deviceSelectionUUID)
-                }
-
-                is MultiGroupChainDevice -> device.state.value.groups.any { group ->
-                    chainContainsDevice(group.chain, deviceSelectionUUID)
-                }
-
-                is ChokeChainDevice -> chainContainsDevice(device.state.value.chain, deviceSelectionUUID)
-                else -> false
-            }
+            device is NestedChainDevice && device.nestedChains().any { chainContainsDevice(it, deviceSelectionUUID) }
         }
     }
 }

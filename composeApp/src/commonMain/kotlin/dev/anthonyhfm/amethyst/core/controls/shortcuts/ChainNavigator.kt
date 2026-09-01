@@ -6,12 +6,14 @@ import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskLayer
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.update
 
 /**
  * Utility for hierarchical chain navigation.
- * Handles compound devices (GroupChainDevice, MultiGroupChainDevice, ChokeChainDevice)
+ * Handles compound devices (Group, Multi, Choke, and Mask)
  * so that keyboard navigation follows the visual left-to-right traversal order.
  */
 object ChainNavigator {
@@ -26,7 +28,7 @@ object ChainNavigator {
         device is GroupChainDevice || device is MultiGroupChainDevice
 
     fun isCompound(device: GenericChainDevice<*>) =
-        device is GroupChainDevice || device is MultiGroupChainDevice || device is ChokeChainDevice
+        device is GroupChainDevice || device is MultiGroupChainDevice || device is ChokeChainDevice || device is MaskChainDevice
 
     /** Returns (openedGroupIndex, groups) for GroupChainDevice/MultiGroupChainDevice. */
     fun getGroupsInfo(device: GenericChainDevice<*>): Pair<Int, List<Group>>? = when (device) {
@@ -50,6 +52,7 @@ object ChainNavigator {
             s.groups.getOrNull(s.openedGroupIndex)?.chain
         }
         is ChokeChainDevice -> device.state.value.chain
+        is MaskChainDevice -> device.chainFor(device.state.value.openedLayer)
         else -> null
     }
 
@@ -58,6 +61,7 @@ object ChainNavigator {
         when (device) {
             is GroupChainDevice -> device.state.update { it.copy(openedGroupIndex = index) }
             is MultiGroupChainDevice -> device.state.update { it.copy(openedGroupIndex = index) }
+            is MaskChainDevice -> MaskLayer.entries.getOrNull(index)?.let(device::openLayer)
             else -> {}
         }
     }
@@ -90,6 +94,12 @@ object ChainNavigator {
                     if (inner === target) return OuterContext(chain, device, index)
                     findOuterContextInChain(inner, target)?.let { return it }
                 }
+                is MaskChainDevice -> {
+                    for (inner in device.nestedChains()) {
+                        if (inner === target) return OuterContext(chain, device, index)
+                        findOuterContextInChain(inner, target)?.let { return it }
+                    }
+                }
             }
         }
         return null
@@ -116,6 +126,11 @@ object ChainNavigator {
                 }
                 is ChokeChainDevice -> {
                     findChainContaining(device.state.value.chain, target)?.let { return it }
+                }
+                is MaskChainDevice -> {
+                    for (inner in device.nestedChains()) {
+                        findChainContaining(inner, target)?.let { return it }
+                    }
                 }
             }
         }

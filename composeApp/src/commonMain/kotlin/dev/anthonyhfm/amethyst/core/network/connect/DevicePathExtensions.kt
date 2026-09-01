@@ -10,6 +10,8 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskLayer
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 fun ChainPath.resolveRootChain(): Chain = when (this) {
@@ -58,6 +60,9 @@ fun Chain.resolve(path: DevicePath): GenericChainDevice<*>? {
                                 device.state.value.groups.getOrNull(nextSegment.groupIndex)?.chain?.devices?.value
                                     ?: return null
                             }
+                            is MaskChainDevice -> {
+                                device.chainAt(nextSegment.groupIndex)?.devices?.value ?: return null
+                            }
                             else -> return null
                         }
                     }
@@ -102,6 +107,7 @@ fun Chain.resolveChain(path: DevicePath): Chain? {
             is GroupStep -> when (device) {
                 is GroupChainDevice -> device.state.value.groups.getOrNull(chainSegment.groupIndex)?.chain
                 is MultiGroupChainDevice -> device.state.value.groups.getOrNull(chainSegment.groupIndex)?.chain
+                is MaskChainDevice -> device.chainAt(chainSegment.groupIndex)
                 else -> null
             }
 
@@ -152,6 +158,14 @@ private fun Chain.findChainPath(
             device.preprocessChain.findChainPath(target, preprocessPath)?.let { return it }
         }
 
+        if (device is MaskChainDevice) {
+            device.nestedChains().forEachIndexed { layerIndex, chain ->
+                val chainPath = stepToDevice + GroupStep(layerIndex)
+                if (chain === target) return DevicePath(chainPath)
+                chain.findChainPath(target, chainPath)?.let { return it }
+            }
+        }
+
         if (device is ChokeChainDevice) {
             val chainPath = stepToDevice + ChokeStep
             if (device.state.value.chain === target) return DevicePath(chainPath)
@@ -191,6 +205,13 @@ private fun Chain.findPath(
             if (path != null) return path
         }
 
+        if (device is MaskChainDevice) {
+            device.nestedChains().forEachIndexed { layerIndex, chain ->
+                val path = chain.findPath(target, stepToDevice + GroupStep(layerIndex))
+                if (path != null) return path
+            }
+        }
+
         if (device is ChokeChainDevice) {
             val path = device.state.value.chain.findPath(target, stepToDevice + ChokeStep)
             if (path != null) return path
@@ -198,4 +219,10 @@ private fun Chain.findPath(
     }
 
     return null
+}
+
+private fun MaskChainDevice.chainAt(index: Int): Chain? = when (index) {
+    0 -> chainFor(MaskLayer.COLOR)
+    1 -> chainFor(MaskLayer.SHAPE)
+    else -> null
 }

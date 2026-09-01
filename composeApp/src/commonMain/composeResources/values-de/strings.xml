@@ -133,6 +133,9 @@
     <string name="device_macro_filter_macro_headline">Macro</string>
     <string name="device_macro_filter_no_macros">Keine Macros verfügbar</string>
     <string name="device_macro_filter_title">Macro Filter</string>
+    <string name="device_mask_color_layer">Farbe</string>
+    <string name="device_mask_shape_layer">Form</string>
+    <string name="device_mask_title">Maske</string>
     <string name="device_multi_mode_label">Modus</string>
     <string name="device_multi_title">Multi</string>
     <string name="device_multi_type_backwards">Rückwärts</string>
@@ -594,6 +597,7 @@
     <string name="workspace_chain_devicepicker_loop">Loop</string>
     <string name="workspace_chain_devicepicker_macro_control">Macro Control</string>
     <string name="workspace_chain_devicepicker_macro_filter">Macro Filter</string>
+    <string name="workspace_chain_devicepicker_mask">Maske</string>
     <string name="workspace_chain_devicepicker_misc">Misc</string>
     <string name="workspace_chain_devicepicker_multi">Multi</string>
     <string name="workspace_chain_devicepicker_offset">Offset</string>

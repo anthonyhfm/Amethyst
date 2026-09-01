@@ -68,6 +68,10 @@ fun StateChain.findMaxMacroIndex(): Int {
                 is dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState -> device.groups.forEach { traverse(it.stateChain.devices) }
                 is dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState -> device.groups.forEach { traverse(it.stateChain.devices) }
                 is dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState -> traverse(device.stateChain.devices)
+                is dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDeviceState -> {
+                    traverse(device.colorStateChain.devices)
+                    traverse(device.shapeStateChain.devices)
+                }
                 else -> {}
             }
         }
@@ -75,4 +79,3 @@ fun StateChain.findMaxMacroIndex(): Int {
     traverse(this.devices)
     return maxIndex
 }
-

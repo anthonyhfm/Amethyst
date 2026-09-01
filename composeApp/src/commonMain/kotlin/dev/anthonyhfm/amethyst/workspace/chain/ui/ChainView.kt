@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.devices.LocalChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.modifier.clickableWithDoubleTap
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
@@ -235,6 +236,7 @@ fun ChainView(
                                                 is GroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
                                                 is MultiGroupChainDevice -> device.Content(dragAndDropState = dragAndDropState)
                                                 is ChokeChainDevice -> device.Content(dragAndDropState = dragAndDropState)
+                                                is MaskChainDevice -> device.Content(dragAndDropState = dragAndDropState)
 
                                                 else -> device.Content()
                                             }

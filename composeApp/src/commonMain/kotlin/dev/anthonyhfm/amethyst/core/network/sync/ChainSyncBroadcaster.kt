@@ -8,10 +8,7 @@ import dev.anthonyhfm.amethyst.core.network.connect.toChainAddress
 import dev.anthonyhfm.amethyst.devices.DeviceRegistry
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
-import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -229,21 +226,8 @@ class ChainSyncBroadcaster(
     private fun collectDevices(chain: Chain, devices: MutableList<GenericChainDevice<*>>) {
         chain.devices.value.forEach { device ->
             devices += device
-            when (device) {
-                is GroupChainDevice -> {
-                    device.state.value.groups.forEach { group ->
-                        collectDevices(group.chain, devices)
-                    }
-                }
-
-                is MultiGroupChainDevice -> {
-                    device.state.value.groups.forEach { group ->
-                        collectDevices(group.chain, devices)
-                    }
-                    collectDevices(device.preprocessChain, devices)
-                }
-
-                is ChokeChainDevice -> collectDevices(device.state.value.chain, devices)
+            if (device is dev.anthonyhfm.amethyst.devices.NestedChainDevice) {
+                device.nestedChains().forEach { collectDevices(it, devices) }
             }
         }
     }

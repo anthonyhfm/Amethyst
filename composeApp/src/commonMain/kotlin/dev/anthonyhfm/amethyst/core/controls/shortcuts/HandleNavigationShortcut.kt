@@ -9,7 +9,6 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
@@ -151,7 +150,7 @@ private fun handleChainDeviceNavigation(
                 return true
             }
             // Empty groups — fall through to normal next-sibling logic
-        } else if (device is ChokeChainDevice) {
+        } else if (ChainNavigator.isCompound(device)) {
             val inner = ChainNavigator.getInnerChainOf(device)
             if (inner != null && inner.devices.value.isNotEmpty()) {
                 SelectionManager.select(
@@ -214,7 +213,7 @@ private fun handleChainDeviceNavigation(
                 return true
             }
             // No groups — fall through to normal prev
-        } else if (prevDevice is ChokeChainDevice) {
+        } else if (ChainNavigator.isCompound(prevDevice)) {
             val inner = ChainNavigator.getInnerChainOf(prevDevice)
             if (inner != null && inner.devices.value.isNotEmpty()) {
                 SelectionManager.select(

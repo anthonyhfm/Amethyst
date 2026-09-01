@@ -16,6 +16,8 @@ import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDeviceState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
@@ -223,6 +225,12 @@ class ChainSyncReceiver(
                 val chain = state.stateChain.unpack()
                 chain.signalExit = { signal -> device.signalExit?.invoke(signal) }
                 device.state.value = state.copy(chain = chain)
+                device.onStateRestored()
+                return true
+            }
+
+            device is MaskChainDevice && state is MaskChainDeviceState -> {
+                device.loadFromState(state)
                 device.onStateRestored()
                 return true
             }
