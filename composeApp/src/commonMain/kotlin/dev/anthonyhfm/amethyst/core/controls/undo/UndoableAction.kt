@@ -112,6 +112,18 @@ sealed interface UndoableAction {
         val frame: KeyframesChainDeviceContract.Frame
     )
 
+    data class KeyframeReverse(
+        val device: KeyframesChainDevice,
+        val startIndex: Int,
+        val endIndex: Int,
+    ) : UndoableAction
+
+    data class KeyframeReorder(
+        val device: KeyframesChainDevice,
+        val fromIndex: Int,
+        val toIndex: Int,
+    ) : UndoableAction
+
     data class GroupCreation(
         val device: GroupChainDevice,
         val groupIndex: Int,

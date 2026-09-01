@@ -27,6 +27,7 @@ import com.composables.icons.lucide.CopyPlus
 import com.composables.icons.lucide.GripVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Rewind
 import com.composables.icons.lucide.Trash2
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
@@ -68,6 +69,17 @@ fun ReorderableItemScope.FramePreviewButton(
                     it.frameIndex == index
         }
     } ?: false
+
+    val selectedKeyframeIndices = selections
+        .filterIsInstance<Selectable.KeyframeItem>()
+        .filter { it.parent == parent }
+        .map { it.frameIndex }
+        .distinct()
+        .sorted()
+
+    val isContiguousMultiSelection = selectedKeyframeIndices.size > 1 &&
+        selectedKeyframeIndices.zipWithNext().all { (a, b) -> b == a + 1 } &&
+        (isSelectedInManager || selectedKeyframeIndices.contains(index))
 
     val clipboard by ClipboardManager.clipboardData.collectAsState()
     val hasFramesInClipboard = clipboard is ClipboardData.Keyframe
@@ -160,10 +172,27 @@ fun ReorderableItemScope.FramePreviewButton(
         }
 
         ContextMenuItem(
-            onClick = { onEvent(KeyframesChainDeviceContract.Event.OnDuplicateFrame(index)) }
+            onClick = {
+                if (isSelectedInManager && selectedKeyframeIndices.size > 1) {
+                    parent?.duplicateFrames(selectedKeyframeIndices)
+                } else {
+                    onEvent(KeyframesChainDeviceContract.Event.OnDuplicateFrame(index))
+                }
+            }
         ) {
             Icon(Lucide.CopyPlus, null, modifier = Modifier.size(16.dp))
             Text("Duplicate", modifier = Modifier.weight(1f))
+        }
+
+        if (isContiguousMultiSelection) {
+            ContextMenuItem(
+                onClick = {
+                    onEvent(KeyframesChainDeviceContract.Event.OnReverseFrames(selectedKeyframeIndices))
+                }
+            ) {
+                Icon(Lucide.Rewind, null, modifier = Modifier.size(16.dp))
+                Text("Reverse", modifier = Modifier.weight(1f))
+            }
         }
 
         ContextMenuItem(
@@ -204,7 +233,11 @@ fun ReorderableItemScope.FramePreviewButton(
             enabled = totalFrames > 1,
             onClick = {
                 if (totalFrames > 1) {
-                    onEvent(KeyframesChainDeviceContract.Event.OnDeleteFrame(index))
+                    if (isSelectedInManager && selectedKeyframeIndices.size > 1) {
+                        parent?.removeFrames(selectedKeyframeIndices)
+                    } else {
+                        onEvent(KeyframesChainDeviceContract.Event.OnDeleteFrame(index))
+                    }
                 }
             }
         ) {

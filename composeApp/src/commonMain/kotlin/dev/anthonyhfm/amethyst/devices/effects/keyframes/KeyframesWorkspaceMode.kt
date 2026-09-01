@@ -216,12 +216,6 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
         if (selectedKeyframes.isNotEmpty()) {
             val device = parentDevice ?: return false
             val frameIndices = selectedKeyframes.map { it.frameIndex }
-
-            if (frameIndices[0] == 0 && state.value.frames.lastIndex == frameIndices.last()) {
-                val newFrame = Frame(timing = state.value.frames[state.value.currentFrameIndex].timing)
-                parentDevice?.addFrameInternal(frameIndices.last() + 1, newFrame)
-            }
-
             parentDevice?.removeFrames(frameIndices)
 
             val lowestDeletedIndex = frameIndices.minOrNull() ?: 0

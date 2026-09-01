@@ -351,6 +351,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     } else {
                         selectedColor
                     }
+                    val before = state.value
                     applyColorAt(
                         device = device,
                         localX = localX,
@@ -358,6 +359,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                         color = targetColor,
                         addToRecent = targetColor != Triple(0f, 0f, 0f)
                     )
+                    pushStateChange(before, state.value)
                 }
             }
 
@@ -499,18 +501,24 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             }
 
             is Event.OnChangeFramePosition -> {
-                state.update {
-                    it.copy(
-                        frames = it.frames.toMutableList().apply {
-                            add(event.to, removeAt(event.from))
-                        }
+                if (event.from != event.to && event.from in state.value.frames.indices && event.to in state.value.frames.indices) {
+                    UndoManager.addAction(
+                        UndoableAction.KeyframeReorder(
+                            device = this,
+                            fromIndex = event.from,
+                            toIndex = event.to
+                        )
                     )
+                    moveFrameInternal(event.from, event.to)
                 }
+            }
 
-                refreshVirtualDevices()
+            is Event.OnReverseFrames -> {
+                reverseFrames(event.frameIndices)
             }
 
             is Event.OnChangeFrameTiming -> {
+                val before = state.value
                 state.update {
                     it.copy(
                         frames = it.frames.toMutableList().apply {
@@ -521,9 +529,11 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                         }
                     )
                 }
+                pushStateChange(before, state.value)
             }
 
             is Event.OnChangeMultiFrameTiming -> {
+                val before = state.value
                 state.update {
                     it.copy(
                         frames = it.frames.toMutableList().apply {
@@ -538,6 +548,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                         }
                     )
                 }
+                pushStateChange(before, state.value)
             }
 
             is Event.OnImportMidiFile -> {
@@ -564,9 +575,11 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                             ),
                         )
 
+                        val before = this@KeyframesChainDevice.state.value
                         this@KeyframesChainDevice.state.update {
                             data
                         }
+                        pushStateChange(before, this@KeyframesChainDevice.state.value)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -574,42 +587,58 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             }
 
             is Event.OnChangeInfinity -> {
+                val before = state.value
                 state.update {
                     it.copy(
                         infinity = event.checked
                     )
                 }
+                pushStateChange(before, state.value)
             }
 
             is Event.OnChangePinch -> {
+                val before = state.value
                 val newPinch = event.pinch.coerceIn(-2f, 2f)
                 state.update { it.copy(pinch = newPinch) }
                 renderAnimation()
+                pushStateChange(before, state.value)
             }
 
             Event.OnTogglePinchBilateral -> {
+                val before = state.value
                 state.update { it.copy(bilateralPinch = !it.bilateralPinch) }
                 renderAnimation()
+                pushStateChange(before, state.value)
             }
 
             is Event.OnChangeRepeats -> {
+                val before = state.value
                 state.update { it.copy(repeats = event.repeats.coerceAtLeast(1)) }
+                pushStateChange(before, state.value)
             }
 
             is Event.OnChangePlaybackMode -> {
+                val before = state.value
                 state.update { it.copy(playbackMode = event.playbackMode) }
+                pushStateChange(before, state.value)
             }
 
             is Event.OnChangeRootKey -> {
+                val before = state.value
                 state.update { it.copy(rootKey = event.rootKey) }
+                pushStateChange(before, state.value)
             }
 
             is Event.OnChangeWrap -> {
+                val before = state.value
                 state.update { it.copy(wrap = event.wrap) }
+                pushStateChange(before, state.value)
             }
 
             is Event.OnChangeIsolate -> {
+                val before = state.value
                 state.update { it.copy(isolate = event.isolate) }
+                pushStateChange(before, state.value)
             }
         }
     }
@@ -646,6 +675,78 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         }
 
         refreshVirtualDevices()
+    }
+
+    fun reverseFrames(indices: List<Int>) {
+        val sortedIndices = indices.distinct().sorted()
+        if (sortedIndices.size <= 1) return
+        val isContiguous = sortedIndices.zipWithNext().all { (a, b) -> b == a + 1 }
+        if (!isContiguous) return
+
+        val startIndex = sortedIndices.first()
+        val endIndex = sortedIndices.last()
+
+        if (startIndex !in state.value.frames.indices || endIndex !in state.value.frames.indices) return
+
+        UndoManager.addAction(
+            UndoableAction.KeyframeReverse(
+                device = this,
+                startIndex = startIndex,
+                endIndex = endIndex
+            )
+        )
+
+        reverseFramesInternal(startIndex, endIndex)
+    }
+
+    internal fun reverseFramesInternal(startIndex: Int, endIndex: Int) {
+        state.update { currentState ->
+            if (startIndex !in currentState.frames.indices || endIndex !in currentState.frames.indices || startIndex >= endIndex) {
+                return@update currentState
+            }
+            val newFrames = currentState.frames.toMutableList()
+            newFrames.subList(startIndex, endIndex + 1).reverse()
+            currentState.copy(frames = newFrames)
+        }
+        refreshVirtualDevices()
+    }
+
+    internal fun moveFrameInternal(fromIndex: Int, toIndex: Int) {
+        state.update { currentState ->
+            if (fromIndex !in currentState.frames.indices || toIndex !in currentState.frames.indices || fromIndex == toIndex) {
+                return@update currentState
+            }
+            val newFrames = currentState.frames.toMutableList()
+            val moved = newFrames.removeAt(fromIndex)
+            newFrames.add(toIndex, moved)
+
+            val newCurrentIndex = when (currentState.currentFrameIndex) {
+                fromIndex -> toIndex
+                in (fromIndex + 1)..toIndex -> currentState.currentFrameIndex - 1
+                in toIndex until fromIndex -> currentState.currentFrameIndex + 1
+                else -> currentState.currentFrameIndex
+            }
+
+            currentState.copy(
+                frames = newFrames,
+                currentFrameIndex = newCurrentIndex
+            )
+        }
+        refreshVirtualDevices()
+    }
+
+    internal fun removeFrameDirectInternal(index: Int) {
+        state.update { currentState ->
+            if (index in currentState.frames.indices) {
+                currentState.copy(
+                    frames = currentState.frames.toMutableList().apply {
+                        removeAt(index)
+                    }
+                )
+            } else {
+                currentState
+            }
+        }
     }
 
     internal fun addFrameInternal(index: Int, frame: Frame) {

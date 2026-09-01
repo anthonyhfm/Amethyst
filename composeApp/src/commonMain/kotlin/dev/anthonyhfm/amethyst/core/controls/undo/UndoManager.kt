@@ -190,6 +190,34 @@ object UndoManager {
                     redoStack.add(action)
                 }
 
+                is UndoableAction.KeyframeReverse -> {
+                    action.device.reverseFramesInternal(action.startIndex, action.endIndex)
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    for (i in action.startIndex..action.endIndex) {
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.KeyframeItem(
+                                parent = action.device,
+                                frameIndex = i
+                            ),
+                            single = false
+                        )
+                    }
+                    redoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeReorder -> {
+                    action.device.moveFrameInternal(action.toIndex, action.fromIndex)
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                        dev.anthonyhfm.amethyst.core.controls.selection.Selectable.KeyframeItem(
+                            parent = action.device,
+                            frameIndex = action.fromIndex
+                        ),
+                        single = true
+                    )
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.GroupCreation -> {
                     action.device.removeGroupInternal(action.groupIndex)
                     redoStack.add(action)
@@ -741,6 +769,34 @@ object UndoManager {
                     action.pastedFrames.forEach { pasteInfo ->
                         action.device.addFrameInternal(pasteInfo.frameIndex, pasteInfo.frame)
                     }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeReverse -> {
+                    action.device.reverseFramesInternal(action.startIndex, action.endIndex)
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    for (i in action.startIndex..action.endIndex) {
+                        dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                            dev.anthonyhfm.amethyst.core.controls.selection.Selectable.KeyframeItem(
+                                parent = action.device,
+                                frameIndex = i
+                            ),
+                            single = false
+                        )
+                    }
+                    undoStack.add(action)
+                }
+
+                is UndoableAction.KeyframeReorder -> {
+                    action.device.moveFrameInternal(action.fromIndex, action.toIndex)
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
+                    dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.select(
+                        dev.anthonyhfm.amethyst.core.controls.selection.Selectable.KeyframeItem(
+                            parent = action.device,
+                            frameIndex = action.toIndex
+                        ),
+                        single = true
+                    )
                     undoStack.add(action)
                 }
 

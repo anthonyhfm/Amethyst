@@ -28,6 +28,7 @@ sealed interface KeyframesChainDeviceContract {
             val from: Int,
             val to: Int
         ) : Event
+        data class OnReverseFrames(val frameIndices: List<Int>) : Event
         data class OnChangePinch(val pinch: Float) : Event
         data object OnTogglePinchBilateral : Event
 
