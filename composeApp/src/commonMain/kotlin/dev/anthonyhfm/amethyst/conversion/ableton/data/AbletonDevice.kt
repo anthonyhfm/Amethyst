@@ -111,8 +111,17 @@ data class OriginalSimpler(
 
     @Serializable
     data class VolumeAndPan(
+        @XmlElement
+        @XmlSerialName("Volume")
+        val volume: VolumeData = VolumeData(),
+
         val oneShotEnvelope: OneShotEnvelope = OneShotEnvelope()
     ) {
+        @Serializable
+        data class VolumeData(
+            val manual: AbletonManual<Float> = AbletonManual(0f)
+        )
+
         @Serializable
         data class OneShotEnvelope(
             @XmlElement

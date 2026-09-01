@@ -14,12 +14,14 @@ class OriginalSimplerAdapter(
 
         val fadeInMs = device.volumeAndPan.oneShotEnvelope.fadeInTime.manual.value.coerceAtLeast(0f)
         val fadeOutMs = device.volumeAndPan.oneShotEnvelope.fadeOutTime.manual.value.coerceAtLeast(0f)
+        val volumeDb = device.volumeAndPan.volume.manual.value
 
         return listOf(
             AbletonConverter.audioMap[data]?.copy(
                 fadeInMs = fadeInMs,
-                fadeOutMs = fadeOutMs
-            ) ?: SampleChainDeviceState()
+                fadeOutMs = fadeOutMs,
+                volumeDb = volumeDb
+            ) ?: SampleChainDeviceState(volumeDb = volumeDb)
         ).withMuteState(device.on.manual.value)
     }
 
