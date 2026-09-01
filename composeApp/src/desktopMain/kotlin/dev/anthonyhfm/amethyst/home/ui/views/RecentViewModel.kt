@@ -11,9 +11,8 @@ import dev.anthonyhfm.amethyst.core.network.lan.DiscoveredSession
 import dev.anthonyhfm.amethyst.core.network.lan.LanDiscoveryService
 import dev.anthonyhfm.amethyst.core.network.user.LocalUserRepository
 import dev.anthonyhfm.amethyst.core.util.BaseViewModel
-import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
-import dev.anthonyhfm.amethyst.core.util.determineFormat
+import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
 import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
@@ -79,7 +78,7 @@ class RecentViewModel(
                 viewModelScope.launch {
                     val file = FileKit.openFilePicker(
                         type = FileKitType.File(
-                            extensions = listOf("ame", "als", "zip", "approj")
+                            extensions = listOf("ame", "als", "zip", "rar", "approj")
                         ),
                         title = getString(Res.string.home_recent_dialog_file_picker_title)
                     )
@@ -112,8 +111,8 @@ class RecentViewModel(
                             }
                         }
 
-                        "zip" -> {
-                            val format = Zip.determineFormat(file)
+                        "zip", "rar" -> {
+                            val format = determineProjectArchiveFormat(file)
 
                             when (format) {
                                 ZippedProjectFormat.ABLETON -> {

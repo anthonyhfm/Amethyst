@@ -21,6 +21,8 @@ import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
+import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
+import dev.anthonyhfm.amethyst.core.util.getProjectArchiveEntries
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
@@ -130,7 +132,7 @@ object AbletonConverter : AmethystConverter {
         reporter?.update(0.05f, statusText = unzippingMsg, detailText = file.name)
 
         zipEntries.clear()
-        val entries = Zip.getEntries(file).filter {
+        val entries = getProjectArchiveEntries(file).filter {
             !it.path.contains("__MACOSX")
         }
 
@@ -151,7 +153,7 @@ object AbletonConverter : AmethystConverter {
             entries.associateBy { it.path }
         )
 
-        val format = Zip.determineFormat(file)
+        val format = determineProjectArchiveFormat(file)
 
         val alsEntry = entries
             .filter { it.path.endsWith(".als") }

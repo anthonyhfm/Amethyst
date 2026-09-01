@@ -129,6 +129,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.flatlaf)
             implementation("io.github.vyfor:kpresence:0.6.5")
+            implementation("com.github.junrar:junrar:8.1.1")
 
             // Ktor WebSocket Server + CIO engine (JVM/Desktop only)
             implementation(libs.ktor.client.cio)

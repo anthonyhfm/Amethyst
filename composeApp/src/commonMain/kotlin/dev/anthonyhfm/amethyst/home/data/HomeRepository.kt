@@ -9,7 +9,7 @@ import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.Zip
-import dev.anthonyhfm.amethyst.core.util.determineFormat
+import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.findMaxMacroIndex
@@ -99,7 +99,7 @@ object HomeRepository {
                 }
                 "als" -> AbletonConverter.convertToWorkspace(file, palettePath = null)
                 "approj" -> ApolloConverter.convertFileToWorkspace(file)
-                "zip" -> when (Zip.determineFormat(file)) {
+                "zip", "rar" -> when (determineProjectArchiveFormat(file)) {
                     dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat.ABLETON,
                     dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat.ABLETON_APOLLO -> {
                         AbletonConverter.convertZipToWorkspace(file)
@@ -228,7 +228,7 @@ object HomeRepository {
             val importedFile = resolveImportedFile(path)
             val workspace = when {
                 !apolloProjPath.isNullOrBlank() -> {
-                    val abletonWorkspace = if (importedFile.extension.equals("zip", ignoreCase = true)) {
+                    val abletonWorkspace = if (importedFile.isProjectArchive()) {
                         AbletonConverter.convertZipToWorkspace(importedFile, palettePath = customPalettePath)
                     } else {
                         AbletonConverter.convertToWorkspace(importedFile, customPalettePath)
@@ -256,7 +256,7 @@ object HomeRepository {
                     )
                 }
 
-                importedFile.extension.equals("zip", ignoreCase = true) -> {
+                importedFile.isProjectArchive() -> {
                     AbletonConverter.convertZipToWorkspace(importedFile, palettePath = customPalettePath)
                 }
 
@@ -285,4 +285,7 @@ object HomeRepository {
     private fun normalizeAuthor(author: String): String {
         return author.trim().ifBlank { "Unknown Author" }
     }
+
+    private fun PlatformFile.isProjectArchive(): Boolean =
+        extension.equals("zip", ignoreCase = true) || extension.equals("rar", ignoreCase = true)
 }

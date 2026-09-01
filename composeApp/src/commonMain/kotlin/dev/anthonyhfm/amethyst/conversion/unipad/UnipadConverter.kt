@@ -5,8 +5,8 @@ import dev.anthonyhfm.amethyst.conversion.unipad.data.KeyLED
 import dev.anthonyhfm.amethyst.conversion.unipad.data.KeySound
 import dev.anthonyhfm.amethyst.conversion.unipad.data.DecodedAudioClip
 import dev.anthonyhfm.amethyst.conversion.unipad.data.UnipadAutoPlay
-import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.core.util.ZipEntry
+import dev.anthonyhfm.amethyst.core.util.getProjectArchiveEntries
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
@@ -26,7 +26,7 @@ object UnipadConverter : AmethystConverter {
 
         entries.clear()
         entries.putAll(
-            from = Zip.getEntries(file)
+            from = getProjectArchiveEntries(file)
                 .associateBy {
                     it.path
                 }

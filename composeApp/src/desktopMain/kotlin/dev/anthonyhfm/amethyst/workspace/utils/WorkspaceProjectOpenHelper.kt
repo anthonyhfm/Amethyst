@@ -27,7 +27,7 @@ sealed interface WorkspaceProjectOpenResult {
 
 object WorkspaceProjectOpenHelper {
     suspend fun openProjectPicker(): WorkspaceProjectOpenResult {
-        val extensions = listOf("ame", "als", "zip", "approj")
+        val extensions = listOf("ame", "als", "zip", "rar", "approj")
 
         val file = FileKit.openFilePicker(
             type = FileKitType.File(extensions = extensions),

@@ -12,18 +12,7 @@ expect object Zip {
 }
 
 fun Zip.determineFormat(file: PlatformFile): ZippedProjectFormat {
-    val paths = Zip.getPaths(file)
-
-    return when {
-        paths.any { it.endsWith(".als") } && paths.any { it.endsWith(".approj") } ->
-            ZippedProjectFormat.ABLETON_APOLLO
-
-        paths.any { it.endsWith(".als") } ->
-            ZippedProjectFormat.ABLETON
-
-        else ->
-            ZippedProjectFormat.UNIPAD
-    }
+    return determineProjectArchiveFormat(Zip.getPaths(file))
 }
 
 data class ZipEntry(
