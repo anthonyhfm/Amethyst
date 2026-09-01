@@ -3,8 +3,16 @@ package dev.anthonyhfm.amethyst.timeline
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLaneKey
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationPoint
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
 
 sealed interface TimelineEditCommand {
+    data class MoveEntries(
+        val entryKeys: List<TimelineClipKey>,
+        val anchorKey: TimelineClipKey,
+        val targetTrackIndex: Int,
+        val targetStartMs: Long,
+    ) : TimelineEditCommand
+
     data class DeleteTracks(
         val trackIndices: List<Int>
     ) : TimelineEditCommand

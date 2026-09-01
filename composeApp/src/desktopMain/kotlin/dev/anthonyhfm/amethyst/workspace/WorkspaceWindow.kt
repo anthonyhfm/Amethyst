@@ -37,6 +37,7 @@ import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
 import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
 import dev.anthonyhfm.amethyst.desktop.utility.CenterWindowOnFirstShow
+import dev.anthonyhfm.amethyst.desktop.utility.RefreshOnDisplayChange
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
@@ -153,6 +154,7 @@ fun WorkspaceWindow(
         }
     ) {
         CenterWindowOnFirstShow(window)
+        RefreshOnDisplayChange(window)
 
         WorkspaceMenuBar()
 

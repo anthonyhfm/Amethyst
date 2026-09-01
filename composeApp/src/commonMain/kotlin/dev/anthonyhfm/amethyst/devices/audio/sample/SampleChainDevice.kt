@@ -235,6 +235,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     @Composable
     private fun AudioView() {
         val deviceState by state.collectAsState()
+        var showDetails by remember { mutableStateOf(false) }
         val resolvedRawData = deviceState.resolvedRawData()
         val livePlayheadFrame by produceState(initialValue = playheadFrame) {
             while (true) {
@@ -389,6 +390,8 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                 volumeMaxDb = VOLUME_MAX_DB,
                 activeVoiceCount = activeVoiceCount,
                 droppedVoiceCount = droppedTriggerCount,
+                showDetails = showDetails,
+                onToggleDetails = { showDetails = !showDetails },
                 onPushStateChange = { before, after ->
                     pushStateChange(before = before, after = after)
                 }

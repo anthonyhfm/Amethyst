@@ -180,7 +180,7 @@ private fun FilterType.toBiquad(): BiquadType = when (this) {
 private fun LabeledFilterSelect(label: String, value: String, options: List<String>, onValue: (String) -> Unit) {
     Column(Modifier.width(155.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label)
-        Select(value = value, options = options, triggerHeight = 44.dp, onValueChange = onValue)
+        Select(value = value, options = options, triggerHeight = 32.dp, onValueChange = onValue)
     }
 }
 
@@ -194,6 +194,6 @@ private fun FilterDial(id: String, label: String, value: Float, text: String, on
         title = label,
         text = text,
         onValueChange = onValue,
-        isFlat = true,
+        isFlat = false,
     )
 }

@@ -137,7 +137,7 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
                     Select(
                         value = selectedLabel,
                         options = listOf("None") + options.map { it.second },
-                        triggerHeight = 44.dp,
+                        triggerHeight = 32.dp,
                         onValueChange = { label ->
                             val before = state.value
                             val id = options.firstOrNull { it.second == label }?.first

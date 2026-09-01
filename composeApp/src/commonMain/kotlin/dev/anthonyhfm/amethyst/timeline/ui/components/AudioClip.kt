@@ -46,6 +46,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -64,6 +66,7 @@ import dev.anthonyhfm.amethyst.timeline.data.msToUs
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
@@ -89,7 +92,8 @@ fun AudioClip(
     trackIndex: Int,
     entryStartMs: Long,
     bpm: Double,
-    gridType: GridUtils.GridType
+    gridType: GridUtils.GridType,
+    dragCallbacks: TimelineClipDragCallbacks? = null,
 ) {
     val zoomLevel = viewport.zoomX
     val timelineDimensions = TimelineTheme.dimensions
@@ -136,6 +140,8 @@ fun AudioClip(
 
     // State that must be declared before any early return so Compose hook order is stable.
     val dragOffsetPx = remember(audioEntry.startTimeMs) { mutableStateOf(0f) }
+    var clipCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var dragPointerInRoot by remember { mutableStateOf(Offset.Unspecified) }
     var snapEnabled by remember { mutableStateOf(true) }
 
     val clipWindow = computeVisibleClipWindowPx(
@@ -143,6 +149,7 @@ fun AudioClip(
         contentEndPx = endOffsetPx,
         viewport = viewport,
         screenOffsetPx = dragOffsetPx.value.roundToInt(),
+        retainOffscreen = dragCallbacks != null && isSelected,
     )
     
     // Rename support
@@ -246,6 +253,7 @@ fun AudioClip(
         .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
         .height(timelineDimensions.laneHeight)
         .width(widthDp)
+        .onGloballyPositioned { clipCoordinates = it }
 
     val clipContent: @Composable () -> Unit = {
         Column(
@@ -281,7 +289,7 @@ fun AudioClip(
                                                                 ),
                                                                 single = false
                                                             )
-                                                        } else {
+                                                        } else if (!isSelected) {
                                                             onSelectEntry()
                                                         }
                                                         change.consume()
@@ -292,21 +300,34 @@ fun AudioClip(
                                     }
                                     .pointerInput(audioEntry.startTimeMs, zoomLevel, gridIntervalMs) {
                                         detectDragGestures(
-                                            onDragStart = { onSelectEntry() },
+                                            onDragStart = { offset ->
+                                                if (!isSelected) onSelectEntry()
+                                                dragPointerInRoot = clipCoordinates?.localToRoot(offset) ?: Offset.Unspecified
+                                                if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
+                                                    dragCallbacks?.onStart?.invoke(dragPointerInRoot)
+                                                }
+                                            },
                                             onDragEnd = {
-                                                if (previewStartMs != audioEntry.startTimeMs) {
+                                                if (dragCallbacks != null) {
+                                                    dragCallbacks.onEnd()
+                                                } else if (previewStartMs != audioEntry.startTimeMs) {
                                                     onMoveEntry(previewStartMs)
                                                 }
                                                 dragOffsetPx.value = 0f
                                                 snapEnabled = true
                                             },
                                             onDragCancel = {
+                                                dragCallbacks?.onCancel?.invoke()
                                                 dragOffsetPx.value = 0f
                                                 snapEnabled = true
                                             },
                                             onDrag = { change, dragAmount ->
                                                 change.consume()
                                                 dragOffsetPx.value += dragAmount.x
+                                                if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
+                                                    dragPointerInRoot += dragAmount
+                                                    dragCallbacks?.onDrag?.invoke(dragPointerInRoot)
+                                                }
                                             }
                                         )
                                     }

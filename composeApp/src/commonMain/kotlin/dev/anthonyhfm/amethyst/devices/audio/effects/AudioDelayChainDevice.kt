@@ -274,7 +274,7 @@ internal fun EffectDial(id: String, title: String, value: Float, text: String, o
         title = title,
         text = text,
         onValueChange = onValue,
-        isFlat = true,
+        isFlat = false,
     )
 }
 
@@ -282,7 +282,7 @@ internal fun EffectDial(id: String, title: String, value: Float, text: String, o
 private fun DelaySelect(label: String, value: String, options: List<String>, onValue: (String) -> Unit) {
     Column(Modifier.width(138.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = Theme[typography][small])
-        Select(value = value, options = options, triggerHeight = 44.dp, onValueChange = onValue)
+        Select(value = value, options = options, triggerHeight = 32.dp, onValueChange = onValue)
     }
 }
 

@@ -339,7 +339,7 @@ data class AutomationChainDeviceState(
 private fun LabeledSelect(label: String, value: String, options: List<String>, onValueChange: (String) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label)
-        Select(value = value, options = options, triggerHeight = 44.dp, onValueChange = onValueChange)
+        Select(value = value, options = options, triggerHeight = 32.dp, onValueChange = onValueChange)
     }
 }
 

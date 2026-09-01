@@ -51,6 +51,8 @@ import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -71,6 +73,7 @@ import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleClipWindowPx
 import dev.anthonyhfm.amethyst.timeline.utils.projectTimelineSpanPx
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
@@ -96,7 +99,8 @@ fun MidiClip(
     trackIndex: Int,
     entryStartMs: Long,
     bpm: Double,
-    gridType: GridUtils.GridType
+    gridType: GridUtils.GridType,
+    dragCallbacks: TimelineClipDragCallbacks? = null,
 ) {
     val zoomLevel = viewport.zoomX
     val timelineDimensions = TimelineTheme.dimensions
@@ -120,6 +124,8 @@ fun MidiClip(
 
     // State that must be declared before any early return so Compose hook order is stable.
     val dragOffsetPx = remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
+    var clipCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var dragPointerInRoot by remember { mutableStateOf(Offset.Unspecified) }
     var snapEnabled by remember { mutableStateOf(true) }
 
     var resizeLeftDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
@@ -181,6 +187,7 @@ fun MidiClip(
         contentEndPx = previewEndOffsetPx,
         viewport = viewport,
         screenOffsetPx = dragOffsetPx.value.roundToInt(),
+        retainOffscreen = dragCallbacks != null && isSelected,
     )
     if (clipWindow == null || clipWindow.visibleWidthPx <= 0) return
 
@@ -200,7 +207,8 @@ fun MidiClip(
         modifier = Modifier
             .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
             .width(finalWidthDp)
-            .height(timelineDimensions.laneHeight),
+            .height(timelineDimensions.laneHeight)
+            .onGloballyPositioned { clipCoordinates = it },
         trigger = {
             Column(
                 modifier = Modifier
@@ -231,7 +239,7 @@ fun MidiClip(
                                                 Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entryStartMs),
                                                 single = false
                                             )
-                                        } else {
+                                        } else if (!isSelected) {
                                             // Single select mode
                                             onSelectEntry()
                                         }
@@ -243,18 +251,35 @@ fun MidiClip(
                     }
                     .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
                         detectDragGestures(
-                            onDragStart = { onSelectEntry() },
+                            onDragStart = { offset ->
+                                if (!isSelected) onSelectEntry()
+                                dragPointerInRoot = clipCoordinates?.localToRoot(offset) ?: Offset.Unspecified
+                                if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
+                                    dragCallbacks?.onStart?.invoke(dragPointerInRoot)
+                                }
+                            },
                             onDragEnd = {
-                                if (dragOffsetPx.value != 0f) {
+                                if (dragCallbacks != null) {
+                                    dragCallbacks.onEnd()
+                                } else if (dragOffsetPx.value != 0f) {
                                     val newStart = previewStartMs
                                     if (newStart != midiEntry.startTimeMs) onMoveEntry(newStart)
                                 }
                                 dragOffsetPx.value = 0f
                                 snapEnabled = true
                             },
-                            onDragCancel = { dragOffsetPx.value = 0f; snapEnabled = true },
+                            onDragCancel = {
+                                dragCallbacks?.onCancel?.invoke()
+                                dragOffsetPx.value = 0f
+                                snapEnabled = true
+                            },
                             onDrag = { change, dragAmount ->
-                                change.consume(); dragOffsetPx.value += dragAmount.x
+                                change.consume()
+                                dragOffsetPx.value += dragAmount.x
+                                if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
+                                    dragPointerInRoot += dragAmount
+                                    dragCallbacks?.onDrag?.invoke(dragPointerInRoot)
+                                }
                             }
                         )
                     }

@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.core.controls.undo
 
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -210,6 +211,13 @@ sealed interface UndoableAction {
         val trackIndex: Int,
         val beforeEntries: List<AudioEntry>,
         val afterEntries: List<AudioEntry>
+    ) : UndoableAction
+
+    data class TimelineMultiTrackChange(
+        val beforeTracks: Map<Int, TimelineTrack<*>>,
+        val afterTracks: Map<Int, TimelineTrack<*>>,
+        val beforeSelections: List<Selectable>,
+        val afterSelections: List<Selectable>,
     ) : UndoableAction
 
     data class MidiTimelineChange(

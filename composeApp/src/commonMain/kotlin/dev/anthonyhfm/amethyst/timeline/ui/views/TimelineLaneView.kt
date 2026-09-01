@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,8 +9,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,10 +26,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.zIndex
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
@@ -43,6 +54,10 @@ import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.ui.components.PlayheadCursor
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCoordinator
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
+import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.timeline.utils.computeTimelineContentWidthPx
 
@@ -57,6 +72,15 @@ fun TimelineLaneView(
     val tracks by viewModel.tracks.collectAsState()
     // Single atomic viewport read — zoom and scroll always come from the same snapshot.
     val viewportState by viewModel.viewport.collectAsState()
+    val density = LocalDensity.current.density
+    var previousDensity by remember { mutableStateOf(density) }
+    LaunchedEffect(density) {
+        val scale = density / previousDensity
+        if (scale.isFinite() && scale > 0f && scale != 1f) {
+            viewModel.updateViewport { it.rescaleHorizontalPixels(scale) }
+        }
+        previousDensity = density
+    }
     val playheadPositionMs by viewModel.playheadPositionMs.collectAsState()
     val timelineTrailingMarginPx = 240f
     val minZoomLevel = 0.0025f
@@ -92,6 +116,9 @@ fun TimelineLaneView(
     // contentWidth uses the true uncapped desiredWidthPx so clamp() computes correct
     // max-scroll bounds — no more artificial 260 k ceiling.
     val renderViewport = viewportWithTimelineMetrics(viewportState)
+    val bpm by WorkspaceRepository.bpm.collectAsState()
+    val gridType by WorkspaceRepository.gridType.collectAsState()
+    val clipDragCoordinator = remember { TimelineClipDragCoordinator() }
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
     var lastPointerX by remember { mutableStateOf<Float?>(null) }
@@ -105,6 +132,7 @@ fun TimelineLaneView(
             .fillMaxSize()
             .background(timelinePalette.canvas)
             .onSizeChanged { viewportWidthPx = it.width }
+            .onGloballyPositioned { clipDragCoordinator.updateSurfaceBounds(it.boundsInRoot()) }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -268,6 +296,48 @@ fun TimelineLaneView(
                             is MidiTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
                         }
                     },
+                    clipDragCallbacks = { key: TimelineClipKey ->
+                        TimelineClipDragCallbacks(
+                            onStart = { pointerRoot ->
+                                clipDragCoordinator.begin(
+                                    anchorKey = key,
+                                    pointerRoot = pointerRoot,
+                                    viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
+                                    tracks = viewModel.tracks.value,
+                                )
+                            },
+                            onDrag = { pointerRoot ->
+                                clipDragCoordinator.updatePointer(pointerRoot)
+                                val surface = clipDragCoordinator.surfaceBoundsInRoot
+                                if (surface.width > 0f) {
+                                    val localX = pointerRoot.x - surface.left
+                                    val edgeWidth = 56f
+                                    val scrollDelta = when {
+                                        localX < edgeWidth -> -((edgeWidth - localX) / edgeWidth * 24f)
+                                        localX > surface.width - edgeWidth ->
+                                            ((localX - (surface.width - edgeWidth)) / edgeWidth * 24f)
+                                        else -> 0f
+                                    }
+                                    if (scrollDelta != 0f) {
+                                        viewModel.updateViewport { current ->
+                                            viewportWithTimelineMetrics(current).panBy(scrollDelta)
+                                        }
+                                    }
+                                }
+                            },
+                            onEnd = {
+                                clipDragCoordinator.buildCommand(
+                                    viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
+                                    bpm = bpm,
+                                    gridType = gridType,
+                                    snapEnabled = true,
+                                )?.let(TimelineCommandExecutor::execute)
+                                clipDragCoordinator.finish()
+                            },
+                            onCancel = clipDragCoordinator::finish,
+                        )
+                    },
+                    onLaneBoundsChanged = clipDragCoordinator::updateLaneBounds,
                     onResizeEntry = { oldStart, newStart, newDuration ->
                         when (track) {
                             is MidiTimelineTrack -> viewModel.resizeMidiEntry(index, oldStart, newStart, newDuration)
@@ -291,5 +361,33 @@ fun TimelineLaneView(
             positionMs = playheadPositionMs,
             viewport = renderViewport,
         )
+
+        if (clipDragCoordinator.isActive) {
+            val preview = clipDragCoordinator.preview(
+                viewport = renderViewport,
+                bpm = bpm,
+                gridType = gridType,
+                snapEnabled = true,
+            )
+            val surface = clipDragCoordinator.surfaceBoundsInRoot
+            preview.placements.forEach { placement ->
+                val lane = clipDragCoordinator.laneBoundsInRoot[placement.targetTrackIndex] ?: return@forEach
+                val widthPx = (placement.durationMs * renderViewport.zoomX).coerceAtLeast(1f)
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                renderViewport.timeMsToScreenX(placement.targetStartMs.toDouble()).roundToInt(),
+                                (lane.top - surface.top).roundToInt(),
+                            )
+                        }
+                        .width(with(LocalDensity.current) { widthPx.toDp() })
+                        .height(with(LocalDensity.current) { lane.height.toDp() })
+                        .background(timelinePalette.selectionFill, RoundedCornerShape(timelineDimensions.clipCornerRadius))
+                        .border(2.dp, timelinePalette.selectionStroke, RoundedCornerShape(timelineDimensions.clipCornerRadius))
+                        .zIndex(20f),
+                )
+            }
+        }
     }
 }

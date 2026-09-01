@@ -23,6 +23,8 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.FlatDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.components.primitives.Tabs
@@ -48,6 +50,8 @@ fun SampleFlatControlsView(
     volumeMaxDb: Float,
     activeVoiceCount: Int,
     droppedVoiceCount: Long,
+    showDetails: Boolean,
+    onToggleDetails: () -> Unit,
     onPushStateChange: (before: SampleChainDeviceState, after: SampleChainDeviceState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -121,12 +125,12 @@ fun SampleFlatControlsView(
 
             SeparatorBox()
 
-            Column(modifier = Modifier.width(132.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.width(112.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Mode", style = Theme[typography][small])
                 Select(
                     value = deviceState.playbackMode.uiLabel,
                     options = SamplePlaybackMode.entries.map(SamplePlaybackMode::uiLabel),
-                    triggerHeight = 44.dp,
+                    triggerHeight = 32.dp,
                     onValueChange = { label ->
                         val selected = SamplePlaybackMode.entries.first { it.uiLabel == label }
                         val before = state.value
@@ -135,10 +139,18 @@ fun SampleFlatControlsView(
                     },
                 )
             }
+
+            Button(
+                onClick = onToggleDetails,
+                size = ButtonSize.Small,
+            ) {
+                Text(if (showDetails) "Less" else "More")
+            }
         }
 
-        val tabs = listOf("Envelope", "Playback", "Warp", "Diagnostics")
-        Tabs(selectedTab = selectedTab, tabs = tabs) {
+        if (showDetails) {
+            val tabs = listOf("Envelope", "Playback", "Warp", "Diagnostics")
+            Tabs(selectedTab = selectedTab, tabs = tabs) {
             TabsList(modifier = Modifier.fillMaxWidth()) {
                 tabs.forEach { tab ->
                     TabsTrigger(
@@ -167,6 +179,7 @@ fun SampleFlatControlsView(
             }
             TabsContent("Diagnostics") {
                 SamplingDiagnostics()
+            }
             }
         }
     }
@@ -477,7 +490,7 @@ private fun LabeledSelect(
         Select(
             value = value,
             options = options,
-            triggerHeight = 44.dp,
+            triggerHeight = 32.dp,
             onValueChange = onValueChange,
         )
     }

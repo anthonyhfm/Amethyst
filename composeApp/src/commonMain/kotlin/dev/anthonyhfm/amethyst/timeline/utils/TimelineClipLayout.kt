@@ -75,6 +75,7 @@ internal fun computeVisibleClipWindowPx(
     viewport: EditorViewportState,
     screenOffsetPx: Int = 0,
     cullPaddingPx: Int = 100,
+    retainOffscreen: Boolean = false,
 ): TimelineVisibleClipWindowPx? {
     val viewportWidthPx = viewport.viewportWidth.roundToInt().coerceAtLeast(0)
     if (viewportWidthPx <= 0) return null
@@ -85,7 +86,19 @@ internal fun computeVisibleClipWindowPx(
     val screenEndPx = screenStartPx + widthPx
 
     if (screenEndPx < -cullPaddingPx || screenStartPx > viewportWidthPx + cullPaddingPx) {
-        return null
+        if (!retainOffscreen) return null
+        val retainedLeft = if (screenEndPx < 0) 0 else (viewportWidthPx - 1).coerceAtLeast(0)
+        val retainedRight = (retainedLeft + 1).coerceAtMost(viewportWidthPx)
+        return TimelineVisibleClipWindowPx(
+            screenStartPx = screenStartPx,
+            screenEndPx = screenEndPx,
+            visibleLeftPx = retainedLeft,
+            visibleRightPx = retainedRight,
+            hiddenLeftPx = (retainedLeft - screenStartPx).coerceAtLeast(0),
+            hiddenRightPx = (screenEndPx - retainedRight).coerceAtLeast(0),
+            visibleContentStartPx = contentStartPx,
+            visibleContentEndPx = (contentStartPx + 1).coerceAtMost(normalizedEndPx),
+        )
     }
 
     val visibleLeftPx = screenStartPx.coerceAtLeast(0)

@@ -130,6 +130,19 @@ data class EditorViewportState(
     fun setContentExtent(width: Float, height: Float): EditorViewportState =
         copy(contentWidth = width, contentHeight = height).clamp()
 
+    /** Preserve the visible time range when the window moves between display densities. */
+    fun rescaleHorizontalPixels(scale: Float): EditorViewportState {
+        if (!scale.isFinite() || scale <= 0f || abs(scale - 1f) < 1e-6f) return this
+        return copy(
+            scrollX = scrollX * scale,
+            zoomX = zoomX * scale,
+            viewportWidth = viewportWidth * scale,
+            contentWidth = contentWidth * scale,
+            minZoomX = minZoomX * scale,
+            maxZoomX = maxZoomX * scale,
+        )
+    }
+
     fun withConstrainedViewport(
         zoomX: Float = this.zoomX,
         scrollX: Float = this.scrollX,
@@ -177,4 +190,3 @@ fun wheelZoomScaleFactor(scrollDelta: Float, sensitivity: Float = 0.7f): Float {
     val factor = kotlin.math.exp(scrollDelta * 0.09f * sensitivity)
     return factor.coerceIn(0.1f, 10f)
 }
-

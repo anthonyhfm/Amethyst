@@ -1,11 +1,15 @@
 package dev.anthonyhfm.amethyst.devices.audio.effects
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,7 +36,13 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.components.primitives.Toggle
+import dev.anthonyhfm.amethyst.ui.components.primitives.ToggleSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ToggleVariant
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.muted
+import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -110,28 +120,29 @@ class EqThreeChainDevice : AudioChainDevice<EqThreeChainDeviceState>(), Paramete
             title = "EQ Three",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
             isDragging = isDragging.value,
-            modifier = Modifier.width(430.dp),
+            modifier = Modifier.width(360.dp),
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BandControl("lowGain", "L", "Gain Low", deviceState.lowGainDb, deviceState.lowKilled, Modifier.weight(1f),
+                        onGain = { state.update { s -> s.copy(lowGainDb = it) } },
+                        onKilled = { state.update { s -> s.copy(lowKilled = it) } })
+                    BandControl("midGain", "M", "Gain Mid", deviceState.midGainDb, deviceState.midKilled, Modifier.weight(1f),
+                        onGain = { state.update { s -> s.copy(midGainDb = it) } },
+                        onKilled = { state.update { s -> s.copy(midKilled = it) } })
+                    BandControl("highGain", "H", "Gain High", deviceState.highGainDb, deviceState.highKilled, Modifier.weight(1f),
+                        onGain = { state.update { s -> s.copy(highGainDb = it) } },
+                        onKilled = { state.update { s -> s.copy(highKilled = it) } })
+                }
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    GainDial("lowGain", "Low", deviceState.lowGainDb) { state.update { s -> s.copy(lowGainDb = it) } }
-                    GainDial("midGain", "Mid", deviceState.midGainDb) { state.update { s -> s.copy(midGainDb = it) } }
-                    GainDial("highGain", "High", deviceState.highGainDb) { state.update { s -> s.copy(highGainDb = it) } }
+                    FrequencyDial("lowCrossover", "Freq Low", deviceState.lowCrossoverHz, 60f, 2_000f) { state.update { s -> s.copy(lowCrossoverHz = it) } }
                     GainDial("output", "Output", deviceState.outputGainDb) { state.update { s -> s.copy(outputGainDb = it) } }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    KillToggle("Low kill", deviceState.lowKilled) { state.update { s -> s.copy(lowKilled = it) } }
-                    KillToggle("Mid kill", deviceState.midKilled) { state.update { s -> s.copy(midKilled = it) } }
-                    KillToggle("High kill", deviceState.highKilled) { state.update { s -> s.copy(highKilled = it) } }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    FrequencyDial("lowCrossover", "Low / Mid", deviceState.lowCrossoverHz, 60f, 2_000f) { state.update { s -> s.copy(lowCrossoverHz = it) } }
-                    FrequencyDial("highCrossover", "Mid / High", deviceState.highCrossoverHz, 500f, 16_000f) { state.update { s -> s.copy(highCrossoverHz = it) } }
+                    FrequencyDial("highCrossover", "Freq High", deviceState.highCrossoverHz, 500f, 16_000f) { state.update { s -> s.copy(highCrossoverHz = it) } }
                 }
             }
         }
@@ -181,7 +192,7 @@ private fun GainDial(id: String, label: String, value: Float, onValue: (Float) -
         title = label,
         text = "${value.roundToInt()} dB",
         onValueChange = { onValue(it * 48f - 24f) },
-        isFlat = true,
+        isFlat = false,
     )
 }
 
@@ -195,14 +206,43 @@ private fun FrequencyDial(id: String, label: String, value: Float, min: Float, m
         title = label,
         text = "${value.roundToInt()} Hz",
         onValueChange = { onValue(min + it * (max - min)) },
-        isFlat = true,
+        isFlat = false,
     )
 }
 
 @Composable
-private fun KillToggle(label: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Checkbox(checked = checked, onCheckedChange = onChecked, size = 22.dp, iconSize = 16.dp)
-        Text(if (checked) "$label · On" else "$label · Off")
+private fun BandControl(
+    parameterId: String,
+    shortLabel: String,
+    title: String,
+    gainDb: Float,
+    killed: Boolean,
+    modifier: Modifier = Modifier,
+    onGain: (Float) -> Unit,
+    onKilled: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(
+            Modifier
+                .size(8.dp)
+                .background(
+                    color = if (killed) Theme[colors][muted] else Theme[colors][primary],
+                    shape = CircleShape,
+                )
+        )
+        GainDial(parameterId, title, gainDb, onGain)
+        Toggle(
+            pressed = !killed,
+            onPressedChange = { active -> onKilled(!active) },
+            modifier = Modifier.width(44.dp),
+            variant = ToggleVariant.Outline,
+            size = ToggleSize.Small,
+        ) {
+            Text(shortLabel)
+        }
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
@@ -82,6 +83,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 
 @Composable
 fun TimelineLane(
@@ -96,6 +101,8 @@ fun TimelineLane(
     onSelectTime: (Long) -> Unit = {},
     onSelectEntry: (Long) -> Unit = {},
     onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> },
+    clipDragCallbacks: (TimelineClipKey) -> TimelineClipDragCallbacks? = { null },
+    onLaneBoundsChanged: (Int, Rect) -> Unit = { _, _ -> },
     onResizeEntry: (oldStart: Long, newStart: Long, newDuration: Long) -> Unit = { _, _, _ -> },
     onDoubleClickLane: (Long) -> Unit = {},
     onCreateMidiClip: (Long, Long) -> Unit = { _, _ -> },
@@ -249,6 +256,7 @@ fun TimelineLane(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(timelineDimensions.laneHeight)
+                .onGloballyPositioned { onLaneBoundsChanged(trackIndex, it.boundsInRoot()) }
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
@@ -403,7 +411,8 @@ fun TimelineLane(
                                 trackIndex = trackIndex,
                                 entryStartMs = audioEntry.startTimeMs,
                                 bpm = bpm,
-                                gridType = gridType
+                                gridType = gridType,
+                                dragCallbacks = clipDragCallbacks(TimelineClipKey(trackIndex, audioEntry.startTimeMs)),
                             )
                         }
                     }
@@ -425,7 +434,8 @@ fun TimelineLane(
                                 trackIndex = trackIndex,
                                 entryStartMs = midiEntry.startTimeMs,
                                 bpm = bpm,
-                                gridType = gridType
+                                gridType = gridType,
+                                dragCallbacks = clipDragCallbacks(TimelineClipKey(trackIndex, midiEntry.startTimeMs)),
                             )
                         }
                     }

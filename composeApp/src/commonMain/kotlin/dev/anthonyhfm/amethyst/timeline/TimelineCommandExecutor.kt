@@ -21,6 +21,7 @@ import kotlin.math.round
 object TimelineCommandExecutor {
     fun execute(command: TimelineEditCommand): TimelineCommandResult {
         return when (command) {
+            is TimelineEditCommand.MoveEntries -> TimelineClipMoveEngine.execute(command)
             is TimelineEditCommand.DeleteTracks -> deleteTracks(command.trackIndices)
             is TimelineEditCommand.DuplicateTracks -> duplicateTracks(command.trackIndices)
             is TimelineEditCommand.RenameTrack -> renameTrack(command.trackIndex, command.newName)
