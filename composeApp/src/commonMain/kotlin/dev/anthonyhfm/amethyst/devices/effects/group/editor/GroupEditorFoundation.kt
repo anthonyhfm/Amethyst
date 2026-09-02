@@ -125,6 +125,7 @@ import dev.anthonyhfm.amethyst.ui.theme.chainSurfaceRaised
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.destructive
+import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
 import dev.anthonyhfm.amethyst.ui.theme.secondary
@@ -764,7 +765,11 @@ private fun GroupEditorInsertButton(
                 com.composeunstyled.UnstyledButton(
                     onClick = onAddGroup,
                 ) {
-                    Icon(Lucide.Plus, null)
+                    Icon(
+                        imageVector = Lucide.Plus,
+                        contentDescription = null,
+                        tint = Theme[colors][foreground]
+                    )
                 }
             }
         }

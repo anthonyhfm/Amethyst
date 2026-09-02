@@ -88,9 +88,10 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
 import dev.anthonyhfm.amethyst.ui.components.primitives.Input
 import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
+import dev.anthonyhfm.amethyst.ui.theme.foreground
 
 private val MacroControlsButtonWidth = 136.dp
-private val MacroControlsButtonHeight = 44.dp
+private val MacroControlsButtonHeight = 32.dp
 private val MacroControlsListHeight = 132.dp
 private val MacroControlsAddButtonWidth = 56.dp
 private val MacroControlsHorizontalPadding = 24.dp
@@ -201,12 +202,13 @@ fun BoxScope.MacroControls(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = stringResource(Res.string.workspace_chain_macrocontrols_toggle_macros),
                     modifier = Modifier.rotate(chevronRotation),
+                    tint = Theme[colors][foreground]
                 )
 
                 Text(
                     text = stringResource(Res.string.workspace_chain_macrocontrols_global_macros),
                     style = Theme[typography][small],
-                    color = Theme[colors][cardForeground],
+                    color = Theme[colors][foreground],
                     modifier = Modifier
                         .padding(end = 6.dp)
                 )
@@ -292,6 +294,7 @@ fun MacroList(
                     Icon(
                         imageVector = Lucide.Pencil,
                         contentDescription = null,
+                        tint = Theme[colors][foreground],
                         modifier = Modifier.size(16.dp),
                     )
                     Text("Rename macro", modifier = Modifier.weight(1f))
@@ -341,6 +344,7 @@ fun MacroList(
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = stringResource(Res.string.workspace_chain_macrocontrols_add_macro),
+                    tint = Theme[colors][foreground]
                 )
             }
         }
