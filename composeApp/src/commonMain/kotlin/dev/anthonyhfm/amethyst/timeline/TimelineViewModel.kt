@@ -69,6 +69,7 @@ class TimelineViewModel : ViewModel() {
         TimelineKeyHandler.duplicateChainEffectClip = { trackIndex, clipId ->
             duplicateChainEffect(trackIndex, clipId)
         }
+        TimelineKeyHandler.nudgeTimelineTime = ::nudgeSelectedTimelineTime
         viewModelScope.launch {
             TimelineRepository.tracks.collect { repoTracks ->
                 _tracks.value = repoTracks
@@ -1002,6 +1003,35 @@ class TimelineViewModel : ViewModel() {
         return snapToGrid(timeMs, interval)
     }
 
+    private fun nudgeSelectedTimelineTime(direction: Int): Boolean {
+        val selection = SelectionManager.selections.value
+            .filterIsInstance<Selectable.TimelineTime>()
+            .firstOrNull()
+            ?: return false
+        val intervalMs = GridUtils.computeWithGridType(
+            _viewport.value.zoomX,
+            WorkspaceRepository.bpm.value,
+            WorkspaceRepository.gridType.value,
+        ).intervalMs
+        val targetTimeMs = adjacentTimelineGridTimeMs(selection.timeMs, intervalMs, direction)
+        SelectionManager.select(selection.copy(timeMs = targetTimeMs))
+        updateViewport { viewport ->
+            val viewportWidth = viewport.viewportWidth
+            if (viewportWidth <= 0f) return@updateViewport viewport
+
+            val marginPx = minOf(24f, viewportWidth / 4f)
+            val targetContentX = viewport.timeMsToContentX(targetTimeMs.toDouble())
+            val targetScreenX = viewport.contentToScreenX(targetContentX)
+            when {
+                targetScreenX < marginPx -> viewport.copy(scrollX = targetContentX - marginPx).clamp()
+                targetScreenX > viewportWidth - marginPx ->
+                    viewport.copy(scrollX = targetContentX - viewportWidth + marginPx).clamp()
+                else -> viewport
+            }
+        }
+        return true
+    }
+
     private fun oneBeatMs(): Long =
         (60_000.0 / WorkspaceRepository.bpm.value.coerceAtLeast(1.0)).toLong().coerceAtLeast(1L)
 
@@ -1009,6 +1039,7 @@ class TimelineViewModel : ViewModel() {
         TimelineKeyHandler.closeChainEffectPanel = null
         TimelineKeyHandler.deleteChainEffectClip = null
         TimelineKeyHandler.duplicateChainEffectClip = null
+        TimelineKeyHandler.nudgeTimelineTime = null
         super.onCleared()
     }
 

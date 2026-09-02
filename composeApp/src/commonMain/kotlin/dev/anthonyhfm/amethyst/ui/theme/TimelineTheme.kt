@@ -127,7 +127,7 @@ internal fun timelineColorMap(palette: AmethystColorPalette): Map<ThemeToken<Col
         timelineTrackHeaderBorder to palette.border,
         timelineSelectionFill to palette.primary.copy(alpha = 0.22f),
         timelineSelectionStroke to palette.primary,
-        timelineSelectionCursor to palette.primary,
+        timelineSelectionCursor to palette.foreground,
         timelinePlayhead to palette.chart2,
         timelineAudioClipSurface to audio[0],
         timelineAudioClipHeader to audio[1],

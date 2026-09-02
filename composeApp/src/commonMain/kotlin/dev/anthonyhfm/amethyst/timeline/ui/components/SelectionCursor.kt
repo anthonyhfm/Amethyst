@@ -10,11 +10,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -32,7 +27,7 @@ fun SelectionCursor(
     if (selectedTimeMs == null) return
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
-    val cursorContainerWidth = 6.dp
+    val cursorWidth = timelineDimensions.selectionCursorWidth
     // SelectionCursor is placed directly in the lane Box (no content-offset wrapper),
     // so we use screen-space X via timeMsToScreenX.
     val cursorXPositionPx by remember(selectedTimeMs, viewport.zoomX, viewport.scrollX) {
@@ -40,31 +35,11 @@ fun SelectionCursor(
     }
     Box(
         modifier = Modifier
-            .offset(x = -(cursorContainerWidth / 2))
+            .offset(x = -(cursorWidth / 2))
             .offset { IntOffset(cursorXPositionPx.roundToInt(), 0) }
-            .width(cursorContainerWidth)
+            .width(cursorWidth)
             .height(laneHeight)
             .zIndex(1.5f)
-            .drawBehind {
-                val centerX = size.width / 2f
-                val topMarkerWidth = 6.dp.toPx()
-                val topMarkerHeight = 8.dp.toPx()
-                val markerTop = 3.dp.toPx()
-
-                drawLine(
-                    color = timelinePalette.selectionCursor,
-                    start = Offset(centerX, 0f),
-                    end = Offset(centerX, size.height),
-                    strokeWidth = timelineDimensions.selectionCursorWidth.toPx().coerceAtLeast(1f),
-                    cap = StrokeCap.Round
-                )
-                drawRoundRect(
-                    color = timelinePalette.selectionCursor,
-                    topLeft = Offset(centerX - topMarkerWidth / 2f, markerTop),
-                    size = Size(topMarkerWidth, topMarkerHeight),
-                    cornerRadius = CornerRadius(topMarkerWidth / 2f, topMarkerWidth / 2f)
-                )
-            }
-            .background(color = timelinePalette.selectionCursor.copy(alpha = 0f))
+            .background(timelinePalette.selectionCursor)
     )
 }

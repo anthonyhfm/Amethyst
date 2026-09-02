@@ -24,6 +24,7 @@ object TimelineKeyHandler {
     internal var closeChainEffectPanel: (() -> Boolean)? = null
     internal var deleteChainEffectClip: ((Int, String) -> Unit)? = null
     internal var duplicateChainEffectClip: ((Int, String) -> Unit)? = null
+    internal var nudgeTimelineTime: ((Int) -> Boolean)? = null
     fun canCopySelection(
         selections: List<Selectable> = SelectionManager.selections.value
     ): Boolean {
@@ -102,11 +103,17 @@ object TimelineKeyHandler {
             keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> deleteSelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.D -> duplicateSelection()
 
+            // Time-cursor navigation: move to the previous/next musical grid line.
+            keyEvent.hasNoShortcutModifier() && keyEvent.key == Key.DirectionLeft ->
+                nudgeTimelineTime?.invoke(-1) == true
+            keyEvent.hasNoShortcutModifier() && keyEvent.key == Key.DirectionRight ->
+                nudgeTimelineTime?.invoke(+1) == true
+
             // Track navigation: ↑/↓ with optional Shift to extend selection
             !keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.DirectionUp ->
-                handleTrackNavigation(direction = -1, extend = keyEvent.isShiftPressed)
+                handleVerticalNavigation(direction = -1, extend = keyEvent.isShiftPressed)
             !keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.DirectionDown ->
-                handleTrackNavigation(direction = +1, extend = keyEvent.isShiftPressed)
+                handleVerticalNavigation(direction = +1, extend = keyEvent.isShiftPressed)
 
             else -> false
         }
@@ -463,21 +470,40 @@ object TimelineKeyHandler {
         }
     }
 
-    private fun handleTrackNavigation(direction: Int, extend: Boolean): Boolean {
+    internal fun handleVerticalNavigation(direction: Int, extend: Boolean): Boolean {
         val tracks = TimelineRepository.tracks.value
-        if (tracks.isEmpty()) return false
+        if (tracks.isEmpty()) return true
+
+        val timeSelection = SelectionManager.selections.value
+            .filterIsInstance<Selectable.TimelineTime>()
+            .firstOrNull()
+        if (timeSelection != null) {
+            val targetIndex = adjacentTimelineTrackIndex(
+                currentTrackIndex = timeSelection.trackIndex,
+                direction = direction,
+                trackCount = tracks.size,
+            ) ?: return true
+            SelectionManager.select(
+                Selectable.TimelineTime(
+                    trackIndex = targetIndex,
+                    timeMs = timeSelection.timeMs,
+                )
+            )
+            return true
+        }
 
         val trackSelections = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineTrack>()
+        // Up/down only enters track-header navigation from an explicit track-header selection.
+        if (trackSelections.isEmpty()) return true
 
-        val anchorIndex = if (trackSelections.isNotEmpty()) {
-            if (direction < 0) trackSelections.minOf { it.trackIndex }
-            else trackSelections.maxOf { it.trackIndex }
+        val anchorIndex = if (direction < 0) {
+            trackSelections.minOf { it.trackIndex }
         } else {
-            if (direction < 0) tracks.lastIndex else 0
+            trackSelections.maxOf { it.trackIndex }
         }
 
         val targetIndex = (anchorIndex + direction).coerceIn(0, tracks.lastIndex)
-        if (targetIndex == anchorIndex && trackSelections.isNotEmpty()) return true
+        if (targetIndex == anchorIndex) return true
 
         SelectionManager.select(
             Selectable.TimelineTrack(targetIndex),
@@ -493,4 +519,29 @@ object TimelineKeyHandler {
     private fun KeyEvent.hasNoShortcutModifier(): Boolean {
         return !isCtrlPressed && !isMetaPressed && !isShiftPressed && !isAltPressed
     }
+}
+
+internal fun adjacentTimelineGridTimeMs(
+    currentTimeMs: Long,
+    intervalMs: Long,
+    direction: Int,
+): Long {
+    val safeCurrent = currentTimeMs.coerceAtLeast(0L)
+    if (intervalMs <= 0L || direction == 0) return safeCurrent
+
+    return if (direction > 0) {
+        ((safeCurrent / intervalMs) + 1L) * intervalMs
+    } else {
+        if (safeCurrent == 0L) 0L else ((safeCurrent - 1L) / intervalMs) * intervalMs
+    }
+}
+
+internal fun adjacentTimelineTrackIndex(
+    currentTrackIndex: Int,
+    direction: Int,
+    trackCount: Int,
+): Int? {
+    if (trackCount <= 1 || direction == 0 || currentTrackIndex !in 0 until trackCount) return null
+    val targetIndex = currentTrackIndex + if (direction > 0) 1 else -1
+    return targetIndex.takeIf { it in 0 until trackCount }
 }
