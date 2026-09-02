@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.HorizontalDivider
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -91,10 +91,9 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
                     parent = parentDevice
                 )
 
-                HorizontalDivider(
+                Separator(
                     modifier = Modifier
                         .padding(horizontal = 12.dp),
-                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
                 )
 
                 KeyframesPinchControl(
@@ -104,10 +103,9 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
                     onToggleBilateral = { onEvent?.invoke(Event.OnTogglePinchBilateral) }
                 )
 
-                HorizontalDivider(
+                Separator(
                     modifier = Modifier
                         .padding(horizontal = 12.dp),
-                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
                 )
 
                 PlaybackModePicker(
@@ -115,10 +113,9 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
                     onModeSelected = { onEvent?.invoke(Event.OnChangePlaybackMode(it)) }
                 )
 
-                HorizontalDivider(
+                Separator(
                     modifier = Modifier
                         .padding(horizontal = 12.dp),
-                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
                 )
 
                 RepeatsControl(
@@ -126,10 +123,9 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
                     onRepeatsChange = { onEvent?.invoke(Event.OnChangeRepeats(it)) }
                 )
 
-                HorizontalDivider(
+                Separator(
                     modifier = Modifier
                         .padding(horizontal = 12.dp),
-                    color = Theme[colors][cardForeground].copy(alpha = 0.4f),
                 )
 
                 InfinityCheckbox(

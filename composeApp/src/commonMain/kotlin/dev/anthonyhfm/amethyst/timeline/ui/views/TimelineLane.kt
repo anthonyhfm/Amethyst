@@ -67,7 +67,7 @@ import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import io.github.vinceglb.filekit.extension
-import androidx.compose.material3.Text
+import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent

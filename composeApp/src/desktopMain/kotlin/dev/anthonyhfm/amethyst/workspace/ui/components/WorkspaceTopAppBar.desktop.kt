@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
+import dev.anthonyhfm.amethyst.ui.components.primitives.Spinner
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -44,6 +42,7 @@ import com.composables.icons.lucide.MousePointer
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Settings
+import com.composables.icons.lucide.Share2
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.rememberDialogState
@@ -158,10 +157,9 @@ actual fun WorkspaceTopAppBar(
             }
 
             if (liveCollaborationEnabled && isConnecting) {
-                CircularProgressIndicator(
+                Spinner(
                     modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = Theme[colors][accent],
+                    size = 18.dp,
                 )
             } else if (liveCollaborationEnabled) {
                 WorkspaceToolbarIconButton(
@@ -174,7 +172,7 @@ actual fun WorkspaceTopAppBar(
                             shareDialogState.visible = true
                         }
                     },
-                    imageVector = Icons.Default.Share,
+                    imageVector = Lucide.Share2,
                     contentDescription = when {
                         isHosting -> "Stop sharing"
                         isConnected -> "Leave shared workspace"

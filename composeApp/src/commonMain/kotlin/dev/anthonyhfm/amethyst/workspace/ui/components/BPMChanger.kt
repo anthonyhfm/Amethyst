@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Timer
 import com.composeunstyled.theme.Theme

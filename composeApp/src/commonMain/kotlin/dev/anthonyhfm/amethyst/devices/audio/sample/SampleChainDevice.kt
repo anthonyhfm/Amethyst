@@ -456,6 +456,19 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         block: AudioProcessingBlock,
         context: AudioRenderContext,
     ) {
+        if (pendingVoiceCommand == null) {
+            pendingVoiceCommand = triggerQueue.poll()
+        }
+        val nextCommand = pendingVoiceCommand
+        val blockEndFrame = context.absoluteFrame + block.frameCount
+        if (
+            voicePool.activeVoiceCount == 0 &&
+            (nextCommand == null || nextCommand.targetFrame >= blockEndFrame)
+        ) {
+            publishedPlayheadFrame.value = -1L
+            return
+        }
+
         val currentState = state.value
         voicePool.updateTempoRatio(
             sampleTempoRatio(currentState.warpMode, currentState.sourceBpm, WorkspaceRepository.bpm.value),
@@ -463,7 +476,6 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         fillModulation(currentState, context.absoluteFrame, block.frameCount)
         var renderedFrames = 0
         while (renderedFrames < block.frameCount) {
-            if (pendingVoiceCommand == null) pendingVoiceCommand = triggerQueue.poll()
             val cursorFrame = context.absoluteFrame + renderedFrames
             var pending = pendingVoiceCommand
             while (pending != null && pending.targetFrame <= cursorFrame) {

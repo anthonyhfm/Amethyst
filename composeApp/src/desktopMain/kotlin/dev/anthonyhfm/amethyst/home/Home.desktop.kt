@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,18 +33,17 @@ import dev.anthonyhfm.amethyst.home.ui.views.RecentView
 import dev.anthonyhfm.amethyst.home.ui.views.SettingsView
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
-import io.github.kdroidfilter.nucleus.updater.NucleusUpdater
-import io.github.kdroidfilter.nucleus.updater.provider.GitHubProvider
-import io.github.kdroidfilter.nucleus.nativehttp.NativeHttpClient
 import dev.anthonyhfm.amethyst.core.util.amethystVersion
 import dev.anthonyhfm.amethyst.core.util.displayString
 import dev.anthonyhfm.amethyst.home.ui.views.UpdateView
-import io.github.kdroidfilter.nucleus.updater.UpdateResult
 import androidx.compose.runtime.LaunchedEffect
 import dev.anthonyhfm.amethyst.home.ui.components.WidescreenNavBar
 import dev.anthonyhfm.amethyst.settings.AppLocaleRefreshBoundary
 import dev.anthonyhfm.amethyst.ui.components.primitives.SidebarProvider
 import dev.anthonyhfm.amethyst.ui.components.primitives.rememberSidebarState
+import dev.nucleusframework.updater.NucleusUpdater
+import dev.nucleusframework.updater.UpdateResult
+import dev.nucleusframework.updater.provider.GitHubProvider
 
 @Composable
 actual fun Home(
@@ -58,7 +56,6 @@ actual fun Home(
         NucleusUpdater {
             provider = GitHubProvider(owner = "anthonyhfm", repo = "Amethyst")
             currentVersion = amethystVersion.displayString
-            httpClient = NativeHttpClient.create()
         }
     }
     var updateResult by remember { mutableStateOf<UpdateResult.Available?>(null) }

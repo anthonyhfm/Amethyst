@@ -6,12 +6,18 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.h3
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.p
+import dev.anthonyhfm.amethyst.ui.theme.typography
 
 @Composable
 fun BrowserView() {
@@ -23,11 +29,12 @@ fun BrowserView() {
     ) {
         Text(
             text = stringResource(Res.string.home_browser_wip),
-            style = MaterialTheme.typography.headlineMedium,
+            style = Theme[typography][h3].copy(color = Theme[colors][foreground]),
         )
 
         Text(
-            text = stringResource(Res.string.home_browser_empty)
+            text = stringResource(Res.string.home_browser_empty),
+            style = Theme[typography][p].copy(color = Theme[colors][mutedForeground]),
         )
     }
 }

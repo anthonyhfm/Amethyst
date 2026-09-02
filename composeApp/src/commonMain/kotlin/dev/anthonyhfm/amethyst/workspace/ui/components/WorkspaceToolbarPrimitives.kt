@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant

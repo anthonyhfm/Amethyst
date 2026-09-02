@@ -4,11 +4,7 @@ import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_linux
-import amethyst.composeapp.generated.resources.amethyst_macos
 import amethyst.composeapp.generated.resources.amethyst_windows
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,32 +22,33 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState.updateFromKeyEvent
 import dev.anthonyhfm.amethyst.core.controls.shortcuts.ShortcutManager
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
-import dev.anthonyhfm.amethyst.desktop.FlatAmethystLaf
-import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
-import dev.anthonyhfm.amethyst.desktop.utility.CenterWindowOnFirstShow
-import dev.anthonyhfm.amethyst.desktop.utility.RefreshOnDisplayChange
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
 import dev.anthonyhfm.amethyst.settings.AppLocaleRefreshBoundary
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
-import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import javax.swing.UIManager
-import kotlin.system.exitProcess
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.DpSize
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import dev.nucleusframework.application.DecoratedWindow
+import dev.nucleusframework.window.TitleBar
+import dev.nucleusframework.window.WindowAppearance
+import dev.nucleusframework.window.WindowAppearanceMode
 
 @Composable
 fun WorkspaceWindow(
@@ -60,10 +57,6 @@ fun WorkspaceWindow(
     onExternalCloseConfirmed: () -> Unit = onClose,
     onExternalCloseCancelled: () -> Unit = { }
 ) {
-    if (DesktopPlatform.get() == DesktopPlatform.Windows) {
-        UIManager.setLookAndFeel(FlatAmethystLaf())
-    }
-
     var showSaveDialog by remember { mutableStateOf(false) }
     var pendingCloseAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingCancelAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -99,7 +92,7 @@ fun WorkspaceWindow(
         }
     }
 
-    Window(
+    DecoratedWindow(
         onCloseRequest = {
             requestWorkspaceClose(afterClose = onClose)
         },
@@ -109,11 +102,12 @@ fun WorkspaceWindow(
             height = 800.dp,
             position = WindowPosition.Aligned(Alignment.Center)
         ),
+        minimumSize = DpSize(750.dp, 550.dp),
         onKeyEvent = {
             updateFromKeyEvent(it)
 
             // Mode-specific handlers have priority over global shortcuts.
-            if (WorkspaceRepository.mode.value.onKeyEvent(it)) return@Window true
+            if (WorkspaceRepository.mode.value.onKeyEvent(it)) return@DecoratedWindow true
             ShortcutManager.handleShortcut(it)
         },
         onPreviewKeyEvent = {
@@ -129,7 +123,7 @@ fun WorkspaceWindow(
                         WorkspaceSaveHelper.saveWorkspace()
                     }
                 }
-                return@Window true
+                return@DecoratedWindow true
             }
 
             val mode = WorkspaceRepository.mode.value
@@ -153,67 +147,56 @@ fun WorkspaceWindow(
             else -> null
         }
     ) {
-        CenterWindowOnFirstShow(window)
-        RefreshOnDisplayChange(window)
+        WindowAppearance(WindowAppearanceMode.Dark)
 
-        WorkspaceMenuBar()
-
-        LaunchedEffect(Unit) {
-            window.minimumSize = java.awt.Dimension(750, 550)
+        TitleBar {
+            Text(
+                text = windowTitle,
+                color = Theme[colors][foreground].copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
         }
 
-        LaunchedEffect(Unit) {
-            window.minimumSize = java.awt.Dimension(1000, 700)
-            if(DesktopPlatform.get() == DesktopPlatform.MacOS) {
-                window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
-                window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
-            }
-        }
+        WorkspaceMenuBar(
+            onRequestClose = { requestWorkspaceClose(afterClose = onClose) },
+        )
 
         AppLocaleProvider {
-            AmethystTheme {
+            AppLocaleRefreshBoundary {
+                Workspace()
+            }
+
+            // Keep the dialog in the same theme tree as the workspace so it matches the catalog styling.
+            if (showSaveDialog) {
                 AppLocaleRefreshBoundary {
-                    Column {
-                        if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
-                            OSXTitleBar()
-                        }
-
-                        Workspace()
-                    }
-                }
-
-                // Keep the dialog in the same theme tree as the workspace so it matches the catalog styling.
-                if (showSaveDialog) {
-                    AppLocaleRefreshBoundary {
-                        SaveChangesDialog(
-                            onSave = {
-                                coroutineScope.launch {
-                                    val saved = WorkspaceSaveHelper.saveWorkspace()
-                                    if (saved) {
-                                        val closeAction = pendingCloseAction
-                                        showSaveDialog = false
-                                        pendingCloseAction = null
-                                        pendingCancelAction = null
-                                        closeAction?.let(::closeWorkspace)
-                                    }
+                    SaveChangesDialog(
+                        onSave = {
+                            coroutineScope.launch {
+                                val saved = WorkspaceSaveHelper.saveWorkspace()
+                                if (saved) {
+                                    val closeAction = pendingCloseAction
+                                    showSaveDialog = false
+                                    pendingCloseAction = null
+                                    pendingCancelAction = null
+                                    closeAction?.let(::closeWorkspace)
                                 }
-                            },
-                            onDontSave = {
-                                val closeAction = pendingCloseAction
-                                showSaveDialog = false
-                                pendingCloseAction = null
-                                pendingCancelAction = null
-                                closeAction?.let(::closeWorkspace)
-                            },
-                            onCancel = {
-                                val cancelAction = pendingCancelAction
-                                showSaveDialog = false
-                                pendingCloseAction = null
-                                pendingCancelAction = null
-                                cancelAction?.invoke()
                             }
-                        )
-                    }
+                        },
+                        onDontSave = {
+                            val closeAction = pendingCloseAction
+                            showSaveDialog = false
+                            pendingCloseAction = null
+                            pendingCancelAction = null
+                            closeAction?.let(::closeWorkspace)
+                        },
+                        onCancel = {
+                            val cancelAction = pendingCancelAction
+                            showSaveDialog = false
+                            pendingCloseAction = null
+                            pendingCancelAction = null
+                            cancelAction?.invoke()
+                        }
+                    )
                 }
             }
         }

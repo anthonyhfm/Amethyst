@@ -4,7 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1003,7 +1003,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                             )
                         }
 
-                        HorizontalDivider(color = Theme[colors][border])
+                        Separator()
 
                         Box(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp).padding(bottom = 12.dp)) {
                             PianoRollEditorCanvas(

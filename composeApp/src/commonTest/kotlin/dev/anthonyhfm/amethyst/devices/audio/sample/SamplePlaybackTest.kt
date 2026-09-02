@@ -256,6 +256,25 @@ class SamplePlaybackTest {
     }
 
     @Test
+    fun idleFastPathRetainsTriggerScheduledForLaterBlock() {
+        val sample = SampleChainDevice().apply { state.value = state(frames = 128) }
+        val runtime = prepareRuntime(sample)
+        runtime.publishFrame(20)
+        sample.signalEnter(listOf(Signal.Midi("launchpad-a", 1, 1, 127)))
+        val block = AudioProcessingBlock(FloatArray(32), 2, 16)
+
+        block.configure(16, 0)
+        sample.processAudio(block, AudioRenderContext(configuration.sampleRate, 0))
+        assertTrue(block.samples.all { it == 0f })
+
+        block.clear()
+        block.configure(16, 16)
+        sample.processAudio(block, AudioRenderContext(configuration.sampleRate, 16))
+        assertTrue(block.samples.take(8).all { it == 0f })
+        assertTrue(block.samples.drop(8).any { abs(it) > 0.0001f })
+    }
+
+    @Test
     fun macroMappingModulatesSamplerGainInTheAudioCallback() {
         val previousMacros = WorkspaceRepository.macros.value
         val previousMappings = WorkspaceRepository.parameterMappings.value

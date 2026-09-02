@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text as MaterialText
+import com.composables.icons.lucide.X
+import com.composeunstyled.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -115,7 +113,7 @@ fun WorkspaceMode(
             size = ButtonSize.Small,
         ) {
             Icon(
-                imageVector = Icons.Default.Close,
+                imageVector = Lucide.X,
                 contentDescription = mode.displayName,
                 tint = workspaceToolbarContentColor(variant),
             )
@@ -219,7 +217,7 @@ private fun WorkspaceModeTabButton(
                 modifier = Modifier.width(animatedLabelWidth),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                MaterialText(
+                Text(
                     text = item.text,
                     style = labelStyle,
                     color = contentColor,

@@ -2,7 +2,7 @@ package dev.anthonyhfm.amethyst.devices.effects.pianoroll
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue

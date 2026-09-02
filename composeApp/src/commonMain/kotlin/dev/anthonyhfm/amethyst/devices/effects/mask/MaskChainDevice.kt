@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.composeunstyled.theme.Theme
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -161,7 +162,7 @@ class MaskChainDevice : LEDChainDevice<MaskChainDeviceState>(), NestedChainDevic
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
+                style = Theme[typography][small],
                 color = textColor,
             )
         }

@@ -12,7 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.twotone.Audiotrack
 import androidx.compose.material.icons.twotone.Lightbulb
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf

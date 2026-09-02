@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +42,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.p
+import dev.anthonyhfm.amethyst.ui.theme.secondary
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -153,9 +159,9 @@ fun ColorPicker(
                 )
                 .zIndex(1f)
                 .padding(2.dp)
-                .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                .border(2.dp, Theme[colors][foreground], CircleShape)
                 .padding(2.dp)
-                .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                .border(2.dp, Theme[colors][background], CircleShape)
                 .size(18.dp)
                 .dropShadow(
                     shape = CircleShape,
@@ -171,7 +177,7 @@ fun ColorPicker(
 
         Canvas(
             modifier = Modifier
-                .border(2.dp, MaterialTheme.colorScheme.secondary, RoundedCornerShape(8.dp))
+                .border(2.dp, Theme[colors][secondary], RoundedCornerShape(8.dp))
                 .padding(paddingDp)
                 .clip(RoundedCornerShape(4.dp))
                 .fillMaxSize()
@@ -249,7 +255,7 @@ fun HuePickerBar(
                     shadow = Shadow(
                         radius = 0.dp,
                         spread = 2.dp,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = Theme[colors][secondary],
                     )
                 )
                 .clip(CircleShape)
@@ -264,7 +270,7 @@ fun HuePickerBar(
 
         Canvas(
             modifier = Modifier
-                .border(2.dp, MaterialTheme.colorScheme.secondary, RoundedCornerShape(8.dp))
+                .border(2.dp, Theme[colors][secondary], RoundedCornerShape(8.dp))
                 .then(if (vertical) Modifier.width(24.dp) else Modifier.height(24.dp))
                 .padding(4.dp)
                 .clip(RoundedCornerShape(4.dp))
@@ -335,15 +341,15 @@ fun HexColorEditor(
             state.setHex(text)
         },
         singleLine = true,
-        textStyle = MaterialTheme.typography.bodyMedium.copy(
-            color = MaterialTheme.colorScheme.onBackground,
+        textStyle = Theme[typography][p].copy(
+            color = Theme[colors][foreground],
             textAlign = TextAlign.Center,
             letterSpacing = 1.sp
         ),
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Theme[colors][background])
             .padding(vertical = 6.dp)
             .trackInputFocus()
     )

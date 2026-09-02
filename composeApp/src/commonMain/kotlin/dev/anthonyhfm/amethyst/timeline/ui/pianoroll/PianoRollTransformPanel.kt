@@ -3,7 +3,7 @@ package dev.anthonyhfm.amethyst.timeline.ui.pianoroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier

@@ -38,10 +38,6 @@ import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.Group
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -88,6 +84,8 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
+import com.composeunstyled.Icon
+import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
@@ -579,8 +577,8 @@ private fun ReorderableItemScope.GroupEditorListItem(
                 if (!renameEnabled) {
                     Text(
                         text = group.name.replace("#", "${index + 1}"),
-                        style = MaterialTheme.typography.labelLarge,
-                        lineHeight = MaterialTheme.typography.labelLarge.fontSize,
+                        style = Theme[typography][small],
+                        lineHeight = Theme[typography][small].fontSize,
                         modifier = Modifier
                             .weight(1f)
                             .align(Alignment.CenterVertically)
@@ -645,7 +643,7 @@ private fun ReorderableItemScope.GroupEditorListItem(
                                 keyboardType = KeyboardType.Unspecified,
                                 imeAction = ImeAction.Done
                             ),
-                            textStyle = MaterialTheme.typography.labelLarge.copy(color = itemTextColor),
+                            textStyle = Theme[typography][small].copy(color = itemTextColor),
                             cursorBrush = SolidColor(itemTextColor),
                         )
                     }
@@ -723,7 +721,7 @@ internal fun AutomappingToggleButton(
     ) {
         Text(
             text = "A",
-            style = MaterialTheme.typography.labelSmall,
+            style = Theme[typography][small],
             color = contentColor,
         )
     }
@@ -763,7 +761,7 @@ private fun GroupEditorInsertButton(
                 enter = hoverRevealEnterTransition(),
                 exit = hoverRevealExitTransition(),
             ) {
-                IconButton(
+                com.composeunstyled.UnstyledButton(
                     onClick = onAddGroup,
                 ) {
                     Icon(Lucide.Plus, null)

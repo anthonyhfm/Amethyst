@@ -40,11 +40,10 @@ import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.h3
-import dev.anthonyhfm.amethyst.ui.theme.muted
 import dev.anthonyhfm.amethyst.ui.theme.mutedText
 import dev.anthonyhfm.amethyst.ui.theme.typography
-import io.github.kdroidfilter.nucleus.updater.NucleusUpdater
-import io.github.kdroidfilter.nucleus.updater.UpdateResult
+import dev.nucleusframework.updater.NucleusUpdater
+import dev.nucleusframework.updater.UpdateResult
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import java.io.File

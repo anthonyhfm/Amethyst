@@ -1,8 +1,8 @@
 package dev.anthonyhfm.amethyst.timeline.ui.pianoroll
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import com.composeunstyled.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,7 +141,7 @@ fun PianoRollInspectorSidebar(
                     }
                 }
 
-                HorizontalDivider(color = Theme[colors][border])
+                Separator()
 
                 // Transforms section
                 PianoRollTransformPanel(

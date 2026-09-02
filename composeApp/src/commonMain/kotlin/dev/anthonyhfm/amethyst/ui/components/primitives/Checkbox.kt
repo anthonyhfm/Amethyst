@@ -47,7 +47,7 @@ fun Checkbox(
     val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
-            .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
+            .sizeIn(minWidth = 44.dp, minHeight = 32.dp)
             .toggleable(
                 value = checked,
                 enabled = enabled,

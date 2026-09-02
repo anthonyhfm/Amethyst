@@ -20,8 +20,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -336,8 +338,8 @@ fun AudioClip(
                             }
                         )
                         .padding(4.dp),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        lineHeight = MaterialTheme.typography.labelSmall.fontSize
+                    style = Theme[typography][small].copy(
+                        lineHeight = Theme[typography][small].fontSize
                     ),
                     color = clipContentColor,
                     maxLines = 1
@@ -387,8 +389,8 @@ fun AudioClip(
                             keyboardType = KeyboardType.Unspecified,
                             imeAction = ImeAction.Done
                         ),
-                        textStyle = MaterialTheme.typography.labelSmall.copy(
-                            lineHeight = MaterialTheme.typography.labelSmall.fontSize,
+                        textStyle = Theme[typography][small].copy(
+                            lineHeight = Theme[typography][small].fontSize,
                             color = clipContentColor
                         ),
                         cursorBrush = SolidColor(clipContentColor),

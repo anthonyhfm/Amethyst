@@ -23,10 +23,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -59,7 +61,6 @@ class ViewportLaunchpadPro(
 
     override val layout: LaunchpadLayout = LaunchpadLayout.LAYOUT_10X10
 
-    @OptIn(InternalResourceApi::class)
     @Composable
     override fun Content() {
         val previewGrid by previewState.grid
@@ -90,6 +91,16 @@ class ViewportLaunchpadPro(
                                 x = padding,
                                 y = padding
                             ),
+                            size = size.copy(
+                                width = size.width - (padding * 2),
+                                height = size.height - (padding * 2)
+                            ),
+                        )
+
+                        drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+                        drawRect(
+                            color = Color(0xFF303030),
+                            topLeft = Offset(x = padding, y = padding),
                             size = size.copy(
                                 width = size.width - (padding * 2),
                                 height = size.height - (padding * 2)
@@ -145,8 +156,9 @@ class ViewportLaunchpadPro(
                             srcOffset = IntOffset(40, 40),
                             srcSize = IntSize(945, 945),
                             dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-                            blendMode = BlendMode.Multiply
+                            blendMode = BlendMode.Modulate
                         )
+                        drawContext.canvas.restore()
 
                         drawImage(
                             image = ledspotsBitmap!!,

@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,7 +60,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.ui.icons.AmethystIcons
 import dev.anthonyhfm.amethyst.ui.icons.filled.Saddam
-import io.github.kdroidfilter.nucleus.core.runtime.ExecutableRuntime
+import dev.nucleusframework.core.runtime.ExecutableRuntime
 import org.jetbrains.compose.resources.painterResource
 
 @Composable

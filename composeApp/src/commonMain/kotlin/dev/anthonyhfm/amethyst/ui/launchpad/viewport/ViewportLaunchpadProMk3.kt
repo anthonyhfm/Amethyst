@@ -20,10 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.platform.LocalDensity
@@ -83,6 +85,16 @@ class ViewportLaunchpadProMk3(
                             ),
                         )
 
+                        drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+                        drawRect(
+                            color = Color(0xFF303030),
+                            topLeft = Offset(x = padding, y = padding),
+                            size = size.copy(
+                                width = size.width - (padding * 2),
+                                height = size.height - (padding * 2)
+                            ),
+                        )
+
                         for (x in 0..9) {
                             for (y in 0..9) {
                                 if (previewGrid[x + (y * 10)].color != Color.Black) {
@@ -112,8 +124,9 @@ class ViewportLaunchpadProMk3(
                             srcOffset = IntOffset(24, 23),
                             srcSize = IntSize(973, 973),
                             dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-                            blendMode = BlendMode.Multiply
+                            blendMode = BlendMode.Modulate
                         )
+                        drawContext.canvas.restore()
 
                         drawImage(
                             image = ledspotsBitmap!!,

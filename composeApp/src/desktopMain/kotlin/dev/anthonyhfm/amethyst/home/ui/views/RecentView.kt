@@ -18,7 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
+import com.composeunstyled.Text
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import com.composables.icons.lucide.Ellipsis
@@ -28,9 +29,8 @@ import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Wifi
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
+import dev.anthonyhfm.amethyst.ui.components.primitives.ToastProvider
+import dev.anthonyhfm.amethyst.ui.components.primitives.rememberToastState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,7 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.composeunstyled.Text as UnstyledText
 import com.composeunstyled.rememberDialogState
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.network.lan.DiscoveredSession
@@ -100,11 +99,11 @@ fun RecentView(
     navigator: NavHostController,
     onOpenWorkspace: () -> Unit = { }
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
+    val toastState = rememberToastState()
     val viewModel = viewModel {
         RecentViewModel(
             navigator = navigator,
-            snackbarHostState = snackbarHostState
+            toastState = toastState
         )
     }
 
@@ -140,89 +139,84 @@ fun RecentView(
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 24.dp, top = 24.dp, end = 12.dp, bottom = 24.dp),
+    ToastProvider(state = toastState) {
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
-            ScrollArea(
-                modifier = Modifier.fillMaxSize(),
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 24.dp, top = 24.dp, end = 12.dp, bottom = 24.dp),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(end = 12.dp),
+                ScrollArea(
+                    modifier = Modifier.fillMaxSize(),
                 ) {
-                    RecentViewHeader(
-                        onOpenProject = { viewModel.onEvent(Event.OnClickOpenProject) },
-                        onCreateProject = { viewModel.onEvent(Event.OnClickNewProject) },
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 12.dp),
                     ) {
-                        if (state.discoveredSessions.isNotEmpty()) {
-                            TypographyMuted(stringResource(Res.string.home_recent_collaboration_network_status))
-                            state.discoveredSessions.forEach { session ->
-                                DiscoveredSessionCard(
-                                    session = session,
-                                    onJoin = { joiningSession = session },
-                                )
-                            }
-                        }
+                        RecentViewHeader(
+                            onOpenProject = { viewModel.onEvent(Event.OnClickOpenProject) },
+                            onCreateProject = { viewModel.onEvent(Event.OnClickNewProject) },
+                        )
 
-                        if (recentProjects.isEmpty()) {
-                            EmptyRecentProjectsCard()
-                        } else {
-                            TypographyMuted(stringResource(Res.string.home_recent_collaboration_recent_opened))
-                            recentProjects.forEachIndexed { index, project ->
-                                RecentProjectCard(
-                                    project = project,
-                                    onOpen = {
-                                        viewModel.onEvent(Event.OpenProjectFromHistory(project))
-                                    },
-                                    onEdit = {
-                                        viewModel.onEvent(Event.OnClickEditProject(project))
-                                    },
-                                    onDelete = {
-                                        HomeRepository.removeRecentWorkspace(project.path)
-                                        recentProjects = loadRecentProjects()
-                                    },
-                                )
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            if (state.discoveredSessions.isNotEmpty()) {
+                                TypographyMuted(stringResource(Res.string.home_recent_collaboration_network_status))
+                                state.discoveredSessions.forEach { session ->
+                                    DiscoveredSessionCard(
+                                        session = session,
+                                        onJoin = { joiningSession = session },
+                                    )
+                                }
+                            }
+
+                            if (recentProjects.isEmpty()) {
+                                EmptyRecentProjectsCard()
+                            } else {
+                                TypographyMuted(stringResource(Res.string.home_recent_collaboration_recent_opened))
+                                recentProjects.forEachIndexed { index, project ->
+                                    RecentProjectCard(
+                                        project = project,
+                                        onOpen = {
+                                            viewModel.onEvent(Event.OpenProjectFromHistory(project))
+                                        },
+                                        onEdit = {
+                                            viewModel.onEvent(Event.OnClickEditProject(project))
+                                        },
+                                        onDelete = {
+                                            HomeRepository.removeRecentWorkspace(project.path)
+                                            recentProjects = loadRecentProjects()
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(24.dp),
-        )
+            joiningSession?.let { session ->
+                JoinSessionDialog(
+                    session = session,
+                    initialUserName = localUser.name,
+                    onDismiss = { joiningSession = null },
+                    onJoin = { userName ->
+                        viewModel.onEvent(Event.OnClickJoinSession(session, userName))
+                        joiningSession = null
+                    },
+                )
+            }
 
-        joiningSession?.let { session ->
-            JoinSessionDialog(
-                session = session,
-                initialUserName = localUser.name,
-                onDismiss = { joiningSession = null },
-                onJoin = { userName ->
-                    viewModel.onEvent(Event.OnClickJoinSession(session, userName))
-                    joiningSession = null
-                },
-            )
-        }
-
-        if (state.initialSyncProgress.active) {
-            InitialSyncProgressDialog(state.initialSyncProgress)
+            if (state.initialSyncProgress.active) {
+                InitialSyncProgressDialog(state.initialSyncProgress)
+            }
         }
     }
 }
@@ -298,7 +292,7 @@ private fun DiscoveredSessionCard(
             onClick = onJoin,
             size = ButtonSize.Small,
         ) {
-            UnstyledText(stringResource(Res.string.home_recent_join_button))
+            Text(stringResource(Res.string.home_recent_join_button))
         }
     }
 }
@@ -339,14 +333,14 @@ private fun JoinSessionDialog(
 
         AlertDialogFooter {
             AlertDialogCancel(onClick = onDismiss) {
-                UnstyledText(stringResource(Res.string.home_recent_join_dialog_cancel))
+                Text(stringResource(Res.string.home_recent_join_dialog_cancel))
             }
             Button(
                 onClick = { onJoin(userName.trim()) },
                 size = ButtonSize.Small,
                 enabled = userName.isNotBlank(),
             ) {
-                UnstyledText(stringResource(Res.string.home_recent_join_button))
+                Text(stringResource(Res.string.home_recent_join_button))
             }
         }
     }
@@ -427,7 +421,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(openVariant),
                 )
-                UnstyledText(stringResource(Res.string.home_recent_open_project))
+                Text(stringResource(Res.string.home_recent_open_project))
             }
 
             Button(
@@ -440,7 +434,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(createVariant),
                 )
-                UnstyledText(stringResource(Res.string.home_recent_new_project))
+                Text(stringResource(Res.string.home_recent_new_project))
             }
         }
     } else {
@@ -456,7 +450,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(openVariant),
                 )
-                UnstyledText(stringResource(Res.string.home_recent_open_project))
+                Text(stringResource(Res.string.home_recent_open_project))
             }
 
             Button(
@@ -468,7 +462,7 @@ private fun RecentActions(
                     contentDescription = null,
                     tint = buttonContentColor(createVariant),
                 )
-                UnstyledText(stringResource(Res.string.home_recent_new_project))
+                Text(stringResource(Res.string.home_recent_new_project))
             }
         }
     }
@@ -571,7 +565,7 @@ private fun RecentProjectCard(
                         modifier = Modifier.size(16.dp),
                         tint = Theme[colors][popoverForeground],
                     )
-                    UnstyledText(stringResource(Res.string.home_recent_menu_open))
+                    Text(stringResource(Res.string.home_recent_menu_open))
                 }
                 DropdownMenuItem(
                     onClick = {
@@ -585,7 +579,7 @@ private fun RecentProjectCard(
                         modifier = Modifier.size(16.dp),
                         tint = Theme[colors][popoverForeground],
                     )
-                    UnstyledText(stringResource(Res.string.home_recent_menu_edit))
+                    Text(stringResource(Res.string.home_recent_menu_edit))
                 }
                 DropdownMenuItem(
                     onClick = {
@@ -600,7 +594,7 @@ private fun RecentProjectCard(
                         modifier = Modifier.size(16.dp),
                         tint = Theme[colors][destructive],
                     )
-                    UnstyledText(stringResource(Res.string.home_recent_menu_remove))
+                    Text(stringResource(Res.string.home_recent_menu_remove))
                 }
             }
         }

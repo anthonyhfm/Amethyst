@@ -1,8 +1,5 @@
 package dev.anthonyhfm.amethyst.ui.theme
 
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 data class AmethystColorPalette(
@@ -99,72 +96,3 @@ fun amethystColorPalette(darkMode: Boolean): AmethystColorPalette {
     return if (darkMode) AmethystDarkPalette else AmethystLightPalette
 }
 
-fun amethystMaterialColorScheme(darkMode: Boolean): ColorScheme {
-    val palette = amethystColorPalette(darkMode)
-
-    return if (darkMode) {
-        darkColorScheme(
-            primary = palette.primary,
-            onPrimary = palette.primaryForeground,
-            primaryContainer = palette.accent,
-            onPrimaryContainer = palette.accentForeground,
-            inversePrimary = palette.ring,
-            secondary = palette.secondary,
-            onSecondary = palette.secondaryForeground,
-            secondaryContainer = palette.muted,
-            onSecondaryContainer = palette.secondaryForeground,
-            tertiary = palette.selectionSurface,
-            onTertiary = palette.selectionForeground,
-            tertiaryContainer = palette.chart2,
-            onTertiaryContainer = palette.foreground,
-            background = palette.background,
-            onBackground = palette.foreground,
-            surface = palette.card,
-            onSurface = palette.cardForeground,
-            surfaceVariant = palette.muted,
-            onSurfaceVariant = palette.mutedForeground,
-            outline = palette.border,
-            outlineVariant = palette.input,
-            error = palette.destructive,
-            onError = palette.destructiveForeground,
-            errorContainer = palette.destructive.copy(alpha = 0.75f),
-            onErrorContainer = palette.destructiveForeground,
-            inverseSurface = palette.foreground,
-            inverseOnSurface = palette.background,
-            surfaceTint = palette.primary,
-            scrim = Color.Black.copy(alpha = 0.7f),
-        )
-    } else {
-        lightColorScheme(
-            primary = palette.primary,
-            onPrimary = palette.primaryForeground,
-            primaryContainer = palette.accent,
-            onPrimaryContainer = palette.accentForeground,
-            inversePrimary = palette.ring,
-            secondary = palette.secondary,
-            onSecondary = palette.secondaryForeground,
-            secondaryContainer = palette.muted,
-            onSecondaryContainer = palette.secondaryForeground,
-            tertiary = palette.selectionSurface,
-            onTertiary = palette.selectionForeground,
-            tertiaryContainer = palette.chart2,
-            onTertiaryContainer = palette.foreground,
-            background = palette.background,
-            onBackground = palette.foreground,
-            surface = palette.card,
-            onSurface = palette.cardForeground,
-            surfaceVariant = palette.muted,
-            onSurfaceVariant = palette.mutedForeground,
-            outline = palette.border,
-            outlineVariant = palette.input,
-            error = palette.destructive,
-            onError = palette.destructiveForeground,
-            errorContainer = palette.destructive.copy(alpha = 0.15f),
-            onErrorContainer = palette.foreground,
-            inverseSurface = palette.foreground,
-            inverseOnSurface = palette.background,
-            surfaceTint = palette.primary,
-            scrim = Color.Black.copy(alpha = 0.35f),
-        )
-    }
-}

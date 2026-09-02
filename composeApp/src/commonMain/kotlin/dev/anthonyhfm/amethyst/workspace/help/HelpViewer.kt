@@ -32,11 +32,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
+import androidx.compose.ui.graphics.Color
+import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownHeader
-import com.mikepenz.markdown.m3.Markdown
-import com.mikepenz.markdown.m3.markdownColor
-import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.DefaultMarkdownColors
+import com.mikepenz.markdown.model.DefaultMarkdownTypography
+import com.mikepenz.markdown.model.MarkdownColors
+import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
 import androidx.compose.ui.text.TextLinkStyles
@@ -291,3 +294,54 @@ internal fun HelpViewer(
         }
     }
 }
+
+fun markdownColor(
+    text: Color = Color.Unspecified,
+    codeBackground: Color = Color.Unspecified,
+    inlineCodeBackground: Color = codeBackground,
+    dividerColor: Color = Color.Unspecified,
+    tableBackground: Color = Color.Unspecified,
+): MarkdownColors = DefaultMarkdownColors(
+    text = text,
+    codeBackground = codeBackground,
+    inlineCodeBackground = inlineCodeBackground,
+    dividerColor = dividerColor,
+    tableBackground = tableBackground,
+)
+
+fun markdownTypography(
+    h1: TextStyle = TextStyle.Default,
+    h2: TextStyle = TextStyle.Default,
+    h3: TextStyle = TextStyle.Default,
+    h4: TextStyle = TextStyle.Default,
+    h5: TextStyle = TextStyle.Default,
+    h6: TextStyle = TextStyle.Default,
+    text: TextStyle = TextStyle.Default,
+    code: TextStyle = TextStyle.Default,
+    inlineCode: TextStyle = code,
+    quote: TextStyle = TextStyle.Default,
+    paragraph: TextStyle = TextStyle.Default,
+    ordered: TextStyle = TextStyle.Default,
+    bullet: TextStyle = TextStyle.Default,
+    list: TextStyle = TextStyle.Default,
+    textLink: TextLinkStyles = TextLinkStyles(style = SpanStyle()),
+    table: TextStyle = TextStyle.Default,
+): MarkdownTypography = DefaultMarkdownTypography(
+    h1 = h1,
+    h2 = h2,
+    h3 = h3,
+    h4 = h4,
+    h5 = h5,
+    h6 = h6,
+    text = text,
+    code = code,
+    inlineCode = inlineCode,
+    quote = quote,
+    paragraph = paragraph,
+    ordered = ordered,
+    bullet = bullet,
+    list = list,
+    textLink = textLink,
+    table = table,
+)
+

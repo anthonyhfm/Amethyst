@@ -3,7 +3,7 @@ package dev.anthonyhfm.amethyst.home.ui.views
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
-import androidx.compose.material3.SnackbarHostState
+import dev.anthonyhfm.amethyst.ui.components.primitives.ToastState
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import dev.anthonyhfm.amethyst.core.network.CollaborationManager
@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 
 class RecentViewModel(
     private val navigator: NavHostController,
-    private val snackbarHostState: SnackbarHostState
+    private val toastState: ToastState
 ) : BaseViewModel<RecentViewContract.State, RecentViewContract.Event, RecentViewContract.Effect>(
     RecentViewContract.State()
 ) {
@@ -168,9 +168,8 @@ class RecentViewModel(
                 log("OnClickJoinSession session=${event.session.session.id}/${event.session.session.name} hostAddress=${event.session.hostAddress} userName='${event.userName}'")
                 viewModelScope.launch {
                     if (!ExperimentalSettings.liveCollaboration.value) {
-                        snackbarHostState.showSnackbar(
-                            message = getString(Res.string.home_recent_collab_disabled_msg),
-                            withDismissAction = true,
+                        toastState.show(
+                            title = org.jetbrains.compose.resources.getString(Res.string.home_recent_collab_disabled_msg),
                         )
                         return@launch
                     }
@@ -189,9 +188,8 @@ class RecentViewModel(
                     } catch (exception: Exception) {
                         log("join failed ${exception::class.simpleName}: ${exception.message}")
                         exception.printStackTrace()
-                        snackbarHostState.showSnackbar(
-                            message = getString(Res.string.home_recent_collab_failed_join_msg),
-                            withDismissAction = true,
+                        toastState.show(
+                            title = org.jetbrains.compose.resources.getString(Res.string.home_recent_collab_failed_join_msg),
                         )
                     }
                 }
@@ -224,9 +222,8 @@ class RecentViewModel(
                 exception.printStackTrace()
             }
 
-            snackbarHostState.showSnackbar(
-                message = errorMessage,
-                withDismissAction = true,
+            toastState.show(
+                title = errorMessage,
             )
         }
     }

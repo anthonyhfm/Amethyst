@@ -5,7 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import com.composeunstyled.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,7 +134,6 @@ fun LoadingScreenView(message: String? = null) {
                     color = Color(0xFFE4E4E7),
                     textAlign = TextAlign.Center,
                     maxLines = 1,
-                    softWrap = false,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -147,7 +146,6 @@ fun LoadingScreenView(message: String? = null) {
                         color = Color(0xFF71717A),
                         textAlign = TextAlign.Center,
                         maxLines = 1,
-                        softWrap = false,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth()
                     )

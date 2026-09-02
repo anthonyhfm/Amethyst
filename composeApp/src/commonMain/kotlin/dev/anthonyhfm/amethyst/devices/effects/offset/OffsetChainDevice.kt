@@ -17,7 +17,7 @@ import androidx.compose.material.icons.filled.South
 import androidx.compose.material.icons.filled.SouthEast
 import androidx.compose.material.icons.filled.SouthWest
 import androidx.compose.material.icons.filled.West
-import androidx.compose.material3.Icon
+import com.composeunstyled.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue

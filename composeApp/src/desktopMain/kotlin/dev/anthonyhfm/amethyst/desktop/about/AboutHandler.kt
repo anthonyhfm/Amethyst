@@ -16,88 +16,65 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.awt.ComposeDialog
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anthonyhfm.amethyst.core.util.amethystVersion
 import dev.anthonyhfm.amethyst.core.util.displayString
-import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
-import dev.anthonyhfm.amethyst.desktop.utility.configureDesktopUtilityDialog
 import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
-import dev.anthonyhfm.amethyst.ui.theme.primary
-import java.awt.Desktop
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.Text
 import org.jetbrains.compose.resources.painterResource
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.rememberDialogState
+import dev.nucleusframework.application.DecoratedDialog
+import dev.nucleusframework.window.DialogTitleBar
 
-private var aboutDialog: ComposeDialog? = null
+@Composable
+fun AboutDialog(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+) {
+    if (!visible) return
 
-fun setupAboutHandler() {
-    if (Desktop.isDesktopSupported()) {
-        val desktop = Desktop.getDesktop()
-
-        if (desktop.isSupported(Desktop.Action.APP_ABOUT)) {
-            desktop.setAboutHandler {
-                showAboutDialog()
-            }
-        }
-    }
-}
-
-fun showAboutDialog() {
-    aboutDialog
-        ?.takeIf { it.isDisplayable }
-        ?.let { dialog ->
-            dialog.toFront()
-            dialog.requestFocus()
-            return
-        }
-
-    val dialog = ComposeDialog()
-    configureDesktopUtilityDialog(
-        dialog = dialog,
+    DecoratedDialog(
+        onCloseRequest = onDismiss,
         title = "About Amethyst",
-        width = 320,
-        height = 260,
-        resizable = false
-    )
-    dialog.addWindowListener(object : WindowAdapter() {
-        override fun windowClosed(event: WindowEvent?) {
-            if (aboutDialog === dialog) {
-                aboutDialog = null
-            }
+        state = rememberDialogState(
+            width = 320.dp,
+            height = 260.dp,
+            position = WindowPosition.Aligned(Alignment.Center),
+        ),
+        resizable = false,
+    ) {
+        DialogTitleBar {
+            Text(
+                text = "About Amethyst",
+                color = Theme[colors][foreground].copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
         }
-    })
-    dialog.setContent {
         AboutDialogContent()
     }
-
-    aboutDialog = dialog
-    dialog.show()
 }
 
 @Composable
 private fun AboutDialogContent() {
-    val topPadding = if (DesktopPlatform.get() == DesktopPlatform.MacOS) 28.dp else 20.dp
-
     AmethystTheme {
         val backgroundColor = Theme[colors][background]
         val titleColor = Theme[colors][foreground]
         val versionColor = Theme[colors][mutedForeground]
-        val authorColor = Theme[colors][primary]
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(backgroundColor)
-                .padding(start = 24.dp, top = topPadding, end = 24.dp, bottom = 24.dp),
+                .padding(horizontal = 24.dp, vertical = 20.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(

@@ -109,16 +109,12 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                         onValueChange = { rawNorm ->
                             val rawAngle = rawNorm * 360f
                             val snappedAngle = snapToCleanAngle(rawAngle)
-                            val before = state.value
-                            state.update { it.copy(angleDegrees = snappedAngle) }
-                            pushStateChange(before, state.value)
+                            updateDeviceState { it.copy(angleDegrees = snappedAngle) }
                         },
                         onResolveTextValue = { textValue ->
                             textValue.removeSuffix("°").trim().toFloatOrNull()?.let { angle ->
                                 val normalized = (angle % 360f + 360f) % 360f
-                                val before = state.value
-                                state.update { it.copy(angleDegrees = normalized) }
-                                pushStateChange(before, state.value)
+                                updateDeviceState { it.copy(angleDegrees = normalized) }
                             }
                         }
                     )
@@ -134,9 +130,7 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                     Checkbox(
                         checked = deviceState.antiAlias,
                         onCheckedChange = { checked ->
-                            val before = state.value
-                            state.update { it.copy(antiAlias = checked) }
-                            pushStateChange(before, state.value)
+                            updateDeviceState { it.copy(antiAlias = checked) }
                         },
                         size = 18.dp,
                         iconSize = 14.dp,
@@ -157,9 +151,7 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                     Checkbox(
                         checked = deviceState.isolate,
                         onCheckedChange = { checked ->
-                            val before = state.value
-                            state.update { it.copy(isolate = checked) }
-                            pushStateChange(before, state.value)
+                            updateDeviceState { it.copy(isolate = checked) }
                         },
                         size = 18.dp,
                         iconSize = 14.dp,
@@ -180,9 +172,7 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                     Checkbox(
                         checked = deviceState.bypass,
                         onCheckedChange = { checked ->
-                            val before = state.value
-                            state.update { it.copy(bypass = checked) }
-                            pushStateChange(before, state.value)
+                            updateDeviceState { it.copy(bypass = checked) }
                         },
                         size = 18.dp,
                         iconSize = 14.dp,
@@ -196,6 +186,25 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
                 }
             }
         }
+    }
+
+    private fun updateDeviceState(transform: (RotateChainDeviceState) -> RotateChainDeviceState) {
+        val before = state.value
+        val after = transform(before)
+        if (before == after) return
+
+        state.value = after
+        rerenderBufferedInput()
+        pushStateChange(before, after)
+    }
+
+    override fun onStateRestored() {
+        super.onStateRestored()
+        rerenderBufferedInput()
+    }
+
+    private fun rerenderBufferedInput() {
+        ledSignalEnter(emptyList())
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
@@ -240,9 +249,15 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
         deviceState: RotateChainDeviceState,
         angle: Float,
     ): Map<Pair<Int, Int>, Signal.LED> {
-        if (deviceState.bypass) return activePads.toMap()
-
         val result = mutableMapOf<Pair<Int, Int>, Signal.LED>()
+
+        // Apollo's Rotate "Bypass" is a dry-through toggle: when enabled it
+        // emits the original signal in addition to the rotated copy.
+        if (deviceState.bypass) {
+            activePads.values.forEach { signal ->
+                combineSignal(result, signal.x to signal.y, signal)
+            }
+        }
 
         for (signal in activePads.values) {
             val bounds = resolveBounds(signal, deviceState.isolate)

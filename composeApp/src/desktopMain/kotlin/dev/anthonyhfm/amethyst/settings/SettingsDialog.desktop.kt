@@ -1,79 +1,24 @@
 package dev.anthonyhfm.amethyst.settings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.awt.ComposeDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import dev.anthonyhfm.amethyst.desktop.utility.DesktopUtilityWindowScaffold
-import dev.anthonyhfm.amethyst.desktop.utility.applyDesktopUtilityLaf
-import dev.anthonyhfm.amethyst.desktop.utility.applyMacUtilityWindowChrome
-import dev.anthonyhfm.amethyst.desktop.utility.configureDesktopUtilityDialog
-import dev.anthonyhfm.amethyst.desktop.utility.CenterWindowOnFirstShow
-import java.awt.Desktop
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
-
-private var settingsDialog: ComposeDialog? = null
-
-fun showSettingsWindow() {
-    settingsDialog
-        ?.takeIf { it.isDisplayable }
-        ?.let { dialog ->
-            dialog.toFront()
-            dialog.requestFocus()
-            return
-        }
-
-    val dialog = ComposeDialog()
-    configureDesktopUtilityDialog(
-        dialog = dialog,
-        title = "Settings",
-        width = 550,
-        height = 600,
-        resizable = false
-    )
-    dialog.addWindowListener(object : WindowAdapter() {
-        override fun windowClosed(event: WindowEvent?) {
-            if (settingsDialog === dialog) {
-                settingsDialog = null
-            }
-        }
-    })
-    dialog.setContent {
-        AppLocaleProvider {
-            DesktopUtilityWindowScaffold {
-                AppLocaleRefreshBoundary {
-                    Settings()
-                }
-            }
-        }
-    }
-
-    settingsDialog = dialog
-    dialog.show()
-}
-
-fun setupPreferencesHandler() {
-    if (Desktop.isDesktopSupported()) {
-        val desktop = Desktop.getDesktop()
-
-        if (desktop.isSupported(Desktop.Action.APP_PREFERENCES)) {
-            desktop.setPreferencesHandler {
-                showSettingsWindow()
-            }
-        }
-    }
-}
+import androidx.compose.ui.Modifier
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.nucleusframework.application.DecoratedDialog
+import dev.nucleusframework.window.DialogTitleBar
 
 @Composable
 actual fun SettingsDialog(visible: Boolean, onDismiss: () -> Unit) {
-    applyDesktopUtilityLaf()
+    if (!visible) return
 
-    DialogWindow(
-        visible = visible,
+    DecoratedDialog(
         onCloseRequest = {
             onDismiss()
         },
@@ -85,9 +30,13 @@ actual fun SettingsDialog(visible: Boolean, onDismiss: () -> Unit) {
         ),
         resizable = false
     ) {
-        CenterWindowOnFirstShow(window)
-
-        applyMacUtilityWindowChrome(window.rootPane)
+        DialogTitleBar {
+            Text(
+                text = "Settings",
+                color = Theme[colors][foreground].copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        }
 
         AppLocaleProvider {
             DesktopUtilityWindowScaffold {

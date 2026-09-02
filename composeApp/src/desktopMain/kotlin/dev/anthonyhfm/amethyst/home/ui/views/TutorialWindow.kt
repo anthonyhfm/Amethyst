@@ -12,49 +12,49 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import com.composeunstyled.theme.Theme
+import com.composeunstyled.Text
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownHeader
-import com.mikepenz.markdown.m3.Markdown
-import com.mikepenz.markdown.m3.markdownColor
-import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.compose.Markdown
+import dev.anthonyhfm.amethyst.workspace.help.markdownColor
+import dev.anthonyhfm.amethyst.workspace.help.markdownTypography
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
 import androidx.compose.ui.text.TextLinkStyles
-import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
-import dev.anthonyhfm.amethyst.desktop.FlatUtilityLaf
-import dev.anthonyhfm.amethyst.desktop.OSXTitleBar
 import dev.anthonyhfm.amethyst.home.data.Tutorial
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.theme.*
 import dev.anthonyhfm.amethyst.workspace.help.ResourceImageTransformer
-import javax.swing.UIManager
+import dev.nucleusframework.application.DecoratedWindow
+import dev.nucleusframework.window.TitleBar
+import dev.nucleusframework.window.WindowAppearance
+import dev.nucleusframework.window.WindowAppearanceMode
 
 @Composable
 fun TutorialWindow(
     tutorial: Tutorial,
     onClose: () -> Unit
 ) {
-    UIManager.setLookAndFeel(FlatUtilityLaf())
-
-    Window(
+    DecoratedWindow(
         onCloseRequest = onClose,
         title = tutorial.title,
         state = rememberWindowState(width = 800.dp, height = 700.dp),
     ) {
-        if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
-            window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
-            window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
+        WindowAppearance(WindowAppearanceMode.Dark)
+
+        TitleBar {
+            Text(
+                text = tutorial.title,
+                color = Theme[colors][foreground].copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
         }
 
         AmethystTheme {
             Column(modifier = Modifier.fillMaxSize().background(Theme[colors][background])) {
-                if (DesktopPlatform.get() == DesktopPlatform.MacOS) {
-                    OSXTitleBar()
-                }
                 ScrollArea(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     TutorialMarkdownViewer(content = tutorial.content)
                 }

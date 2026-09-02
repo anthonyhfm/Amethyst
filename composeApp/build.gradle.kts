@@ -1,5 +1,5 @@
-import io.github.kdroidfilter.nucleus.desktop.application.dsl.DmgContentType
-import io.github.kdroidfilter.nucleus.desktop.application.dsl.TargetFormat
+import dev.nucleusframework.desktop.application.dsl.DmgContentType
+import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -11,7 +11,7 @@ plugins {
     kotlin("plugin.serialization") version "2.4.20-Beta2"
     id("org.jetbrains.kotlinx.atomicfu") version "0.29.0"
     alias(libs.plugins.sentryKmp)
-    alias(libs.plugins.nucleus)
+    id("dev.nucleusframework") version "2.5.12"
 }
 
 group = "dev.anthonyhfm.amethyst"
@@ -22,11 +22,22 @@ configurations.all {
     }
 }
 
+configurations.matching { it.name.startsWith("desktop") }.configureEach {
+    exclude(group = "org.jetbrains.compose.material3", module = "material3")
+    exclude(group = "org.jetbrains.compose.material3", module = "material3-desktop")
+}
+
 kotlin {
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+
+    kotlin {
+        jvmToolchain {
+            languageVersion.set(JavaLanguageVersion.of(25))
         }
     }
 
@@ -75,13 +86,13 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.splashscreen)
             implementation(libs.androidx.lifecycle.process)
+            implementation(libs.jetbrains.material3)
 
             implementation(projects.nativeEngine)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(libs.jetbrains.material3)
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             implementation(compose.components.resources)
@@ -109,7 +120,6 @@ kotlin {
             implementation("com.composables:icons-lucide-cmp:2.2.1")
 
             implementation("com.mikepenz:multiplatform-markdown-renderer:0.40.2")
-            implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.40.2")
 
             // Ktor WebSocket Client (commonMain — used by LanConnectProvider client mode)
             implementation(libs.ktor.client.core)
@@ -127,7 +137,6 @@ kotlin {
 
             implementation(projects.nativeEngine)
             implementation(libs.kotlinx.coroutines.swing)
-            implementation(libs.flatlaf)
             implementation("io.github.vyfor:kpresence:0.6.5")
             implementation("com.github.junrar:junrar:8.1.1")
 
@@ -136,13 +145,13 @@ kotlin {
             implementation(libs.ktor.server.core)
             implementation(libs.ktor.server.cio)
             implementation(libs.ktor.server.websockets)
-            // Nucleus runtime
-            implementation(libs.nucleus.core.runtime)
-            implementation(libs.nucleus.aot.runtime)
-            implementation(libs.nucleus.updater.runtime)
-            implementation(libs.nucleus.native.http)
-            implementation(libs.nucleus.taskbar.progress)
-            implementation(libs.nucleus.decorated.window)
+
+            implementation("dev.nucleusframework:nucleus.updater-runtime:2.5.12")
+            implementation("dev.nucleusframework:nucleus.nucleus-application:2.5.12")
+            implementation("dev.nucleusframework:nucleus.decorated-window-tao:2.5.12")
+            implementation("dev.nucleusframework:nucleus.menu-macos:2.5.12")
+            implementation("dev.nucleusframework:nucleus.global-hotkey:2.5.12")
+            implementation("dev.nucleusframework:nucleus.system-info:2.5.12")
         }
     }
 }
@@ -197,7 +206,7 @@ nucleus.application {
             }
         }
     }
-    
+
     jvmArgs += listOf(
         "--add-opens=java.base/java.lang=ALL-UNNAMED",
         "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
@@ -222,7 +231,7 @@ nucleus.application {
         macOS {
             iconFile.set(project.file("../icons/amethyst_macos.icns"))
 
-            macOsSdkVersion = null
+            macOsSdkVersion = "26.0"
 
             dmg {
                 title = "Amethyst Installer"
@@ -232,7 +241,6 @@ nucleus.application {
 
                 content(x = 143, y = 140, type = DmgContentType.File, name = "Amethyst.app")
                 content(x = 143, y = 455, type = DmgContentType.Link, path = "/Applications")
-
             }
         }
 
