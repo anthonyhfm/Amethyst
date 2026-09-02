@@ -104,13 +104,14 @@ fun WorkspaceWindow(
         ),
         minimumSize = DpSize(750.dp, 550.dp),
         onKeyEvent = {
-            updateFromKeyEvent(it)
-
             // Mode-specific handlers have priority over global shortcuts.
             if (WorkspaceRepository.mode.value.onKeyEvent(it)) return@DecoratedWindow true
             ShortcutManager.handleShortcut(it)
         },
         onPreviewKeyEvent = {
+            // Keep modifier state current even when a focused editor consumes the event.
+            updateFromKeyEvent(it)
+
             if (
                 it.type == KeyEventType.KeyDown &&
                 (it.isCtrlPressed || it.isMetaPressed) &&

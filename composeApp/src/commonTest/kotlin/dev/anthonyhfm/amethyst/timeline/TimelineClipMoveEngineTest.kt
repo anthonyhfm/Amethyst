@@ -10,6 +10,7 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCoordinator
+import dev.anthonyhfm.amethyst.timeline.ui.timelineClipVisualOffsetPx
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleClipWindowPx
@@ -200,14 +201,18 @@ class TimelineClipMoveEngineTest {
             snapEnabled = true,
         )
 
-        assertEquals(500L, command?.targetStartMs)
+        val snappedTargetStartMs = command?.targetStartMs
+        assertEquals(500L, snappedTargetStartMs)
+        assertEquals(500, timelineClipVisualOffsetPx(0L, requireNotNull(snappedTargetStartMs), 1f))
         val freeCommand = coordinator.buildCommand(
             viewport = EditorViewportState(zoomX = 1f),
             bpm = 120.0,
             gridType = GridUtils.GridType.Fixed._1_4,
             snapEnabled = false,
         )
-        assertEquals(260L, freeCommand?.targetStartMs)
+        val freeTargetStartMs = freeCommand?.targetStartMs
+        assertEquals(260L, freeTargetStartMs)
+        assertEquals(260, timelineClipVisualOffsetPx(0L, requireNotNull(freeTargetStartMs), 1f))
     }
 
     @Test

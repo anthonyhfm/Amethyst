@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.util.primaryModifierShortcutLabel
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
 import dev.anthonyhfm.amethyst.timeline.TimelineEditCommand
@@ -69,6 +70,7 @@ import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.timeline.ui.timelineClipVisualOffsetPx
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
@@ -144,16 +146,8 @@ fun AudioClip(
     val dragOffsetPx = remember(audioEntry.startTimeMs) { mutableStateOf(0f) }
     var clipCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var dragPointerInRoot by remember { mutableStateOf(Offset.Unspecified) }
-    var snapEnabled by remember { mutableStateOf(true) }
+    val snapEnabled = !ModifierKeysState.isAltPressed
 
-    val clipWindow = computeVisibleClipWindowPx(
-        contentStartPx = startOffsetPx,
-        contentEndPx = endOffsetPx,
-        viewport = viewport,
-        screenOffsetPx = dragOffsetPx.value.roundToInt(),
-        retainOffscreen = dragCallbacks != null && isSelected,
-    )
-    
     // Rename support
     val displayName = if (audioEntry.name.isNotEmpty()) audioEntry.name else audioEntry.fileName.substringBeforeLast('.')
     val selections by SelectionManager.selections.collectAsState()
@@ -197,12 +191,29 @@ fun AudioClip(
             val candidateMsDouble = audioEntry.startTimeMs.toDouble() + rawDeltaMsDouble
             val nonNegativeCandidate = candidateMsDouble.coerceAtLeast(0.0)
             if (snapEnabled && gridIntervalMs > 0) {
-                val gridPxSpacing = gridIntervalMs * zoomLevel
-                val thresholdPx = (gridPxSpacing * 0.35f).coerceAtLeast(5f)
-                GridUtils.snapToGridWithThreshold(nonNegativeCandidate.roundToLong(), zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value, thresholdPx)
+                GridUtils.snapToGrid(
+                    nonNegativeCandidate.roundToLong(),
+                    zoomLevel,
+                    WorkspaceRepository.bpm.value,
+                    WorkspaceRepository.gridType.value,
+                )
             } else round(nonNegativeCandidate).toLong()
         }
     }
+    val coordinatedVisualStartMs = dragCallbacks?.visualStartMs?.invoke()
+    val visualStartMs = coordinatedVisualStartMs ?: previewStartMs
+    val visualDragOffsetPx = if (dragOffsetPx.value != 0f || coordinatedVisualStartMs != null) {
+        timelineClipVisualOffsetPx(audioEntry.startTimeMs, visualStartMs, zoomLevel)
+    } else {
+        0
+    }
+    val clipWindow = computeVisibleClipWindowPx(
+        contentStartPx = startOffsetPx,
+        contentEndPx = endOffsetPx,
+        viewport = viewport,
+        screenOffsetPx = visualDragOffsetPx,
+        retainOffscreen = dragCallbacks != null && isSelected,
+    )
     
     // Visibility culling: skip layout entirely if clip is off-screen.
     // All state above must be declared before this return so Compose hook order stays stable.
@@ -316,12 +327,10 @@ fun AudioClip(
                                                     onMoveEntry(previewStartMs)
                                                 }
                                                 dragOffsetPx.value = 0f
-                                                snapEnabled = true
                                             },
                                             onDragCancel = {
                                                 dragCallbacks?.onCancel?.invoke()
                                                 dragOffsetPx.value = 0f
-                                                snapEnabled = true
                                             },
                                             onDrag = { change, dragAmount ->
                                                 change.consume()

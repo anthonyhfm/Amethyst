@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.util.primaryModifierShortcutLabel
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
 import dev.anthonyhfm.amethyst.timeline.TimelineEditCommand
@@ -76,6 +77,7 @@ import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleClipWindowPx
 import dev.anthonyhfm.amethyst.timeline.utils.projectTimelineSpanPx
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.timeline.ui.timelineClipVisualOffsetPx
 import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
@@ -128,7 +130,7 @@ fun MidiClip(
     val dragOffsetPx = remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
     var clipCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var dragPointerInRoot by remember { mutableStateOf(Offset.Unspecified) }
-    var snapEnabled by remember { mutableStateOf(true) }
+    val snapEnabled = !ModifierKeysState.isAltPressed
 
     var resizeLeftDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
     var resizeRightDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
@@ -175,20 +177,30 @@ fun MidiClip(
             val candidateMsDouble = midiEntry.startTimeMs.toDouble() + rawDeltaMsDouble
             val nonNegativeCandidate = candidateMsDouble.coerceAtLeast(0.0)
             if (snapEnabled && gridIntervalMs > 0) {
-                val gridPxSpacing = gridIntervalMs * zoomLevel
-                val thresholdPx = (gridPxSpacing * 0.35f).coerceAtLeast(5f)
-                GridUtils.snapToGridWithThreshold(nonNegativeCandidate.roundToLong(), zoomLevel, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value, thresholdPx)
+                GridUtils.snapToGrid(
+                    nonNegativeCandidate.roundToLong(),
+                    zoomLevel,
+                    WorkspaceRepository.bpm.value,
+                    WorkspaceRepository.gridType.value,
+                )
             } else round(nonNegativeCandidate).toLong()
         }
     }
 
     val previewStartOffsetPx = startOffsetPx + resizeLeftDeltaPx.roundToInt()
     val previewEndOffsetPx = endOffsetPx + resizeRightDeltaPx.roundToInt()
+    val coordinatedVisualStartMs = dragCallbacks?.visualStartMs?.invoke()
+    val visualStartMs = coordinatedVisualStartMs ?: previewStartMs
+    val visualDragOffsetPx = if (dragOffsetPx.value != 0f || coordinatedVisualStartMs != null) {
+        timelineClipVisualOffsetPx(midiEntry.startTimeMs, visualStartMs, zoomLevel)
+    } else {
+        0
+    }
     val clipWindow = computeVisibleClipWindowPx(
         contentStartPx = previewStartOffsetPx,
         contentEndPx = previewEndOffsetPx,
         viewport = viewport,
-        screenOffsetPx = dragOffsetPx.value.roundToInt(),
+        screenOffsetPx = visualDragOffsetPx,
         retainOffscreen = dragCallbacks != null && isSelected,
     )
     if (clipWindow == null || clipWindow.visibleWidthPx <= 0) return
@@ -268,12 +280,10 @@ fun MidiClip(
                                     if (newStart != midiEntry.startTimeMs) onMoveEntry(newStart)
                                 }
                                 dragOffsetPx.value = 0f
-                                snapEnabled = true
                             },
                             onDragCancel = {
                                 dragCallbacks?.onCancel?.invoke()
                                 dragOffsetPx.value = 0f
-                                snapEnabled = true
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()

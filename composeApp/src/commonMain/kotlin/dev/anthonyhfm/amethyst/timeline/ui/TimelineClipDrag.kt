@@ -17,12 +17,21 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import kotlin.math.roundToInt
+
+internal fun timelineClipVisualOffsetPx(
+    sourceStartMs: Long,
+    visualStartMs: Long,
+    zoomX: Float,
+): Int = ((visualStartMs - sourceStartMs) * zoomX).roundToInt()
 
 data class TimelineClipDragCallbacks(
     val onStart: (Offset) -> Unit,
     val onDrag: (Offset) -> Unit,
     val onEnd: () -> Unit,
     val onCancel: () -> Unit,
+    /** Current authoritative start used by both the visual clip and the drop preview. */
+    val visualStartMs: () -> Long? = { null },
 )
 
 @Stable

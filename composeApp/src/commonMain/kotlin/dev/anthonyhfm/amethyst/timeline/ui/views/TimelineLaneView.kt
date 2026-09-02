@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -48,8 +49,10 @@ import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.TimelineClipMoveEngine
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -121,6 +124,17 @@ fun TimelineLaneView(
     val clipDragCoordinator = remember { TimelineClipDragCoordinator() }
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
+    val clipSnapEnabled = !ModifierKeysState.isAltPressed
+    val clipDragPreview = if (clipDragCoordinator.isActive) {
+        clipDragCoordinator.preview(
+            viewport = renderViewport,
+            bpm = bpm,
+            gridType = gridType,
+            snapEnabled = clipSnapEnabled,
+        )
+    } else {
+        TimelineClipMoveEngine.Preview(false)
+    }
     var lastPointerX by remember { mutableStateOf<Float?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val gesturePanUnlockJobHolder = remember { arrayOfNulls<Job>(1) }
@@ -137,6 +151,9 @@ fun TimelineLaneView(
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
+                        // Pointer modifiers are authoritative for the active drag and also
+                        // recover from a modifier key-up lost during a focus transition.
+                        ModifierKeysState.updateFromPointerModifiers(event.keyboardModifiers)
                         val pointerX = event.changes.firstOrNull()?.position?.x
                         if (event.type == PointerEventType.Exit) {
                             lastPointerX = null
@@ -330,11 +347,16 @@ fun TimelineLaneView(
                                     viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
                                     bpm = bpm,
                                     gridType = gridType,
-                                    snapEnabled = true,
+                                    snapEnabled = !ModifierKeysState.isAltPressed,
                                 )?.let(TimelineCommandExecutor::execute)
                                 clipDragCoordinator.finish()
                             },
                             onCancel = clipDragCoordinator::finish,
+                            visualStartMs = {
+                                clipDragPreview.placements
+                                    .firstOrNull { it.source == key }
+                                    ?.targetStartMs
+                            },
                         )
                     },
                     onLaneBoundsChanged = clipDragCoordinator::updateLaneBounds,
@@ -363,31 +385,47 @@ fun TimelineLaneView(
         )
 
         if (clipDragCoordinator.isActive) {
-            val preview = clipDragCoordinator.preview(
-                viewport = renderViewport,
-                bpm = bpm,
-                gridType = gridType,
-                snapEnabled = true,
-            )
             val surface = clipDragCoordinator.surfaceBoundsInRoot
-            preview.placements.forEach { placement ->
-                val lane = clipDragCoordinator.laneBoundsInRoot[placement.targetTrackIndex] ?: return@forEach
-                val widthPx = (placement.durationMs * renderViewport.zoomX).coerceAtLeast(1f)
+            val anchorStartMs = clipDragPreview.placements
+                .firstOrNull { it.source == clipDragCoordinator.session?.anchorKey }
+                ?.targetStartMs
+            if (anchorStartMs != null) {
                 Box(
                     modifier = Modifier
                         .offset {
                             IntOffset(
-                                renderViewport.timeMsToScreenX(placement.targetStartMs.toDouble()).roundToInt(),
-                                (lane.top - surface.top).roundToInt(),
+                                renderViewport.timeMsToScreenX(anchorStartMs.toDouble()).roundToInt(),
+                                0,
                             )
                         }
-                        .width(with(LocalDensity.current) { widthPx.toDp() })
-                        .height(with(LocalDensity.current) { lane.height.toDp() })
-                        .background(timelinePalette.selectionFill, RoundedCornerShape(timelineDimensions.clipCornerRadius))
-                        .border(2.dp, timelinePalette.selectionStroke, RoundedCornerShape(timelineDimensions.clipCornerRadius))
-                        .zIndex(20f),
+                        .width(timelineDimensions.selectionCursorWidth)
+                        .fillMaxHeight()
+                        .background(timelinePalette.trackHeaderContent.copy(alpha = 0.92f))
+                        .zIndex(21f),
                 )
             }
+            // Same-track clips render themselves at the authoritative snapped position.
+            // A lightweight placement preview is only needed while crossing track lanes.
+            clipDragPreview.placements
+                .filter { it.source.trackIndex != it.targetTrackIndex }
+                .forEach { placement ->
+                    val lane = clipDragCoordinator.laneBoundsInRoot[placement.targetTrackIndex] ?: return@forEach
+                    val widthPx = (placement.durationMs * renderViewport.zoomX).coerceAtLeast(1f)
+                    Box(
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    renderViewport.timeMsToScreenX(placement.targetStartMs.toDouble()).roundToInt(),
+                                    (lane.top - surface.top).roundToInt(),
+                                )
+                            }
+                            .width(with(LocalDensity.current) { widthPx.toDp() })
+                            .height(with(LocalDensity.current) { lane.height.toDp() })
+                            .background(timelinePalette.selectionFill, RoundedCornerShape(timelineDimensions.clipCornerRadius))
+                            .border(2.dp, timelinePalette.selectionStroke, RoundedCornerShape(timelineDimensions.clipCornerRadius))
+                            .zIndex(20f),
+                    )
+                }
         }
     }
 }
