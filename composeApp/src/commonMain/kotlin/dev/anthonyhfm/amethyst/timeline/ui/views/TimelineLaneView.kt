@@ -301,7 +301,17 @@ fun TimelineLaneView(
                         )
                     },
                     onSelectTime = { rawClickTimeMs ->
-                        val snapped = GridUtils.snapToGrid(rawClickTimeMs.coerceAtLeast(0), renderViewport.zoomX, WorkspaceRepository.bpm.value, WorkspaceRepository.gridType.value)
+                        val rawTimeMs = rawClickTimeMs.coerceAtLeast(0)
+                        val snapped = if (ModifierKeysState.isAltPressed) {
+                            rawTimeMs
+                        } else {
+                            GridUtils.snapToGrid(
+                                rawTimeMs,
+                                renderViewport.zoomX,
+                                WorkspaceRepository.bpm.value,
+                                WorkspaceRepository.gridType.value,
+                            )
+                        }
                         SelectionManager.select(Selectable.TimelineTime(trackIndex = index, timeMs = snapped))
                     },
                     onSelectEntry = { entryStart ->

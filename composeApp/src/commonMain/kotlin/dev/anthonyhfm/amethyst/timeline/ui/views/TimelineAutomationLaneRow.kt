@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -121,6 +122,7 @@ internal fun TimelineAutomationLaneRow(
     val zoomLevel = viewport.zoomX
     val scrollOffsetPx = viewport.scrollX
     val timelinePalette = TimelineTheme.palette
+    val timelineDimensions = TimelineTheme.dimensions
     val selections by SelectionManager.selections.collectAsState()
     val activeAutomationLane by SelectionManager.activeTimelineAutomationLane.collectAsState()
     val normalizedLane = lane.normalized()
@@ -128,7 +130,7 @@ internal fun TimelineAutomationLaneRow(
     val isSelected = activeAutomationLane?.trackIndex == trackIndex &&
         activeAutomationLane?.laneKey == laneKey
     val currentIsCurveEditPressed by rememberUpdatedState(ModifierKeysState.isAltPressed)
-    val currentIsSnapBypassPressed by rememberUpdatedState(ModifierKeysState.isShiftPressed)
+    val currentIsSnapBypassPressed by rememberUpdatedState(ModifierKeysState.isAltPressed)
     val currentIsMetaSelectionPressed by rememberUpdatedState(
         ModifierKeysState.isMetaPressed || ModifierKeysState.isCtrlPressed
     )
@@ -162,8 +164,13 @@ internal fun TimelineAutomationLaneRow(
     var contextMenuPosition by remember {
         mutableStateOf(Offset.Zero)
     }
+    val automationContentHeight = if (overlayMode) {
+        (rowHeight - timelineDimensions.clipHeaderHeight).coerceAtLeast(1.dp)
+    } else {
+        rowHeight
+    }
     val laneHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) {
-        rowHeight.toPx()
+        automationContentHeight.toPx()
     }
 
     val renderedPoints = remember(normalizedLane.points, dragState) {
@@ -259,11 +266,13 @@ internal fun TimelineAutomationLaneRow(
             .height(rowHeight)
             .then(
                 if (overlayMode) {
-                    Modifier.background(
-                        color = timelinePalette.automationLaneSurface.copy(
-                            alpha = if (isSelected) 0.18f else 0.12f
+                    Modifier
+                        .padding(top = timelineDimensions.clipHeaderHeight)
+                        .background(
+                            color = timelinePalette.automationLaneSurface.copy(
+                                alpha = if (isSelected) 0.18f else 0.12f
+                            )
                         )
-                    )
                 } else {
                     Modifier
                         .background(
@@ -615,7 +624,7 @@ internal fun TimelineAutomationLaneRow(
                         viewport = vp,
                         bpm = currentBpm.value,
                         gridType = currentGridType.value,
-                        snapToGrid = true
+                        snapToGrid = !currentIsSnapBypassPressed
                     )
                     dragState = null
 
@@ -648,7 +657,7 @@ internal fun TimelineAutomationLaneRow(
                                 viewport = vp2,
                                 bpm = currentBpm.value,
                                 gridType = currentGridType.value,
-                                snapToGrid = true
+                                snapToGrid = !currentIsSnapBypassPressed
                             )
                             rangeWasApplied = true
                             val normalizedStart = minOf(initTime, rangeEndTimeMs)

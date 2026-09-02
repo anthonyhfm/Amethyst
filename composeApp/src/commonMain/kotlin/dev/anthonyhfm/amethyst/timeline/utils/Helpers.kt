@@ -41,38 +41,50 @@ internal fun isPointInsideAnyEntry(track: TimelineTrack<*>, timeMs: Long): Boole
 }
 
 /**
- * Converts a CONTENT-SPACE x position to milliseconds with threshold-based grid snap.
+ * Converts a CONTENT-SPACE x position to milliseconds with authoritative grid snap.
  *
  * Use this when you have already obtained the content-x via [EditorViewportState.screenToContentX],
  * or for clip-body drag where `contentX = clipStartMs * zoom + clip_local_offset`.
  *
  * Prefer [computeSnappedTimeFromViewport] when you have the full [EditorViewportState] available.
  */
-internal fun computeSnappedTimeFromContentX(x: Float, zoomLevel: Float, bpm: Double, gridType: GridUtils.GridType): Long {
+internal fun computeSnappedTimeFromContentX(
+    x: Float,
+    zoomLevel: Float,
+    bpm: Double,
+    gridType: GridUtils.GridType,
+    snapEnabled: Boolean = true,
+): Long {
     val rawPx = x.toDouble()
     val rawTimeMsDouble = if (zoomLevel > 0f) rawPx / zoomLevel.toDouble() else 0.0
     val rawTimeMs = rawTimeMsDouble.roundToLong().coerceAtLeast(0L)
-    val intervals = GridUtils.computeWithGridType(zoomLevel, bpm, gridType)
-    val gridIntervalMs = intervals.intervalMs
-    val gridPxSpacing = gridIntervalMs * zoomLevel
-    val snapThresholdPx = (gridPxSpacing * 0.40f).coerceAtLeast(6f)
-    val shouldSnap = gridIntervalMs > 0 && gridPxSpacing >= 6f
-    return if (shouldSnap) GridUtils.snapToGridWithThreshold(rawTimeMs, zoomLevel, bpm, gridType, thresholdPx = snapThresholdPx) else rawTimeMs
+    return if (snapEnabled) {
+        GridUtils.snapToGrid(rawTimeMs, zoomLevel, bpm, gridType)
+    } else {
+        rawTimeMs
+    }
 }
 
 /**
  * Converts a SCREEN-SPACE x pointer position to milliseconds using [viewport] projections,
- * with threshold-based grid snap applied.
+ * with authoritative grid snap applied unless [snapEnabled] is false.
  *
  * Use this in outer-Box pointer handlers where `pos.x` is viewport/screen relative.
  * Replaces the former `computeStrictGridTime(pos.x, scrollOffsetPx, …)` pattern.
  */
-internal fun computeSnappedTimeFromViewport(screenX: Float, viewport: EditorViewportState, bpm: Double, gridType: GridUtils.GridType): Long {
+internal fun computeSnappedTimeFromViewport(
+    screenX: Float,
+    viewport: EditorViewportState,
+    bpm: Double,
+    gridType: GridUtils.GridType,
+    snapEnabled: Boolean = true,
+): Long {
     return computeSnappedTimeFromContentX(
         x = viewport.screenToContentX(screenX),
         zoomLevel = viewport.zoomX,
         bpm = bpm,
-        gridType = gridType
+        gridType = gridType,
+        snapEnabled = snapEnabled,
     )
 }
 

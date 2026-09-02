@@ -87,6 +87,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 
 @Composable
 fun TimelineLane(
@@ -134,6 +135,7 @@ fun TimelineLane(
     val automationOverlayActive = overlayAutomationLanes.isNotEmpty()
     // Always-fresh viewport for pointer-input closures that are not keyed on scroll changes.
     val currentViewport = rememberUpdatedState(viewport)
+    val currentSnapEnabled = rememberUpdatedState(!ModifierKeysState.isAltPressed)
     val laneInteractionModifier = if (automationOverlayActive) {
         Modifier
     } else {
@@ -161,7 +163,8 @@ fun TimelineLane(
                                 currentViewport.value.screenToContentX(pos.x),
                                 currentViewport.value.zoomX,
                                 bpm,
-                                gridType
+                                gridType,
+                                snapEnabled = currentSnapEnabled.value,
                             )
                             onSelectTime(snappedMs)
                             change.consume()
@@ -190,7 +193,8 @@ fun TimelineLane(
                             currentViewport.value.screenToContentX(offset.x),
                             currentViewport.value.zoomX,
                             bpm,
-                            gridType
+                            gridType,
+                            snapEnabled = currentSnapEnabled.value,
                         )
                         if (!isPointInsideAnyEntry(track, startMs)) {
                             rangeStartMs = startMs
@@ -208,7 +212,8 @@ fun TimelineLane(
                                 currentViewport.value.screenToContentX(change.position.x),
                                 currentViewport.value.zoomX,
                                 bpm,
-                                gridType
+                                gridType,
+                                snapEnabled = currentSnapEnabled.value,
                             )
                             if (currentMs != rangeEndMs) rangeEndMs = currentMs
                         }

@@ -32,6 +32,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +72,7 @@ import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.timeline.ui.timelineClipVisualOffsetPx
+import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromContentX
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
@@ -147,6 +149,7 @@ fun AudioClip(
     var clipCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var dragPointerInRoot by remember { mutableStateOf(Offset.Unspecified) }
     val snapEnabled = !ModifierKeysState.isAltPressed
+    val currentSnapEnabled = rememberUpdatedState(snapEnabled)
 
     // Rename support
     val displayName = if (audioEntry.name.isNotEmpty()) audioEntry.name else audioEntry.fileName.substringBeforeLast('.')
@@ -415,13 +418,12 @@ fun AudioClip(
                             Modifier.pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
                                         detectDragGestures(
                                             onDragStart = { offset ->
-                                                val startMs = GridUtils.snapToGrid(
-                                            viewport.contentXToTimeMs(clipWindow.visibleContentStartPx + offset.x)
-                                                .roundToLong()
-                                                .coerceAtLeast(0L),
-                                            zoomLevel,
-                                            bpm,
-                                            gridType
+                                        val startMs = computeSnappedTimeFromContentX(
+                                            x = clipWindow.visibleContentStartPx + offset.x,
+                                            zoomLevel = zoomLevel,
+                                            bpm = bpm,
+                                            gridType = gridType,
+                                            snapEnabled = currentSnapEnabled.value,
                                         )
                                         rangeStartMs = startMs
                                         rangeEndMs = startMs
@@ -429,13 +431,12 @@ fun AudioClip(
                                     },
                                     onDrag = { change, _ ->
                                         if (rangeActive && rangeStartMs != null) {
-                                            val currentMs = GridUtils.snapToGrid(
-                                                viewport.contentXToTimeMs(clipWindow.visibleContentStartPx + change.position.x)
-                                                    .roundToLong()
-                                                    .coerceAtLeast(0L),
-                                                zoomLevel,
-                                                bpm,
-                                                gridType
+                                            val currentMs = computeSnappedTimeFromContentX(
+                                                x = clipWindow.visibleContentStartPx + change.position.x,
+                                                zoomLevel = zoomLevel,
+                                                bpm = bpm,
+                                                gridType = gridType,
+                                                snapEnabled = currentSnapEnabled.value,
                                             )
                                             if (currentMs != rangeEndMs) {
                                                 rangeEndMs = currentMs

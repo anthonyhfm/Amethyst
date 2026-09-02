@@ -33,6 +33,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,7 @@ import dev.anthonyhfm.amethyst.timeline.utils.projectTimelineSpanPx
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.timeline.ui.timelineClipVisualOffsetPx
+import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromContentX
 import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
@@ -131,6 +133,7 @@ fun MidiClip(
     var clipCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var dragPointerInRoot by remember { mutableStateOf(Offset.Unspecified) }
     val snapEnabled = !ModifierKeysState.isAltPressed
+    val currentSnapEnabled = rememberUpdatedState(snapEnabled)
 
     var resizeLeftDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
     var resizeRightDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
@@ -362,9 +365,12 @@ fun MidiClip(
                 .pointerInput(midiEntry.startTimeMs, zoomLevel, bpm, gridType) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            val startMs = GridUtils.snapToGrid(
-                                viewport.contentXToTimeMs((clipWindow.visibleContentStartPx + offset.x).toFloat()).roundToLong().coerceAtLeast(0L),
-                                zoomLevel, bpm, gridType
+                            val startMs = computeSnappedTimeFromContentX(
+                                x = clipWindow.visibleContentStartPx + offset.x,
+                                zoomLevel = zoomLevel,
+                                bpm = bpm,
+                                gridType = gridType,
+                                snapEnabled = currentSnapEnabled.value,
                             )
                             rangeStartMs = startMs
                             rangeEndMs = startMs
@@ -372,9 +378,12 @@ fun MidiClip(
                         },
                         onDrag = { change, _ ->
                             if (rangeActive && rangeStartMs != null) {
-                                val currentMs = GridUtils.snapToGrid(
-                                    viewport.contentXToTimeMs((clipWindow.visibleContentStartPx + change.position.x).toFloat()).roundToLong().coerceAtLeast(0L),
-                                    zoomLevel, bpm, gridType
+                                val currentMs = computeSnappedTimeFromContentX(
+                                    x = clipWindow.visibleContentStartPx + change.position.x,
+                                    zoomLevel = zoomLevel,
+                                    bpm = bpm,
+                                    gridType = gridType,
+                                    snapEnabled = currentSnapEnabled.value,
                                 )
                                 if (currentMs != rangeEndMs) {
                                     rangeEndMs = currentMs
