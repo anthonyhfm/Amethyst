@@ -149,17 +149,14 @@ fun RecentView(
                     .padding(start = 24.dp, top = 24.dp, end = 12.dp, bottom = 24.dp),
             ) {
                 ScrollArea(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(end = 12.dp),
                     ) {
-                        RecentViewHeader(
-                            onOpenProject = { viewModel.onEvent(Event.OnClickOpenProject) },
-                            onCreateProject = { viewModel.onEvent(Event.OnClickNewProject) },
-                        )
+                        RecentViewHeader()
 
                         Spacer(modifier = Modifier.height(24.dp))
 
@@ -181,6 +178,7 @@ fun RecentView(
                                 EmptyRecentProjectsCard()
                             } else {
                                 TypographyMuted(stringResource(Res.string.home_recent_collaboration_recent_opened))
+
                                 recentProjects.forEachIndexed { index, project ->
                                     RecentProjectCard(
                                         project = project,
@@ -200,6 +198,11 @@ fun RecentView(
                         }
                     }
                 }
+
+                RecentActions(
+                    onOpenProject = { viewModel.onEvent(Event.OnClickOpenProject) },
+                    onCreateProject = { viewModel.onEvent(Event.OnClickNewProject) },
+                )
             }
 
             joiningSession?.let { session ->
@@ -347,123 +350,56 @@ private fun JoinSessionDialog(
 }
 
 @Composable
-private fun RecentViewHeader(
-    onOpenProject: () -> Unit,
-    onCreateProject: () -> Unit,
-) {
+private fun RecentViewHeader() {
     BoxWithConstraints(
         modifier = Modifier.fillMaxWidth(),
     ) {
-        val stackedActions = maxWidth < 720.dp
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TypographyH2(stringResource(Res.string.home_recent_title))
 
-        if (stackedActions) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    TypographyH2(stringResource(Res.string.home_recent_title))
-                    TypographyLead(stringResource(Res.string.home_recent_subtitle))
-                }
-
-                RecentActions(
-                    stacked = true,
-                    onOpenProject = onOpenProject,
-                    onCreateProject = onCreateProject,
-                )
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    TypographyH2(stringResource(Res.string.home_recent_title))
-                    TypographyLead(stringResource(Res.string.home_recent_subtitle))
-                }
-
-                RecentActions(
-                    stacked = false,
-                    onOpenProject = onOpenProject,
-                    onCreateProject = onCreateProject,
-                )
-            }
+            TypographyLead(stringResource(Res.string.home_recent_subtitle))
         }
     }
 }
 
 @Composable
 private fun RecentActions(
-    stacked: Boolean,
     onOpenProject: () -> Unit,
     onCreateProject: () -> Unit,
 ) {
-    val openVariant = ButtonVariant.Outline
-    val createVariant = ButtonVariant.Default
-
-    if (stacked) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier
+            .padding(end  = 12.dp),
+    ) {
+        Button(
+            onClick = onCreateProject,
+            variant = ButtonVariant.Default,
+            modifier = Modifier.weight(1f),
         ) {
-            Button(
-                onClick = onOpenProject,
-                modifier = Modifier.fillMaxWidth(),
-                variant = openVariant,
-            ) {
-                Icon(
-                    imageVector = Lucide.FolderOpen,
-                    contentDescription = null,
-                    tint = buttonContentColor(openVariant),
-                )
-                Text(stringResource(Res.string.home_recent_open_project))
-            }
+            Icon(
+                imageVector = Lucide.Plus,
+                contentDescription = null,
+                tint = buttonContentColor(ButtonVariant.Default),
+            )
 
-            Button(
-                onClick = onCreateProject,
-                modifier = Modifier.fillMaxWidth(),
-                variant = createVariant,
-            ) {
-                Icon(
-                    imageVector = Lucide.Plus,
-                    contentDescription = null,
-                    tint = buttonContentColor(createVariant),
-                )
-                Text(stringResource(Res.string.home_recent_new_project))
-            }
+            Text(stringResource(Res.string.home_recent_new_project))
         }
-    } else {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(
-                onClick = onOpenProject,
-                variant = openVariant,
-            ) {
-                Icon(
-                    imageVector = Lucide.FolderOpen,
-                    contentDescription = null,
-                    tint = buttonContentColor(openVariant),
-                )
-                Text(stringResource(Res.string.home_recent_open_project))
-            }
 
-            Button(
-                onClick = onCreateProject,
-                variant = createVariant,
-            ) {
-                Icon(
-                    imageVector = Lucide.Plus,
-                    contentDescription = null,
-                    tint = buttonContentColor(createVariant),
-                )
-                Text(stringResource(Res.string.home_recent_new_project))
-            }
+        Button(
+            onClick = onOpenProject,
+            variant = ButtonVariant.Outline,
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(
+                imageVector = Lucide.FolderOpen,
+                contentDescription = null,
+                tint = buttonContentColor(ButtonVariant.Outline),
+            )
+
+            Text(stringResource(Res.string.home_recent_open_project))
         }
     }
 }
