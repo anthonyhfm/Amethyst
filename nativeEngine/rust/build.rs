@@ -3,5 +3,7 @@ fn main() {
     if target_os == "android" {
         println!("cargo:rustc-link-lib=c++_shared");
         println!("cargo:rustc-link-lib=aaudio");
+    } else if target_os == "macos" {
+        println!("cargo:rustc-link-lib=framework=AppKit");
     }
 }

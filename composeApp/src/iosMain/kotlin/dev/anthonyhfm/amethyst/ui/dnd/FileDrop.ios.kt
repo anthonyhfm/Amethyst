@@ -8,7 +8,7 @@ import io.github.vinceglb.filekit.PlatformFile
 @Composable
 actual fun Modifier.fileDropTarget(
     onHover: (Boolean, Offset?, List<PlatformFile>) -> Unit,
-    onDrop: (List<PlatformFile>) -> Unit,
+    onDrop: (Offset?, List<PlatformFile>) -> Unit,
 ): Modifier {
     println("File drop is not supported on iOS")
     return this

@@ -293,11 +293,11 @@ fun TimelineLaneView(
                     selectedTimeMs = laneSelectedTimeMs,
                     selectedEntryStarts = laneSelectedEntries.map { it.entryStartMs }.toSet(),
                     selectedChainEffectIds = laneSelectedEntries.mapNotNull { it.clipId }.toSet(),
-                    onDropInFile = { file ->
+                    onDropInFile = { file, atTimeMs ->
                         viewModel.addAudioFileToTrack(
                             trackIndex = index,
                             file = file,
-                            at = playheadPositionMs
+                            at = atTimeMs
                         )
                     },
                     onSelectTime = { rawClickTimeMs ->

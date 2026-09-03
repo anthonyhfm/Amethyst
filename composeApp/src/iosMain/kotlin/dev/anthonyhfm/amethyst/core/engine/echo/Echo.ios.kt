@@ -27,6 +27,19 @@ actual object Echo {
     private var loggedStreamErrors = 0L
     private var loggedRenderDeadlineMisses = 0L
 
+    actual suspend fun probeAudioFile(
+        filePath: String
+    ): AudioFileMetadata? = withContext(Dispatchers.Default) {
+        val signal = IosAudioDecoder.decodeFile(filePath, 0L, 1L) ?: return@withContext null
+        AudioFileMetadata(
+            durationMs = signal.durationMs,
+            sampleRate = signal.sampleRate,
+            channels = signal.channels,
+            totalSamples = (signal.durationMs * signal.sampleRate) / 1000L,
+            bitDepth = signal.bitDepth,
+        )
+    }
+
     actual suspend fun decodeAudioFile(
         filePath: String,
         sampleStart: Long?,
@@ -46,6 +59,8 @@ actual object Echo {
 
     actual fun isFormatSupported(fileName: String): Boolean =
         fileName.substringAfterLast('.', "").lowercase() in IosAudioDecoder.formats
+
+    actual fun getActiveDragFile(): String? = null
 
     actual fun getSupportedFormats(): List<String> = IosAudioDecoder.formats
 

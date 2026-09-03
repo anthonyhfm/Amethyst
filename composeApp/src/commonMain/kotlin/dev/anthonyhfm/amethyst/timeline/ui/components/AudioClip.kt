@@ -4,16 +4,20 @@ import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -73,6 +77,9 @@ import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.timeline.ui.timelineClipVisualOffsetPx
 import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromContentX
+import dev.anthonyhfm.amethyst.timeline.data.AudioDecodingManager
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
@@ -102,6 +109,13 @@ fun AudioClip(
     dragCallbacks: TimelineClipDragCallbacks? = null,
 ) {
     val zoomLevel = viewport.zoomX
+    val decodingStates by AudioDecodingManager.loadingStates.collectAsState()
+    val clipDecoding = decodingStates[audioEntry.sourceId]
+    val isDecoding = audioEntry.source() == null || clipDecoding?.isDecoding == true
+    val decodingProgress by animateFloatAsState(
+        targetValue = clipDecoding?.progress ?: (if (audioEntry.source() != null) 1f else 0.08f),
+        animationSpec = tween(120)
+    )
     val timelineDimensions = TimelineTheme.dimensions
     val timelinePalette = TimelineTheme.palette
     val clipColors = TimelineTheme.clipColors(
@@ -280,8 +294,7 @@ fun AudioClip(
                 .border(if (isSelected) 1.5.dp else 1.dp, clipBorderColor, clipShape)
         ) {
             if (!renaming) {
-                Text(
-                    text = displayName,
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(timelineDimensions.clipHeaderHeight)
@@ -349,13 +362,16 @@ fun AudioClip(
                                 Modifier
                             }
                         )
-                        .padding(4.dp),
-                    style = Theme[typography][small].copy(
-                        lineHeight = Theme[typography][small].fontSize
-                    ),
-                    color = clipContentColor,
-                    maxLines = 1
-                )
+                        .padding(horizontal = 6.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = if (isDecoding) "$displayName (Decoding ${(decodingProgress * 100).toInt()}%)" else displayName,
+                        style = Theme[typography][small],
+                        color = clipContentColor,
+                        maxLines = 1
+                    )
+                }
             } else {
                 val customTextSelectionColors = TextSelectionColors(
                     handleColor = timelinePalette.selectionStroke,
@@ -394,7 +410,7 @@ fun AudioClip(
 
                                 return@onKeyEvent false
                             }
-                            .padding(4.dp),
+                            .padding(horizontal = 6.dp),
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.None,
                             autoCorrectEnabled = false,
@@ -402,7 +418,6 @@ fun AudioClip(
                             imeAction = ImeAction.Done
                         ),
                         textStyle = Theme[typography][small].copy(
-                            lineHeight = Theme[typography][small].fontSize,
                             color = clipContentColor
                         ),
                         cursorBrush = SolidColor(clipContentColor),
@@ -514,21 +529,42 @@ fun AudioClip(
                         }
                     }
             ) {
-                WaveformView(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 4.dp),
-                    waveColor = clipContentColor,
-                    rawData = audioEntry.source()?.rawData,
-                    sampleRate = audioEntry.sampleRate,
-                    channels = audioEntry.channels,
-                    bitDepth = audioEntry.bitDepth,
-                    timelineStartUs = visibleStartUs,
-                    startSample = visibleStartSample,
-                    endSample = visibleEndSample,
-                    renderWidthPx = clipWindow.visibleWidthPx,
-                    zoomLevel = zoomLevel
-                )
+                // Clean neutral baseline always visible
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val centerY = size.height / 2f
+                    drawLine(
+                        color = clipContentColor.copy(alpha = 0.40f),
+                        start = Offset(0f, centerY),
+                        end = Offset(size.width, centerY),
+                        strokeWidth = 1f
+                    )
+                }
+
+                if (audioEntry.source()?.rawData != null) {
+                    val revealProgress = if (isDecoding) decodingProgress.coerceIn(0.01f, 1f) else 1f
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(revealProgress)
+                            .clipToBounds()
+                    ) {
+                        WaveformView(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(vertical = 4.dp),
+                            waveColor = clipContentColor,
+                            rawData = audioEntry.source()?.rawData,
+                            sampleRate = audioEntry.sampleRate,
+                            channels = audioEntry.channels,
+                            bitDepth = audioEntry.bitDepth,
+                            timelineStartUs = visibleStartUs,
+                            startSample = visibleStartSample,
+                            endSample = visibleEndSample,
+                            renderWidthPx = clipWindow.visibleWidthPx,
+                            zoomLevel = zoomLevel
+                        )
+                    }
+                }
             }
         }
     }

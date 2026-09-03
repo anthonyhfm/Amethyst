@@ -199,6 +199,20 @@ actual object Echo {
         if (!backgrounded.get()) initialize()
     }
 
+    actual suspend fun probeAudioFile(
+        filePath: String
+    ): AudioFileMetadata? = withContext(Dispatchers.IO) {
+        val result = decoder.probeFile(filePath)
+        val meta = result.metadata ?: return@withContext null
+        AudioFileMetadata(
+            durationMs = meta.durationMs.toLong(),
+            sampleRate = meta.sampleRate.toInt(),
+            channels = meta.channels.toInt(),
+            totalSamples = meta.totalSamples.toLong(),
+            bitDepth = meta.bitDepth.toInt(),
+        )
+    }
+
     actual suspend fun decodeAudioFile(
         filePath: String,
         sampleStart: Long?,
@@ -222,6 +236,8 @@ actual object Echo {
 
     actual fun isFormatSupported(fileName: String): Boolean =
         fileName.substringAfterLast('.', "").lowercase() in formats
+
+    actual fun getActiveDragFile(): String? = null
 
     actual fun getSupportedFormats(): List<String> = formats
 

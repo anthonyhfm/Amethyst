@@ -4,6 +4,7 @@ import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,10 +66,13 @@ import dev.anthonyhfm.amethyst.timeline.utils.isPointInsideAnyEntry
 import dev.anthonyhfm.amethyst.timeline.utils.trackIndexOf
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import io.github.vinceglb.filekit.extension
+import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.nameWithoutExtension
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
@@ -83,10 +89,14 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import io.github.vinceglb.filekit.path
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.timeline.ui.components.AudioClipSkeletonView
+import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromViewport
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 
 @Composable
@@ -98,7 +108,7 @@ fun TimelineLane(
     selectedTimeMs: Long?,
     selectedEntryStarts: Set<Long> = emptySet(),
     selectedChainEffectIds: Set<String> = emptySet(),
-    onDropInFile: (file: PlatformFile) -> Unit = {},
+    onDropInFile: (file: PlatformFile, atTimeMs: Long) -> Unit = { _, _ -> },
     onSelectTime: (Long) -> Unit = {},
     onSelectEntry: (Long) -> Unit = {},
     onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> },
@@ -119,6 +129,36 @@ fun TimelineLane(
     var rangeStartMs by remember(track, zoomLevel) { mutableStateOf<Long?>(null) }
     var rangeEndMs by remember(track, zoomLevel) { mutableStateOf<Long?>(null) }
     var rangeActive by remember { mutableStateOf(false) }
+    var isFileHovering by remember { mutableStateOf(false) }
+    var hoverOffset by remember { mutableStateOf<Offset?>(null) }
+    var hoverFiles by remember { mutableStateOf<List<PlatformFile>>(emptyList()) }
+    var probedDurationMs by remember { mutableStateOf<Long?>(null) }
+    var probedFileName by remember { mutableStateOf<String?>(null) }
+    var lastProbedPath by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(isFileHovering, hoverFiles) {
+        if (isFileHovering) {
+            val candidatePath = hoverFiles.firstOrNull { it.extension.lowercase() in Echo.getSupportedFormats() }?.path
+                ?: Echo.getActiveDragFile()
+
+            if (candidatePath != null && candidatePath != lastProbedPath) {
+                lastProbedPath = candidatePath
+                val ext = candidatePath.substringAfterLast('.').lowercase()
+                if (ext in Echo.getSupportedFormats()) {
+                    val meta = Echo.probeAudioFile(candidatePath)
+                    if (meta != null && meta.durationMs > 0) {
+                        probedDurationMs = meta.durationMs
+                        probedFileName = candidatePath.substringAfterLast('/').substringBeforeLast('.')
+                    }
+                }
+            }
+        } else {
+            probedDurationMs = null
+            probedFileName = null
+            lastProbedPath = null
+        }
+    }
+
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuPosition by remember { mutableStateOf(Offset.Zero) }
     val selections by SelectionManager.selections.collectAsState()
@@ -284,10 +324,27 @@ fun TimelineLane(
                     color = timelinePalette.shellBorder.copy(alpha = 0.78f),
                 )
                 .fileDropTarget(
-                    onHover = { _: Boolean, _: Offset?, _: List<PlatformFile> -> },
-                    onDrop = { files: List<PlatformFile> ->
+                    onHover = { hovering, offset, files ->
+                        isFileHovering = hovering
+                        hoverOffset = offset
+                        hoverFiles = files
+                    },
+                    onDrop = { offset, files ->
+                        isFileHovering = false
+                        hoverOffset = null
+                        hoverFiles = emptyList()
                         val audioFiles = files.filter { it.extension.lowercase() in Echo.getSupportedFormats() }
-                        if (audioFiles.isNotEmpty()) onDropInFile(audioFiles.first())
+                        if (audioFiles.isNotEmpty()) {
+                            val localX = offset?.x ?: 0f
+                            val dropTimeMs = computeSnappedTimeFromViewport(
+                                screenX = localX,
+                                viewport = currentViewport.value,
+                                bpm = bpm,
+                                gridType = gridType,
+                                snapEnabled = currentSnapEnabled.value,
+                            ).coerceAtLeast(0L)
+                            onDropInFile(audioFiles.first(), dropTimeMs)
+                        }
                     }
                 )
                 .clipToBounds()
@@ -299,6 +356,100 @@ fun TimelineLane(
                 }
                 .then(laneInteractionModifier)
         ) {
+        if (isFileHovering && hoverOffset != null && track is AudioTimelineTrack) {
+            val localX = hoverOffset!!.x
+            val snappedHoverTimeMs = computeSnappedTimeFromViewport(
+                screenX = localX,
+                viewport = currentViewport.value,
+                bpm = bpm,
+                gridType = gridType,
+                snapEnabled = currentSnapEnabled.value,
+            ).coerceAtLeast(0L)
+
+            val screenStartPx = currentViewport.value.timeMsToScreenX(snappedHoverTimeMs.toDouble())
+            val defaultBarMs = ((60_000.0 / bpm.coerceAtLeast(1.0)) * 4.0).toLong()
+            val durationMs = probedDurationMs ?: (defaultBarMs * 4L)
+            val durationWidthPx = (durationMs.toDouble() * zoomLevel.toDouble()).toFloat()
+            val previewWidthDp = maxOf(with(LocalDensity.current) { durationWidthPx.toDp() }, 140.dp)
+
+            val audioClipColors = TimelineTheme.clipColors(
+                role = TimelineClipRole.Audio,
+                selected = false
+            )
+            val clipShape = RoundedCornerShape(timelineDimensions.clipCornerRadius)
+            val clipHeaderShape = RoundedCornerShape(
+                topStart = timelineDimensions.clipCornerRadius,
+                topEnd = timelineDimensions.clipCornerRadius
+            )
+
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(screenStartPx.roundToInt(), 0) }
+                    .width(previewWidthDp)
+                    .height(timelineDimensions.laneHeight)
+                    .zIndex(20f)
+                    .clip(clipShape)
+                    .background(audioClipColors.background.copy(alpha = 0.88f))
+                    .border(
+                        width = 1.dp,
+                        color = audioClipColors.border,
+                        shape = clipShape
+                    )
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Identical clip header bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(timelineDimensions.clipHeaderHeight)
+                            .background(audioClipColors.header, clipHeaderShape)
+                            .padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val fileNameText = probedFileName ?: hoverFiles.firstOrNull()?.name?.substringBeforeLast('.')
+                        val formattedDuration = if (probedDurationMs != null) {
+                            val totalSecs = (durationMs / 1000L).coerceAtLeast(0L)
+                            val mins = totalSecs / 60L
+                            val secs = totalSecs % 60L
+                            "$mins:${secs.toString().padStart(2, '0')}"
+                        } else null
+
+                        val label = when {
+                            fileNameText != null && formattedDuration != null -> "$fileNameText ($formattedDuration)"
+                            fileNameText != null -> fileNameText
+                            formattedDuration != null -> "Audio Clip ($formattedDuration)"
+                            else -> "Audio Clip"
+                        }
+                        Text(
+                            text = label,
+                            style = Theme[typography][small].copy(
+                                color = audioClipColors.content,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            singleLine = true,
+                        )
+                    }
+
+                    // Body: clean neutral skeleton with center baseline
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val centerY = size.height / 2f
+                            drawLine(
+                                color = audioClipColors.content.copy(alpha = 0.40f),
+                                start = Offset(0f, centerY),
+                                end = Offset(size.width, centerY),
+                                strokeWidth = 1f
+                            )
+                        }
+                    }
+                }
+            }
+        }
         if (showContextMenu && track is MidiTimelineTrack) {
             val targetStartMs: Long
             val targetEndMs: Long

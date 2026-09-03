@@ -40,12 +40,22 @@ data class AudioSourcePlayback(
     val origin: Any? = null,
 )
 
+data class AudioFileMetadata(
+    val durationMs: Long,
+    val sampleRate: Int,
+    val channels: Int,
+    val totalSamples: Long,
+    val bitDepth: Int = 16,
+)
+
 /** Cross-platform output-only interface for the Echo audio engine. */
 expect object Echo {
+    suspend fun probeAudioFile(filePath: String): AudioFileMetadata?
     suspend fun decodeAudioFile(filePath: String, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal?
     suspend fun decodeAudioData(audioData: ByteArray, fileName: String, sampleStart: Long? = null, sampleEnd: Long? = null): Signal.AudioSignal?
     fun isFormatSupported(fileName: String): Boolean
     fun getSupportedFormats(): List<String>
+    fun getActiveDragFile(): String?
 
     /** Opens the platform output using the configured low-latency buffer size. */
     fun initialize(): Boolean

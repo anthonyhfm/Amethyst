@@ -9,5 +9,5 @@ import io.github.vinceglb.filekit.PlatformFile
 @Composable
 expect fun Modifier.fileDropTarget(
     onHover: (isHovering: Boolean, offset: Offset?, files: List<PlatformFile>) -> Unit,
-    onDrop: (files: List<PlatformFile>) -> Unit
+    onDrop: (offset: Offset?, files: List<PlatformFile>) -> Unit
 ): Modifier

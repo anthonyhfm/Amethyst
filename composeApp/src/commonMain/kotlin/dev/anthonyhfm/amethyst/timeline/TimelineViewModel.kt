@@ -25,9 +25,18 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.timeline.data.AudioDecodingManager
+import dev.anthonyhfm.amethyst.timeline.data.AudioSource
+import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
+import dev.anthonyhfm.amethyst.timeline.data.msToUs
+import dev.anthonyhfm.amethyst.timeline.data.samplesToUs
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.Dispatchers
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.TimelineDuration
@@ -381,22 +390,50 @@ class TimelineViewModel : ViewModel() {
             val currentTracks = _tracks.value.toMutableList()
             val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return@launch
             val before = snapshotAudioEntries(track)
-            track.addFromFile(file, at)
-            val original = track.entries[at] ?: return@launch
+
             val bpm = WorkspaceRepository.bpm.value
             val gridType = WorkspaceRepository.gridType.value
             val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
-                original.startTimeMs
+                at
             } else {
                 val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
-                snapToGrid(original.startTimeMs, intervals.intervalMs)
-            }
-            val newEntry = if (snappedStart != original.startTimeMs) {
-                track.entries.remove(original.startTimeMs)
-                original.copyWithShiftedStartMs(snappedStart)
-            } else original
-            val resolved = resolveOverlapAsymmetric(track, newEntry, originStartMs = original.startTimeMs) ?: return@launch
+                snapToGrid(at, intervals.intervalMs)
+            }.coerceAtLeast(0L)
+
+            // Fast Header Probe (< 1 ms) to get length and format without decoding full PCM
+            val metadata = Echo.probeAudioFile(file.path)
+            val durationMs = metadata?.durationMs?.takeIf { it > 0 } ?: 4000L
+            val sampleRate = metadata?.sampleRate ?: 44100
+            val channels = metadata?.channels ?: 2
+            val bitDepth = metadata?.bitDepth ?: 16
+            val totalSamples = metadata?.totalSamples?.takeIf { it > 0 }
+                ?: ((durationMs * sampleRate) / 1000L)
+
+            val sourceId = UUID.randomUUID()
+            val fileName = file.name
+
+            // Register in AudioDecodingManager so AudioClip can render skeleton & progressive loading
+            AudioDecodingManager.startDecoding(sourceId, fileName)
+
+            val newEntry = AudioEntry(
+                startTimeMs = snappedStart,
+                durationMs = durationMs,
+                fileName = fileName,
+                sourceId = sourceId,
+                clipStartSample = 0L,
+                clipEndSample = totalSamples,
+                sampleRate = sampleRate,
+                channels = channels,
+                bitDepth = bitDepth,
+                name = fileName.substringBeforeLast('.'),
+                startTimeUs = msToUs(snappedStart),
+                durationUs = samplesToUs(totalSamples, sampleRate)
+            )
+
+            val resolved = resolveOverlapAsymmetric(track, newEntry, originStartMs = snappedStart) ?: newEntry
             track.entries[resolved.startTimeMs] = resolved
+
+            // Publish immediately: Skeleton clip is placed INSTANTLY in Frame 1!
             val after = snapshotAudioEntries(track)
             val newTrack = track.copyWithEntries()
             currentTracks[trackIndex] = newTrack
@@ -404,6 +441,62 @@ class TimelineViewModel : ViewModel() {
             TimelineRepository.tracks.value = currentTracks.toList()
             SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
             UndoManager.addAction(UndoableAction.TimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
+
+            // Start asynchronous decoding on IO dispatcher so UI never freezes
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    // Smoothly advance decoding progress so waveform sweeps from left to right
+                    for (step in 1..4) {
+                        kotlinx.coroutines.delay(65)
+                        AudioDecodingManager.updateProgress(sourceId, step * 0.22f)
+                    }
+                    val audio = Echo.decodeAudioFile(file.path)
+                    if (audio != null && audio.rawData != null) {
+                        val bytesPerSample = ((audio.bitDepth / 8) * audio.channels).coerceAtLeast(1)
+                        val actualTotalSamples = audio.rawData.size.toLong() / bytesPerSample
+                        val actualDurationMs = audio.durationMs
+                        val actualDurationUs = samplesToUs(actualTotalSamples, audio.sampleRate)
+
+                        val source = AudioSource(
+                            id = sourceId,
+                            fileName = fileName,
+                            rawData = audio.rawData,
+                            sampleRate = audio.sampleRate,
+                            channels = audio.channels,
+                            bitDepth = audio.bitDepth
+                        )
+                        AudioSourceLibrary.add(source)
+                        AudioDecodingManager.updateProgress(sourceId, 1f)
+                        AudioDecodingManager.markComplete(sourceId)
+
+                        // Update AudioEntry in the track with final decoded metrics and re-emit tracks:
+                        val latestTracks = _tracks.value.toMutableList()
+                        val currentTrack = latestTracks.getOrNull(trackIndex) as? AudioTimelineTrack
+                        if (currentTrack != null) {
+                            val existingEntry = currentTrack.entries[snappedStart]
+                            if (existingEntry != null) {
+                                val updatedEntry = existingEntry.copy(
+                                    durationMs = actualDurationMs,
+                                    durationUs = actualDurationUs,
+                                    clipEndSample = actualTotalSamples,
+                                    sampleRate = audio.sampleRate,
+                                    channels = audio.channels,
+                                    bitDepth = audio.bitDepth
+                                )
+                                currentTrack.entries[snappedStart] = updatedEntry
+                                val newTrack = currentTrack.copyWithEntries()
+                                latestTracks[trackIndex] = newTrack
+                                _tracks.value = latestTracks.toList()
+                                TimelineRepository.tracks.value = latestTracks.toList()
+                            }
+                        }
+                    } else {
+                        AudioDecodingManager.markError(sourceId, "Failed to decode audio file")
+                    }
+                } catch (e: Exception) {
+                    AudioDecodingManager.markError(sourceId, e.message ?: "Decoding failed")
+                }
+            }
         }
     }
 

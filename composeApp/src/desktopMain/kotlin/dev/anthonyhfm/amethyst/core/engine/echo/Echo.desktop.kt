@@ -250,6 +250,28 @@ actual object Echo {
         }
     }
 
+    actual fun getActiveDragFile(): String? {
+        return try {
+            decoder.getActiveDragFile()
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    actual suspend fun probeAudioFile(
+        filePath: String
+    ): AudioFileMetadata? = withContext(Dispatchers.IO) {
+        val result = decoder.probeFile(filePath)
+        val meta = result.metadata ?: return@withContext null
+        AudioFileMetadata(
+            durationMs = meta.durationMs.toLong(),
+            sampleRate = meta.sampleRate.toInt(),
+            channels = meta.channels.toInt(),
+            totalSamples = meta.totalSamples.toLong(),
+            bitDepth = meta.bitDepth.toInt(),
+        )
+    }
+
     actual suspend fun decodeAudioFile(
         filePath: String,
         sampleStart: Long?,

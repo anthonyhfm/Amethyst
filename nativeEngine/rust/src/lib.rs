@@ -1,6 +1,7 @@
 pub mod midi;
 pub mod echo;
 pub mod pcm_output;
+pub mod drag_drop;
 #[cfg(target_os = "android")]
 mod android_context;
 
@@ -9,7 +10,7 @@ pub use midi::error::*;
 pub use midi::event::*;
 pub use midi::access::MidiAccess;
 pub use midi::connection::MidiConnection;
-pub use echo::{EchoAudioBuffer, EchoDecodeResult, EchoEngine};
+pub use echo::{EchoAudioBuffer, EchoAudioMetadata, EchoDecodeResult, EchoEngine, EchoProbeResult};
 pub use pcm_output::{PcmOutputDeviceInfo, PcmOutputService, PcmOutputTelemetry};
 
 #[derive(uniffi::Record)]
