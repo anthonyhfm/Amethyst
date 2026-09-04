@@ -12,22 +12,11 @@ let package = Package(
       targets: ["KotlinMultiplatformLinkedPackage"]
     )
   ],
-  dependencies: [
-    .package(
-      url: "https://github.com/HealsCodes/vorbis-swift.git",
-      exact: "1.3.7"
-    )
-  ],
+  dependencies: [],
   targets: [
     .target(
       name: "KotlinMultiplatformLinkedPackage",
-      dependencies: [
-        .product(
-          name: "LibVorbis",
-          package: "vorbis-swift",
-          condition: .when(platforms: [.iOS])
-        )
-      ]
+      dependencies: []
     )
   ]
 )

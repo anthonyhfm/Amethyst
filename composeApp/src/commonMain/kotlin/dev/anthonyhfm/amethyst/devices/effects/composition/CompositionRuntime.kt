@@ -90,6 +90,45 @@ sealed interface GeometryPaint {
         override fun opacityAt(point: Vec2, bounds: Pair<IntOffset, IntSize>) =
             (source.opacityAt(point, bounds) * predicate(point, bounds)).coerceIn(0f, 1f)
     }
+
+    data class Invert(
+        val source: GeometryPaint,
+        val amount: Float = 1f,
+        val invertAlpha: Boolean = false,
+        val mode: String = "RGB",
+    ) : GeometryPaint {
+        override fun colorAt(point: Vec2, bounds: Pair<IntOffset, IntSize>): Color {
+            val src = source.colorAt(point, bounds)
+            val a = amount.coerceIn(0f, 1f)
+            if (a <= 0.0001f) return src
+            val targetColor = if (mode == "Lightness") {
+                invertLightness(src)
+            } else {
+                Color(1f - src.red, 1f - src.green, 1f - src.blue, src.alpha)
+            }
+            val finalAlpha = if (invertAlpha) {
+                (src.alpha + ((1f - src.alpha) - src.alpha) * a).coerceIn(0f, 1f)
+            } else {
+                src.alpha
+            }
+            return Color(
+                red = (src.red + (targetColor.red - src.red) * a).coerceIn(0f, 1f),
+                green = (src.green + (targetColor.green - src.green) * a).coerceIn(0f, 1f),
+                blue = (src.blue + (targetColor.blue - src.blue) * a).coerceIn(0f, 1f),
+                alpha = finalAlpha,
+            )
+        }
+
+        override fun opacityAt(point: Vec2, bounds: Pair<IntOffset, IntSize>): Float {
+            val src = source.opacityAt(point, bounds)
+            return if (invertAlpha) {
+                val a = amount.coerceIn(0f, 1f)
+                (src + ((1f - src) - src) * a).coerceIn(0f, 1f)
+            } else {
+                src
+            }
+        }
+    }
 }
 
 data class PaintStop(val position: Float, val color: Color, val smoothness: String = "Linear")
@@ -120,7 +159,7 @@ fun interpolatePaintStops(rawStops: List<PaintStop>, t: Float): Color {
     )
 }
 
-private fun shiftHsl(color: Color, hueDegrees: Float, saturationDelta: Float, lightnessDelta: Float): Color {
+internal fun shiftHsl(color: Color, hueDegrees: Float, saturationDelta: Float, lightnessDelta: Float): Color {
     val max = maxOf(color.red, color.green, color.blue); val min = minOf(color.red, color.green, color.blue)
     val delta = max - min; var hue = 0f
     if (delta > .00001f) hue = when (max) { color.red -> 60f * (((color.green - color.blue) / delta) % 6f); color.green -> 60f * ((color.blue - color.red) / delta + 2f); else -> 60f * ((color.red - color.green) / delta + 4f) }
@@ -131,3 +170,12 @@ private fun shiftHsl(color: Color, hueDegrees: Float, saturationDelta: Float, li
     val (r, g, b) = when (hue) { in 0f..<60f -> Triple(c,x,0f); in 60f..<120f -> Triple(x,c,0f); in 120f..<180f -> Triple(0f,c,x); in 180f..<240f -> Triple(0f,x,c); in 240f..<300f -> Triple(x,0f,c); else -> Triple(c,0f,x) }
     return Color((r + m).coerceIn(0f,1f), (g + m).coerceIn(0f,1f), (b + m).coerceIn(0f,1f), color.alpha)
 }
+
+fun invertLightness(color: Color): Color {
+    val max = maxOf(color.red, color.green, color.blue)
+    val min = minOf(color.red, color.green, color.blue)
+    val currentL = (max + min) / 2f
+    val deltaL = (1f - currentL) - currentL
+    return shiftHsl(color, hueDegrees = 0f, saturationDelta = 0f, lightnessDelta = deltaL)
+}
+

@@ -53,6 +53,7 @@ struct AbletonImportWizardSheet: View {
                             .truncationMode(.middle)
                     }
                 }
+                .listRowBackground(theme.muted)
 
                 // Custom palette (optional)
                 Section {
@@ -87,6 +88,7 @@ struct AbletonImportWizardSheet: View {
                 } footer: {
                     Text("Optional. Overrides the default Novation colour palette.")
                 }
+                .listRowBackground(theme.muted)
 
                 // Apollo project (optional)
                 Section {
@@ -121,6 +123,7 @@ struct AbletonImportWizardSheet: View {
                 } footer: {
                     Text("Optional. If set, the lights chain will be taken from the Apollo project instead.")
                 }
+                .listRowBackground(theme.muted)
             }
             .scrollContentBackground(.hidden)
             .background(theme.background.ignoresSafeArea())

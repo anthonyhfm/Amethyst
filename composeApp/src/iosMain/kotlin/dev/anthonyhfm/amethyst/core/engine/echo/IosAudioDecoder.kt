@@ -1,17 +1,12 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.nativeengine.EchoAudioBuffer
+import dev.anthonyhfm.amethyst.nativeengine.EchoEngine as NativeEchoDecoder
 import io.github.vinceglb.filekit.utils.toNSData
-import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.FloatVar
-import kotlinx.cinterop.IntVar
-import kotlinx.cinterop.alloc
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.pointed
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.value
 import platform.AVFAudio.AVAudioFile
 import platform.AVFAudio.AVAudioPCMBuffer
 import platform.AVFAudio.AVAudioPCMFormatFloat32
@@ -19,25 +14,30 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
 import platform.Foundation.NSUUID
-import swiftPMImport.dev.anthonyhfm.amethyst.composeApp.OggVorbis_File
-import swiftPMImport.dev.anthonyhfm.amethyst.composeApp.ov_clear
-import swiftPMImport.dev.anthonyhfm.amethyst.composeApp.ov_fopen
-import swiftPMImport.dev.anthonyhfm.amethyst.composeApp.ov_info
-import swiftPMImport.dev.anthonyhfm.amethyst.composeApp.ov_pcm_seek
-import swiftPMImport.dev.anthonyhfm.amethyst.composeApp.ov_pcm_total
-import swiftPMImport.dev.anthonyhfm.amethyst.composeApp.ov_read_float
 import kotlin.math.roundToInt
 
 /**
  * iOS decoder that normalizes every supported format to the same signed
  * little-endian 24-bit PCM representation used by the desktop backend.
  *
- * AVFoundation handles the system formats. Ogg/Vorbis uses libvorbis through
- * Kotlin's SwiftPM Clang-module import, without a Swift bridge.
+ * AVFoundation handles the system formats. The shared Rust/Symphonia decoder
+ * provides parity with desktop and Android for unsupported codecs/containers.
  */
 @OptIn(ExperimentalForeignApi::class)
 internal object IosAudioDecoder {
-    val formats = listOf("wav", "mp3", "flac", "ogg", "aiff", "aif", "aifc")
+    val formats = EchoSupportedAudioFormats
+    private val fallbackDecoder = NativeEchoDecoder()
+
+    fun probeFile(filePath: String): AudioFileMetadata? {
+        val metadata = fallbackDecoder.probeFile(filePath).metadata ?: return null
+        return AudioFileMetadata(
+            durationMs = metadata.durationMs.toLong(),
+            sampleRate = metadata.sampleRate.toInt(),
+            channels = metadata.channels.toInt(),
+            totalSamples = metadata.totalSamples.toLong(),
+            bitDepth = metadata.bitDepth.toInt(),
+        )
+    }
 
     fun decodeFile(
         filePath: String,
@@ -46,11 +46,9 @@ internal object IosAudioDecoder {
     ): Signal.AudioSignal? {
         val extension = filePath.substringAfterLast('.', "").lowercase()
         if (extension !in formats) return null
-        return if (extension == "ogg") {
-            decodeVorbis(filePath, sampleStart, sampleEnd)
-        } else {
-            decodeWithAvFoundation(filePath, sampleStart, sampleEnd)
-        }
+        val platformDecoded = decodeWithAvFoundation(filePath, sampleStart, sampleEnd)
+        return platformDecoded ?: fallbackDecoder.decodeFile(filePath).buffer
+            ?.toSignal(sampleStart, sampleEnd)
     }
 
     fun decodeData(
@@ -75,7 +73,9 @@ internal object IosAudioDecoder {
             return null
         }
         return try {
-            decodeFile(temporaryPath, sampleStart, sampleEnd)
+            val platformDecoded = decodeWithAvFoundation(temporaryPath, sampleStart, sampleEnd)
+            platformDecoded ?: fallbackDecoder.decodeBytes(audioData, fileName).buffer
+                ?.toSignal(sampleStart, sampleEnd)
         } finally {
             fileManager.removeItemAtPath(temporaryPath, null)
         }
@@ -162,81 +162,6 @@ internal object IosAudioDecoder {
         }
     }
 
-    private fun decodeVorbis(
-        filePath: String,
-        sampleStart: Long?,
-        sampleEnd: Long?,
-    ): Signal.AudioSignal? = memScoped {
-        val vorbisFile = alloc<OggVorbis_File>()
-        if (ov_fopen(filePath, vorbisFile.ptr) != 0) return null
-
-        try {
-            val initialInfo = ov_info(vorbisFile.ptr, -1)?.pointed ?: return null
-            val sampleRate = initialInfo.rate.toInt()
-            val channels = initialInfo.channels
-            if (sampleRate <= 0 || channels !in 1..2) return null
-
-            val range = normalizedRange(
-                totalFrames = ov_pcm_total(vorbisFile.ptr, -1),
-                sampleStart = sampleStart,
-                sampleEnd = sampleEnd,
-            ) ?: return null
-            val requestedFrames = range.last - range.first
-            val output = allocatePcm24(requestedFrames, channels) ?: return null
-            if (requestedFrames == 0L) {
-                return signal(output, sampleRate, channels, 0L)
-            }
-            if (range.first > 0L && ov_pcm_seek(vorbisFile.ptr, range.first) != 0) {
-                return null
-            }
-
-            val pcmChannels = alloc<CPointerVar<CPointerVar<FloatVar>>>()
-            val bitstream = alloc<IntVar>()
-            var framesRemaining = requestedFrames
-            var outputIndex = 0
-            var decodedFrames = 0L
-            var recoverableHoles = 0
-            while (framesRemaining > 0L) {
-                val framesToRead = minOf(DECODE_BLOCK_FRAMES.toLong(), framesRemaining).toInt()
-                val read = ov_read_float(
-                    vorbisFile.ptr,
-                    pcmChannels.ptr,
-                    framesToRead,
-                    bitstream.ptr,
-                )
-                if (read == 0L) break
-                if (read < 0L) {
-                    if (++recoverableHoles > MAX_RECOVERABLE_VORBIS_HOLES) return null
-                    continue
-                }
-                recoverableHoles = 0
-
-                val streamInfo = ov_info(vorbisFile.ptr, bitstream.value)?.pointed ?: return null
-                if (streamInfo.rate.toInt() != sampleRate || streamInfo.channels != channels) {
-                    return null
-                }
-                val planar = pcmChannels.value ?: return null
-                var frame = 0
-                while (frame < read.toInt()) {
-                    var channel = 0
-                    while (channel < channels) {
-                        val samples = planar[channel] ?: return null
-                        outputIndex = writePcm24(output, outputIndex, samples[frame])
-                        channel++
-                    }
-                    frame++
-                }
-                decodedFrames += read
-                framesRemaining -= read
-            }
-
-            val exactOutput = if (outputIndex == output.size) output else output.copyOf(outputIndex)
-            signal(exactOutput, sampleRate, channels, decodedFrames)
-        } finally {
-            ov_clear(vorbisFile.ptr)
-        }
-    }
-
     private fun normalizedRange(
         totalFrames: Long,
         sampleStart: Long?,
@@ -282,7 +207,30 @@ internal object IosAudioDecoder {
         durationMs = frameCount * 1_000L / sampleRate,
     )
 
+    private fun EchoAudioBuffer.toSignal(
+        sampleStart: Long?,
+        sampleEnd: Long?,
+    ): Signal.AudioSignal? {
+        val channelCount = channels.toInt()
+        val rate = sampleRate.toInt()
+        if (rate <= 0 || channelCount !in 1..2) return null
+
+        val totalFrames = samples.size / channelCount
+        val start = (sampleStart ?: 0L).coerceIn(0L, totalFrames.toLong()).toInt()
+        val end = (sampleEnd ?: totalFrames.toLong())
+            .coerceIn(start.toLong(), totalFrames.toLong())
+            .toInt()
+        val output = allocatePcm24((end - start).toLong(), channelCount) ?: return null
+        var outputIndex = 0
+        var sampleIndex = start * channelCount
+        val sampleEndIndex = end * channelCount
+        while (sampleIndex < sampleEndIndex) {
+            outputIndex = writePcm24(output, outputIndex, samples[sampleIndex])
+            sampleIndex++
+        }
+        return signal(output, rate, channelCount, (end - start).toLong())
+    }
+
     private const val PCM24_BYTES = 3
     private const val DECODE_BLOCK_FRAMES = 4_096
-    private const val MAX_RECOVERABLE_VORBIS_HOLES = 8
 }

@@ -46,5 +46,5 @@ jni = "0.21"
 ndk-context = "0.1.1"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "staticlib"]
 path = "src/lib.rs"

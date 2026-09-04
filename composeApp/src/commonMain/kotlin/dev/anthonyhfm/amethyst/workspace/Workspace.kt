@@ -22,7 +22,7 @@ import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.ui.components.ActivityToastOverlay
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
-import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceBottomSheet
+import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 
@@ -30,7 +30,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 fun Workspace(onBack: () -> Unit = {}) {
     val mode by WorkspaceRepository.mode.collectAsState()
     val activityToasts by CollaborationPresence.activityToasts.collectAsState()
-    var showExitSheet by remember { mutableStateOf(false) }
+    var showExitDialog by remember { mutableStateOf(false) }
 
     val showDeviceConfigurator by WorkspaceRepository.showDeviceConfigurator.collectAsState()
     val showDevicePicker by WorkspaceRepository.showDevicePicker.collectAsState()
@@ -44,7 +44,7 @@ fun Workspace(onBack: () -> Unit = {}) {
             mode = mode,
             onBack = {
                 if (WorkspaceRepository.hasUnsavedChanges()) {
-                    showExitSheet = true
+                    showExitDialog = true
                 } else {
                     onBack()
                 }
@@ -56,19 +56,19 @@ fun Workspace(onBack: () -> Unit = {}) {
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            if (showExitSheet) {
-                ExitWorkspaceBottomSheet(
+            if (showExitDialog) {
+                ExitWorkspaceDialog(
                     onSaveAndExit = {
-                        showExitSheet = false
+                        showExitDialog = false
                         WorkspaceRepository.saveWorkspace()
                         onBack()
                     },
                     onDiscardAndExit = {
-                        showExitSheet = false
+                        showExitDialog = false
                         onBack()
                     },
                     onCancel = {
-                        showExitSheet = false
+                        showExitDialog = false
                     }
                 )
             }

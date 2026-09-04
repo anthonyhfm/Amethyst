@@ -24,7 +24,7 @@ import kotlin.math.max
 
 actual object Echo {
     private val decoder = NativeEchoDecoder()
-    private val formats = listOf("wav", "mp3", "flac", "ogg", "aiff", "aif", "aifc")
+    private val formats = EchoSupportedAudioFormats
     private val renderRunning = AtomicBoolean(false)
     private val healthMonitorRunning = AtomicBoolean(false)
     private val mutableOutputStatus = MutableStateFlow(AudioOutputStatus())

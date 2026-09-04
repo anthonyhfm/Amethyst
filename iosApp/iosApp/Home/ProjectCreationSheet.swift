@@ -55,6 +55,7 @@ struct ProjectCreationSheet: View {
                         Text("Shown in your workspace and recent projects.")
                     }
                 }
+                .listRowBackground(theme.muted)
 
                 // Author
                 Section {
@@ -72,6 +73,7 @@ struct ProjectCreationSheet: View {
                 } footer: {
                     Text("Saved as your default. Leave blank to fall back to \"Unknown Author\".")
                 }
+                .listRowBackground(theme.muted)
             }
             .scrollContentBackground(.hidden)
             .background(theme.background.ignoresSafeArea())

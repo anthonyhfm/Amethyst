@@ -30,14 +30,7 @@ actual object Echo {
     actual suspend fun probeAudioFile(
         filePath: String
     ): AudioFileMetadata? = withContext(Dispatchers.Default) {
-        val signal = IosAudioDecoder.decodeFile(filePath, 0L, 1L) ?: return@withContext null
-        AudioFileMetadata(
-            durationMs = signal.durationMs,
-            sampleRate = signal.sampleRate,
-            channels = signal.channels,
-            totalSamples = (signal.durationMs * signal.sampleRate) / 1000L,
-            bitDepth = signal.bitDepth,
-        )
+        IosAudioDecoder.probeFile(filePath)
     }
 
     actual suspend fun decodeAudioFile(

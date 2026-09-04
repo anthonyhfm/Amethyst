@@ -54,23 +54,6 @@ kotlin {
         }
     }
 
-    swiftPMDependencies {
-        discoverClangModulesImplicitly = false
-        iosMinimumDeploymentTarget.set("15.3")
-
-        swiftPackage(
-            url = url("https://github.com/HealsCodes/vorbis-swift.git"),
-            version = exact("1.3.7"),
-            products = listOf(
-                product(
-                    "LibVorbis",
-                    platforms = setOf(iOS()),
-                ),
-            ),
-            importedClangModules = listOf("LibVorbis"),
-        )
-    }
-
     jvm("desktop") {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
@@ -129,6 +112,9 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+        }
+        iosMain.dependencies {
+            implementation(projects.nativeEngine)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs) {

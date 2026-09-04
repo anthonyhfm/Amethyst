@@ -442,8 +442,8 @@ class TimelineViewModel : ViewModel() {
             SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
             UndoManager.addAction(UndoableAction.TimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
 
-            // Start asynchronous decoding on IO dispatcher so UI never freezes
-            viewModelScope.launch(Dispatchers.IO) {
+            // Decoding is CPU-bound and Dispatchers.IO is not available on every native target.
+            viewModelScope.launch(Dispatchers.Default) {
                 try {
                     // Smoothly advance decoding progress so waveform sweeps from left to right
                     for (step in 1..4) {

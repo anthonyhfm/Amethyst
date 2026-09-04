@@ -4,6 +4,11 @@ import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlinx.coroutines.flow.StateFlow
 
+internal val EchoSupportedAudioFormats = listOf(
+    "wav", "wave", "mp1", "mp2", "mp3", "flac", "ogg", "oga",
+    "aac", "m4a", "caf", "aiff", "aif", "aifc",
+)
+
 data class AudioOutputDevice(
     val id: String,
     val displayName: String,
