@@ -34,9 +34,7 @@ object NodeRegistry {
         register(MagnetNode)
         register(GlitchNode)
         register(WaveNode)
-        register(InvertNode)
         register(KaleidoscopeNode)
-        register(ScaleNode)
         register(OutputNode)
     }
 
