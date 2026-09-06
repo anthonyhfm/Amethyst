@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
+import com.mohamedrejeb.compose.dnd.DragAndDropContainer
+import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -35,12 +38,15 @@ import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
+import dev.anthonyhfm.amethyst.timeline.data.AudioSource
+import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
 
 @Composable
 fun Workspace(onBack: () -> Unit = {}) {
     val mode by WorkspaceRepository.mode.collectAsState()
     val activityToasts by CollaborationPresence.activityToasts.collectAsState()
     var showExitDialog by remember { mutableStateOf(false) }
+    val audioLibraryDragState = rememberDragAndDropState<AudioSource>()
 
     val showDeviceConfigurator by WorkspaceRepository.showDeviceConfigurator.collectAsState()
     val showDevicePicker by WorkspaceRepository.showDevicePicker.collectAsState()
@@ -67,47 +73,54 @@ fun Workspace(onBack: () -> Unit = {}) {
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            if (!mode.selectableMode) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clipToBounds()
+            CompositionLocalProvider(LocalAudioLibraryDragAndDropState provides audioLibraryDragState) {
+                DragAndDropContainer(
+                    state = audioLibraryDragState,
+                    modifier = Modifier.fillMaxSize(),
                 ) {
-                    mode.Content(Modifier.fillMaxSize())
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clipToBounds()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clipToBounds()
-                    ) {
-                        mode.Content(Modifier.fillMaxSize())
-                    }
+                    if (!mode.selectableMode) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clipToBounds()
+                        ) {
+                            mode.Content(Modifier.fillMaxSize())
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clipToBounds()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clipToBounds()
+                            ) {
+                                mode.Content(Modifier.fillMaxSize())
+                            }
 
-                    AnimatedVisibility(
-                        visible = showAudioLibrary,
-                        enter = slideInHorizontally(
-                            initialOffsetX = { fullWidth -> fullWidth },
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        ) + expandHorizontally(
-                            expandFrom = Alignment.End,
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        ),
-                        exit = slideOutHorizontally(
-                            targetOffsetX = { fullWidth -> fullWidth },
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        ) + shrinkHorizontally(
-                            shrinkTowards = Alignment.End,
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        ),
-                    ) {
-                        AudioLibraryPanel()
+                            AnimatedVisibility(
+                                visible = showAudioLibrary,
+                                enter = slideInHorizontally(
+                                    initialOffsetX = { fullWidth -> fullWidth },
+                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                                ) + expandHorizontally(
+                                    expandFrom = Alignment.End,
+                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                                ),
+                                exit = slideOutHorizontally(
+                                    targetOffsetX = { fullWidth -> fullWidth },
+                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                                ) + shrinkHorizontally(
+                                    shrinkTowards = Alignment.End,
+                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                                ),
+                            ) {
+                                AudioLibraryPanel()
+                            }
+                        }
                     }
                 }
             }

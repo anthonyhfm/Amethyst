@@ -24,6 +24,7 @@ import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
 import dev.anthonyhfm.amethyst.core.util.getProjectArchiveEntries
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
+import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -71,6 +72,8 @@ object AbletonConverter : AmethystConverter {
 
     var audioMap: Map<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState> = emptyMap()
         private set
+
+    private var audioSources: List<AudioSource> = emptyList()
 
     var isZip: Boolean = false
         private set
@@ -297,7 +300,9 @@ object AbletonConverter : AmethystConverter {
         val decodingSamplesMsg = runCatching { runBlocking { getString(Res.string.home_loading_decoding_audio_samples) } }.getOrDefault("Decoding audio samples...")
         reporter?.update(0.25f, statusText = decodingSamplesMsg, detailText = null)
         val audioReporter = reporter?.subReporter(0.25f, 0.75f)
-        audioMap = audioRenderer.decodeAll(audioTracks, reporter = audioReporter)
+        val renderedAudio = audioRenderer.decodeAll(audioTracks, reporter = audioReporter)
+        audioMap = renderedAudio.states
+        audioSources = renderedAudio.sources
 
         val analyzingLightsMsg = runCatching { runBlocking { getString(Res.string.home_loading_analyzing_light_chains) } }.getOrDefault("Analyzing light chains...")
         reporter?.update(0.78f, statusText = analyzingLightsMsg, detailText = null)
@@ -425,7 +430,9 @@ object AbletonConverter : AmethystConverter {
             } ?: StateChain(emptyList())
         }
 
+        val projectAudioSources = audioSources
         audioMap = emptyMap()
+        audioSources = emptyList()
         MxDeviceMidiEffectAdapter.fileHashMap.clear()
         MxDeviceInstrumentAdapter.fileHashMap.clear()
         projectLayout = null
@@ -447,6 +454,7 @@ object AbletonConverter : AmethystConverter {
             ),
             launchpadDevices = launchpadLayout.launchpads,
             macros = macros,
+            audioSources = projectAudioSources,
         ).also {
             this.launchpadLayout = null
         }

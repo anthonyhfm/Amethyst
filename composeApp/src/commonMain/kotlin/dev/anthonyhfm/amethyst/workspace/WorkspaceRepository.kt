@@ -18,6 +18,7 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.audio.sample.resolvedRawData
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
@@ -46,7 +47,7 @@ import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
-import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceMeta
@@ -598,14 +599,15 @@ object WorkspaceRepository {
             autoPlay = workspaceData.autoPlay
         )
 
+        // Audio is a dependency of timeline entries and sample devices. Publish the
+        // complete library before either consumer is restored.
+        AudioLibraryRepository.load(workspaceData.audioSources)
         lightsChain = workspaceData.lights.unpack()
         samplingChain = workspaceData.sampling.unpackAudio()
 
         lightsChain.signalExit = {
             Heaven.midiEnter(it.filterIsInstance<Signal.LED>())
         }
-        Echo.attachAudioChain(samplingChain)
-
         fun renderAnimationsInChain(chain: Chain): Int {
             var rendered = 0
             chain.devices.value.forEach { device ->
@@ -641,9 +643,13 @@ object WorkspaceRepository {
         )
 
         TimelineRepository.loadTracks(workspaceData.timelineData)
-        AudioSourceLibrary.load(workspaceData.audioSources)
         migrateAudioEntries()
         canonicalizeSampleSources(samplingChain)
+
+        _bpm.update {
+            workspaceData.settings.bpm
+        }
+        Echo.attachAudioChain(samplingChain)
 
         ViewportRepository.devices.value.forEach { device ->
             midiManager.detachElement(device)
@@ -675,10 +681,6 @@ object WorkspaceRepository {
 
         if (ViewportRepository.devices.value.isNotEmpty()) {
             updateWorkspaceBounds()
-        }
-
-        _bpm.update {
-            workspaceData.settings.bpm
         }
 
         renderAnimationsInChain(lightsChain)
@@ -714,7 +716,7 @@ object WorkspaceRepository {
                         channels = entry.channels,
                         bitDepth = entry.bitDepth
                     )
-                    AudioSourceLibrary.add(source)
+                    AudioLibraryRepository.add(source)
                     val startSample = if (entry.legacySourceStartMs > 0) {
                         entry.legacySourceStartMs * entry.sampleRate / 1000L
                     } else 0L
@@ -762,23 +764,60 @@ object WorkspaceRepository {
             contentHash = rawData.contentHashCode(),
         )
 
-        val sourceIndex = AudioSourceLibrary.all()
-            .groupByTo(mutableMapOf(), AudioSource::fingerprint)
-            .mapValuesTo(mutableMapOf()) { (_, sources) -> sources.toMutableList() }
+        var sourceIndex: MutableMap<SourceFingerprint, MutableList<AudioSource>>? = null
+
+        fun legacySourceIndex(): MutableMap<SourceFingerprint, MutableList<AudioSource>> =
+            sourceIndex ?: AudioLibraryRepository.all()
+                .groupByTo(mutableMapOf(), AudioSource::fingerprint)
+                .mapValuesTo(mutableMapOf()) { (_, sources) -> sources.toMutableList() }
+                .also { sourceIndex = it }
+
+        fun canonicalizeState(
+            device: SampleChainDevice,
+            state: SampleChainDeviceState,
+            source: AudioSource,
+        ) {
+            val migratedStartFrame = state.sourceStartFrame
+                ?: (source.totalSamples.toDouble() * state.startPosition.toDouble())
+                    .toLong()
+                    .coerceIn(0L, source.totalSamples)
+            val migratedEndFrame = state.sourceEndFrameExclusive
+                ?: (source.totalSamples.toDouble() * state.endPosition.toDouble())
+                    .toLong()
+                    .coerceIn(migratedStartFrame, source.totalSamples)
+            if (
+                state.sourceId != source.id || state.rawData != null ||
+                state.sourceStartFrame != migratedStartFrame ||
+                state.sourceEndFrameExclusive != migratedEndFrame
+            ) {
+                device.state.value = state.copy(
+                    rawData = null,
+                    sourceId = source.id,
+                    sourceStartFrame = migratedStartFrame,
+                    sourceEndFrameExclusive = migratedEndFrame,
+                )
+                device.onStateRestored()
+            }
+        }
 
         fun visit(current: Chain) {
             current.devices.value.forEach { device ->
                 when (device) {
                     is SampleChainDevice -> {
                         val state = device.state.value
-                        val bytes = state.resolvedRawData() ?: return@forEach
                         val directSource = state.sourceId
-                            ?.let(AudioSourceLibrary::get)
+                            ?.let(AudioLibraryRepository::get)
                             ?.takeIf {
                                 it.sampleRate == state.sampleRate &&
                                     it.channels == state.channels &&
                                     it.bitDepth == state.bitDepth
                             }
+                        if (directSource != null) {
+                            canonicalizeState(device, state, directSource)
+                            return@forEach
+                        }
+
+                        val bytes = state.resolvedRawData() ?: return@forEach
                         val fingerprint = SourceFingerprint(
                             sampleRate = state.sampleRate,
                             channels = state.channels,
@@ -786,11 +825,11 @@ object WorkspaceRepository {
                             byteCount = bytes.size,
                             contentHash = bytes.contentHashCode(),
                         )
-                        val source = directSource
-                            ?: sourceIndex[fingerprint]
-                                ?.firstOrNull {
-                                    it.rawData === bytes || it.rawData.contentEquals(bytes)
-                                }
+                        val index = legacySourceIndex()
+                        val source = index[fingerprint]
+                            ?.firstOrNull {
+                                it.rawData === bytes || it.rawData.contentEquals(bytes)
+                            }
                             ?: AudioSource(
                                 id = UUID.randomUUID(),
                                 fileName = state.fileName,
@@ -799,16 +838,10 @@ object WorkspaceRepository {
                                 channels = state.channels,
                                 bitDepth = state.bitDepth,
                             ).also {
-                                AudioSourceLibrary.add(it)
-                                sourceIndex.getOrPut(fingerprint, ::mutableListOf) += it
+                                AudioLibraryRepository.add(it)
+                                index.getOrPut(fingerprint, ::mutableListOf) += it
                             }
-                        if (state.sourceId != source.id || state.rawData != null) {
-                            device.state.value = state.copy(
-                                rawData = null,
-                                sourceId = source.id,
-                            )
-                            device.onStateRestored()
-                        }
+                        canonicalizeState(device, state, source)
                     }
 
                     is NestedChainDevice -> device.nestedChains().forEach(::visit)
@@ -924,7 +957,7 @@ object WorkspaceRepository {
                     else -> { TODO("Could not serialize virtual launchpad element for the workspace") }
                 }
             },
-            audioSources = AudioSourceLibrary.all(),
+            audioSources = AudioLibraryRepository.all(),
         )
     }
 
@@ -961,7 +994,7 @@ object WorkspaceRepository {
         SelectionManager.clear()
         Echo.reset()
         Heaven.clear()
-        AudioSourceLibrary.clear()
+        AudioLibraryRepository.clear()
         TransmitChainDevice.clearReceiversForTesting()
         AutomappingManager.reset()
 

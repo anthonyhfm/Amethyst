@@ -169,6 +169,23 @@ class SamplePlaybackTest {
         assertEquals(0, restored.chokeGroup)
         assertEquals(SampleWarpMode.Off, restored.warpMode)
         assertEquals(null, restored.sourceBpm)
+        assertEquals(null, restored.sourceStartFrame)
+        assertEquals(null, restored.sourceEndFrameExclusive)
+    }
+
+    @Test
+    fun exactSourceRegionOverridesLossyNormalizedPositions() {
+        val snapshot = snapshot(
+            state(frames = 100).copy(
+                startPosition = 0f,
+                endPosition = 1f,
+                sourceStartFrame = 23L,
+                sourceEndFrameExclusive = 71L,
+            )
+        )
+
+        assertEquals(23L, snapshot.startFrame)
+        assertEquals(71L, snapshot.endFrame)
     }
 
     @Test

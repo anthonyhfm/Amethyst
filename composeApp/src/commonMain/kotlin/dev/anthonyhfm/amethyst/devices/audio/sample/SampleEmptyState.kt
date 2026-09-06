@@ -14,10 +14,7 @@ import com.composeunstyled.Icon
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
-import dev.anthonyhfm.amethyst.core.util.UUID
-import dev.anthonyhfm.amethyst.core.util.randomUUID
-import dev.anthonyhfm.amethyst.timeline.data.AudioSource
-import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.Empty
@@ -32,7 +29,6 @@ import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.name
-import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -69,37 +65,19 @@ fun SampleEmptyState(
 
                         file?.let { selectedFile ->
                             try {
-                                val audioSignal = Echo.decodeAudioData(
-                                    audioData = selectedFile.readBytes(),
-                                    fileName = selectedFile.name
-                                )
-
-                                audioSignal?.let { signal ->
-                                    val rawData = signal.rawData ?: return@let
-                                    val bytesPerSample = signal.bitDepth / 8
-                                    val frameSize = bytesPerSample * signal.channels
-                                    val totalFrames = rawData.size / frameSize
-                                    val durationMs = ((totalFrames.toFloat() / signal.sampleRate) * 1000f).toLong()
-                                    val source = AudioSource(
-                                        id = UUID.randomUUID(),
-                                        fileName = selectedFile.name,
-                                        rawData = rawData,
-                                        sampleRate = signal.sampleRate,
-                                        channels = signal.channels,
-                                        bitDepth = signal.bitDepth,
-                                    )
-                                    AudioSourceLibrary.add(source)
-
+                                AudioLibraryRepository.importFile(selectedFile)?.let { source ->
                                     state.update { currentState ->
                                         currentState.copy(
-                                            fileName = selectedFile.name,
+                                            fileName = source.fileName,
                                             rawData = null,
-                                            sampleRate = signal.sampleRate,
-                                            channels = signal.channels,
-                                            bitDepth = signal.bitDepth,
-                                            totalDurationMs = durationMs,
+                                            sampleRate = source.sampleRate,
+                                            channels = source.channels,
+                                            bitDepth = source.bitDepth,
+                                            totalDurationMs = source.totalDurationMs,
                                             isLoaded = true,
                                             sourceId = source.id,
+                                            sourceStartFrame = 0L,
+                                            sourceEndFrameExclusive = source.totalSamples,
                                         )
                                     }
                                     // Snapshot creation can include high-quality sample-rate

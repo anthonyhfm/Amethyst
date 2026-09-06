@@ -19,6 +19,11 @@ fun usToSamples(timeUs: Long, sampleRate: Int): Long {
     return ((timeUs.toDouble() * sampleRate.toDouble()) / MICROS_PER_SECOND.toDouble()).roundToLong()
 }
 
+private fun signedUsToSamples(timeUs: Long, sampleRate: Int): Long {
+    if (sampleRate <= 0 || timeUs == 0L) return 0L
+    return ((timeUs.toDouble() * sampleRate.toDouble()) / MICROS_PER_SECOND.toDouble()).roundToLong()
+}
+
 val AudioEntry.endTimeUs: Long
     get() = startTimeUs + durationUs
 
@@ -47,6 +52,50 @@ fun AudioEntry.copyWithPreciseTiming(
 
 fun AudioEntry.copyWithShiftedStartMs(startTimeMs: Long): AudioEntry =
     copyWithPreciseTiming(startTimeUs = msToUs(startTimeMs))
+
+/**
+ * Moves the clip's left edge without modifying or copying its library source.
+ * Moving left reveals samples before [AudioEntry.clipStartSample]; moving right hides them.
+ * The right timeline edge remains fixed.
+ */
+fun AudioEntry.resizeLeftTo(newStartMs: Long): AudioEntry? {
+    if (sampleRate <= 0 || clipEndSample <= 0L) return null
+
+    val requestedStartUs = msToUs(newStartMs.coerceAtLeast(0L))
+    val requestedSampleDelta = signedUsToSamples(requestedStartUs - startTimeUs, sampleRate)
+    val newStartSample = (clipStartSample + requestedSampleDelta)
+        .coerceIn(0L, clipEndSample - 1L)
+    val newDurationUs = samplesToUs(clipEndSample - newStartSample, sampleRate)
+    val newStartUs = (endTimeUs - newDurationUs).coerceAtLeast(0L)
+
+    return copyWithPreciseTiming(
+        startTimeUs = newStartUs,
+        durationUs = newDurationUs,
+        clipStartSample = newStartSample,
+    )
+}
+
+/**
+ * Moves the clip's right edge without modifying or copying its library source.
+ * Moving right can reveal samples up to [sourceTotalSamples].
+ */
+fun AudioEntry.resizeRightTo(newEndMs: Long, sourceTotalSamples: Long): AudioEntry? {
+    if (sampleRate <= 0) return null
+
+    val boundedSourceSamples = sourceTotalSamples.coerceAtLeast(clipEndSample)
+    if (boundedSourceSamples <= clipStartSample) return null
+
+    val requestedEndUs = msToUs(newEndMs.coerceAtLeast(0L))
+    val requestedSampleDelta = signedUsToSamples(requestedEndUs - endTimeUs, sampleRate)
+    val newEndSample = (clipEndSample + requestedSampleDelta)
+        .coerceIn(clipStartSample + 1L, boundedSourceSamples)
+    val newDurationUs = samplesToUs(newEndSample - clipStartSample, sampleRate)
+
+    return copyWithPreciseTiming(
+        durationUs = newDurationUs,
+        clipEndSample = newEndSample,
+    )
+}
 
 fun AudioEntry.cropAudioEntryEnd(newEndMs: Long): AudioEntry? {
     val newEndUs = msToUs(newEndMs)

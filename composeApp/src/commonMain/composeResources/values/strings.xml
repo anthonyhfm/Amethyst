@@ -753,4 +753,10 @@
     <string name="workspace_exit_dialog_save">Save Workspace</string>
     <string name="workspace_exit_dialog_dont_save">Don't Save</string>
     <string name="workspace_exit_dialog_cancel">Cancel</string>
+    <string name="audio_library_import">Import audio</string>
+    <string name="audio_library_importing">Importing audio…</string>
+    <string name="audio_library_import_failed">Some audio files could not be imported.</string>
+    <string name="audio_library_play">Play audio preview</string>
+    <string name="audio_library_pause">Pause audio preview</string>
+    <string name="audio_library_reorder">Reorder audio in the library</string>
 </resources>

@@ -1,12 +1,14 @@
 package dev.anthonyhfm.amethyst.devices.audio.sample
 
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PolyphaseSincResampler
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.PadTriggerKey
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import kotlinx.atomicfu.AtomicLongArray
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.atomicArrayOfNulls
@@ -51,13 +53,34 @@ internal class SampleRenderSnapshot private constructor(
             ) return null
 
             val original = ByteArrayPcmAudioSource(
-                id = state.fileName.ifBlank { "sample" },
+                id = state.sourceId?.takeIf(String::isNotBlank)
+                    ?: state.fileName.ifBlank { "sample" },
                 sampleRate = state.sampleRate,
                 channels = state.channels,
                 bitDepth = state.bitDepth,
                 rawData = rawData,
             )
             if (state.sampleRate == outputSampleRate) return original
+
+            // Library-backed Sample devices all reference the same immutable PCM
+            // payload. Preparing that complete payload independently per device
+            // defeats the library sharing and can allocate gigabytes for a rack
+            // containing many regions of the same file.
+            val librarySource = state.sourceId
+                ?.takeIf(String::isNotBlank)
+                ?.let(AudioLibraryRepository::get)
+                ?.takeIf {
+                    it.rawData === rawData &&
+                        it.sampleRate == state.sampleRate &&
+                        it.channels == state.channels &&
+                        it.bitDepth == state.bitDepth
+                }
+            if (librarySource != null) {
+                return PreparedAudioSourceCache.getOrPrepare(
+                    source = original,
+                    outputRate = outputSampleRate,
+                ) as ByteArrayPcmAudioSource
+            }
 
             val outputFrames = (
                 original.frameCount.toDouble() * outputSampleRate / original.sampleRate
@@ -102,9 +125,19 @@ internal class SampleRenderSnapshot private constructor(
             source: ByteArrayPcmAudioSource,
             workspaceBpm: Double = state.sourceBpm?.toDouble() ?: 120.0,
         ): SampleRenderSnapshot? {
-            val startFrame = (source.frameCount * state.startPosition).toLong()
-                .coerceIn(0, source.frameCount)
-            val endFrame = (source.frameCount * state.endPosition).toLong()
+            val sourceAssetFrames = state.resolvedRawData()
+                ?.size
+                ?.let { byteCount ->
+                    val bytesPerFrame = (state.bitDepth / 8) * state.channels
+                    if (bytesPerFrame > 0) byteCount.toLong() / bytesPerFrame else 0L
+                }
+                ?.takeIf { it > 0L }
+                ?: source.frameCount
+            val (assetStartFrame, assetEndFrame) = state.resolvedRegion(sourceAssetFrames)
+            val preparedScale = source.frameCount.toDouble() / sourceAssetFrames.toDouble()
+            val startFrame = (assetStartFrame * preparedScale).toLong()
+                .coerceIn(0L, source.frameCount)
+            val endFrame = (assetEndFrame * preparedScale).toLong()
                 .coerceIn(startFrame, source.frameCount)
             if (endFrame <= startFrame) return null
 

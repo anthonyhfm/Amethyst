@@ -743,4 +743,10 @@
     <string name="workspace_viewport_launchpad_actions_style_dialog_title_ios">面板样式</string>
     <string name="workspace_viewport_launchpad_actions_style_ios">面板样式</string>
     <string name="workspace_window_untitled_project">未命名工程</string>
+    <string name="audio_library_import">导入音频</string>
+    <string name="audio_library_importing">正在导入音频…</string>
+    <string name="audio_library_import_failed">部分音频文件无法导入。</string>
+    <string name="audio_library_play">播放音频预览</string>
+    <string name="audio_library_pause">暂停音频预览</string>
+    <string name="audio_library_reorder">在音频库中重新排序</string>
 </resources>

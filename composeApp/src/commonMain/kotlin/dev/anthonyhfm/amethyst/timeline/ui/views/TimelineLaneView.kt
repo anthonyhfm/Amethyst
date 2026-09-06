@@ -300,6 +300,13 @@ fun TimelineLaneView(
                             at = atTimeMs
                         )
                     },
+                    onDropInAudioSource = { source, atTimeMs ->
+                        viewModel.addAudioSourceToTrack(
+                            trackIndex = index,
+                            sourceId = source.id,
+                            at = atTimeMs,
+                        )
+                    },
                     onSelectTime = { rawClickTimeMs ->
                         val rawTimeMs = rawClickTimeMs.coerceAtLeast(0)
                         val snapped = if (ModifierKeysState.isAltPressed) {
@@ -322,6 +329,9 @@ fun TimelineLaneView(
                             is AudioTimelineTrack -> viewModel.moveAudioEntry(index, oldStart, newStart)
                             is MidiTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
                         }
+                    },
+                    onTrimAudioEntry = { oldStart, trimmedEntry ->
+                        viewModel.resizeAudioEntry(index, oldStart, trimmedEntry)
                     },
                     clipDragCallbacks = { key: TimelineClipKey ->
                         TimelineClipDragCallbacks(

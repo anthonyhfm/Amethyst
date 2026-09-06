@@ -11,7 +11,7 @@ import dev.anthonyhfm.amethyst.nativeengine.EchoAudioBuffer
 import dev.anthonyhfm.amethyst.nativeengine.EchoEngine as NativeEchoDecoder
 import dev.anthonyhfm.amethyst.nativeengine.audio.NativePcmOutput
 import dev.anthonyhfm.amethyst.settings.data.AudioSettings
-import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -273,7 +273,7 @@ actual object Echo {
         playback.setMasterGain(AudioSettings.masterVolume.value)
         val targetFrame = playback.renderer.absoluteFrame
         return sources.map { request ->
-            val source = AudioSourceLibrary.get(request.sourceId)
+            val source = AudioLibraryRepository.get(request.sourceId)
                 ?: return@map null
             val pcm = runCatching {
                 ByteArrayPcmAudioSource(

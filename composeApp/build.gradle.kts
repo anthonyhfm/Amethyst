@@ -193,6 +193,11 @@ nucleus.application {
         }
     }
 
+    if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
+        // Tao's native event loop has to run on macOS process thread 0.
+        jvmArgs += "-XstartOnFirstThread"
+    }
+
     jvmArgs += listOf(
         "--add-opens=java.base/java.lang=ALL-UNNAMED",
         "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",

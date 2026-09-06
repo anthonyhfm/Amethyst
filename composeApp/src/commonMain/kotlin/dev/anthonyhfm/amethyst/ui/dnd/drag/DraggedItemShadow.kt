@@ -78,18 +78,25 @@ internal fun <T> DraggedItemShadow(
                 translationY = rawY
                 scaleX = scale
                 scaleY = scale
-                shadowElevation = elevation
                 this.alpha = alpha
             }
     ) {
         CompositionLocalProvider(LocalDragAndDropInfo provides DragAndDropInfoImpl(isShadow = true)) {
-            // Overlay leichte Tönung hinter Content für „Card“ Effekt
             Box(
-                Modifier
-                    .matchParentSize()
-                    .background(Color.Black.copy(alpha = 0.04f))
-            )
-            state.currentDraggableItem?.content?.invoke()
+                modifier = Modifier.graphicsLayer {
+                    // The drag source can provide a smaller preview than its original bounds.
+                    // Keeping elevation here makes the shadow follow the measured preview.
+                    shadowElevation = elevation
+                }
+            ) {
+                // Overlay leichte Tönung hinter Content für „Card“ Effekt
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.04f))
+                )
+                state.currentDraggableItem?.content?.invoke()
+            }
         }
     }
 }

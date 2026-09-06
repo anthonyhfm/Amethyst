@@ -1,9 +1,5 @@
 package dev.anthonyhfm.amethyst.desktop
 
-import kotlinx.coroutines.runBlocking
-import org.jetbrains.compose.resources.getString
-import amethyst.composeapp.generated.resources.Res
-import amethyst.composeapp.generated.resources.*
 import dev.anthonyhfm.amethyst.settings.data.DiscordSettings
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
@@ -120,7 +116,10 @@ actual object DiscordRPCManager {
                 details = if (showProject && projectName != null) {
                     projectName
                 } else {
-                    runBlocking { getString(Res.string.home_widescreen_navbar_group_home) }
+                    // Never resolve Compose resources from this background scope.
+                    // On macOS that reaches AWT's Toolkit and can deadlock Tao's
+                    // AppKit main thread while the first window is being attached.
+                    HOME_PRESENCE_LABEL
                 }
                 
                 if (showState && projectName != null) {
@@ -172,4 +171,6 @@ actual object DiscordRPCManager {
             )
         }
     }
+
+    private const val HOME_PRESENCE_LABEL = "Home"
 }

@@ -1,9 +1,7 @@
 package dev.anthonyhfm.amethyst.timeline.data
 
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 
 /**
  * In-memory pool of [AudioSource] objects.
@@ -14,24 +12,22 @@ import kotlinx.coroutines.flow.update
  * Persisted alongside the project so [AudioEntry] objects never need to
  * embed the raw PCM bytes themselves.
  */
+@Deprecated("Use AudioLibraryRepository; this facade only preserves source compatibility")
 object AudioSourceLibrary {
-    private val _sources = MutableStateFlow<Map<String, AudioSource>>(emptyMap())
-    val sources: StateFlow<Map<String, AudioSource>> = _sources.asStateFlow()
+    val sources: StateFlow<Map<String, AudioSource>> = AudioLibraryRepository.sources
 
-    fun add(source: AudioSource) {
-        _sources.update { it + (source.id to source) }
-    }
+    fun add(source: AudioSource): AudioSource = AudioLibraryRepository.add(source)
 
-    fun get(id: String): AudioSource? = _sources.value[id]
+    fun get(id: String): AudioSource? = AudioLibraryRepository.get(id)
 
-    fun all(): List<AudioSource> = _sources.value.values.toList()
+    fun all(): List<AudioSource> = AudioLibraryRepository.all()
 
     /** Replaces the entire library — called on project load. */
     fun load(sources: List<AudioSource>) {
-        _sources.value = sources.associateBy { it.id }
+        AudioLibraryRepository.load(sources)
     }
 
     fun clear() {
-        _sources.value = emptyMap()
+        AudioLibraryRepository.clear()
     }
 }

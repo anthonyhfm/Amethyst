@@ -56,6 +56,8 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.sample.sampleChainStateFromAudioSource
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -74,6 +76,7 @@ import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.reflect.KClass
@@ -105,13 +108,20 @@ fun ExpandingChainDevicePicker(
     var pickerVisible: Boolean by remember { mutableStateOf(false) }
     var isExpandedByTap by remember { mutableStateOf(false) }
     val dropKey = remember { UUID.randomUUID() }
+    val audioDropKey = remember { UUID.randomUUID() }
     var isDropHover by remember { mutableStateOf(false) }
     val clipboard by ClipboardManager.clipboardData.collectAsState()
 
     var showRightClickMenu by remember { mutableStateOf(false) }
     var rightClickMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
-    val hasGlobalDrag = dragAndDropState.draggedItem != null
+    val audioLibraryDragState = LocalAudioLibraryDragAndDropState.current
+    val isSamplingDestination = samplingOverride
+        ?: (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode)
+    val acceptsAudioLibraryDrop = !forceOff && isSamplingDestination &&
+        isDeviceTypeEnabled(SampleChainDevice::class)
+    val hasGlobalDrag = dragAndDropState.draggedItem != null ||
+        audioLibraryDragState?.draggedItem != null
     val reducedMotion = rememberReducedMotion()
 
     val actualCollapsedWidth = if (isMobile) 24.dp else collapsedWidth
@@ -225,6 +235,23 @@ fun ExpandingChainDevicePicker(
 
                     isDropHover = false
                 }
+            )
+            .then(
+                if (audioLibraryDragState != null && acceptsAudioLibraryDrop) {
+                    Modifier.dropTarget(
+                        state = audioLibraryDragState,
+                        key = audioDropKey,
+                        zIndex = 20f,
+                        dropAnimationEnabled = false,
+                        onDragEnter = { isDropHover = true },
+                        onDragExit = { isDropHover = false },
+                        onDrop = { dragged ->
+                            val state = sampleChainStateFromAudioSource(dragged.data)
+                            onAddComponent(StateChain.unpackDevice(state))
+                            isDropHover = false
+                        },
+                    )
+                } else Modifier
             )
             .hoverable(interaction)
             .rightClickable {

@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import kotlin.math.ceil
@@ -128,6 +129,8 @@ fun WaveformView(
     renderWidthPx: Int? = null,
     modifier: Modifier = Modifier,
     waveColor: Color = Color.White,
+    playedProgress: Float = 0f,
+    playedWaveColor: Color? = null,
     onSeek: ((Float) -> Unit)? = null,
     zoomLevel: Float,
     fadeInMs: Float = 0f,
@@ -293,6 +296,14 @@ fun WaveformView(
             }
 
             drawPath(path = path, color = wave.copy(alpha = 0.6f))
+            playedWaveColor?.let { playedColor ->
+                val playedWidth = w * playedProgress.coerceIn(0f, 1f)
+                if (playedWidth > 0f) {
+                    clipRect(right = playedWidth) {
+                        drawPath(path = path, color = playedColor.copy(alpha = 0.9f))
+                    }
+                }
+            }
 
             // Active region overlays
             val startX = w * startPosition

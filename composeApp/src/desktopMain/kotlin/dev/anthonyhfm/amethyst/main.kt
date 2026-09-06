@@ -24,21 +24,13 @@ import io.github.vinceglb.filekit.PlatformFile
 import java.awt.Desktop
 import java.io.File
 import javax.swing.SwingUtilities
-import kotlin.system.exitProcess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 fun main(args: Array<String>) {
     initializeSentry()
 
     val platform = DesktopPlatform.get()
-
-    Echo.setPreferredBufferFrames(AudioSettings.renderBufferFrames.value)
-    Echo.setPreferredOutputDevice(
-        AudioSettings.outputDevice.value.takeUnless { it == AudioSettings.SystemDefaultOutputDevice }
-    )
-    Echo.setExclusiveMode(AudioSettings.exclusiveMode?.value == true)
-    Echo.initialize()
-    
-    DiscordRPCManager.initialize()
 
     nucleusApplication(backend = NucleusBackend.Tao) {
         FileKit.init(appId = "Amethyst")
@@ -46,6 +38,25 @@ fun main(args: Array<String>) {
         var showEditor: Boolean by remember { mutableStateOf(false) }
         var macQuitRequest by remember { mutableIntStateOf(0) }
         var pendingMacQuitResponse by remember { mutableStateOf<java.awt.desktop.QuitResponse?>(null) }
+
+        // Tao must own the macOS main thread before optional services start.
+        // Audio device setup is synchronous, so keep it off Tao's event loop.
+        LaunchedEffect(Unit) {
+            withContext(Dispatchers.IO) {
+                Echo.setPreferredBufferFrames(AudioSettings.renderBufferFrames.value)
+                Echo.setPreferredOutputDevice(
+                    AudioSettings.outputDevice.value.takeUnless {
+                        it == AudioSettings.SystemDefaultOutputDevice
+                    }
+                )
+                Echo.setExclusiveMode(AudioSettings.exclusiveMode?.value == true)
+                Echo.initialize()
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            DiscordRPCManager.initialize()
+        }
 
         LaunchedEffect(Unit) {
             if (

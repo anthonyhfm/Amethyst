@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.timeline.data.buildSegment
 import dev.anthonyhfm.amethyst.timeline.data.copyWithShiftedStartMs
 import dev.anthonyhfm.amethyst.timeline.data.cropAudioEntryEnd
 import dev.anthonyhfm.amethyst.timeline.data.deepCopy
+import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
 import dev.anthonyhfm.amethyst.timeline.data.timelineTrackRows
 import dev.anthonyhfm.amethyst.timeline.data.trimAudioEntry
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
@@ -30,7 +31,7 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.timeline.data.AudioDecodingManager
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
-import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.timeline.data.msToUs
 import dev.anthonyhfm.amethyst.timeline.data.samplesToUs
 import io.github.vinceglb.filekit.PlatformFile
@@ -457,15 +458,14 @@ class TimelineViewModel : ViewModel() {
                         val actualDurationMs = audio.durationMs
                         val actualDurationUs = samplesToUs(actualTotalSamples, audio.sampleRate)
 
-                        val source = AudioSource(
+                        val source = AudioLibraryRepository.add(AudioSource(
                             id = sourceId,
                             fileName = fileName,
                             rawData = audio.rawData,
                             sampleRate = audio.sampleRate,
                             channels = audio.channels,
                             bitDepth = audio.bitDepth
-                        )
-                        AudioSourceLibrary.add(source)
+                        ))
                         AudioDecodingManager.updateProgress(sourceId, 1f)
                         AudioDecodingManager.markComplete(sourceId)
 
@@ -476,6 +476,7 @@ class TimelineViewModel : ViewModel() {
                             val existingEntry = currentTrack.entries[snappedStart]
                             if (existingEntry != null) {
                                 val updatedEntry = existingEntry.copy(
+                                    sourceId = source.id,
                                     durationMs = actualDurationMs,
                                     durationUs = actualDurationUs,
                                     clipEndSample = actualTotalSamples,
@@ -498,6 +499,54 @@ class TimelineViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    fun addAudioSourceToTrack(trackIndex: Int, sourceId: String, at: Long = 0) {
+        val source = AudioLibraryRepository.get(sourceId) ?: return
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
+        val before = snapshotAudioEntries(track)
+        val bpm = WorkspaceRepository.bpm.value
+        val gridType = WorkspaceRepository.gridType.value
+        val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
+            at
+        } else {
+            val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
+            snapToGrid(at, intervals.intervalMs)
+        }.coerceAtLeast(0L)
+        val entry = AudioEntry(
+            startTimeMs = snappedStart,
+            durationMs = source.totalDurationMs,
+            fileName = source.fileName,
+            sourceId = source.id,
+            clipStartSample = 0L,
+            clipEndSample = source.totalSamples,
+            sampleRate = source.sampleRate,
+            channels = source.channels,
+            bitDepth = source.bitDepth,
+            name = source.fileName.substringBeforeLast('.'),
+            startTimeUs = msToUs(snappedStart),
+            durationUs = samplesToUs(source.totalSamples, source.sampleRate),
+        )
+        val resolved = resolveOverlapAsymmetric(track, entry, originStartMs = snappedStart) ?: entry
+        track.entries[resolved.startTimeMs] = resolved
+        val after = snapshotAudioEntries(track)
+        currentTracks[trackIndex] = track.copyWithEntries()
+        _tracks.value = currentTracks.toList()
+        TimelineRepository.tracks.value = currentTracks.toList()
+        SelectionManager.select(
+            Selectable.TimelineEntryItem(
+                trackIndex = trackIndex,
+                entryStartMs = resolved.startTimeMs,
+            )
+        )
+        UndoManager.addAction(
+            UndoableAction.TimelineChange(
+                trackIndex = trackIndex,
+                beforeEntries = before,
+                afterEntries = after,
+            )
+        )
     }
 
     /** Update zoom and scroll atomically to prevent mismatched recompositions. */
@@ -694,6 +743,57 @@ class TimelineViewModel : ViewModel() {
         TimelineRepository.tracks.value = currentTracks.toList()
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
         UndoManager.addAction(UndoableAction.TimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
+    }
+
+    fun resizeAudioEntry(trackIndex: Int, oldStartMs: Long, resizedEntry: AudioEntry) {
+        val currentTracks = _tracks.value.toMutableList()
+        val track = currentTracks.getOrNull(trackIndex) as? AudioTimelineTrack ?: return
+        val original = track.entries[oldStartMs] ?: return
+
+        val sourceSampleCount = AudioLibraryRepository.get(original.sourceId)?.totalSamples
+            ?: original.clipEndSample
+        val validSourceRegion = resizedEntry.sourceId == original.sourceId &&
+            resizedEntry.sampleRate == original.sampleRate &&
+            resizedEntry.channels == original.channels &&
+            resizedEntry.bitDepth == original.bitDepth &&
+            resizedEntry.clipStartSample >= 0L &&
+            resizedEntry.clipEndSample <= sourceSampleCount &&
+            resizedEntry.clipEndSample > resizedEntry.clipStartSample
+        val validTimelineRegion = resizedEntry.startTimeUs >= 0L &&
+            resizedEntry.durationUs > 0L &&
+            resizedEntry.endTimeUs > resizedEntry.startTimeUs
+        if (!validSourceRegion || !validTimelineRegion) return
+
+        val overlapsAnotherClip = track.entries.values.any { other ->
+            other.startTimeMs != oldStartMs &&
+                resizedEntry.startTimeUs < other.endTimeUs &&
+                resizedEntry.endTimeUs > other.startTimeUs
+        }
+        if (overlapsAnotherClip) return
+
+        val didChange = resizedEntry.startTimeUs != original.startTimeUs ||
+            resizedEntry.durationUs != original.durationUs ||
+            resizedEntry.clipStartSample != original.clipStartSample ||
+            resizedEntry.clipEndSample != original.clipEndSample
+        if (!didChange) return
+
+        track.entries.remove(oldStartMs)
+        track.entries[resizedEntry.startTimeMs] = resizedEntry
+        currentTracks[trackIndex] = track.copyWithEntries()
+        publishTrackSnapshot(currentTracks.toList())
+        SelectionManager.select(
+            Selectable.TimelineEntryItem(
+                trackIndex = trackIndex,
+                entryStartMs = resizedEntry.startTimeMs,
+            )
+        )
+        UndoManager.addAction(
+            UndoableAction.TimelineClipTrim(
+                trackIndex = trackIndex,
+                original = original,
+                trimmed = resizedEntry,
+            )
+        )
     }
 
     fun deleteAudioEntry(trackIndex: Int, entryStartMs: Long) {

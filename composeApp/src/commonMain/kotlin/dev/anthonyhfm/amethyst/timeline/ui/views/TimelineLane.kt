@@ -40,7 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.vinceglb.filekit.PlatformFile
 import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
+import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
@@ -75,6 +77,7 @@ import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.nameWithoutExtension
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
+import com.mohamedrejeb.compose.dnd.drop.dropTarget
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
 import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
@@ -98,6 +101,9 @@ import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.timeline.ui.components.AudioClipSkeletonView
 import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromViewport
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
+import dev.anthonyhfm.amethyst.timeline.data.AudioSource
+import dev.anthonyhfm.amethyst.timeline.data.usToRoundedMs
+import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
 
 @Composable
 fun TimelineLane(
@@ -109,9 +115,11 @@ fun TimelineLane(
     selectedEntryStarts: Set<Long> = emptySet(),
     selectedChainEffectIds: Set<String> = emptySet(),
     onDropInFile: (file: PlatformFile, atTimeMs: Long) -> Unit = { _, _ -> },
+    onDropInAudioSource: (source: AudioSource, atTimeMs: Long) -> Unit = { _, _ -> },
     onSelectTime: (Long) -> Unit = {},
     onSelectEntry: (Long) -> Unit = {},
     onMoveEntry: (oldStart: Long, newStart: Long) -> Unit = { _, _ -> },
+    onTrimAudioEntry: (oldStart: Long, trimmedEntry: AudioEntry) -> Unit = { _, _ -> },
     clipDragCallbacks: (TimelineClipKey) -> TimelineClipDragCallbacks? = { null },
     onLaneBoundsChanged: (Int, Rect) -> Unit = { _, _ -> },
     onResizeEntry: (oldStart: Long, newStart: Long, newDuration: Long) -> Unit = { _, _, _ -> },
@@ -130,11 +138,19 @@ fun TimelineLane(
     var rangeEndMs by remember(track, zoomLevel) { mutableStateOf<Long?>(null) }
     var rangeActive by remember { mutableStateOf(false) }
     var isFileHovering by remember { mutableStateOf(false) }
+    var isLibraryHovering by remember { mutableStateOf(false) }
+    var laneBoundsInRoot by remember { mutableStateOf(Rect.Zero) }
     var hoverOffset by remember { mutableStateOf<Offset?>(null) }
     var hoverFiles by remember { mutableStateOf<List<PlatformFile>>(emptyList()) }
     var probedDurationMs by remember { mutableStateOf<Long?>(null) }
     var probedFileName by remember { mutableStateOf<String?>(null) }
     var lastProbedPath by remember { mutableStateOf<String?>(null) }
+    val audioLibraryDragState = LocalAudioLibraryDragAndDropState.current
+    val libraryDraggedSource = audioLibraryDragState?.draggedItem?.data
+    val libraryDropKey = remember(track.trackId) { "audio-library-lane-${track.trackId}" }
+    val libraryHoverOffset = if (isLibraryHovering && audioLibraryDragState != null) {
+        audioLibraryDragState.currentPointerPositionInRoot - laneBoundsInRoot.topLeft
+    } else null
 
     LaunchedEffect(isFileHovering, hoverFiles) {
         if (isFileHovering) {
@@ -301,7 +317,10 @@ fun TimelineLane(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(timelineDimensions.laneHeight)
-                .onGloballyPositioned { onLaneBoundsChanged(trackIndex, it.boundsInRoot()) }
+                .onGloballyPositioned {
+                    laneBoundsInRoot = it.boundsInRoot()
+                    onLaneBoundsChanged(trackIndex, laneBoundsInRoot)
+                }
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
@@ -347,6 +366,33 @@ fun TimelineLane(
                         }
                     }
                 )
+                .then(
+                    if (track is AudioTimelineTrack && audioLibraryDragState != null) {
+                        Modifier.dropTarget(
+                            state = audioLibraryDragState,
+                            key = libraryDropKey,
+                            zIndex = 10f,
+                            dropAnimationEnabled = false,
+                            onDragEnter = { isLibraryHovering = true },
+                            onDragExit = { isLibraryHovering = false },
+                            onDrop = { dragged ->
+                                val localX = (
+                                    audioLibraryDragState.currentPointerPositionInRoot.x -
+                                        laneBoundsInRoot.left
+                                    ).coerceAtLeast(0f)
+                                val dropTimeMs = computeSnappedTimeFromViewport(
+                                    screenX = localX,
+                                    viewport = currentViewport.value,
+                                    bpm = bpm,
+                                    gridType = gridType,
+                                    snapEnabled = currentSnapEnabled.value,
+                                ).coerceAtLeast(0L)
+                                onDropInAudioSource(dragged.data, dropTimeMs)
+                                isLibraryHovering = false
+                            },
+                        )
+                    } else Modifier
+                )
                 .clipToBounds()
                 .rightClickable { position ->
                     if (track is MidiTimelineTrack) {
@@ -356,8 +402,9 @@ fun TimelineLane(
                 }
                 .then(laneInteractionModifier)
         ) {
-        if (isFileHovering && hoverOffset != null && track is AudioTimelineTrack) {
-            val localX = hoverOffset!!.x
+        val activeHoverOffset = libraryHoverOffset ?: hoverOffset
+        if ((isFileHovering || isLibraryHovering) && activeHoverOffset != null && track is AudioTimelineTrack) {
+            val localX = activeHoverOffset.x
             val snappedHoverTimeMs = computeSnappedTimeFromViewport(
                 screenX = localX,
                 viewport = currentViewport.value,
@@ -368,7 +415,9 @@ fun TimelineLane(
 
             val screenStartPx = currentViewport.value.timeMsToScreenX(snappedHoverTimeMs.toDouble())
             val defaultBarMs = ((60_000.0 / bpm.coerceAtLeast(1.0)) * 4.0).toLong()
-            val durationMs = probedDurationMs ?: (defaultBarMs * 4L)
+            val durationMs = libraryDraggedSource?.totalDurationMs
+                ?: probedDurationMs
+                ?: (defaultBarMs * 4L)
             val durationWidthPx = (durationMs.toDouble() * zoomLevel.toDouble()).toFloat()
             val previewWidthDp = maxOf(with(LocalDensity.current) { durationWidthPx.toDp() }, 140.dp)
 
@@ -407,8 +456,10 @@ fun TimelineLane(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        val fileNameText = probedFileName ?: hoverFiles.firstOrNull()?.name?.substringBeforeLast('.')
-                        val formattedDuration = if (probedDurationMs != null) {
+                        val fileNameText = libraryDraggedSource?.fileName?.substringBeforeLast('.')
+                            ?: probedFileName
+                            ?: hoverFiles.firstOrNull()?.name?.substringBeforeLast('.')
+                        val formattedDuration = if (libraryDraggedSource != null || probedDurationMs != null) {
                             val totalSecs = (durationMs / 1000L).coerceAtLeast(0L)
                             val mins = totalSecs / 60L
                             val secs = totalSecs % 60L
@@ -553,7 +604,18 @@ fun TimelineLane(
         ) {
             when (track) {
                 is AudioTimelineTrack -> {
-                    track.entries.values.sortedBy { it.startTimeMs }.forEach { audioEntry ->
+                    val sortedEntries = track.entries.values.sortedBy { it.startTimeUs }
+                    sortedEntries.forEachIndexed { entryIndex, audioEntry ->
+                        val previousEndMs = sortedEntries
+                            .getOrNull(entryIndex - 1)
+                            ?.endTimeUs
+                            ?.let(::usToRoundedMs)
+                            ?: 0L
+                        val nextStartMs = sortedEntries
+                            .getOrNull(entryIndex + 1)
+                            ?.startTimeUs
+                            ?.let(::usToRoundedMs)
+                            ?: Long.MAX_VALUE
                         androidx.compose.runtime.key(audioEntry.startTimeMs) {
                             val isSelectedEntry = audioEntry.startTimeMs in selectedEntryStarts
                             AudioClip(
@@ -563,6 +625,9 @@ fun TimelineLane(
                                 automationOverlayActive = automationOverlayActive,
                                 onSelectEntry = { onSelectEntry(audioEntry.startTimeMs) },
                                 onMoveEntry = { newStart -> onMoveEntry(audioEntry.startTimeMs, newStart) },
+                                onTrimEntry = onTrimAudioEntry,
+                                minTrimStartMs = previousEndMs,
+                                maxTrimEndMs = nextStartMs,
                                 gridIntervalMs = GridUtils.computeWithGridType(zoomLevel, bpm, gridType).intervalMs,
                                 trackIndex = trackIndex,
                                 entryStartMs = audioEntry.startTimeMs,

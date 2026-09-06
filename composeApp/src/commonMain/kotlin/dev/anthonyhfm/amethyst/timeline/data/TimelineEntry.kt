@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package dev.anthonyhfm.amethyst.timeline.data
 
 import androidx.compose.ui.graphics.Color
@@ -6,9 +8,11 @@ import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.timeline.automation.TimelineTrackAutomationState
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
+import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.math.abs
 
 interface TimelineEntry {
@@ -28,7 +32,7 @@ interface TimelineEntry {
  * A region on the audio timeline that references an [AudioSource] via [sourceId].
  *
  * All editing operations (cut, trim, crop) are **non-destructive**: they only adjust
- * [clipStartSample] / [clipEndSample]. The source PCM data in [AudioSourceLibrary]
+ * [clipStartSample] / [clipEndSample]. The source PCM data in [AudioLibraryRepository]
  * is never copied or modified.
  *
  * [clipStartSample] and [clipEndSample] are sample-accurate indices into the source's
@@ -41,21 +45,36 @@ interface TimelineEntry {
  */
 @Serializable
 data class AudioEntry(
+    @ProtoNumber(1)
     override val startTimeMs: Long,
+    @ProtoNumber(2)
     override val durationMs: Long,
+    @ProtoNumber(3)
     val fileName: String,
-    val sourceId: String,
+    @ProtoNumber(4)
+    val sourceId: String = "",
+    @ProtoNumber(5)
     val clipStartSample: Long = 0L,
-    val clipEndSample: Long,
+    @ProtoNumber(6)
+    val clipEndSample: Long = 0L,
+    @ProtoNumber(7)
     val sampleRate: Int = 44100,
+    @ProtoNumber(8)
     val channels: Int = 2,
+    @ProtoNumber(9)
     val bitDepth: Int = 16,
+    @ProtoNumber(10)
     var name: String = "",
     // Legacy fields kept for migration — populated only when loading old project files.
+    @ProtoNumber(11)
     val legacyRawData: ByteArray? = null,
+    @ProtoNumber(12)
     val legacySourceStartMs: Long = 0L,
+    @ProtoNumber(13)
     val legacySourceDurationMs: Long = 0L,
+    @ProtoNumber(14)
     val startTimeUs: Long = msToUs(startTimeMs),
+    @ProtoNumber(15)
     val durationUs: Long = msToUs(durationMs),
 ) : TimelineEntry {
     @Transient
@@ -64,10 +83,17 @@ data class AudioEntry(
     val bytesPerSample: Int get() = (bitDepth / 8) * channels
 
     /** Returns the [AudioSource] for this entry from the library, or null if missing. */
-    fun source(): AudioSource? = AudioSourceLibrary.get(sourceId)
+    fun source(): AudioSource? = AudioLibraryRepository.get(sourceId)
 
     /** Total number of samples this clip spans in the source. */
     val clipSampleCount: Long get() = clipEndSample - clipStartSample
+
+    val region: AudioRegion
+        get() = AudioRegion(
+            sourceId = sourceId,
+            startFrame = clipStartSample,
+            endFrameExclusive = clipEndSample,
+        )
 
     /** Builds a zero-copy, sample-accurate playback request. */
     internal fun buildPlaybackRequest(

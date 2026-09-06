@@ -68,6 +68,9 @@ class DragAndDropState<T>(
     internal val dragAfterLongPress: Boolean = false,
     internal val requireFirstDownUnconsumed: Boolean = false,
 ) {
+    /** Latest pointer position in root coordinates while a drag is active. */
+    var currentPointerPositionInRoot by mutableStateOf(Offset.Zero)
+        internal set
     /**
      * If true, drag and drop is enabled
      */
@@ -171,6 +174,7 @@ class DragAndDropState<T>(
         }
 
         dragPosition.value = draggableItemState.positionInRoot
+        currentPointerPositionInRoot = offset
 
         dragStartPositionInRoot = draggableItemState.positionInRoot
         dragStartOffset = offset
@@ -196,6 +200,7 @@ class DragAndDropState<T>(
         val dropTargetIds = currentDraggableItem.dropTargets
 
         val dragAmount = offset - dragStartOffset
+        currentPointerPositionInRoot = offset
         val newTopLeft = dragStartPositionInRoot + dragAmount
         val hoveredDropTargets =
             dropTargetMap.values
@@ -326,6 +331,7 @@ class DragAndDropState<T>(
         hoveredDropTargetKey = ""
         dragStartOffset = Offset.Zero
         dragStartPositionInRoot = Offset.Zero
+        currentPointerPositionInRoot = Offset.Zero
         dragPosition.value = Offset.Zero
         dragPositionAnimatable.snapTo(Offset.Zero)
     }

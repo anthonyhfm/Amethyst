@@ -35,6 +35,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
+import com.mohamedrejeb.compose.dnd.drop.dropTarget
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -59,7 +60,7 @@ import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
-import dev.anthonyhfm.amethyst.timeline.data.AudioSourceLibrary
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLane
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationPoint
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
@@ -69,9 +70,11 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -207,6 +210,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
+        val audioLibraryDragState = LocalAudioLibraryDragAndDropState.current
+        val audioDropKey = remember(selectionUUID) { "audio-library-sample-$selectionUUID" }
+        var isAudioDropHover by remember { mutableStateOf(false) }
 
         val titleText = if (deviceState.isLoaded && deviceState.fileName.isNotBlank()) {
             formatCleanTitle(deviceState.fileName)
@@ -218,7 +224,31 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
             title = titleText,
             isSelected = isSelected,
             isDragging = isDragging.value,
-            modifier = Modifier.width(if (deviceState.isLoaded) 480.dp else 220.dp),
+            modifier = Modifier
+                .width(if (deviceState.isLoaded) 480.dp else 220.dp)
+                .then(
+                    if (audioLibraryDragState != null) {
+                        Modifier.dropTarget(
+                            state = audioLibraryDragState,
+                            key = audioDropKey,
+                            zIndex = 30f,
+                            dropAnimationEnabled = false,
+                            onDragEnter = { isAudioDropHover = true },
+                            onDragExit = { isAudioDropHover = false },
+                            onDrop = { dragged ->
+                                resetAudio()
+                                state.value = sampleChainStateFromAudioSource(dragged.data)
+                                onStateRestored()
+                                isAudioDropHover = false
+                            },
+                        )
+                    } else Modifier
+                )
+                .then(
+                    if (isAudioDropHover) {
+                        Modifier.border(2.dp, Theme[colors][primary], RoundedCornerShape(6.dp))
+                    } else Modifier
+                ),
             titleBarModifier = LocalTitleBarModifier.current
         ) {
             if (deviceState.isLoaded) {
@@ -293,6 +323,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                             )
                             it.copy(
                                 startPosition = targetStart,
+                                sourceStartFrame = (totalFrames.toDouble() * targetStart.toDouble())
+                                    .roundToLong()
+                                    .coerceIn(0L, totalFrames.toLong()),
                                 fadeInMs = it.fadeInMs.coerceAtMost(newActiveDurMs),
                                 fadeOutMs = it.fadeOutMs.coerceAtMost(newActiveDurMs),
                                 loopStartPosition = it.loopStartPosition?.coerceIn(
@@ -313,6 +346,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                             )
                             it.copy(
                                 endPosition = targetEnd,
+                                sourceEndFrameExclusive = (totalFrames.toDouble() * targetEnd.toDouble())
+                                    .roundToLong()
+                                    .coerceIn(0L, totalFrames.toLong()),
                                 fadeInMs = it.fadeInMs.coerceAtMost(newActiveDurMs),
                                 fadeOutMs = it.fadeOutMs.coerceAtMost(newActiveDurMs),
                                 loopStartPosition = loopStart,
@@ -939,6 +975,10 @@ data class SampleChainDeviceState(
     val warpMode: SampleWarpMode = SampleWarpMode.Off,
     @ProtoNumber(21)
     val sourceBpm: Float? = null,
+    @ProtoNumber(22)
+    val sourceStartFrame: Long? = null,
+    @ProtoNumber(23)
+    val sourceEndFrameExclusive: Long? = null,
 ) : DeviceState()
 
 @Serializable
@@ -957,9 +997,18 @@ enum class SampleWarpMode {
 fun SampleChainDeviceState.resolvedRawData(): ByteArray? =
     sourceId
         ?.takeIf(String::isNotBlank)
-        ?.let(AudioSourceLibrary::get)
+        ?.let(AudioLibraryRepository::get)
         ?.rawData
         ?: rawData
+
+fun SampleChainDeviceState.resolvedRegion(totalFrames: Long): Pair<Long, Long> {
+    val start = sourceStartFrame
+        ?: (totalFrames.toDouble() * startPosition.toDouble()).toLong()
+    val end = sourceEndFrameExclusive
+        ?: (totalFrames.toDouble() * endPosition.toDouble()).toLong()
+    val clampedStart = start.coerceIn(0L, totalFrames)
+    return clampedStart to end.coerceIn(clampedStart, totalFrames)
+}
 
 fun sampleChainStateFromAudioEntry(
     entry: AudioEntry,
@@ -989,8 +1038,26 @@ fun sampleChainStateFromAudioEntry(
         endPosition = endPosition,
         volumeAutomationLane = volumeAutomationLane?.normalized(),
         sourceId = source.id,
+        sourceStartFrame = entry.clipStartSample,
+        sourceEndFrameExclusive = entry.clipEndSample,
     )
 }
+
+fun sampleChainStateFromAudioSource(source: dev.anthonyhfm.amethyst.timeline.data.AudioSource): SampleChainDeviceState =
+    SampleChainDeviceState(
+        fileName = source.fileName,
+        rawData = null,
+        sampleRate = source.sampleRate,
+        channels = source.channels,
+        bitDepth = source.bitDepth,
+        totalDurationMs = source.totalDurationMs,
+        isLoaded = true,
+        startPosition = 0f,
+        endPosition = 1f,
+        sourceId = source.id,
+        sourceStartFrame = 0L,
+        sourceEndFrameExclusive = source.totalSamples,
+    )
 
 private fun appendSampleEnvelopeSegmentToPath(
     path: Path,

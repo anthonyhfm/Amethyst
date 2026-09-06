@@ -16,6 +16,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.data.findMaxMacroIndex
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
+import dev.anthonyhfm.amethyst.workspace.data.decodeLegacyInlineAudioWorkspace
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.extension
 import io.github.vinceglb.filekit.name
@@ -27,6 +28,7 @@ import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.time.Clock
@@ -114,10 +116,10 @@ object HomeRepository {
             }
 
             workspace.path = file.path
-            val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
+            val loadingDevicesMsg = runCatching { getString(Res.string.home_loading_loading_devices) }.getOrDefault("Loading devices & chains...")
             dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
-                1.0f,
-                statusText = loadedMsg,
+                0.95f,
+                statusText = loadingDevicesMsg,
                 detailText = workspace.title
             )
             workspace
@@ -130,6 +132,13 @@ object HomeRepository {
     ) {
         withContext(Dispatchers.Default) {
             WorkspaceRepository.loadWorkspace(workspace)
+
+            val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                1.0f,
+                statusText = loadedMsg,
+                detailText = workspace.title,
+            )
 
             if (rememberRecent) {
                 workspace.path?.let { path ->
@@ -265,15 +274,30 @@ object HomeRepository {
                 }
             }
 
+            val loadingDevicesMsg = runCatching { getString(Res.string.home_loading_loading_devices) }.getOrDefault("Loading devices & chains...")
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                0.95f,
+                statusText = loadingDevicesMsg,
+                detailText = workspace.title,
+            )
             WorkspaceRepository.loadWorkspace(workspace)
+            val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
+            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                1.0f,
+                statusText = loadedMsg,
+                detailText = workspace.title,
+            )
         }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun decodeAmethystWorkspace(file: PlatformFile): SavableWorkspaceData {
-        val workspace = AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(
-            bytes = Zip.decode(file.readBytes())
-        )
+        val bytes = Zip.decode(file.readBytes())
+        val workspace = try {
+            AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(bytes = bytes)
+        } catch (_: SerializationException) {
+            decodeLegacyInlineAudioWorkspace(bytes)
+        }
         workspace.path = file.path
         return workspace
     }
