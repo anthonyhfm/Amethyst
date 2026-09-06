@@ -58,6 +58,7 @@ actual fun WorkspaceTopAppBar(
     val modeSamplingLabel = stringResource(Res.string.workspace_topappbar_mode_sampling_ios)
     val modeLayoutLabel = stringResource(Res.string.workspace_topappbar_mode_layout_ios)
     val backToHomeLabel = stringResource(Res.string.workspace_topappbar_back_to_home_ios)
+    val openAudioLibraryLabel = stringResource(Res.string.workspace_topappbar_open_audio_library_ios)
     val openSettingsLabel = stringResource(Res.string.workspace_topappbar_open_settings_ios)
     val switchModeLabel = stringResource(Res.string.workspace_topappbar_switch_mode_ios)
 
@@ -91,6 +92,7 @@ actual fun WorkspaceTopAppBar(
                     onBack = onBack,
                     selectableModes = selectableModes,
                     backToHomeLabel = backToHomeLabel,
+                    openAudioLibraryLabel = openAudioLibraryLabel,
                     openSettingsLabel = openSettingsLabel,
                     switchModeLabel = switchModeLabel,
                 )
@@ -108,6 +110,7 @@ private fun UIView.rebuildWorkspaceTopAppBar(
     onBack: () -> Unit,
     selectableModes: List<IosModeEntry>,
     backToHomeLabel: String,
+    openAudioLibraryLabel: String,
     openSettingsLabel: String,
     switchModeLabel: String,
 ) {
@@ -176,6 +179,23 @@ private fun UIView.rebuildWorkspaceTopAppBar(
 
     val spacer = UIView()
     stackView.addArrangedSubview(spacer)
+
+    if (mode.selectableMode) {
+        val audioLibraryButton = UIButton.buttonWithType(UIButtonTypeSystem)
+        audioLibraryButton.configuration = liquidGlassButtonConfiguration().apply {
+            image = UIImage.systemImageNamed("music.note")
+            baseForegroundColor = UIColor.labelColor
+        }
+        audioLibraryButton.setAccessibilityLabel(openAudioLibraryLabel)
+        audioLibraryButton.addAction(
+            UIAction.actionWithHandler {
+                dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.toggleAudioLibrary()
+            },
+            forControlEvents = UIControlEventTouchUpInside,
+        )
+        stackView.addArrangedSubview(audioLibraryButton)
+        audioLibraryButton.constrainSize(width = 50.0, height = 50.0)
+    }
 
     val settingsButton = UIButton.buttonWithType(UIButtonTypeSystem)
     settingsButton.configuration = liquidGlassButtonConfiguration().apply {

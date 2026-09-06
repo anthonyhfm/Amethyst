@@ -1,8 +1,17 @@
 package dev.anthonyhfm.amethyst.workspace
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,6 +30,7 @@ import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.ui.components.ActivityToastOverlay
+import dev.anthonyhfm.amethyst.workspace.ui.components.AudioLibraryPanel
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
@@ -34,6 +44,7 @@ fun Workspace(onBack: () -> Unit = {}) {
 
     val showDeviceConfigurator by WorkspaceRepository.showDeviceConfigurator.collectAsState()
     val showDevicePicker by WorkspaceRepository.showDevicePicker.collectAsState()
+    val showAudioLibrary by WorkspaceRepository.showAudioLibrary.collectAsState()
 
     Column(
         modifier = Modifier
@@ -56,6 +67,51 @@ fun Workspace(onBack: () -> Unit = {}) {
                 .weight(1f)
                 .fillMaxWidth()
         ) {
+            if (!mode.selectableMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clipToBounds()
+                ) {
+                    mode.Content(Modifier.fillMaxSize())
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clipToBounds()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clipToBounds()
+                    ) {
+                        mode.Content(Modifier.fillMaxSize())
+                    }
+
+                    AnimatedVisibility(
+                        visible = showAudioLibrary,
+                        enter = slideInHorizontally(
+                            initialOffsetX = { fullWidth -> fullWidth },
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        ) + expandHorizontally(
+                            expandFrom = Alignment.End,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        ),
+                        exit = slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> fullWidth },
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        ) + shrinkHorizontally(
+                            shrinkTowards = Alignment.End,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        ),
+                    ) {
+                        AudioLibraryPanel()
+                    }
+                }
+            }
+
             if (showExitDialog) {
                 ExitWorkspaceDialog(
                     onSaveAndExit = {
@@ -90,14 +146,6 @@ fun Workspace(onBack: () -> Unit = {}) {
                     .align(Alignment.BottomEnd)
                     .padding(24.dp),
             )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clipToBounds()
-            ) {
-                mode.Content(Modifier.fillMaxSize())
-            }
         }
     }
 }

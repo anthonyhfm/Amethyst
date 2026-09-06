@@ -36,6 +36,7 @@ import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.LayoutGrid
 import com.composables.icons.lucide.Lightbulb
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Music
 import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.X
@@ -158,6 +159,14 @@ actual fun WorkspaceTopAppBar(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
+            }
+            if (mode.selectableMode) {
+                IconButton(onClick = { WorkspaceRepository.toggleAudioLibrary() }) {
+                    Icon(
+                        imageVector = Lucide.Music,
+                        contentDescription = stringResource(Res.string.workspace_topappbar_open_audio_library),
+                    )
+                }
             }
             IconButton(onClick = { showSettingsDialog = true }) {
                 Icon(

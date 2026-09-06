@@ -171,6 +171,21 @@ object WorkspaceRepository {
         _showDevicePicker.update { false }
     }
 
+    private val _showAudioLibrary = MutableStateFlow(false)
+    val showAudioLibrary: StateFlow<Boolean> = _showAudioLibrary.asStateFlow()
+
+    fun toggleAudioLibrary() {
+        _showAudioLibrary.update { !it }
+    }
+
+    fun openAudioLibrary() {
+        _showAudioLibrary.value = true
+    }
+
+    fun closeAudioLibrary() {
+        _showAudioLibrary.value = false
+    }
+
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val midiManager = AmethystMidiManager()
 
@@ -972,6 +987,7 @@ object WorkspaceRepository {
         replaceMode(LayoutWorkspaceMode())
         _bpm.update { 120.00 }
         _projectName.update { null }
+        _showAudioLibrary.value = false
         previousMode = LayoutWorkspaceMode()
         _gridType.update { GridUtils.GridType.Flexible.Medium }
     }

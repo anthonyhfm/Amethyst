@@ -719,8 +719,13 @@
     <string name="workspace_topappbar_mode_sampling_ios">Sampling</string>
     <string name="workspace_topappbar_mode_timeline">Timeline</string>
     <string name="workspace_topappbar_mode_timeline_ios">Timeline</string>
+    <string name="workspace_topappbar_open_audio_library">Audio Library</string>
+    <string name="workspace_topappbar_open_audio_library_ios">Audio Library</string>
     <string name="workspace_topappbar_open_settings">Settings öffnen</string>
     <string name="workspace_topappbar_open_settings_ios">Settings öffnen</string>
+    <string name="audio_library_title">Audio Library</string>
+    <string name="audio_library_hint">Hier sind alle geladenen Audio-Dateien aus dem jeweiligen Projekt gespeichert.</string>
+    <string name="audio_library_close">Audio Library schließen</string>
     <string name="workspace_topappbar_root_key_format">Root: X$x Y$y</string>
     <string name="workspace_topappbar_set_root_key">Root-Key festlegen</string>
     <string name="workspace_topappbar_switch_mode">Modus wechseln</string>

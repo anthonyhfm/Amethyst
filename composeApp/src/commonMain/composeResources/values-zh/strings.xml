@@ -713,8 +713,13 @@
     <string name="workspace_topappbar_mode_sampling_ios">采样</string>
     <string name="workspace_topappbar_mode_timeline">时间线</string>
     <string name="workspace_topappbar_mode_timeline_ios">时间线</string>
+    <string name="workspace_topappbar_open_audio_library">音频库</string>
+    <string name="workspace_topappbar_open_audio_library_ios">音频库</string>
     <string name="workspace_topappbar_open_settings">打开设置</string>
     <string name="workspace_topappbar_open_settings_ios">打开设置</string>
+    <string name="audio_library_title">音频库</string>
+    <string name="audio_library_hint">当前项目中所有已加载的音频文件均保存在此处。</string>
+    <string name="audio_library_close">关闭音频库</string>
     <string name="workspace_topappbar_root_key_format">根键: X$x Y$y</string>
     <string name="workspace_topappbar_set_root_key">设置根键 (Root Key)</string>
     <string name="workspace_topappbar_switch_mode">切换模式</string>

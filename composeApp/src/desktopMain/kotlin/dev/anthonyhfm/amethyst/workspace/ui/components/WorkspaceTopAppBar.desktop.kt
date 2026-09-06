@@ -39,6 +39,7 @@ import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MousePointer
+import com.composables.icons.lucide.Music
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Settings
@@ -101,6 +102,7 @@ actual fun WorkspaceTopAppBar(
     val session by CollaborationManager.session.collectAsState()
     val connectLocalUser by CollaborationManager.localUser.collectAsState()
     val localUser by LocalUserRepository.localUser.collectAsState()
+    val showAudioLibrary by WorkspaceRepository.showAudioLibrary.collectAsState()
     var showSettingsDialog by remember { mutableStateOf(false) }
     val shareDialogState = rememberDialogState()
     val scope = rememberCoroutineScope()
@@ -184,6 +186,15 @@ actual fun WorkspaceTopAppBar(
                         else -> ButtonVariant.Ghost
                     },
                     modifier = if (isHosting) Modifier.scale(1.04f) else Modifier,
+                )
+            }
+
+            if (mode.selectableMode) {
+                WorkspaceToolbarIconButton(
+                    onClick = { WorkspaceRepository.toggleAudioLibrary() },
+                    imageVector = Lucide.Music,
+                    contentDescription = stringResource(Res.string.workspace_topappbar_open_audio_library),
+                    variant = if (showAudioLibrary) ButtonVariant.Secondary else ButtonVariant.Ghost,
                 )
             }
 
