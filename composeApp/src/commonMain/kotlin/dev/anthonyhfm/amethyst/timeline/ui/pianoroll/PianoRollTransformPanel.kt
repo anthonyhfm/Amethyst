@@ -86,6 +86,17 @@ fun PianoRollTransformPanel(
             }
         }
 
+        SectionLabel("Scramble")
+        ButtonRow {
+            LabeledIconButton(Lucide.Shuffle, "Pads", "Scramble pads as groups", enabled = enabled) {
+                onApplyTransform { PianoRollTransforms.scrambleByPad(it) }
+            }
+            Separator()
+            LabeledIconButton(Lucide.Dices, "All", "Scramble every note", enabled = enabled) {
+                onApplyTransform { PianoRollTransforms.scrambleAll(it) }
+            }
+        }
+
         // Note Length
         SectionLabel("Note Length")
         ButtonRow {

@@ -430,7 +430,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                    action.notesAfter.zip(action.notesBefore).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -458,7 +458,7 @@ object UndoManager {
                     val currentEntry = action.currentEntryGetter()
                     if (currentEntry != null) {
                         action.currentEntrySetter(
-                            currentEntry.copy(notes = currentEntry.notes.filter { it != action.note })
+                            currentEntry.copy(notes = currentEntry.notes.filterNot { it.noteId == action.note.noteId })
                         )
                     }
                     dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager.clear()
@@ -474,7 +474,7 @@ object UndoManager {
                     if (currentEntry != null) {
                         action.currentEntrySetter(
                             currentEntry.copy(notes = currentEntry.notes.filter { note ->
-                                !action.notes.contains(note)
+                                action.notes.none { it.noteId == note.noteId }
                             })
                         )
                     }
@@ -516,7 +516,7 @@ object UndoManager {
                     if (currentEntry != null) {
                         action.currentEntrySetter(
                             currentEntry.copy(notes = currentEntry.notes.filter { note ->
-                                !action.duplicates.contains(note)
+                                action.duplicates.none { it.noteId == note.noteId }
                             })
                         )
                     }
@@ -534,7 +534,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                    action.notesAfter.zip(action.notesBefore).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -563,7 +563,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                    action.notesAfter.zip(action.notesBefore).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -592,7 +592,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                    action.notesAfter.zip(action.notesBefore).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -621,7 +621,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesAfter.zip(action.notesBefore).find { it.first == note }?.second ?: note
+                                    action.notesAfter.zip(action.notesBefore).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -1021,7 +1021,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                    action.notesBefore.zip(action.notesAfter).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -1098,7 +1098,7 @@ object UndoManager {
                     if (currentEntry != null) {
                         action.currentEntrySetter(
                             currentEntry.copy(notes = currentEntry.notes.filter { note ->
-                                !action.notes.contains(note)
+                                action.notes.none { it.noteId == note.noteId }
                             })
                         )
                     }
@@ -1141,7 +1141,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                    action.notesBefore.zip(action.notesAfter).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -1170,7 +1170,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                    action.notesBefore.zip(action.notesAfter).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -1199,7 +1199,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                    action.notesBefore.zip(action.notesAfter).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )
@@ -1228,7 +1228,7 @@ object UndoManager {
                         action.currentEntrySetter(
                             currentEntry.copy(
                                 notes = currentEntry.notes.map { note ->
-                                    action.notesBefore.zip(action.notesAfter).find { it.first == note }?.second ?: note
+                                    action.notesBefore.zip(action.notesAfter).find { it.first.noteId == note.noteId }?.second ?: note
                                 }
                             )
                         )

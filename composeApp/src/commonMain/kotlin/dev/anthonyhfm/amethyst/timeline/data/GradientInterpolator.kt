@@ -3,21 +3,32 @@ package dev.anthonyhfm.amethyst.timeline.data
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientSmoothness
 
 object GradientInterpolator {
+    fun normalize(stops: List<NoteGradientStop>): List<NoteGradientStop> =
+        stops.map { stop ->
+            stop.copy(
+                position = stop.position.coerceIn(0f, 1f),
+                r = stop.r.coerceIn(0f, 1f),
+                g = stop.g.coerceIn(0f, 1f),
+                b = stop.b.coerceIn(0f, 1f),
+            )
+        }.sortedWith(compareBy<NoteGradientStop> { it.position }.thenBy { it.selectionUUID })
+
     fun interpolate(stops: List<NoteGradientStop>, t: Float): Triple<Float, Float, Float> {
         if (stops.isEmpty()) return Triple(0f, 0f, 0f)
 
         val clampedT = t.coerceIn(0f, 1f)
-        val sorted = stops.sortedBy { it.position }
+        val sorted = normalize(stops)
 
         if (sorted.size == 1) return Triple(sorted[0].r, sorted[0].g, sorted[0].b)
+        if (clampedT <= sorted.first().position) {
+            return sorted.first().let { Triple(it.r, it.g, it.b) }
+        }
+        if (clampedT >= sorted.last().position) {
+            return sorted.last().let { Triple(it.r, it.g, it.b) }
+        }
 
-        // Find segment: largest i where sorted[i].position <= clampedT
-        var segmentIndex = 0
-        for (i in 0 until sorted.size - 1) {
-            if (clampedT >= sorted[i].position && clampedT <= sorted[i + 1].position) {
-                segmentIndex = i
-                break
-            }
+        val segmentIndex = (0 until sorted.lastIndex).first { i ->
+            clampedT >= sorted[i].position && clampedT <= sorted[i + 1].position
         }
 
         val startStop = sorted[segmentIndex]

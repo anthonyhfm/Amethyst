@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.timeline
 import androidx.compose.ui.geometry.Offset
 import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.timeline.data.resolvedPadIndex
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -38,6 +39,43 @@ internal data class PianoRollDraftSpan(
     val startTimeMs: Long,
     val durationMs: Long,
 )
+
+internal data class PianoRollGridPoint(
+    val deviceIndex: Int,
+    val pointInDevice: Offset,
+)
+
+/** Maps a pointer in the scrolled editor viewport to one device's 0..99 pad grid. */
+internal fun resolvePianoRollGridPoint(
+    point: Offset,
+    verticalScrollPx: Float,
+    deviceHeaderHeightPx: Float,
+    deviceRowHeightPx: Float,
+    deviceCount: Int,
+): PianoRollGridPoint? {
+    if (deviceCount <= 0 || deviceRowHeightPx <= 0f) return null
+    val contentY = point.y + verticalScrollPx
+    val blockHeight = deviceHeaderHeightPx + deviceRowHeightPx
+    if (contentY < 0f || blockHeight <= 0f) return null
+
+    val deviceIndex = floor(contentY / blockHeight).toInt()
+    if (deviceIndex !in 0 until deviceCount) return null
+    val yInBlock = contentY - deviceIndex * blockHeight
+    if (yInBlock < deviceHeaderHeightPx || yInBlock >= blockHeight) return null
+
+    return PianoRollGridPoint(
+        deviceIndex = deviceIndex,
+        pointInDevice = Offset(point.x, yInBlock - deviceHeaderHeightPx),
+    )
+}
+
+internal fun applyPianoRollNoteEdits(
+    notes: List<MidiNote>,
+    changes: List<TimelineEditedNote>,
+): List<MidiNote> {
+    val replacements = changes.associate { it.before.noteId to it.after }
+    return notes.map { note -> replacements[note.noteId] ?: note }
+}
 
 internal fun findPianoRollHitTarget(
     point: Offset,
@@ -85,14 +123,17 @@ internal fun resolveViewportRelativeCursorX(
 /**
  * Snaps [clipTimeMs] to the nearest grid boundary defined by [resolution].
  *
- * Uses [MS_PER_BEAT]-based cells so the result aligns with the visual grid drawn
- * by the renderer (which also uses the fixed [MS_PER_BEAT] constant).
+ * Uses the supplied project-tempo beat duration so the result aligns with the visual grid.
  */
-internal fun snapClipTimeToGrid(clipTimeMs: Double, resolution: GridResolution): Long {
+internal fun snapClipTimeToGrid(
+    clipTimeMs: Double,
+    resolution: GridResolution,
+    beatDurationMs: Double = DEFAULT_MS_PER_BEAT,
+): Long {
     val n = resolution.snapDivisionsPerBeat
-    val beatFraction = clipTimeMs / MS_PER_BEAT.toDouble()
+    val beatFraction = clipTimeMs / beatDurationMs
     val snapped = kotlin.math.round(beatFraction * n) / n.toDouble()
-    return (snapped * MS_PER_BEAT).toLong()
+    return (snapped * beatDurationMs).toLong()
 }
 
 /**
@@ -101,18 +142,26 @@ internal fun snapClipTimeToGrid(clipTimeMs: Double, resolution: GridResolution):
  * Used by the DRAW tool so a new note anchors to the cell the user clicked,
  * matching the floor behaviour of [PianoRollMetrics.xPxToNotePlacementMs].
  */
-internal fun floorClipTimeToGrid(clipTimeMs: Double, resolution: GridResolution): Long {
+internal fun floorClipTimeToGrid(
+    clipTimeMs: Double,
+    resolution: GridResolution,
+    beatDurationMs: Double = DEFAULT_MS_PER_BEAT,
+): Long {
     val n = resolution.snapDivisionsPerBeat
-    val beatFraction = clipTimeMs / MS_PER_BEAT.toDouble()
+    val beatFraction = clipTimeMs / beatDurationMs
     val floored = floor(beatFraction * n) / n.toDouble()
-    return (floored * MS_PER_BEAT).toLong()
+    return (floored * beatDurationMs).toLong()
 }
 
-internal fun cellDurationAt(cellStartMs: Long, resolution: GridResolution): Long {
+internal fun cellDurationAt(
+    cellStartMs: Long,
+    resolution: GridResolution,
+    beatDurationMs: Double = DEFAULT_MS_PER_BEAT,
+): Long {
     val n = resolution.snapDivisionsPerBeat
-    val currentBeatFraction = cellStartMs / MS_PER_BEAT.toDouble()
+    val currentBeatFraction = cellStartMs / beatDurationMs
     val k = kotlin.math.round(currentBeatFraction * n)
-    val nextCellStartMs = (((k + 1) * MS_PER_BEAT) / n.toDouble()).toLong()
+    val nextCellStartMs = (((k + 1) * beatDurationMs) / n.toDouble()).toLong()
     return nextCellStartMs - cellStartMs
 }
 
@@ -122,11 +171,16 @@ internal fun cellDurationAt(cellStartMs: Long, resolution: GridResolution): Long
  * even if [clipTimeMs] itself was off-grid to begin with.
  *
  * Used to grid-align keyboard-driven (arrow key) playhead nudging in the piano roll,
- * matching the same [MS_PER_BEAT]-based grid the renderer and note-drawing tools use.
+ * matching the same tempo-aware grid the renderer and note-drawing tools use.
  */
-internal fun stepClipTimeOnGrid(clipTimeMs: Long, resolution: GridResolution, direction: Int): Long {
+internal fun stepClipTimeOnGrid(
+    clipTimeMs: Long,
+    resolution: GridResolution,
+    direction: Int,
+    beatDurationMs: Double = DEFAULT_MS_PER_BEAT,
+): Long {
     val n = resolution.snapDivisionsPerBeat
-    val beatFraction = clipTimeMs / MS_PER_BEAT.toDouble()
+    val beatFraction = clipTimeMs / beatDurationMs
     val k = beatFraction * n
     val epsilon = 1e-6
     val steppedK = if (direction >= 0) {
@@ -134,7 +188,7 @@ internal fun stepClipTimeOnGrid(clipTimeMs: Long, resolution: GridResolution, di
     } else {
         ceil(k - epsilon) - 1
     }
-    return ((steppedK / n.toDouble()) * MS_PER_BEAT).toLong()
+    return ((steppedK / n.toDouble()) * beatDurationMs).toLong()
 }
 
 /**
@@ -152,7 +206,7 @@ internal fun buildNoteRectsScreenSpace(
     PianoRollNoteRect(
         note = note,
         left = viewport.contentToScreenX(metrics.timeMsToXPx(note.startTimeMs)),
-        top = metrics.pitchToYPx(note.pitch),
+        top = metrics.pitchToYPx(note.resolvedPadIndex),
         width = metrics.durationMsToWidthPx(note.durationMs),
         height = metrics.noteRenderHeightPx,
     )

@@ -61,7 +61,7 @@ interface Selectable {
         val trackIndex: Int,
         val entryStartMs: Long,
         val note: MidiNote,
-        override val selectionUUID: String = UUID.randomUUID()
+        override val selectionUUID: String = "piano-roll-note:${note.noteId}"
     ) : Selectable
 
     data class TimelineRange(

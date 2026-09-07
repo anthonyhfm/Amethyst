@@ -284,7 +284,8 @@ object TimelineCommandExecutor {
 
     private fun createNotes(trackIndex: Int, entryStartTime: Long, notes: List<MidiNote>): TimelineCommandResult {
         return updateMidiEntryNotes(trackIndex, entryStartTime) { entry ->
-            val uniqueNotes = notes.distinct().filterNot(entry.notes::contains)
+            val existingIds = entry.notes.mapTo(mutableSetOf()) { it.noteId }
+            val uniqueNotes = notes.distinctBy { it.noteId }.filterNot { it.noteId in existingIds }
             if (uniqueNotes.isEmpty()) entry else entry.copy(notes = entry.notes + uniqueNotes)
         }
     }
@@ -315,11 +316,11 @@ object TimelineCommandExecutor {
 
     private fun deleteNotes(trackIndex: Int, entryStartTime: Long, notes: List<MidiNote>): TimelineCommandResult {
         return updateMidiEntryNotes(trackIndex, entryStartTime) { entry ->
-            val notesToDelete = notes.distinct()
-            if (notesToDelete.isEmpty()) {
+            val noteIdsToDelete = notes.mapTo(mutableSetOf()) { it.noteId }
+            if (noteIdsToDelete.isEmpty()) {
                 entry
             } else {
-                entry.copy(notes = entry.notes.filterNot(notesToDelete::contains))
+                entry.copy(notes = entry.notes.filterNot { it.noteId in noteIdsToDelete })
             }
         }
     }
@@ -550,16 +551,7 @@ object TimelineCommandExecutor {
         if (effectiveChanges.isEmpty()) return TimelineCommandResult()
 
         return updateMidiEntryNotes(trackIndex, entryStartTime) { entry ->
-            val replacements = effectiveChanges.associateBy(TimelineEditedNote::before, TimelineEditedNote::after)
-            if (replacements.isEmpty()) {
-                entry
-            } else {
-                entry.copy(
-                    notes = entry.notes.map { note ->
-                        replacements[note] ?: note
-                    }
-                )
-            }
+            entry.copy(notes = applyPianoRollNoteEdits(entry.notes, effectiveChanges))
         }
     }
 

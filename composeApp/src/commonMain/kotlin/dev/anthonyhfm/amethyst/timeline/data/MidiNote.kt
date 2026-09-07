@@ -17,14 +17,24 @@ data class NoteGradientStop(
     val selectionUUID: String = UUID.randomUUID()
 )
 
-val MidiNote.isGradient: Boolean get() = led.gradient != null && (led.gradient?.size ?: 0) >= 2
+val MidiNote.isGradient: Boolean get() = led.gradient?.size?.let { it >= 2 } == true
+
+/**
+ * Canonical pad address used by the editor and playback engine. Early prototype clips sometimes
+ * encoded the device in `pitch / 100`; current clips store it explicitly in [MidiNote.device].
+ */
+val MidiNote.resolvedDeviceIndex: Int
+    get() = if (device == 0 && pitch >= 100) pitch / 100 else device.coerceAtLeast(0)
+
+val MidiNote.resolvedPadIndex: Int
+    get() = pitch.mod(100)
 
 fun MidiNote.isOutOfBounds(clipDurationMs: Long): Boolean = startTimeMs < 0 || startTimeMs >= clipDurationMs
 
 /**
  * Represents a single LED note for light shows on launchpad devices.
  * 
- * @property pitch Note position (0-127), for launchpad: x + y*10 within 0-99 range per device
+ * @property pitch Pad position as x + y*10 within the 0-99 range for [device]
  * @property led LED signal containing color, position, layer, and blending mode
  * @property startTimeMs Start time of the note in milliseconds relative to the track
  * @property durationMs Duration of the note in milliseconds
@@ -35,7 +45,9 @@ data class MidiNote(
     val pitch: Int,
     val led: NoteLED,
     val startTimeMs: Long,
-    val durationMs: Long
+    val durationMs: Long,
+    /** Stable editor identity. Older projects receive an id while being decoded. */
+    val noteId: String = UUID.randomUUID()
 ) {
     val endTimeMs: Long get() = startTimeMs + durationMs
     
@@ -59,7 +71,7 @@ data class MidiNote(
                 blue = color.blue,
                 layer = layer,
                 blendingMode = blendingMode,
-                gradient = gradient?.takeIf { it.size >= 2 }
+                gradient = gradient?.takeIf { it.size >= 2 }?.let(GradientInterpolator::normalize)
             ),
             startTimeMs = startTimeMs,
             durationMs = durationMs

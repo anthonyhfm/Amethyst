@@ -99,6 +99,7 @@ data class AudioEntry(
     internal fun buildPlaybackRequest(
         startAt: Long?,
         automation: TimelineTrackAutomationState,
+        origin: Any? = "AudioEntry_$fileName",
     ): AudioSourcePlayback? {
         val src = source() ?: return null
         val startAtUs = startAt?.let(::msToUs)
@@ -115,12 +116,16 @@ data class AudioEntry(
             endFrameExclusive = endSample,
             gain = automation.volume,
             pan = 0f,
-            origin = "AudioEntry_$fileName"
+            origin = origin
         )
     }
 
     /** Stores the transient playback ID returned by Echo. */
     internal fun receiveSourceId(id: String?) {
+        val previousId = audioSourceId
+        if (previousId != null && previousId != id) {
+            Echo.stop(previousId)
+        }
         audioSourceId = id
         if (id != null) {
             println("AUDIO: Playing $fileName (source: $id) startTimeMs=$startTimeMs durationMs=$durationMs clipStart=$clipStartSample clipEnd=$clipEndSample")
@@ -140,14 +145,14 @@ data class AudioEntry(
             println("No audio data for $fileName")
             return
         }
-        audioSourceId = Echo.playSource(
+        receiveSourceId(Echo.playSource(
             sourceId = request.sourceId,
             startFrame = request.startFrame,
             endFrameExclusive = request.endFrameExclusive,
             gain = request.gain,
             pan = request.pan,
             origin = request.origin,
-        )
+        ))
         if (audioSourceId != null) {
             println("Started audio entry: $fileName at ${actualStartTime}ms (source: $audioSourceId)")
         } else {
@@ -221,9 +226,9 @@ data class MidiEntry(
     @kotlinx.serialization.Transient
     private val lastSentGradientColor = mutableMapOf<MidiNote, Triple<Float, Float, Float>>()
 
-    private fun pitchToXY(pitch: Int): Pair<Int, Int> {
-        val deviceIndex = pitch / 100
-        val localPitch = pitch % 100
+    private fun pitchToXY(note: MidiNote): Pair<Int, Int> {
+        val deviceIndex = note.resolvedDeviceIndex
+        val localPitch = note.resolvedPadIndex
         val x = localPitch % 10
         val y = 9 - (localPitch / 10)
         
@@ -297,7 +302,7 @@ data class MidiEntry(
             val last = lastSentGradientColor[note]
             val eps = 0.004f  // ~1/255
             if (last == null || abs(last.first - r) > eps || abs(last.second - g) > eps || abs(last.third - b) > eps) {
-                val (x, y) = pitchToXY(note.pitch)
+                val (x, y) = pitchToXY(note)
                 Heaven.midiEnter(listOf(Signal.LED(
                     origin = activeSignalOwner,
                     x = x, y = y,
@@ -327,7 +332,7 @@ data class MidiEntry(
     }
 
     private fun sendNoteOn(note: MidiNote) {
-        val (x, y) = pitchToXY(note.pitch)
+        val (x, y) = pitchToXY(note)
         val color = if (note.isGradient) {
             val (r, g, b) = GradientInterpolator.interpolate(note.led.gradient!!, 0f)
             Color(r, g, b)
@@ -349,7 +354,7 @@ data class MidiEntry(
     }
 
     private fun sendNoteOff(note: MidiNote) {
-        val (x, y) = pitchToXY(note.pitch)
+        val (x, y) = pitchToXY(note)
         val signal = Signal.LED(
             origin = activeSignalOwner,
             x = x,

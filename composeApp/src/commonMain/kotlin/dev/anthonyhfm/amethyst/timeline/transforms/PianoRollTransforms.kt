@@ -3,17 +3,36 @@ package dev.anthonyhfm.amethyst.timeline.transforms
 import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.NoteGradientStop
+import dev.anthonyhfm.amethyst.timeline.data.resolvedDeviceIndex
+import dev.anthonyhfm.amethyst.timeline.data.resolvedPadIndex
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.roundToLong
+import kotlin.random.Random
 
 object PianoRollTransforms {
+
+    private fun MidiNote.withPitchAndLedIndex(newPitch: Int): MidiNote =
+        copy(
+            device = resolvedDeviceIndex,
+            pitch = newPitch.coerceIn(0, 99),
+            led = led.copy(index = newPitch.coerceIn(0, 99)),
+        )
 
     fun doubleLength(notes: List<MidiNote>): List<MidiNote> =
         notes.map { it.copy(durationMs = it.durationMs * 2) }
 
     fun halveLength(notes: List<MidiNote>): List<MidiNote> =
         notes.map { it.copy(durationMs = maxOf(1L, it.durationMs / 2)) }
+
+    fun setLength(notes: List<MidiNote>, durationMs: Long): List<MidiNote> =
+        notes.map { it.copy(durationMs = durationMs.coerceAtLeast(1L)) }
+
+    fun ensureMinimumLength(notes: List<MidiNote>, minimumDurationMs: Long): List<MidiNote> =
+        notes.map { it.copy(durationMs = maxOf(it.durationMs, minimumDurationMs.coerceAtLeast(1L))) }
+
+    fun scaleLength(notes: List<MidiNote>, ratio: Double): List<MidiNote> =
+        notes.map { it.copy(durationMs = (it.durationMs * ratio.coerceAtLeast(0.0)).roundToLong().coerceAtLeast(1L)) }
 
     fun doubleSpeed(notes: List<MidiNote>): List<MidiNote> {
         if (notes.isEmpty()) return notes
@@ -70,57 +89,72 @@ object PianoRollTransforms {
     }
 
     fun shiftUp(notes: List<MidiNote>): List<MidiNote> =
-        notes.map { it.copy(pitch = it.pitch + 10) }
+        notes.map { it.withPitchAndLedIndex(transformPitch(it.resolvedPadIndex) { col, row -> col to row + 1 }) }
 
     fun shiftDown(notes: List<MidiNote>): List<MidiNote> =
-        notes.map { it.copy(pitch = it.pitch - 10) }
+        notes.map { it.withPitchAndLedIndex(transformPitch(it.resolvedPadIndex) { col, row -> col to row - 1 }) }
 
     fun shiftLeft(notes: List<MidiNote>): List<MidiNote> =
-        notes.map { it.copy(pitch = it.pitch - 1) }
+        notes.map { it.withPitchAndLedIndex(transformPitch(it.resolvedPadIndex) { col, row -> col - 1 to row }) }
 
     fun shiftRight(notes: List<MidiNote>): List<MidiNote> =
-        notes.map { it.copy(pitch = it.pitch + 1) }
+        notes.map { it.withPitchAndLedIndex(transformPitch(it.resolvedPadIndex) { col, row -> col + 1 to row }) }
 
     private fun transformPitch(pitch: Int, transform: (col: Int, row: Int) -> Pair<Int, Int>): Int {
-        val basePitch = pitch - (pitch % 100)
-        val localPitch = pitch % 100
-        val col = localPitch % 10
-        val row = localPitch / 10
+        val col = pitch % 10
+        val row = pitch / 10
         val (newCol, newRow) = transform(col, row)
         val clampedCol = newCol.coerceIn(0, 9)
         val clampedRow = newRow.coerceIn(0, 9)
-        return basePitch + clampedCol + clampedRow * 10
+        return clampedCol + clampedRow * 10
     }
 
     fun rotateCW(notes: List<MidiNote>): List<MidiNote> {
         return notes.map { note ->
-            note.copy(pitch = transformPitch(note.pitch) { col, row -> Pair(row, 9 - col) })
+            note.withPitchAndLedIndex(transformPitch(note.resolvedPadIndex) { col, row -> Pair(row, 9 - col) })
         }
     }
 
     fun rotateCCW(notes: List<MidiNote>): List<MidiNote> {
         return notes.map { note ->
-            note.copy(pitch = transformPitch(note.pitch) { col, row -> Pair(9 - row, col) })
+            note.withPitchAndLedIndex(transformPitch(note.resolvedPadIndex) { col, row -> Pair(9 - row, col) })
         }
     }
 
     fun rotate180(notes: List<MidiNote>): List<MidiNote> {
         return notes.map { note ->
-            note.copy(pitch = transformPitch(note.pitch) { col, row -> Pair(9 - col, 9 - row) })
+            note.withPitchAndLedIndex(transformPitch(note.resolvedPadIndex) { col, row -> Pair(9 - col, 9 - row) })
         }
     }
 
     fun mirrorHorizontal(notes: List<MidiNote>): List<MidiNote> {
         return notes.map { note ->
-            note.copy(pitch = transformPitch(note.pitch) { col, row -> Pair(9 - col, row) })
+            note.withPitchAndLedIndex(transformPitch(note.resolvedPadIndex) { col, row -> Pair(9 - col, row) })
         }
     }
 
     fun mirrorVertical(notes: List<MidiNote>): List<MidiNote> {
         return notes.map { note ->
-            note.copy(pitch = transformPitch(note.pitch) { col, row -> Pair(col, 9 - row) })
+            note.withPitchAndLedIndex(transformPitch(note.resolvedPadIndex) { col, row -> Pair(col, 9 - row) })
         }
     }
+
+    /** Keeps every occurrence of the same pad together while assigning pads to new locations. */
+    fun scrambleByPad(notes: List<MidiNote>, random: Random = Random.Default): List<MidiNote> =
+        notes.groupBy { it.resolvedDeviceIndex }.values.flatMap { deviceNotes ->
+            val sourcePads = deviceNotes.map { it.resolvedPadIndex }.distinct().sorted()
+            val targets = sourcePads.shuffled(random)
+            val mapping = sourcePads.zip(targets).toMap()
+            deviceNotes.map { note ->
+                note.withPitchAndLedIndex(mapping.getValue(note.resolvedPadIndex))
+            }
+        }
+
+    /** Randomizes each note independently while keeping it on its original device surface. */
+    fun scrambleAll(notes: List<MidiNote>, random: Random = Random.Default): List<MidiNote> =
+        notes.map { note ->
+            note.withPitchAndLedIndex(random.nextInt(100))
+        }
 
     fun gradientSpread(notes: List<MidiNote>, gradientStops: List<NoteGradientStop>): List<MidiNote> {
         if (notes.size < 2 || gradientStops.size < 2) return notes

@@ -133,6 +133,10 @@ fun AudioClip(
         role = TimelineClipRole.Audio,
         selected = isSelected
     )
+    val unselectedClipColors = TimelineTheme.clipColors(
+        role = TimelineClipRole.Audio,
+        selected = false
+    )
     val interactionEnabled = !automationOverlayActive
     val clipBackgroundColor = if (automationOverlayActive) {
         clipColors.background.copy(alpha = if (isSelected) 0.54f else 0.42f)
@@ -153,6 +157,11 @@ fun AudioClip(
         clipColors.content.copy(alpha = 0.44f)
     } else {
         clipColors.content
+    }
+    val waveformColor = if (automationOverlayActive) {
+        unselectedClipColors.content.copy(alpha = 0.44f)
+    } else {
+        unselectedClipColors.content
     }
 
     var rangeActive by remember { mutableStateOf(false) }
@@ -361,7 +370,10 @@ fun AudioClip(
                     .fillMaxSize()
                     .clip(clipShape)
                     .background(clipBackgroundColor)
-                    .border(if (isSelected) 1.5.dp else 1.dp, clipBorderColor, clipShape)
+                    .then(
+                        if (isSelected) Modifier.border(2.dp, clipBorderColor, clipShape)
+                        else Modifier
+                    )
             ) {
             if (!renaming) {
                 Box(
@@ -603,7 +615,7 @@ fun AudioClip(
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val centerY = size.height / 2f
                     drawLine(
-                        color = clipContentColor.copy(alpha = 0.40f),
+                        color = waveformColor.copy(alpha = 0.40f),
                         start = Offset(0f, centerY),
                         end = Offset(size.width, centerY),
                         strokeWidth = 1f
@@ -622,7 +634,7 @@ fun AudioClip(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(vertical = 4.dp),
-                            waveColor = clipContentColor,
+                            waveColor = waveformColor,
                             rawData = audioEntry.source()?.rawData,
                             sampleRate = audioEntry.sampleRate,
                             channels = audioEntry.channels,

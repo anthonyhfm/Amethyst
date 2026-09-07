@@ -39,6 +39,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientSmoothness
 import dev.anthonyhfm.amethyst.timeline.data.NoteGradientStop
+import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
@@ -101,57 +102,9 @@ fun NoteGradientEditorBar(
                 val stepWidth = size.width / visualSteps
 
                 for (step in 0..visualSteps) {
-                    val progress = step.toDouble() / visualSteps
-
-                    var segmentIndex = 0
-                    for (i in 0 until sortedStops.size - 1) {
-                        if (progress >= sortedStops[i].position && progress <= sortedStops[i + 1].position) {
-                            segmentIndex = i
-                            break
-                        }
-                    }
-
-                    val startStop = sortedStops[segmentIndex]
-                    val endStop = sortedStops.getOrNull(segmentIndex + 1) ?: sortedStops.last()
-                    val smoothness = startStop.smoothness
-
-                    val segmentStart = startStop.position.toDouble()
-                    val segmentEnd = endStop.position.toDouble()
-                    val segmentDuration = segmentEnd - segmentStart
-
-                    val linearT = if (segmentDuration > 0.0001) {
-                        ((progress - segmentStart) / segmentDuration).coerceIn(0.0, 1.0)
-                    } else {
-                        0.0
-                    }
-
-                    val easedT = when (smoothness) {
-                        GradientSmoothness.Linear -> linearT
-                        GradientSmoothness.Hold -> if (linearT < 0.95) 0.0 else 1.0
-                        GradientSmoothness.Release -> if (linearT > 0.05) 1.0 else 0.0
-                        GradientSmoothness.Fast -> kotlin.math.sqrt(linearT)
-                        GradientSmoothness.Slow -> 1.0 - kotlin.math.sqrt(1.0 - linearT)
-                        GradientSmoothness.Sharp -> {
-                            if (linearT < 0.5) {
-                                0.5 - kotlin.math.sqrt(0.5 - linearT) / kotlin.math.sqrt(2.0)
-                            } else {
-                                0.5 + kotlin.math.sqrt(linearT - 0.5) / kotlin.math.sqrt(2.0)
-                            }
-                        }
-                        GradientSmoothness.Smooth -> {
-                            if (linearT < 0.5) {
-                                kotlin.math.sqrt(linearT / 2.0)
-                            } else {
-                                1.0 - kotlin.math.sqrt((1.0 - linearT) / 2.0)
-                            }
-                        }
-                    }
-
-                    val color = Color(
-                        red = (startStop.r + (endStop.r - startStop.r) * easedT.toFloat()).coerceIn(0f, 1f),
-                        green = (startStop.g + (endStop.g - startStop.g) * easedT.toFloat()).coerceIn(0f, 1f),
-                        blue = (startStop.b + (endStop.b - startStop.b) * easedT.toFloat()).coerceIn(0f, 1f)
-                    )
+                    val progress = step.toFloat() / visualSteps
+                    val (r, g, b) = GradientInterpolator.interpolate(sortedStops, progress)
+                    val color = Color(r, g, b)
 
                     drawRect(
                         color = color,
@@ -226,11 +179,7 @@ fun NoteGradientEditorBar(
                                         if (isDragging) {
                                             onDragFinish()
                                         } else {
-                                            if (selectedStopUUID == stop.selectionUUID) {
-                                                onSelectionChange(null)
-                                            } else {
-                                                onSelectionChange(stop.selectionUUID)
-                                            }
+                                            onSelectionChange(stop.selectionUUID)
                                         }
                                     }
                                 }

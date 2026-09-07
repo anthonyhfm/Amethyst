@@ -3,21 +3,21 @@ package dev.anthonyhfm.amethyst.timeline.contract
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 
 enum class TimelineEditorTool {
-    SELECT,
-    DRAW,
-    ERASE
+    NORMAL,
+    DRAW
 }
 
-enum class GridResolution(val snapDivisionsPerBeat: Int, val subBeatsPerBeat: Int) {
-    Quarter(snapDivisionsPerBeat = 4, subBeatsPerBeat = 1),
-    Eighth(snapDivisionsPerBeat = 8, subBeatsPerBeat = 2),
-    Sixteenth(snapDivisionsPerBeat = 16, subBeatsPerBeat = 4),
-    ThirtySecond(snapDivisionsPerBeat = 32, subBeatsPerBeat = 8),
-    SixtyFourth(snapDivisionsPerBeat = 64, subBeatsPerBeat = 16),
-    OneTwentyEighth(snapDivisionsPerBeat = 128, subBeatsPerBeat = 32);
-
-    val label: String
-        get() = "1/$snapDivisionsPerBeat"
+enum class GridResolution(
+    val snapDivisionsPerBeat: Int,
+    val subBeatsPerBeat: Int,
+    val label: String,
+) {
+    Quarter(snapDivisionsPerBeat = 1, subBeatsPerBeat = 1, label = "1/4"),
+    Eighth(snapDivisionsPerBeat = 2, subBeatsPerBeat = 2, label = "1/8"),
+    Sixteenth(snapDivisionsPerBeat = 4, subBeatsPerBeat = 4, label = "1/16"),
+    ThirtySecond(snapDivisionsPerBeat = 8, subBeatsPerBeat = 8, label = "1/32"),
+    SixtyFourth(snapDivisionsPerBeat = 16, subBeatsPerBeat = 16, label = "1/64"),
+    OneTwentyEighth(snapDivisionsPerBeat = 32, subBeatsPerBeat = 32, label = "1/128");
 
     companion object {
         fun fromZoomFactor(zoomFactor: Float): GridResolution = when {
@@ -40,7 +40,7 @@ data class TimelineTimingContext(
 )
 
 data class TimelineEditorSurface(
-    val activeTool: TimelineEditorTool = TimelineEditorTool.SELECT,
+    val activeTool: TimelineEditorTool = TimelineEditorTool.NORMAL,
     val timingContext: TimelineTimingContext? = null,
     val gridResolution: GridResolution = GridResolution.Quarter
 )

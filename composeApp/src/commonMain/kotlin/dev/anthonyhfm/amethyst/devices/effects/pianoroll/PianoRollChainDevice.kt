@@ -76,7 +76,7 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
         customMode.onNoteUpdate = { oldNote, newNote ->
             state.update { currentState ->
                 val updatedNotes = currentState.midiEntry.notes.map { 
-                    if (it == oldNote) newNote else it 
+                    if (it.noteId == oldNote.noteId) newNote else it
                 }
                 currentState.copy(
                     midiEntry = currentState.midiEntry.copy(notes = updatedNotes)
@@ -86,7 +86,7 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
 
         customMode.onNoteDelete = { note ->
             state.update { currentState ->
-                val updatedNotes = currentState.midiEntry.notes.filter { it != note }
+                val updatedNotes = currentState.midiEntry.notes.filterNot { it.noteId == note.noteId }
                 currentState.copy(
                     midiEntry = currentState.midiEntry.copy(notes = updatedNotes)
                 )

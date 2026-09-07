@@ -435,19 +435,15 @@ private fun KeyframesToggleOption(
 @Composable
 private fun PianoRollOptions(mode: PianoRollWorkspaceMode) {
     WorkspaceToolbarSurface {
-        listOf(
-            TimelineEditorTool.SELECT to Lucide.MousePointer,
-            TimelineEditorTool.DRAW   to Lucide.Pencil,
-            TimelineEditorTool.ERASE  to Lucide.Eraser,
-        ).forEach { (tool, icon) ->
-            val variant = if (mode.activeTool == tool) ButtonVariant.Default else ButtonVariant.Ghost
-            WorkspaceToolbarIconButton(
-                onClick = { mode.activeTool = tool },
-                imageVector = icon,
-                contentDescription = tool.name.lowercase().replaceFirstChar { it.uppercase() },
-                variant = variant,
-            )
-        }
+        val drawEnabled = mode.activeTool == TimelineEditorTool.DRAW
+        WorkspaceToolbarIconButton(
+            onClick = {
+                mode.activeTool = if (drawEnabled) TimelineEditorTool.NORMAL else TimelineEditorTool.DRAW
+            },
+            imageVector = Lucide.Pencil,
+            contentDescription = "Draw mode (B)",
+            variant = if (drawEnabled) ButtonVariant.Default else ButtonVariant.Ghost,
+        )
     }
 
     var gridMenuExpanded by remember { mutableStateOf(false) }
@@ -457,7 +453,7 @@ private fun PianoRollOptions(mode: PianoRollWorkspaceMode) {
         mode.gridResolution == GridResolution.Eighth       -> stringResource(Res.string.workspace_topappbar_grid_eighth)
         mode.gridResolution == GridResolution.Sixteenth    -> stringResource(Res.string.workspace_topappbar_grid_sixteenth)
         mode.gridResolution == GridResolution.ThirtySecond -> stringResource(Res.string.workspace_topappbar_grid_thirty_second)
-        else -> stringResource(Res.string.workspace_topappbar_grid_auto)
+        else -> mode.gridResolution.label
     }
 
     WorkspaceToolbarSurface {
@@ -504,6 +500,8 @@ private fun PianoRollOptions(mode: PianoRollWorkspaceMode) {
                     GridResolution.Eighth       to stringResource(Res.string.workspace_topappbar_grid_eighth),
                     GridResolution.Sixteenth    to stringResource(Res.string.workspace_topappbar_grid_sixteenth),
                     GridResolution.ThirtySecond to stringResource(Res.string.workspace_topappbar_grid_thirty_second),
+                    GridResolution.SixtyFourth to GridResolution.SixtyFourth.label,
+                    GridResolution.OneTwentyEighth to GridResolution.OneTwentyEighth.label,
                 ).forEach { (res, label) ->
                     DropdownMenuRadioItem(
                         selected = mode.gridResolutionLocked && mode.gridResolution == res,

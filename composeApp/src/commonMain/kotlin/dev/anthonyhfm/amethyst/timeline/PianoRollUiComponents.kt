@@ -3,7 +3,7 @@ package dev.anthonyhfm.amethyst.timeline
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -40,6 +40,7 @@ import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.timeline.data.resolvedPadIndex
 import dev.anthonyhfm.amethyst.timeline.data.isGradient
 import dev.anthonyhfm.amethyst.timeline.data.isOutOfBounds
 import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
@@ -241,6 +242,8 @@ internal fun NoteBox(
     activeTool: TimelineEditorTool,
     clipDurationMs: Long = Long.MAX_VALUE,
     onSelect: () -> Unit,
+    onEditStart: () -> Unit,
+    onDoubleClick: () -> Unit,
     onDrag: (dragAmount: Offset) -> Unit,
     onDragEnd: () -> Unit,
     onResizeLeft: (resizeDelta: Float) -> Unit,
@@ -252,15 +255,16 @@ internal fun NoteBox(
     resizeRightDelta: Float
 ) {
     val density = LocalDensity.current
-    val directEditEnabled = activeTool != TimelineEditorTool.ERASE
+    val directEditEnabled = activeTool == TimelineEditorTool.NORMAL
     val latestOnSelect by rememberUpdatedState(onSelect)
+    val latestOnEditStart by rememberUpdatedState(onEditStart)
     val latestOnDrag by rememberUpdatedState(onDrag)
     val latestOnDragEnd by rememberUpdatedState(onDragEnd)
     val latestOnResizeLeft by rememberUpdatedState(onResizeLeft)
     val latestOnResizeLeftEnd by rememberUpdatedState(onResizeLeftEnd)
     val latestOnResizeRight by rememberUpdatedState(onResizeRight)
     val latestOnResizeRightEnd by rememberUpdatedState(onResizeRightEnd)
-    val baseY = metrics.pitchToYPx(note.pitch)
+    val baseY = metrics.pitchToYPx(note.resolvedPadIndex)
     val baseX = metrics.timeMsToXPx(note.startTimeMs)
     val screenX = viewport.contentToScreenX(baseX)
     val baseWidthPx = metrics.durationMsToWidthPx(note.durationMs)
@@ -273,7 +277,7 @@ internal fun NoteBox(
 
     val currentX = screenX + dragOffset.x + resizeLeftDelta
     val currentY = baseY + snappedDragOffsetY
-    val currentWidthPx = (baseWidthPx - resizeLeftDelta + resizeRightDelta).coerceAtLeast(20f)
+    val currentWidthPx = (baseWidthPx - resizeLeftDelta + resizeRightDelta).coerceAtLeast(6f)
 
     val isOutOfBounds = note.isOutOfBounds(clipDurationMs)
     val normalBorderColor = Theme[colors][foreground].copy(alpha = if (isSelected) 1f else 0.4f)
@@ -313,12 +317,16 @@ internal fun NoteBox(
                     Modifier.border(1.dp, innerBorderColor)
                 }
             )
-            .clickable(enabled = directEditEnabled) { latestOnSelect() }
+            .combinedClickable(
+                enabled = directEditEnabled,
+                onClick = { latestOnSelect() },
+                onDoubleClick = onDoubleClick,
+            )
             .then(
                 if (directEditEnabled) {
                     Modifier.pointerInput(note, activeTool) {
                         detectDragGestures(
-                            onDragStart = { latestOnSelect() },
+                            onDragStart = { latestOnEditStart() },
                             onDragEnd = { latestOnDragEnd() },
                             onDrag = { change, dragAmount ->
                                 change.consume()
@@ -372,7 +380,7 @@ internal fun NoteBox(
                             .pointerHoverIcon(PointerIcon.ResizeLeft)
                             .pointerInput(note, activeTool) {
                                 detectDragGestures(
-                                    onDragStart = { latestOnSelect() },
+                                    onDragStart = { latestOnEditStart() },
                                     onDragEnd = { latestOnResizeLeftEnd() },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
@@ -397,7 +405,7 @@ internal fun NoteBox(
                             .pointerHoverIcon(PointerIcon.ResizeRight)
                             .pointerInput(note, activeTool) {
                                 detectDragGestures(
-                                    onDragStart = { latestOnSelect() },
+                                    onDragStart = { latestOnEditStart() },
                                     onDragEnd = { latestOnResizeRightEnd() },
                                     onDrag = { change, dragAmount ->
                                         change.consume()

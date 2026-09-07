@@ -40,6 +40,8 @@ import dev.anthonyhfm.amethyst.timeline.contract.TimelineEditorTool
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.NoteGradientStop
+import dev.anthonyhfm.amethyst.timeline.data.resolvedDeviceIndex
+import dev.anthonyhfm.amethyst.timeline.data.resolvedPadIndex
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.viewport.wheelZoomScaleFactor
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
@@ -83,7 +85,7 @@ fun PianoRollEditorCanvas(
     viewport: EditorViewportState,
     onViewportChange: (EditorViewportState) -> Unit,
     gridResolution: GridResolution,
-    currentBpm: () -> Double,
+    bpm: Double,
     pressedKeysState: StateFlow<Map<Pair<Int, Int>, Boolean>>,
     selectedTimeMs: Long?,
     playheadPositionMs: Long?,
@@ -111,17 +113,26 @@ fun PianoRollEditorCanvas(
 
     val launchpadCount = launchpads.size.coerceAtLeast(1)
     val totalPitches = 100
+    val beatDurationMs = millisecondsPerBeat(bpm)
 
     val noteHeightDp: Dp = 22.dp
     val beatsPerBar = 4
-    val clipBeats = entry.durationMs.toFloat() / MS_PER_BEAT.toFloat()
+    val clipBeats = entry.durationMs.toFloat() / beatDurationMs.toFloat()
 
     val oobOverhangMs = 0L
     val oobOverhangRightMs = (entry.durationMs * 0.25).toLong().coerceAtLeast(2000L)
-    val totalBeatsWithOverhang = (entry.durationMs + oobOverhangRightMs).toFloat() / MS_PER_BEAT.toFloat()
+    val totalBeatsWithOverhang = (entry.durationMs + oobOverhangRightMs).toFloat() / beatDurationMs.toFloat()
 
-    val metrics = remember(totalPitches, density, gridResolution, viewport.zoomX, oobOverhangMs) {
-        PianoRollMetrics(totalPitches, noteHeightDp, viewport.zoomX, density, gridResolution, oobOffsetMs = oobOverhangMs)
+    val metrics = remember(totalPitches, density, gridResolution, viewport.zoomX, oobOverhangMs, beatDurationMs) {
+        PianoRollMetrics(
+            totalPitches,
+            noteHeightDp,
+            viewport.zoomX,
+            density,
+            gridResolution,
+            beatDurationMs = beatDurationMs,
+            oobOffsetMs = oobOverhangMs,
+        )
     }
     val latestMetrics by rememberUpdatedState(metrics)
     val latestOobOverhangMs by rememberUpdatedState(oobOverhangMs)
@@ -131,7 +142,7 @@ fun PianoRollEditorCanvas(
 
     LaunchedEffect(Unit) {
         val initialScrollX = metrics.timeMsToXPx(0L).coerceAtLeast(0f)
-        val contentWidthPx = viewport.zoomX * MS_PER_BEAT.toFloat() * totalBeatsWithOverhang
+        val contentWidthPx = viewport.zoomX * beatDurationMs.toFloat() * totalBeatsWithOverhang
         latestOnViewportChange(
             viewport.copy(scrollX = initialScrollX, contentWidth = contentWidthPx)
         )
@@ -159,11 +170,52 @@ fun PianoRollEditorCanvas(
     var resizeRightDelta by remember { mutableStateOf(0f) }
     var activeDragNote by remember { mutableStateOf<MidiNote?>(null) }
     var draftNote by remember { mutableStateOf<MidiNote?>(null) }
+    var draftAnchorCellStartMs by remember { mutableStateOf<Long?>(null) }
     var viewportWidthPx by remember { mutableStateOf(0) }
     var lastPointerX by remember { mutableStateOf<Float?>(null) }
+    var lastTapUptimeMillis by remember { mutableStateOf<Long?>(null) }
+    var lastTapPosition by remember { mutableStateOf<Offset?>(null) }
+
+    val visibleNotes = remember(notesState, viewport.scrollX, viewport.zoomX, viewportWidthPx, beatDurationMs) {
+        notesState.filter { note ->
+            val left = viewport.contentToScreenX(metrics.timeMsToXPx(note.startTimeMs))
+            val right = left + metrics.durationMsToWidthPx(note.durationMs)
+            right >= 0f && left <= viewportWidthPx.toFloat()
+        }
+    }
 
     fun snapSelectedTimeMs(timeMs: Double, currentResolution: GridResolution): Long {
-        return snapClipTimeToGrid(timeMs, currentResolution)
+        return snapClipTimeToGrid(timeMs, currentResolution, beatDurationMs)
+    }
+
+    fun resolveGridPoint(offset: Offset): PianoRollGridPoint? = resolvePianoRollGridPoint(
+        point = offset,
+        verticalScrollPx = latestScrollOffsetPx,
+        deviceHeaderHeightPx = latestHeaderOffsetPx,
+        deviceRowHeightPx = latestMetrics.canvasHeightPx,
+        deviceCount = launchpadCount,
+    )
+
+    fun noteRectsForDevice(deviceIndex: Int): List<PianoRollNoteRect> = buildNoteRectsScreenSpace(
+        notes = notesState.filter { it.resolvedDeviceIndex == deviceIndex },
+        metrics = latestMetrics,
+        viewport = latestViewport,
+    )
+
+    fun noteRectsInViewport(): List<PianoRollNoteRect> {
+        val blockHeightPx = latestHeaderOffsetPx + latestMetrics.canvasHeightPx
+        return notesState
+            .filter { it.resolvedDeviceIndex in 0 until launchpadCount }
+            .map { note ->
+                PianoRollNoteRect(
+                    note = note,
+                    left = latestViewport.contentToScreenX(latestMetrics.timeMsToXPx(note.startTimeMs)),
+                    top = note.resolvedDeviceIndex * blockHeightPx + latestHeaderOffsetPx +
+                        latestMetrics.pitchToYPx(note.resolvedPadIndex) - latestScrollOffsetPx,
+                    width = latestMetrics.durationMsToWidthPx(note.durationMs),
+                    height = latestMetrics.noteRenderHeightPx,
+                )
+            }
     }
 
     fun buildDraftNote(
@@ -191,14 +243,15 @@ fun PianoRollEditorCanvas(
     }
 
     fun handleNoteTap(offset: Offset) {
+        val gridPoint = resolveGridPoint(offset) ?: return
         val contentX = latestViewport.screenToContentX(offset.x)
         val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
-        val contentOffset = offset.copy(y = offset.y + latestScrollOffsetPx - latestHeaderOffsetPx)
+        val contentOffset = gridPoint.pointInDevice
         val pitch = latestMetrics.yPxToPitch(contentOffset.y)
 
         when (activeTool) {
-            TimelineEditorTool.SELECT -> {
-                val clickedRect = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+            TimelineEditorTool.NORMAL -> {
+                val clickedRect = noteRectsForDevice(gridPoint.deviceIndex)
                     .firstOrNull { it.contains(contentOffset) }
 
                 if (clickedRect != null) {
@@ -208,7 +261,7 @@ fun PianoRollEditorCanvas(
                         it is Selectable.PianoRollNote &&
                             it.entryStartMs == entryStartMs &&
                             it.trackIndex == trackIndex &&
-                            it.note == note
+                            it.note.noteId == note.noteId
                     }
                     if (multiSelectModifierDown || shiftModifierDown) {
                         if (isSelected) {
@@ -229,18 +282,18 @@ fun PianoRollEditorCanvas(
             }
 
             TimelineEditorTool.DRAW -> {
-                val clickedNote = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+                val clickedNote = noteRectsForDevice(gridPoint.deviceIndex)
                     .firstOrNull { it.contains(contentOffset) }?.note
 
                 if (clickedNote != null) {
                     onDeleteNotes(listOf(clickedNote))
-                    notesState = notesState.filter { it != clickedNote }
+                    notesState = notesState.filterNot { it.noteId == clickedNote.noteId }
                 } else {
-                    val startTimeMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
-                    val durationMs = currentCellDurationMs(gridResolution)
+                    val startTimeMs = floorClipTimeToGrid(clipTimeMs, gridResolution, beatDurationMs)
+                    val durationMs = currentCellDurationMs(gridResolution, beatDurationMs)
 
                     val newNote = MidiNote.withPaint(
-                        device = 0,
+                        device = gridPoint.deviceIndex,
                         pitch = pitch,
                         color = selectedColor,
                         startTimeMs = startTimeMs,
@@ -258,32 +311,58 @@ fun PianoRollEditorCanvas(
                 }
             }
 
-            TimelineEditorTool.ERASE -> {
-                val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                    .firstOrNull { it.contains(contentOffset) }?.note
+        }
+    }
 
-                if (noteToErase != null) {
-                    val result = onDeleteNotes(listOf(noteToErase))
-                    if (result.didChange) {
-                        notesState = notesState.filter { it != noteToErase }
-                        SelectionManager.replaceSelections(
-                            SelectionManager.selections.value - Selectable.PianoRollNote(trackIndex, entryStartMs, noteToErase)
-                        )
+    fun handleNoteDoubleTap(offset: Offset) {
+        if (activeTool != TimelineEditorTool.NORMAL) return
+        val gridPoint = resolveGridPoint(offset) ?: return
+        val contentOffset = gridPoint.pointInDevice
+        val clickedNote = noteRectsForDevice(gridPoint.deviceIndex)
+            .firstOrNull { it.contains(contentOffset) }
+            ?.note
+
+        if (clickedNote != null) {
+            val result = onDeleteNotes(listOf(clickedNote))
+            if (result.didChange) {
+                notesState = notesState.filterNot { it.noteId == clickedNote.noteId }
+                SelectionManager.replaceSelections(
+                    SelectionManager.selections.value.filterNot {
+                        it is Selectable.PianoRollNote && it.note.noteId == clickedNote.noteId
                     }
-                }
+                )
             }
+            return
+        }
+
+        val contentX = latestViewport.screenToContentX(offset.x)
+        val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
+        val pitch = latestMetrics.yPxToPitch(contentOffset.y)
+        val newNote = MidiNote.withPaint(
+            device = gridPoint.deviceIndex,
+            pitch = pitch,
+            color = selectedColor,
+            startTimeMs = floorClipTimeToGrid(clipTimeMs, gridResolution, beatDurationMs),
+            durationMs = currentCellDurationMs(gridResolution, beatDurationMs),
+            gradient = if (gradientMode) workingGradient else null,
+        )
+        val result = onCreateNotes(listOf(newNote))
+        if (result.didChange) {
+            notesState = notesState + newNote
+            SelectionManager.select(Selectable.PianoRollNote(trackIndex, entryStartMs, newNote), single = true)
         }
     }
 
     fun handleNoteDragStart(offset: Offset) {
+        val gridPoint = resolveGridPoint(offset) ?: return
         val contentX = latestViewport.screenToContentX(offset.x)
         val clipTimeMs = latestViewport.contentXToClipTimeMs(contentX, latestOobOverhangMs)
-        val contentOffset = offset.copy(y = offset.y + latestScrollOffsetPx - latestHeaderOffsetPx)
+        val contentOffset = gridPoint.pointInDevice
         val pitch = latestMetrics.yPxToPitch(contentOffset.y)
 
         when (activeTool) {
-            TimelineEditorTool.SELECT -> {
-                val noteRects = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+            TimelineEditorTool.NORMAL -> {
+                val noteRects = noteRectsForDevice(gridPoint.deviceIndex)
                 val hitTarget = findPianoRollHitTarget(contentOffset, noteRects)
 
                 when (hitTarget) {
@@ -294,7 +373,7 @@ fun PianoRollEditorCanvas(
                             it is Selectable.PianoRollNote &&
                                 it.entryStartMs == entryStartMs &&
                                 it.trackIndex == trackIndex &&
-                                it.note == note
+                                it.note.noteId == note.noteId
                         }
                         if (!isSelected) {
                             SelectionManager.select(
@@ -324,10 +403,11 @@ fun PianoRollEditorCanvas(
             }
 
             TimelineEditorTool.DRAW -> {
-                val anchorStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
-                val cellDurMs = currentCellDurationMs(gridResolution)
+                val anchorStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution, beatDurationMs)
+                draftAnchorCellStartMs = anchorStartMs
+                val cellDurMs = currentCellDurationMs(gridResolution, beatDurationMs)
                 draftNote = buildDraftNote(
-                    device = 0,
+                    device = gridPoint.deviceIndex,
                     pitch = pitch,
                     color = selectedColor,
                     gradient = if (gradientMode) workingGradient else null,
@@ -337,17 +417,6 @@ fun PianoRollEditorCanvas(
                 )
             }
 
-            TimelineEditorTool.ERASE -> {
-                val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                    .firstOrNull { it.contains(contentOffset) }?.note
-
-                if (noteToErase != null) {
-                    val result = onDeleteNotes(listOf(noteToErase))
-                    if (result.didChange) {
-                        notesState = notesState.filter { it != noteToErase }
-                    }
-                }
-            }
         }
     }
 
@@ -362,10 +431,10 @@ fun PianoRollEditorCanvas(
             val start = marqueeStart ?: return
             val left = min(start.x, currentPos.x)
             val right = max(start.x, currentPos.x)
-            val top = min(start.y, currentPos.y) + latestScrollOffsetPx - latestHeaderOffsetPx
-            val bottom = max(start.y, currentPos.y) + latestScrollOffsetPx - latestHeaderOffsetPx
+            val top = min(start.y, currentPos.y)
+            val bottom = max(start.y, currentPos.y)
 
-            val newlySelected = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
+            val newlySelected = noteRectsInViewport()
                 .filter { rect ->
                     rect.left <= right && rect.right >= left &&
                         rect.top <= bottom && rect.bottom >= top
@@ -383,29 +452,19 @@ fun PianoRollEditorCanvas(
                 )
             }
         } else if (draftNote != null) {
-            val pitch = latestMetrics.yPxToPitch(currentPos.y + latestScrollOffsetPx - latestHeaderOffsetPx)
-            val currentCellStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution)
-            val cellDurMs = currentCellDurationMs(gridResolution)
+            val gridPoint = resolveGridPoint(currentPos) ?: return
+            val pitch = latestMetrics.yPxToPitch(gridPoint.pointInDevice.y)
+            val currentCellStartMs = floorClipTimeToGrid(clipTimeMs, gridResolution, beatDurationMs)
+            val cellDurMs = currentCellDurationMs(gridResolution, beatDurationMs)
             draftNote = buildDraftNote(
-                device = draftNote!!.device,
+                device = gridPoint.deviceIndex,
                 pitch = pitch,
                 color = selectedColor,
                 gradient = if (gradientMode) workingGradient else null,
-                anchorCellStartMs = draftNote!!.startTimeMs,
+                anchorCellStartMs = draftAnchorCellStartMs ?: draftNote!!.startTimeMs,
                 currentCellStartMs = currentCellStartMs,
                 cellDurationMs = cellDurMs,
             )
-        } else if (activeTool == TimelineEditorTool.ERASE) {
-            val contentPos = currentPos.copy(y = currentPos.y + latestScrollOffsetPx - latestHeaderOffsetPx)
-            val noteToErase = buildNoteRectsScreenSpace(notesState, latestMetrics, latestViewport)
-                .firstOrNull { it.contains(contentPos) }?.note
-
-            if (noteToErase != null) {
-                val result = onDeleteNotes(listOf(noteToErase))
-                if (result.didChange) {
-                    notesState = notesState.filter { it != noteToErase }
-                }
-            }
         }
     }
 
@@ -426,6 +485,7 @@ fun PianoRollEditorCanvas(
                 )
             }
             draftNote = null
+            draftAnchorCellStartMs = null
         }
     }
 
@@ -434,6 +494,7 @@ fun PianoRollEditorCanvas(
         marqueeCurrent = null
         marqueeGestureActive = false
         draftNote = null
+        draftAnchorCellStartMs = null
         activeDragNote = null
         dragOffset = Offset.Zero
         resizeLeftDelta = 0f
@@ -536,7 +597,7 @@ fun PianoRollEditorCanvas(
                         .fillMaxHeight()
                         .onSizeChanged { size ->
                             viewportWidthPx = size.width
-                            val totalWidthPx = viewport.zoomX * MS_PER_BEAT.toFloat() * latestTotalBeatsWithOverhang
+                            val totalWidthPx = viewport.zoomX * beatDurationMs.toFloat() * latestTotalBeatsWithOverhang
                             val updatedViewport = viewport.withConstrainedViewport(
                                 viewportWidth = size.width.toFloat(),
                                 contentWidth = totalWidthPx
@@ -571,7 +632,7 @@ fun PianoRollEditorCanvas(
                                             val actualScale = targetZoomX / currentVP.zoomX
 
                                             val newScrollX = anchorPx + actualScale * (currentVP.scrollX - anchorPx)
-                                            val totalContentWidthPx = targetZoomX * MS_PER_BEAT.toFloat() * latestTotalBeatsWithOverhang
+                                            val totalContentWidthPx = targetZoomX * beatDurationMs.toFloat() * latestTotalBeatsWithOverhang
 
                                             val newVP = currentVP.withConstrainedViewport(
                                                 zoomX = targetZoomX,
@@ -609,6 +670,14 @@ fun PianoRollEditorCanvas(
                         .pointerInput(activeTool, notesState) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
+                                val downGridPoint = resolveGridPoint(down.position)
+                                val noteOwnsGesture = activeTool == TimelineEditorTool.NORMAL &&
+                                    downGridPoint != null &&
+                                    findPianoRollHitTarget(
+                                        downGridPoint.pointInDevice,
+                                        noteRectsForDevice(downGridPoint.deviceIndex),
+                                    ) !is PianoRollHitTarget.Empty
+                                if (noteOwnsGesture) return@awaitEachGesture
                                 var overSlop = Offset.Zero
                                 var slopChange: PointerInputChange?
                                 do {
@@ -631,7 +700,21 @@ fun PianoRollEditorCanvas(
                                         handleNoteDragCancel()
                                     }
                                 } else {
-                                    handleNoteTap(down.position)
+                                    val previousTime = lastTapUptimeMillis
+                                    val previousPosition = lastTapPosition
+                                    val isDoubleTap = previousTime != null &&
+                                        down.uptimeMillis - previousTime <= 400L &&
+                                        previousPosition != null &&
+                                        (down.position - previousPosition).getDistance() <= viewConfiguration.touchSlop * 2f
+                                    if (isDoubleTap) {
+                                        handleNoteDoubleTap(down.position)
+                                        lastTapUptimeMillis = null
+                                        lastTapPosition = null
+                                    } else {
+                                        handleNoteTap(down.position)
+                                        lastTapUptimeMillis = down.uptimeMillis
+                                        lastTapPosition = down.position
+                                    }
                                 }
                             }
                         }
@@ -662,15 +745,15 @@ fun PianoRollEditorCanvas(
                                             viewport = viewport
                                         )
                                 ) {
-                                notesState.forEach { note ->
+                                visibleNotes.filter { it.resolvedDeviceIndex == index }.forEach { note ->
                                     val selected = selections.any {
                                         it is Selectable.PianoRollNote &&
                                             it.entryStartMs == entryStartMs &&
                                             it.trackIndex == trackIndex &&
-                                            it.note == note
+                                            it.note.noteId == note.noteId
                                     }
 
-                                    key(note.startTimeMs, note.pitch) {
+                                    key(note.noteId) {
                                         NoteBox(
                                             note = note,
                                             metrics = metrics,
@@ -692,6 +775,29 @@ fun PianoRollEditorCanvas(
                                                     }
                                                 }
                                             },
+                                            onEditStart = {
+                                                activeDragNote = note
+                                                dragOffset = Offset.Zero
+                                                resizeLeftDelta = 0f
+                                                resizeRightDelta = 0f
+                                                if (!selected) {
+                                                    SelectionManager.select(
+                                                        Selectable.PianoRollNote(trackIndex, entryStartMs, note),
+                                                        single = !multiSelectModifierDown && !shiftModifierDown,
+                                                    )
+                                                }
+                                            },
+                                            onDoubleClick = {
+                                                val result = onDeleteNotes(listOf(note))
+                                                if (result.didChange) {
+                                                    notesState = notesState.filterNot { it.noteId == note.noteId }
+                                                    SelectionManager.replaceSelections(
+                                                        SelectionManager.selections.value.filterNot {
+                                                            it is Selectable.PianoRollNote && it.note.noteId == note.noteId
+                                                        }
+                                                    )
+                                                }
+                                            },
                                             onDrag = { dragAmount ->
                                                 dragOffset += dragAmount
                                             },
@@ -707,22 +813,32 @@ fun PianoRollEditorCanvas(
                                                     return@NoteBox
                                                 }
 
-                                                val pitchDelta = (- (dragOffset.y / metrics.noteHeightPx)).roundToInt()
+                                                val requestedPitchDelta = (-(dragOffset.y / metrics.noteHeightPx)).roundToInt()
+                                                val minPitch = selectedNotes.minOf { it.resolvedPadIndex }
+                                                val maxPitch = selectedNotes.maxOf { it.resolvedPadIndex }
+                                                val pitchDelta = requestedPitchDelta.coerceIn(-minPitch, totalPitches - 1 - maxPitch)
+
+                                                val timeAnchor = activeDragNote ?: selectedNotes.first()
+                                                val anchorContentX = viewport.clipTimeMsToContentX(
+                                                    timeAnchor.startTimeMs.toDouble(),
+                                                    oobOverhangMs,
+                                                )
+                                                val requestedAnchorStartMs = snapClipTimeToGrid(
+                                                    viewport.contentXToClipTimeMs(anchorContentX + dragOffset.x, oobOverhangMs),
+                                                    gridResolution,
+                                                    beatDurationMs,
+                                                )
+                                                val requestedTimeDelta = requestedAnchorStartMs - timeAnchor.startTimeMs
+                                                val timeDelta = requestedTimeDelta.coerceAtLeast(-selectedNotes.minOf { it.startTimeMs })
 
                                                 val noteUpdates = selectedNotes.map { noteToDrag ->
-                                                    val startContentX = viewport.clipTimeMsToContentX(
-                                                        noteToDrag.startTimeMs.toDouble(),
-                                                        oobOverhangMs
-                                                    )
-                                                    val newStartContentX = startContentX + dragOffset.x
-                                                    val newStartMs = snapClipTimeToGrid(
-                                                        viewport.contentXToClipTimeMs(newStartContentX, oobOverhangMs),
-                                                        gridResolution,
-                                                    )
-                                                    val newPitch = (noteToDrag.pitch + pitchDelta).coerceIn(0, totalPitches - 1)
+                                                    val newStartMs = noteToDrag.startTimeMs + timeDelta
+                                                    val newPitch = noteToDrag.resolvedPadIndex + pitchDelta
                                                     val updatedNote = noteToDrag.copy(
                                                         startTimeMs = newStartMs,
-                                                        pitch = newPitch
+                                                        device = noteToDrag.resolvedDeviceIndex,
+                                                        pitch = newPitch,
+                                                        led = noteToDrag.led.copy(index = newPitch),
                                                     )
                                                     noteToDrag to updatedNote
                                                 }
@@ -733,16 +849,18 @@ fun PianoRollEditorCanvas(
 
                                                 if (result.didChange) {
                                                     val updatedNotes = notesState.map { existingNote ->
-                                                        noteUpdates.find { it.first == existingNote }?.second ?: existingNote
+                                                        noteUpdates.find { it.first.noteId == existingNote.noteId }?.second ?: existingNote
                                                     }
                                                     notesState = updatedNotes
-                                                    SelectionManager.clear()
-                                                    noteUpdates.forEach { (_, new) ->
-                                                        SelectionManager.select(
-                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, new),
-                                                            single = false
-                                                        )
-                                                    }
+                                                    val replacements = noteUpdates.associate { it.first.noteId to it.second }
+                                                    SelectionManager.replaceSelections(
+                                                        SelectionManager.selections.value.map { selection ->
+                                                            if (selection is Selectable.PianoRollNote) {
+                                                                replacements[selection.note.noteId]?.let { selection.copy(note = it) }
+                                                                    ?: selection
+                                                            } else selection
+                                                        }
+                                                    )
                                                 }
                                                 dragOffset = Offset.Zero
                                                 activeDragNote = null
@@ -768,15 +886,15 @@ fun PianoRollEditorCanvas(
                                                         oobOverhangMs
                                                     )
                                                     val newStartContentX = startContentX + resizeLeftDelta
-                                                    val newStartMs = snapClipTimeToGrid(
+                                                    val requestedStartMs = snapClipTimeToGrid(
                                                         viewport.contentXToClipTimeMs(newStartContentX, oobOverhangMs),
                                                         gridResolution,
+                                                        beatDurationMs,
                                                     )
                                                     val newEndMs = noteToResize.endTimeMs
-                                                    val minDur = MS_PER_BEAT / 4
+                                                    val minDur = currentCellDurationMs(gridResolution, beatDurationMs)
+                                                    val newStartMs = requestedStartMs.coerceIn(0L, (newEndMs - minDur).coerceAtLeast(0L))
                                                     val newDurationMs = (newEndMs - newStartMs).coerceAtLeast(minDur)
-
-                                                    if (newDurationMs < minDur) return@mapNotNull null
 
                                                     val updatedNote = noteToResize.copy(
                                                         startTimeMs = newStartMs,
@@ -791,16 +909,18 @@ fun PianoRollEditorCanvas(
 
                                                 if (result.didChange) {
                                                     val updatedNotes = notesState.map { existingNote ->
-                                                        noteUpdates.find { it.first == existingNote }?.second ?: existingNote
+                                                        noteUpdates.find { it.first.noteId == existingNote.noteId }?.second ?: existingNote
                                                     }
                                                     notesState = updatedNotes
-                                                    SelectionManager.clear()
-                                                    noteUpdates.forEach { (_, new) ->
-                                                        SelectionManager.select(
-                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, new),
-                                                            single = false
-                                                        )
-                                                    }
+                                                    val replacements = noteUpdates.associate { it.first.noteId to it.second }
+                                                    SelectionManager.replaceSelections(
+                                                        SelectionManager.selections.value.map { selection ->
+                                                            if (selection is Selectable.PianoRollNote) {
+                                                                replacements[selection.note.noteId]?.let { selection.copy(note = it) }
+                                                                    ?: selection
+                                                            } else selection
+                                                        }
+                                                    )
                                                 }
                                                 resizeLeftDelta = 0f
                                                 activeDragNote = null
@@ -829,8 +949,9 @@ fun PianoRollEditorCanvas(
                                                     val newEndTimeMs = snapClipTimeToGrid(
                                                         viewport.contentXToClipTimeMs(newEndContentX, oobOverhangMs),
                                                         gridResolution,
+                                                        beatDurationMs,
                                                     )
-                                                    val minDur = MS_PER_BEAT / 4
+                                                    val minDur = currentCellDurationMs(gridResolution, beatDurationMs)
                                                     val newDurationMs = (newEndTimeMs - noteToResize.startTimeMs).coerceAtLeast(minDur)
 
                                                     if (newDurationMs < minDur) return@mapNotNull null
@@ -845,28 +966,73 @@ fun PianoRollEditorCanvas(
 
                                                 if (result.didChange) {
                                                     val updatedNotes = notesState.map { existingNote ->
-                                                        noteUpdates.find { it.first == existingNote }?.second ?: existingNote
+                                                        noteUpdates.find { it.first.noteId == existingNote.noteId }?.second ?: existingNote
                                                     }
                                                     notesState = updatedNotes
-                                                    SelectionManager.clear()
-                                                    noteUpdates.forEach { (_, new) ->
-                                                        SelectionManager.select(
-                                                            Selectable.PianoRollNote(trackIndex, entryStartMs, new),
-                                                            single = false
-                                                        )
-                                                    }
+                                                    val replacements = noteUpdates.associate { it.first.noteId to it.second }
+                                                    SelectionManager.replaceSelections(
+                                                        SelectionManager.selections.value.map { selection ->
+                                                            if (selection is Selectable.PianoRollNote) {
+                                                                replacements[selection.note.noteId]?.let { selection.copy(note = it) }
+                                                                    ?: selection
+                                                            } else selection
+                                                        }
+                                                    )
                                                 }
                                                 resizeRightDelta = 0f
                                                 activeDragNote = null
                                             },
-                                            dragOffset = if (selected) dragOffset else Offset.Zero,
-                                            resizeLeftDelta = if (selected && activeDragNote != null) resizeLeftDelta else 0f,
-                                            resizeRightDelta = if (selected && activeDragNote != null) resizeRightDelta else 0f
+                                            dragOffset = if (selected && activeDragNote != null) {
+                                                val anchor = activeDragNote!!
+                                                val anchorContentX = viewport.clipTimeMsToContentX(
+                                                    anchor.startTimeMs.toDouble(),
+                                                    oobOverhangMs,
+                                                )
+                                                val snappedAnchorMs = snapClipTimeToGrid(
+                                                    viewport.contentXToClipTimeMs(anchorContentX + dragOffset.x, oobOverhangMs),
+                                                    gridResolution,
+                                                    beatDurationMs,
+                                                )
+                                                val selectedStart = selections.filterIsInstance<Selectable.PianoRollNote>()
+                                                    .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                                                    .minOfOrNull { it.note.startTimeMs } ?: anchor.startTimeMs
+                                                val deltaMs = (snappedAnchorMs - anchor.startTimeMs)
+                                                    .coerceAtLeast(-selectedStart)
+                                                Offset(metrics.durationMsToWidthPx(deltaMs), dragOffset.y)
+                                            } else Offset.Zero,
+                                            resizeLeftDelta = if (selected && activeDragNote != null && resizeLeftDelta != 0f) {
+                                                val requestedStartMs = snapClipTimeToGrid(
+                                                    viewport.contentXToClipTimeMs(
+                                                        viewport.clipTimeMsToContentX(note.startTimeMs.toDouble(), oobOverhangMs) + resizeLeftDelta,
+                                                        oobOverhangMs,
+                                                    ),
+                                                    gridResolution,
+                                                    beatDurationMs,
+                                                )
+                                                val minimumDuration = currentCellDurationMs(gridResolution, beatDurationMs)
+                                                val previewStartMs = requestedStartMs.coerceIn(
+                                                    0L,
+                                                    (note.endTimeMs - minimumDuration).coerceAtLeast(0L),
+                                                )
+                                                metrics.durationMsToWidthPx(previewStartMs - note.startTimeMs)
+                                            } else 0f,
+                                            resizeRightDelta = if (selected && activeDragNote != null && resizeRightDelta != 0f) {
+                                                val requestedEndMs = snapClipTimeToGrid(
+                                                    viewport.contentXToClipTimeMs(
+                                                        viewport.clipTimeMsToContentX(note.endTimeMs.toDouble(), oobOverhangMs) + resizeRightDelta,
+                                                        oobOverhangMs,
+                                                    ),
+                                                    gridResolution,
+                                                    beatDurationMs,
+                                                )
+                                                val minimumEndMs = note.startTimeMs + currentCellDurationMs(gridResolution, beatDurationMs)
+                                                metrics.durationMsToWidthPx(requestedEndMs.coerceAtLeast(minimumEndMs) - note.endTimeMs)
+                                            } else 0f
                                         )
                                     }
                                 }
 
-                                draftNote?.let { draft ->
+                                draftNote?.takeIf { it.resolvedDeviceIndex == index }?.let { draft ->
                                     DraftNoteBox(
                                         note = draft,
                                         metrics = metrics,
@@ -895,5 +1061,5 @@ fun PianoRollEditorCanvas(
     }
 }
 
-private fun currentCellDurationMs(currentResolution: GridResolution): Long =
-    (MS_PER_BEAT / currentResolution.snapDivisionsPerBeat).coerceAtLeast(1L)
+private fun currentCellDurationMs(currentResolution: GridResolution, beatDurationMs: Double): Long =
+    (beatDurationMs / currentResolution.snapDivisionsPerBeat).toLong().coerceAtLeast(1L)

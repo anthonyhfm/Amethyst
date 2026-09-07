@@ -41,28 +41,21 @@ fun PianoRollToolbar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Tool Selection
+        // Ableton-style draw toggle. Normal selection/editing is always available when off.
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ToolButton(
-                icon = Lucide.MousePointer,
-                label = "Select",
-                selected = activeTool == TimelineEditorTool.SELECT,
-                onClick = { onToolChange(TimelineEditorTool.SELECT) }
-            )
-            ToolButton(
                 icon = Lucide.Pencil,
-                label = "Draw",
+                label = "Draw  B",
                 selected = activeTool == TimelineEditorTool.DRAW,
-                onClick = { onToolChange(TimelineEditorTool.DRAW) }
-            )
-            ToolButton(
-                icon = Lucide.Eraser,
-                label = "Erase",
-                selected = activeTool == TimelineEditorTool.ERASE,
-                onClick = { onToolChange(TimelineEditorTool.ERASE) }
+                onClick = {
+                    onToolChange(
+                        if (activeTool == TimelineEditorTool.DRAW) TimelineEditorTool.NORMAL
+                        else TimelineEditorTool.DRAW
+                    )
+                }
             )
         }
 

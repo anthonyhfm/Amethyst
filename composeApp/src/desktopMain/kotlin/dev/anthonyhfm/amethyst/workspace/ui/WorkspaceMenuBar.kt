@@ -385,31 +385,13 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
         if (pianoRollMode != null) {
             Menu(text = pianoRollLabel) {
-                Menu(text = toolLabel) {
-                    RadioButtonItem(
-                        text = selectToolLabel,
-                        selected = pianoRollMode.activeTool == TimelineEditorTool.SELECT,
-                        onClick = {
-                            pianoRollMode.activeTool = TimelineEditorTool.SELECT
-                        }
-                    )
-
-                    RadioButtonItem(
-                        text = drawToolLabel,
-                        selected = pianoRollMode.activeTool == TimelineEditorTool.DRAW,
-                        onClick = {
-                            pianoRollMode.activeTool = TimelineEditorTool.DRAW
-                        }
-                    )
-
-                    RadioButtonItem(
-                        text = "Erase",
-                        selected = pianoRollMode.activeTool == TimelineEditorTool.ERASE,
-                        onClick = {
-                            pianoRollMode.activeTool = TimelineEditorTool.ERASE
-                        }
-                    )
-                }
+                CheckboxItem(
+                    text = "$drawToolLabel (B)",
+                    checked = pianoRollMode.activeTool == TimelineEditorTool.DRAW,
+                    onCheckedChange = { checked ->
+                        pianoRollMode.activeTool = if (checked) TimelineEditorTool.DRAW else TimelineEditorTool.NORMAL
+                    }
+                )
 
                 Menu(text = "Grid") {
                     RadioButtonItem(
@@ -513,6 +495,8 @@ private fun pianoRollGridOptions(): List<Pair<GridResolution, String>> {
         GridResolution.Quarter to stringResource(Res.string.workspace_menubar_grid_quarter),
         GridResolution.Eighth to stringResource(Res.string.workspace_menubar_grid_eighth),
         GridResolution.Sixteenth to stringResource(Res.string.workspace_menubar_grid_sixteenth),
-        GridResolution.ThirtySecond to stringResource(Res.string.workspace_menubar_grid_thirty_second)
+        GridResolution.ThirtySecond to stringResource(Res.string.workspace_menubar_grid_thirty_second),
+        GridResolution.SixtyFourth to GridResolution.SixtyFourth.label,
+        GridResolution.OneTwentyEighth to GridResolution.OneTwentyEighth.label,
     )
 }

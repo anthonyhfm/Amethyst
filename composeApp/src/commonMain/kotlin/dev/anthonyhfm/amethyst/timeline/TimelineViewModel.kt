@@ -34,6 +34,7 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.timeline.data.msToUs
 import dev.anthonyhfm.amethyst.timeline.data.samplesToUs
+import dev.anthonyhfm.amethyst.timeline.data.withDecodedSourceMetadata
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.path
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class TimelineViewModel : ViewModel() {
     private val _tracks = MutableStateFlow<List<TimelineTrack<*>>>(emptyList())
@@ -155,12 +157,11 @@ class TimelineViewModel : ViewModel() {
                 is Selectable.TimelineTrack -> selection.trackIndex in visibleTrackIndices
                 is Selectable.PianoRollNote -> {
                     val track = tracks.getOrNull(selection.trackIndex) as? MidiTimelineTrack
-                    // Match by identity (startTimeMs + pitch) rather than full structural equality.
-                    // LED/gradient edits update the SelectionManager first, then the timeline note
-                    // by note; full equality would incorrectly prune still-pending selections.
+                    // LED/gradient edits update the selection before the timeline note. The stable
+                    // note id keeps that selection alive through the pending repository update.
                     selection.trackIndex in visibleTrackIndices &&
                         track?.entries?.get(selection.entryStartMs)?.notes?.any {
-                            it.startTimeMs == selection.note.startTimeMs && it.pitch == selection.note.pitch
+                            it.noteId == selection.note.noteId
                         } == true
                 }
 
@@ -438,8 +439,7 @@ class TimelineViewModel : ViewModel() {
             val after = snapshotAudioEntries(track)
             val newTrack = track.copyWithEntries()
             currentTracks[trackIndex] = newTrack
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.tracks.value = currentTracks.toList()
+            publishTrackSnapshot(currentTracks.toList())
             SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
             UndoManager.addAction(UndoableAction.TimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
 
@@ -455,9 +455,6 @@ class TimelineViewModel : ViewModel() {
                     if (audio != null && audio.rawData != null) {
                         val bytesPerSample = ((audio.bitDepth / 8) * audio.channels).coerceAtLeast(1)
                         val actualTotalSamples = audio.rawData.size.toLong() / bytesPerSample
-                        val actualDurationMs = audio.durationMs
-                        val actualDurationUs = samplesToUs(actualTotalSamples, audio.sampleRate)
-
                         val source = AudioLibraryRepository.add(AudioSource(
                             id = sourceId,
                             fileName = fileName,
@@ -466,29 +463,35 @@ class TimelineViewModel : ViewModel() {
                             channels = audio.channels,
                             bitDepth = audio.bitDepth
                         ))
-                        AudioDecodingManager.updateProgress(sourceId, 1f)
-                        AudioDecodingManager.markComplete(sourceId)
+                        withContext(Dispatchers.Main) {
+                            AudioDecodingManager.updateProgress(sourceId, 1f)
+                            AudioDecodingManager.markComplete(sourceId)
 
-                        // Update AudioEntry in the track with final decoded metrics and re-emit tracks:
-                        val latestTracks = _tracks.value.toMutableList()
-                        val currentTrack = latestTracks.getOrNull(trackIndex) as? AudioTimelineTrack
-                        if (currentTrack != null) {
-                            val existingEntry = currentTrack.entries[snappedStart]
-                            if (existingEntry != null) {
-                                val updatedEntry = existingEntry.copy(
-                                    sourceId = source.id,
-                                    durationMs = actualDurationMs,
-                                    durationUs = actualDurationUs,
-                                    clipEndSample = actualTotalSamples,
-                                    sampleRate = audio.sampleRate,
-                                    channels = audio.channels,
-                                    bitDepth = audio.bitDepth
-                                )
-                                currentTrack.entries[snappedStart] = updatedEntry
-                                val newTrack = currentTrack.copyWithEntries()
-                                latestTracks[trackIndex] = newTrack
-                                _tracks.value = latestTracks.toList()
-                                TimelineRepository.tracks.value = latestTracks.toList()
+                            // Timeline runtime state is main-confined; publishing from the
+                            // decoder dispatcher can otherwise race the playback tick.
+                            var hasMatchingEntries = false
+                            val latestTracks = _tracks.value.map { timelineTrack ->
+                                if (timelineTrack !is AudioTimelineTrack) return@map timelineTrack
+
+                                val updatedEntries = timelineTrack.entries.mapValues { (_, existingEntry) ->
+                                    if (existingEntry.sourceId != source.id) return@mapValues existingEntry
+                                    hasMatchingEntries = true
+                                    existingEntry.withDecodedSourceMetadata(
+                                        probedTotalSamples = totalSamples,
+                                        decodedTotalSamples = actualTotalSamples,
+                                        decodedSampleRate = audio.sampleRate,
+                                        decodedChannels = audio.channels,
+                                        decodedBitDepth = audio.bitDepth,
+                                    ) ?: existingEntry
+                                }
+                                if (updatedEntries == timelineTrack.entries) {
+                                    timelineTrack
+                                } else {
+                                    timelineTrack.copyWithEntries(updatedEntries)
+                                }
+                            }
+                            if (hasMatchingEntries) {
+                                publishTrackSnapshot(latestTracks)
                             }
                         }
                     } else {
@@ -532,8 +535,7 @@ class TimelineViewModel : ViewModel() {
         track.entries[resolved.startTimeMs] = resolved
         val after = snapshotAudioEntries(track)
         currentTracks[trackIndex] = track.copyWithEntries()
-        _tracks.value = currentTracks.toList()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
         SelectionManager.select(
             Selectable.TimelineEntryItem(
                 trackIndex = trackIndex,
@@ -626,8 +628,7 @@ class TimelineViewModel : ViewModel() {
                 val newTrack = track.copyWithEntries()
 
                 currentTracks[trackIndex] = newTrack
-                _tracks.value = currentTracks.toList()
-                TimelineRepository.tracks.value = currentTracks.toList()
+                publishTrackSnapshot(currentTracks.toList())
                 SelectionManager.select(
                     Selectable.TimelineEntryItem(
                         trackIndex = trackIndex,
@@ -653,8 +654,7 @@ class TimelineViewModel : ViewModel() {
                 val newTrack = track.copyWithEntries()
 
                 currentTracks[trackIndex] = newTrack
-                _tracks.value = currentTracks.toList()
-                TimelineRepository.tracks.value = currentTracks.toList()
+                publishTrackSnapshot(currentTracks.toList())
                 SelectionManager.select(
                     Selectable.TimelineEntryItem(
                         trackIndex = trackIndex,
@@ -739,8 +739,7 @@ class TimelineViewModel : ViewModel() {
         val after = snapshotAudioEntries(track)
         val newTrack = track.copyWithEntries()
         currentTracks[trackIndex] = newTrack
-        _tracks.value = currentTracks.toList()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        publishTrackSnapshot(currentTracks.toList())
         SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = resolved.startTimeMs))
         UndoManager.addAction(UndoableAction.TimelineChange(trackIndex = trackIndex, beforeEntries = before, afterEntries = after))
     }
@@ -801,7 +800,7 @@ class TimelineViewModel : ViewModel() {
         val original = track.entries.remove(entryStartMs) ?: return
         val newTrack = track.copyWithEntries()
         val current = _tracks.value.toMutableList(); current[trackIndex] = newTrack
-        _tracks.value = current.toList(); TimelineRepository.tracks.value = current.toList()
+        publishTrackSnapshot(current.toList())
         UndoManager.addAction(UndoableAction.TimelineClipDeletion(trackIndex, deleted = original))
     }
 
@@ -1387,11 +1386,15 @@ class TimelineViewModel : ViewModel() {
     }
 
     fun updateMidiNoteLive(trackIndex: Int, entryStartMs: Long, oldNote: MidiNote, newNote: MidiNote) {
-        updateMidiEntry(trackIndex, entryStartMs) { it.copy(notes = it.notes.map { n -> if (n == oldNote) newNote else n }) }
+        updateMidiEntry(trackIndex, entryStartMs) {
+            it.copy(notes = it.notes.map { note -> if (note.noteId == oldNote.noteId) newNote else note })
+        }
     }
 
     fun deleteMidiNoteLive(trackIndex: Int, entryStartMs: Long, note: MidiNote) {
-        updateMidiEntry(trackIndex, entryStartMs) { it.copy(notes = it.notes.filter { n -> n != note }) }
+        updateMidiEntry(trackIndex, entryStartMs) {
+            it.copy(notes = it.notes.filterNot { existing -> existing.noteId == note.noteId })
+        }
     }
 
     fun resizeMidiEntry(trackIndex: Int, oldStartMs: Long, newStartMs: Long, newDurationMs: Long) {

@@ -269,9 +269,9 @@ object ClipboardManager {
                 val after = track.entries.values.sortedBy { it.startTimeMs }.map { it.copy() }
 
                 val current = TimelineRepository.tracks.value.toMutableList()
-                val newTrack = AudioTimelineTrack().apply { entries.putAll(track.entries) }
+                val newTrack = track.copyWithEntries()
                 current[anchorTrackIndex] = newTrack
-                TimelineRepository.tracks.value = current.toList()
+                TimelineRepository.updateTracksSnapshot(current.toList())
                 UndoManager.addAction(UndoableAction.TimelineChange(anchorTrackIndex, beforeEntries = before, afterEntries = after))
             }
 

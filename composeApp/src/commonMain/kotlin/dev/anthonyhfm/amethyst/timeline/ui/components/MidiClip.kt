@@ -6,6 +6,7 @@ import org.jetbrains.compose.resources.stringResource
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -42,8 +43,11 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -70,6 +74,9 @@ import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
 import dev.anthonyhfm.amethyst.timeline.TimelineEditCommand
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
+import dev.anthonyhfm.amethyst.timeline.data.isGradient
+import dev.anthonyhfm.amethyst.timeline.data.resolvedPadIndex
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
@@ -87,6 +94,7 @@ import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.round
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
@@ -233,7 +241,10 @@ fun MidiClip(
                     .fillMaxHeight()
                     .clip(clipShape)
                     .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
-                    .border(if (isSelected) 1.5.dp else 1.dp, clipColors.border, clipShape)
+                    .then(
+                        if (isSelected) Modifier.border(2.dp, clipColors.border, clipShape)
+                        else Modifier
+                    )
             ) {
         if (!renaming) {
             Text(
@@ -448,6 +459,61 @@ fun MidiClip(
                     }
                 }
         ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(vertical = 3.dp)
+            ) {
+                if (midiEntry.notes.isNotEmpty() && zoomLevel > 0f) {
+                    val visibleContentStartPx = clipWindow.visibleContentStartPx.toFloat()
+                    val visibleContentEndPx = clipWindow.visibleContentEndPx.toFloat()
+                    val rowHeight = (size.height / 100f).coerceAtLeast(1f)
+                    val noteHeight = (rowHeight * 0.72f).coerceIn(1f, 3f)
+                    val minimumNoteWidth = 1f
+                    val backgroundLuminance = (clipColors.background.red * 0.2126f) +
+                        (clipColors.background.green * 0.7152f) +
+                        (clipColors.background.blue * 0.0722f)
+
+                    midiEntry.notes.forEach { note ->
+                        val absoluteNoteStartPx =
+                            (midiEntry.startTimeMs + note.startTimeMs).toFloat() * zoomLevel
+                        val absoluteNoteEndPx =
+                            (midiEntry.startTimeMs + note.endTimeMs).toFloat() * zoomLevel
+                        if (absoluteNoteEndPx < visibleContentStartPx ||
+                            absoluteNoteStartPx > visibleContentEndPx
+                        ) return@forEach
+
+                        val left = absoluteNoteStartPx - visibleContentStartPx
+                        val right = absoluteNoteEndPx - visibleContentStartPx
+                        val width = (right - left).coerceAtLeast(minimumNoteWidth)
+                        val pitch = note.resolvedPadIndex.coerceIn(0, 99)
+                        val top = ((99 - pitch) / 99f) * (size.height - noteHeight)
+                        val sourceColor = if (note.isGradient) {
+                            val (r, g, b) = GradientInterpolator.interpolate(note.led.gradient!!, 0.5f)
+                            Color(r, g, b)
+                        } else {
+                            Color(note.led.red, note.led.green, note.led.blue)
+                        }
+                        val sourceLuminance = (sourceColor.red * 0.2126f) +
+                            (sourceColor.green * 0.7152f) +
+                            (sourceColor.blue * 0.0722f)
+                        val previewColor = if (abs(sourceLuminance - backgroundLuminance) < 0.20f) {
+                            lerp(sourceColor, clipColors.content, 0.52f)
+                        } else {
+                            sourceColor
+                        }
+
+                        drawRoundRect(
+                            color = previewColor.copy(alpha = if (isSelected) 0.95f else 0.82f),
+                            topLeft = Offset(left, top),
+                            size = Size(width, noteHeight),
+                            cornerRadius = CornerRadius(noteHeight * 0.35f),
+                        )
+                    }
+                }
+            }
+
             // Left resize handle
             if (clipWindow.isLeftEdgeVisible) {
                 Box(

@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.timeline.data.GradientInterpolator
 import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.NoteGradientStop
 import dev.anthonyhfm.amethyst.timeline.ui.NoteGradientEditorBar
+import dev.anthonyhfm.amethyst.timeline.ui.RecentColorsStrip
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
 import dev.anthonyhfm.amethyst.ui.components.primitives.Tabs
 import dev.anthonyhfm.amethyst.ui.components.primitives.TabsContent
@@ -32,7 +33,11 @@ import dev.anthonyhfm.amethyst.ui.theme.colors
 fun PianoRollInspectorSidebar(
     gradientMode: Boolean,
     selectedColor: Color,
-    onColorChange: (Color) -> Unit,
+    recentColors: List<Triple<Float, Float, Float>>,
+    onSolidColorChange: (Color) -> Unit,
+    onGradientStopColorChange: (Color) -> Unit,
+    onColorInteractionStart: () -> Unit,
+    onColorInteractionFinish: () -> Unit,
     workingGradient: List<NoteGradientStop>?,
     selectedGradientStopUUID: String?,
     onSelectGradientStop: (String?) -> Unit,
@@ -52,6 +57,11 @@ fun PianoRollInspectorSidebar(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollAreaState()
+    var selectedPaintTab by remember { mutableStateOf(if (gradientMode) "gradient" else "solid") }
+
+    LaunchedEffect(workingGradient, gradientMode) {
+        selectedPaintTab = if (gradientMode) "gradient" else "solid"
+    }
 
     Box(
         modifier = modifier
@@ -71,15 +81,18 @@ fun PianoRollInspectorSidebar(
                 // Color / Gradient Tab Section
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Tabs(
-                        selectedTab = if (gradientMode) "gradient" else "solid",
+                        selectedTab = selectedPaintTab,
                         tabs = listOf("solid", "gradient"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         TabsList(modifier = Modifier.fillMaxWidth()) {
                             TabsTrigger(
                                 key = "solid",
-                                selected = !gradientMode,
-                                onSelected = onSolidTabSelected,
+                                selected = selectedPaintTab == "solid",
+                                onSelected = {
+                                    selectedPaintTab = "solid"
+                                    if (gradientMode) onSolidTabSelected()
+                                },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Row(
@@ -92,8 +105,11 @@ fun PianoRollInspectorSidebar(
                             }
                             TabsTrigger(
                                 key = "gradient",
-                                selected = gradientMode,
-                                onSelected = onGradientTabSelected,
+                                selected = selectedPaintTab == "gradient",
+                                onSelected = {
+                                    selectedPaintTab = "gradient"
+                                    if (!gradientMode || workingGradient == null) onGradientTabSelected()
+                                },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Row(
@@ -106,21 +122,22 @@ fun PianoRollInspectorSidebar(
                             }
                         }
                         TabsContent("solid") {
-                            ColorControls(
-                                color = selectedColor,
-                                onColorChange = onColorChange
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ColorControls(
+                                    color = selectedColor,
+                                    onColorChange = onSolidColorChange,
+                                    onInteractionStart = onColorInteractionStart,
+                                    onInteractionFinish = onColorInteractionFinish,
+                                )
+                                RecentColorsStrip(recentColors, selectedColor, onSolidColorChange)
+                            }
                         }
                         TabsContent("gradient") {
                             if (workingGradient != null) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     NoteGradientEditorBar(
                                         selectedStopUUID = selectedGradientStopUUID,
-                                        onSelectionChange = { uuid ->
-                                            onSelectGradientStop(uuid)
-                                            val stop = workingGradient.find { it.selectionUUID == uuid }
-                                            if (stop != null) onColorChange(Color(stop.r, stop.g, stop.b))
-                                        },
+                                        onSelectionChange = onSelectGradientStop,
                                         stops = workingGradient,
                                         onStopMoved = onStopMoved,
                                         onAddStop = onAddStop,
@@ -132,10 +149,15 @@ fun PianoRollInspectorSidebar(
                                     if (selectedGradientStopUUID != null) {
                                         ColorControls(
                                             color = selectedColor,
-                                            onColorChange = onColorChange
+                                            onColorChange = onGradientStopColorChange,
+                                            onInteractionStart = onColorInteractionStart,
+                                            onInteractionFinish = onColorInteractionFinish,
                                         )
+                                        RecentColorsStrip(recentColors, selectedColor, onGradientStopColorChange)
                                     }
                                 }
+                            } else {
+                                Text(if (enabled) "Preparing gradient…" else "Select one or more notes")
                             }
                         }
                     }

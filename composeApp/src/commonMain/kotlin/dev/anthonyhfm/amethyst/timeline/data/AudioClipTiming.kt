@@ -53,6 +53,39 @@ fun AudioEntry.copyWithPreciseTiming(
 fun AudioEntry.copyWithShiftedStartMs(startTimeMs: Long): AudioEntry =
     copyWithPreciseTiming(startTimeUs = msToUs(startTimeMs))
 
+/** Applies final decoder metadata without undoing timeline moves, splits, or trims. */
+fun AudioEntry.withDecodedSourceMetadata(
+    probedTotalSamples: Long,
+    decodedTotalSamples: Long,
+    decodedSampleRate: Int,
+    decodedChannels: Int,
+    decodedBitDepth: Int,
+): AudioEntry? {
+    if (decodedTotalSamples <= 0L || decodedSampleRate <= 0) return null
+
+    val resolvedStartSample = clipStartSample.coerceIn(0L, decodedTotalSamples)
+    val resolvedEndSample = if (clipEndSample == probedTotalSamples) {
+        decodedTotalSamples
+    } else {
+        clipEndSample.coerceAtMost(decodedTotalSamples)
+    }
+    if (resolvedEndSample <= resolvedStartSample) return null
+
+    val resolvedDurationUs = samplesToUs(
+        sampleCount = resolvedEndSample - resolvedStartSample,
+        sampleRate = decodedSampleRate,
+    )
+    return copy(
+        durationMs = usToRoundedMs(resolvedDurationUs),
+        clipStartSample = resolvedStartSample,
+        clipEndSample = resolvedEndSample,
+        sampleRate = decodedSampleRate,
+        channels = decodedChannels,
+        bitDepth = decodedBitDepth,
+        durationUs = resolvedDurationUs,
+    )
+}
+
 /**
  * Moves the clip's left edge without modifying or copying its library source.
  * Moving left reveals samples before [AudioEntry.clipStartSample]; moving right hides them.

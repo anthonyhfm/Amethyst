@@ -94,14 +94,26 @@ private fun clipColorSet(
     )
 }
 
+private fun neutralClipColorSet(palette: AmethystColorPalette): List<Color> {
+    val surface = blend(palette.background, palette.foreground, 0.14f)
+    val header = blend(palette.background, palette.foreground, 0.22f)
+    return listOf(
+        surface,
+        header,
+        blend(palette.background, palette.foreground, 0.38f),
+        contrastingText(surface, palette),
+    )
+}
+
 /**
  * Keeps the timeline-specific semantic names while deriving every value from
  * the app-wide Amethyst palette. Clip roles use the global chart colors as
  * controlled accents rather than introducing another color system.
  */
 internal fun timelineColorMap(palette: AmethystColorPalette): Map<ThemeToken<Color>, Color> {
-    val audio = clipColorSet(palette.chart1, palette)
-    val lights = clipColorSet(palette.chart2, palette)
+    // Audio and light-show clips stay neutral so waveform detail and RGB notes remain readable.
+    val audio = neutralClipColorSet(palette)
+    val lights = neutralClipColorSet(palette)
     val midi = clipColorSet(palette.chart4, palette)
     val laneSurface = blend(palette.background, palette.secondary, 0.28f)
     val raisedSurface = blend(palette.card, palette.secondary, 0.18f)
@@ -288,12 +300,28 @@ object TimelineTheme {
     @Composable
     fun clipColors(role: TimelineClipRole, selected: Boolean): TimelineClipColors {
         return if (selected) {
-            TimelineClipColors(
-                background = Theme[colors][selectionSurface],
-                header = Theme[colors][selectionSurface],
-                border = Theme[colors][selectionSurface],
-                content = Theme[colors][selectionForeground],
-            )
+            when (role) {
+                TimelineClipRole.Audio -> TimelineClipColors(
+                    background = Theme[timelineColorTokens][timelineAudioClipSurface],
+                    header = Theme[colors][selectionSurface],
+                    border = Theme[colors][selectionSurface],
+                    content = Theme[colors][selectionForeground],
+                )
+
+                TimelineClipRole.Lights -> TimelineClipColors(
+                    background = Theme[timelineColorTokens][timelineLightsClipSurface],
+                    header = Theme[colors][selectionSurface],
+                    border = Theme[colors][selectionSurface],
+                    content = Theme[colors][selectionForeground],
+                )
+
+                TimelineClipRole.Midi -> TimelineClipColors(
+                    background = Theme[colors][selectionSurface],
+                    header = Theme[colors][selectionSurface],
+                    border = Theme[colors][selectionSurface],
+                    content = Theme[colors][selectionForeground],
+                )
+            }
         } else {
             when (role) {
                 TimelineClipRole.Audio -> TimelineClipColors(

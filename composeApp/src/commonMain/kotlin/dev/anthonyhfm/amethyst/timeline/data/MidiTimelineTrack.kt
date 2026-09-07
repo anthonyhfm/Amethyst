@@ -89,7 +89,7 @@ class MidiTimelineTrack : TimelineTrack<MidiEntry>() {
      */
     fun removeNote(entryStartMs: Long, note: MidiNote) {
         val entry = entries[entryStartMs] ?: return
-        val updatedNotes = entry.notes.filter { it != note }
+        val updatedNotes = entry.notes.filterNot { it.noteId == note.noteId }
         
         if (updatedNotes.isEmpty()) {
             // Remove entry if no notes remain
@@ -104,7 +104,7 @@ class MidiTimelineTrack : TimelineTrack<MidiEntry>() {
      */
     fun updateNote(entryStartMs: Long, oldNote: MidiNote, newNote: MidiNote) {
         val entry = entries[entryStartMs] ?: return
-        val updatedNotes = entry.notes.map { if (it == oldNote) newNote else it }
+        val updatedNotes = entry.notes.map { if (it.noteId == oldNote.noteId) newNote else it }
         entries[entryStartMs] = entry.copy(notes = updatedNotes)
     }
 }

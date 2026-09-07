@@ -108,7 +108,7 @@ object TimelineClipUtils {
         audioTrack.entries[first.startTimeMs] = first
         audioTrack.entries[second.startTimeMs] = second
         currentTracks[trackIndex] = audioTrack.copyWithEntries()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        TimelineRepository.updateTracksSnapshot(currentTracks.toList())
 
         UndoManager.addAction(
             UndoableAction.TimelineClipSplit(
@@ -128,7 +128,7 @@ object TimelineClipUtils {
         track.entries[first.startTimeMs] = first
         track.entries[second.startTimeMs] = second
         currentTracks[trackIndex] = track.copyWithEntries()
-        TimelineRepository.tracks.value = currentTracks.toList()
+        TimelineRepository.updateTracksSnapshot(currentTracks.toList())
 
         UndoManager.addAction(
             UndoableAction.MidiTimelineClipSplit(

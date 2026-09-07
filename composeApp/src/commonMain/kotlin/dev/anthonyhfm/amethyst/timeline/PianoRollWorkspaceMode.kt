@@ -23,6 +23,8 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineActiveEditorContext
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
@@ -35,6 +37,8 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.NoteGradientStop
 import dev.anthonyhfm.amethyst.timeline.data.isGradient
+import dev.anthonyhfm.amethyst.timeline.data.resolvedDeviceIndex
+import dev.anthonyhfm.amethyst.timeline.data.resolvedPadIndex
 import dev.anthonyhfm.amethyst.timeline.migration.LegacyPianoRollPath
 import dev.anthonyhfm.amethyst.timeline.migration.PianoRollCutoverSupport
 import dev.anthonyhfm.amethyst.timeline.ui.pianoroll.PianoRollEditorCanvas
@@ -55,7 +59,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
     override val selectableMode: Boolean = false
     override val claimMidiInputs: Boolean = true
 
-    var activeTool by mutableStateOf(TimelineEditorTool.SELECT)
+    var activeTool by mutableStateOf(TimelineEditorTool.NORMAL)
     var clipContext by mutableStateOf<TimelineClipContext?>(null)
         private set
     var timingContextProvider: (() -> TimelineTimingContext)? = null
@@ -88,11 +92,13 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
     var selectedColor by mutableStateOf(Color(0xFFFF6B35))
     var gradientMode by mutableStateOf(false)
     var workingGradient by mutableStateOf<List<NoteGradientStop>?>(null)
+    var selectedGradientStopUUID by mutableStateOf<String?>(null)
     var selectedTimeMs by mutableStateOf<Long?>(null)
     var gridResolution by mutableStateOf(GridResolution.Quarter)
     var gridResolutionLocked by mutableStateOf(false)
 
     var multiSelectModifierDown by mutableStateOf(false)
+    private var deleteSelectedGradientStopHandler: (() -> Unit)? = null
 
     val activeEditorContext: TimelineActiveEditorContext?
         get() = clipContext?.let { context ->
@@ -194,7 +200,10 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         val earliestStartTime = selected.minOf { it.note.startTimeMs }
         val offset = latestEndTime - earliestStartTime
         val duplicates = selected.map { sel ->
-            sel.note.copy(startTimeMs = sel.note.startTimeMs + offset)
+            sel.note.copy(
+                startTimeMs = sel.note.startTimeMs + offset,
+                noteId = UUID.randomUUID()
+            )
         }
 
         val result = if (isTimelineBackedEditing) {
@@ -273,7 +282,9 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                 onNoteDelete?.invoke(selection.note)
             }
             currentEntry = currentEntry?.copy(
-                notes = currentEntry?.notes.orEmpty().filter { note -> note !in notesToDelete }
+                notes = currentEntry?.notes.orEmpty().filterNot { note ->
+                    notesToDelete.any { it.noteId == note.noteId }
+                }
             )
             TimelineCommandResult(didChange = true)
         }
@@ -282,6 +293,68 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
 
         SelectionManager.clear()
         return true
+    }
+
+    private fun nudgeSelectedNotes(timeDirection: Int = 0, pitchDirection: Int = 0): Boolean {
+        val selected = selectedNotes()
+        if (selected.isEmpty()) return false
+        val notesBefore = selected.map { it.note }
+        val beatDurationMs = millisecondsPerBeat(currentBpm())
+        val timeDelta = if (timeDirection == 0) {
+            0L
+        } else {
+            val anchor = notesBefore.minOf { it.startTimeMs }
+            val requestedDelta = stepClipTimeOnGrid(anchor, gridResolution, timeDirection, beatDurationMs) - anchor
+            requestedDelta.takeIf { anchor + it >= 0L } ?: 0L
+        }
+        val notesAfter = notesBefore.map { note ->
+            val newPitch = (note.resolvedPadIndex + pitchDirection).coerceIn(0, 99)
+            note.copy(
+                startTimeMs = (note.startTimeMs + timeDelta).coerceAtLeast(0L),
+                device = note.resolvedDeviceIndex,
+                pitch = newPitch,
+                led = note.led.copy(index = newPitch),
+            )
+        }
+        val changes = notesBefore.zip(notesAfter) { before, after -> TimelineEditedNote(before, after) }
+            .filter { it.before != it.after }
+        if (changes.isEmpty()) return false
+
+        val result = if (isTimelineBackedEditing) {
+            TimelineCommandSurface.updateNotes(trackIndex, entryStartMs, changes).also {
+                if (it.didChange) syncCurrentEntry(timelineEntrySnapshot())
+            }
+        } else {
+            changes.forEach { onNoteUpdate?.invoke(it.before, it.after) }
+            UndoManager.addAction(
+                UndoableAction.PianoRollNoteTransform(
+                    trackIndex = trackIndex,
+                    entryStartMs = entryStartMs,
+                    notesBefore = changes.map(TimelineEditedNote::before),
+                    notesAfter = changes.map(TimelineEditedNote::after),
+                    onNoteUpdate = { old, new -> onNoteUpdate?.invoke(old, new) },
+                    currentEntryGetter = { currentEntry },
+                    currentEntrySetter = { currentEntry = it },
+                )
+            )
+            val replacements = changes.associate { it.before.noteId to it.after }
+            currentEntry = currentEntry?.copy(
+                notes = currentEntry?.notes.orEmpty().map { replacements[it.noteId] ?: it }
+            )
+            TimelineCommandResult(didChange = true)
+        }
+
+        if (result.didChange) {
+            val replacements = changes.associate { it.before.noteId to it.after }
+            SelectionManager.replaceSelections(
+                SelectionManager.selections.value.map { selection ->
+                    if (selection is Selectable.PianoRollNote) {
+                        replacements[selection.note.noteId]?.let { selection.copy(note = it) } ?: selection
+                    } else selection
+                }
+            )
+        }
+        return result.didChange
     }
 
     fun pasteNotes(pastedNotes: List<MidiNote>) {
@@ -298,7 +371,8 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
             val offset = note.startTimeMs - earliestStartTime
             note.copy(
                 startTimeMs = anchorTimeMs + offset,
-                led = note.led.copy(index = note.pitch)
+                led = note.led.copy(index = note.pitch),
+                noteId = UUID.randomUUID()
             )
         }
 
@@ -346,14 +420,18 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         val launchpads = Heaven.devices
         val selections by SelectionManager.selections.collectAsState()
         val playheadPositionMs by TimelineRepository.playheadPositionMs.collectAsState()
+        val workspaceBpm by WorkspaceRepository.bpm.collectAsState()
+        val recentColors by WorkspaceRepository.recentColors.collectAsState()
+        val editorBpm = timingContextProvider?.invoke()?.bpm ?: workspaceBpm
+        val beatDurationMs = millisecondsPerBeat(editorBpm)
 
-        var selectedGradientStopUUID by remember { mutableStateOf<String?>(null) }
         var gradientBeforeDrag by remember { mutableStateOf<List<NoteGradientStop>?>(null) }
+        var paintBeforeInteraction by remember { mutableStateOf<List<MidiNote>?>(null) }
 
         val selectedNoteIdentities = remember(selections) {
             selections.filterIsInstance<Selectable.PianoRollNote>()
                 .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
-                .map { it.note.startTimeMs to it.note.pitch }
+                .map { it.note.noteId }
                 .toSet()
         }
 
@@ -367,13 +445,20 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                 selectedColor = Color(note.led.red, note.led.green, note.led.blue)
                 gradientMode = note.isGradient
                 workingGradient = note.led.gradient
+                if (selectedGradientStopUUID != null &&
+                    note.led.gradient?.none { it.selectionUUID == selectedGradientStopUUID } != false
+                ) {
+                    selectedGradientStopUUID = null
+                }
             } else if (selectedNotes.size > 1) {
                 val allAreGradient = selectedNotes.all { it.note.isGradient }
 
                 if (allAreGradient) {
                     val referenceGradient = selectedNotes.first().note.led.gradient
                     gradientMode = true
-                    workingGradient = referenceGradient
+                    workingGradient = referenceGradient.takeIf { candidate ->
+                        selectedNotes.all { it.note.led.gradient == candidate }
+                    }
 
                     if (selectedGradientStopUUID != null &&
                         referenceGradient != null &&
@@ -397,7 +482,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         val density = LocalDensity.current
         val basePixelsPerBeatPx = remember(density) { with(density) { 80.dp.toPx() } }
         var viewport by remember {
-            val initialZoomX = basePixelsPerBeatPx / MS_PER_BEAT.toFloat()
+            val initialZoomX = basePixelsPerBeatPx / beatDurationMs.toFloat()
             mutableStateOf(
                 EditorViewportState(
                     zoomX = initialZoomX,
@@ -407,9 +492,23 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
             )
         }
 
+        LaunchedEffect(beatDurationMs, basePixelsPerBeatPx) {
+            val targetZoomX = (basePixelsPerBeatPx * zoomFactor / beatDurationMs.toFloat())
+            val minZoomX = 0.75f * basePixelsPerBeatPx / beatDurationMs.toFloat()
+            val maxZoomX = 12f * basePixelsPerBeatPx / beatDurationMs.toFloat()
+            val tempoAdjustedViewport = viewport.copy(
+                minZoomX = minZoomX,
+                maxZoomX = maxZoomX,
+            )
+            viewport = tempoAdjustedViewport.withConstrainedViewport(
+                zoomX = targetZoomX.coerceIn(minZoomX, maxZoomX),
+                contentWidth = targetZoomX * (entry.durationMs + (entry.durationMs * 0.25).toLong().coerceAtLeast(2000L)),
+            )
+        }
+
         val applyViewportChange: (EditorViewportState) -> Unit = { newViewport ->
             viewport = newViewport
-            val newZoomFactor = newViewport.zoomX * MS_PER_BEAT.toFloat() / basePixelsPerBeatPx
+            val newZoomFactor = newViewport.zoomX * beatDurationMs.toFloat() / basePixelsPerBeatPx
             zoomFactor = newZoomFactor
             if (!this@PianoRollWorkspaceMode.gridResolutionLocked) {
                 val targetRes = GridResolution.fromZoomFactor(newZoomFactor)
@@ -421,7 +520,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
 
         LaunchedEffect(this@PianoRollWorkspaceMode.gridResolutionLocked) {
             if (!this@PianoRollWorkspaceMode.gridResolutionLocked) {
-                val currentZoomFactor = viewport.zoomX * MS_PER_BEAT.toFloat() / basePixelsPerBeatPx
+                val currentZoomFactor = viewport.zoomX * beatDurationMs.toFloat() / basePixelsPerBeatPx
                 val targetRes = GridResolution.fromZoomFactor(currentZoomFactor)
                 if (targetRes != this@PianoRollWorkspaceMode.gridResolution) {
                     this@PianoRollWorkspaceMode.gridResolution = targetRes
@@ -498,7 +597,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                     }
                     currentEntry = currentEntry?.copy(
                         notes = currentEntry?.notes.orEmpty().map { note ->
-                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                            effectiveChanges.find { it.before.noteId == note.noteId }?.after ?: note
                         }
                     )
                     TimelineCommandResult(didChange = true)
@@ -539,7 +638,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                     }
                     currentEntry = currentEntry?.copy(
                         notes = currentEntry?.notes.orEmpty().map { note ->
-                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                            effectiveChanges.find { it.before.noteId == note.noteId }?.after ?: note
                         }
                     )
                     TimelineCommandResult(didChange = true)
@@ -579,7 +678,9 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                         onNoteDelete?.invoke(note)
                     }
                     currentEntry = currentEntry?.copy(
-                        notes = currentEntry?.notes.orEmpty().filter { note -> note !in notesToDelete }
+                        notes = currentEntry?.notes.orEmpty().filterNot { note ->
+                            notesToDelete.any { it.noteId == note.noteId }
+                        }
                     )
                     TimelineCommandResult(didChange = true)
                 }
@@ -587,19 +688,19 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         }
 
         val updateNoteSelections: (List<TimelineEditedNote>) -> Unit = { changes ->
-            val beforeToAfter = changes.associate { it.before to it.after }
+            val beforeToAfter = changes.associate { it.before.noteId to it.after }
             SelectionManager.replaceSelections(
                 SelectionManager.selections.value.map { sel ->
                     if (sel is Selectable.PianoRollNote &&
                         sel.entryStartMs == entryStartMs &&
                         sel.trackIndex == trackIndex) {
-                        beforeToAfter[sel.note]?.let { updated -> sel.copy(note = updated) } ?: sel
+                        beforeToAfter[sel.note.noteId]?.let { updated -> sel.copy(note = updated) } ?: sel
                     } else sel
                 }
             )
         }
 
-        val applyColorToSelection: (Color) -> Unit = { newColor ->
+        val applyColorToSelection: (Color, Boolean) -> Unit = { newColor, withUndo ->
             selectedColor = newColor
             WorkspaceRepository.addRecentColor(Triple(newColor.red, newColor.green, newColor.blue))
 
@@ -622,7 +723,15 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                 val updatedNotes = noteChanges.map(TimelineEditedNote::after)
 
                 updateNoteSelections(noteChanges)
-                if (isTimelineBackedEditing) {
+                if (!withUndo) {
+                    if (!isTimelineBackedEditing) {
+                        noteChanges.forEach { change -> onNoteUpdate?.invoke(change.before, change.after) }
+                    }
+                    val replacements = noteChanges.associate { it.before.noteId to it.after }
+                    currentEntry = currentEntry?.copy(
+                        notes = currentEntry?.notes.orEmpty().map { note -> replacements[note.noteId] ?: note }
+                    )
+                } else if (isTimelineBackedEditing) {
                     TimelineCommandSurface.updateNotes(
                         trackIndex = trackIndex,
                         entryStartMs = entryStartMs,
@@ -647,10 +756,10 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                             currentEntrySetter = { entry -> this@PianoRollWorkspaceMode.currentEntry = entry }
                         )
                     )
-                    val replacements = noteChanges.associate { it.before to it.after }
+                    val replacements = noteChanges.associate { it.before.noteId to it.after }
                     currentEntry = currentEntry?.copy(
                         notes = currentEntry?.notes?.map { note ->
-                            replacements[note] ?: note
+                            replacements[note.noteId] ?: note
                         } ?: emptyList()
                     )
                 }
@@ -693,7 +802,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
 
                     currentEntry = currentEntry?.copy(
                         notes = currentEntry?.notes?.map { note ->
-                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                            effectiveChanges.find { it.before.noteId == note.noteId }?.after ?: note
                         } ?: emptyList()
                     )
                 }
@@ -701,13 +810,14 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         }
 
         val applyGradientToNotes: (List<NoteGradientStop>, Boolean) -> Unit = { gradient, withUndo ->
+            val normalizedGradient = GradientInterpolator.normalize(gradient)
             val selectedNotes = SelectionManager.selections.value
                 .filterIsInstance<Selectable.PianoRollNote>()
                 .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
             val changes = selectedNotes.map { sel ->
                 TimelineEditedNote(
                     before = sel.note,
-                    after = sel.note.copy(led = sel.note.led.copy(gradient = gradient))
+                    after = sel.note.copy(led = sel.note.led.copy(gradient = normalizedGradient))
                 )
             }
             if (withUndo) {
@@ -723,11 +833,50 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
 
                     currentEntry = currentEntry?.copy(
                         notes = currentEntry?.notes?.map { note ->
-                            effectiveChanges.find { it.before.startTimeMs == note.startTimeMs && it.before.pitch == note.pitch }?.after ?: note
+                            effectiveChanges.find { it.before.noteId == note.noteId }?.after ?: note
                         } ?: emptyList()
                     )
                 }
             }
+        }
+
+        val beginPaintInteraction: () -> Unit = {
+            if (paintBeforeInteraction == null) {
+                paintBeforeInteraction = selectedNotes().map { it.note }
+            }
+        }
+
+        val finishPaintInteraction: () -> Unit = {
+            val before = paintBeforeInteraction
+            if (before != null) {
+                val currentById = selectedNotes().associate { it.note.noteId to it.note }
+                val changes = before.mapNotNull { old ->
+                    currentById[old.noteId]?.let { new -> TimelineEditedNote(old, new) }
+                }.filter { it.before != it.after }
+                if (changes.isNotEmpty()) applyNoteChanges(changes)
+            }
+            paintBeforeInteraction = null
+        }
+
+        val removeGradientStop: (String) -> Unit = { uuid ->
+            val currentGradient = workingGradient
+            if (currentGradient != null && currentGradient.size > 2) {
+                val deletedPosition = currentGradient.firstOrNull { it.selectionUUID == uuid }?.position ?: 0f
+                val updatedGradient = currentGradient.filter { it.selectionUUID != uuid }
+                workingGradient = updatedGradient
+                if (selectedGradientStopUUID == uuid) {
+                    val next = updatedGradient.minByOrNull { kotlin.math.abs(it.position - deletedPosition) }
+                    selectedGradientStopUUID = next?.selectionUUID
+                    next?.let { selectedColor = Color(it.r, it.g, it.b) }
+                }
+                applyGradientToNotes(updatedGradient, true)
+            }
+        }
+        deleteSelectedGradientStopHandler = {
+            selectedGradientStopUUID?.let(removeGradientStop)
+        }
+        DisposableEffect(Unit) {
+            onDispose { deleteSelectedGradientStopHandler = null }
         }
 
         val selectedPianoNotes = selections.filterIsInstance<Selectable.PianoRollNote>()
@@ -771,9 +920,9 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                             )
                         )
 
-                        val replacements = effectiveChanges.associate { it.before to it.after }
+                        val replacements = effectiveChanges.associate { it.before.noteId to it.after }
                         currentEntry = currentEntry?.copy(
-                            notes = currentEntry?.notes?.map { note -> replacements[note] ?: note } ?: emptyList()
+                            notes = currentEntry?.notes?.map { note -> replacements[note.noteId] ?: note } ?: emptyList()
                         )
                     }
                 }
@@ -790,10 +939,36 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                 PianoRollInspectorSidebar(
                     gradientMode = gradientMode,
                     selectedColor = selectedColor,
-                    onColorChange = applyColorToSelection,
+                    recentColors = recentColors,
+                    onSolidColorChange = { color ->
+                        applyColorToSelection(color, paintBeforeInteraction == null)
+                    },
+                    onGradientStopColorChange = { color ->
+                        val stopId = selectedGradientStopUUID
+                        val currentGradient = workingGradient
+                        if (stopId != null && currentGradient != null) {
+                            selectedColor = color
+                            val updatedGradient = currentGradient.map { stop ->
+                                if (stop.selectionUUID == stopId) {
+                                    stop.copy(r = color.red, g = color.green, b = color.blue)
+                                } else {
+                                    stop
+                                }
+                            }
+                            workingGradient = updatedGradient
+                            applyGradientToNotes(updatedGradient, paintBeforeInteraction == null)
+                        }
+                    },
+                    onColorInteractionStart = beginPaintInteraction,
+                    onColorInteractionFinish = finishPaintInteraction,
                     workingGradient = workingGradient,
                     selectedGradientStopUUID = selectedGradientStopUUID,
-                    onSelectGradientStop = { selectedGradientStopUUID = it },
+                    onSelectGradientStop = { uuid ->
+                        selectedGradientStopUUID = uuid
+                        workingGradient?.firstOrNull { it.selectionUUID == uuid }?.let { stop ->
+                            selectedColor = Color(stop.r, stop.g, stop.b)
+                        }
+                    },
                     onStopMoved = { uuid, newPos ->
                         val currentGrad = workingGradient ?: emptyList()
                         val updatedGradient = currentGrad.map { s ->
@@ -813,12 +988,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                         applyGradientToNotes(updatedGradient, true)
                     },
                     onDeleteStop = { uuid ->
-                        val currentGrad = workingGradient ?: emptyList()
-                        if (currentGrad.size > 2) {
-                            val updatedGradient = currentGrad.filter { it.selectionUUID != uuid }
-                            workingGradient = updatedGradient
-                            applyGradientToNotes(updatedGradient, true)
-                        }
+                        removeGradientStop(uuid)
                     },
                     onSmoothnessChange = { uuid, smoothness ->
                         val currentGrad = workingGradient ?: emptyList()
@@ -873,34 +1043,30 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                             }
                             gradientMode = false
                             workingGradient = null
+                            selectedGradientStopUUID = null
                         }
                     },
                     onGradientTabSelected = {
-                        if (!gradientMode) {
-                            val selectedNotes = SelectionManager.selections.value
-                                .filterIsInstance<Selectable.PianoRollNote>()
-                                .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
-                            if (selectedNotes.isNotEmpty()) {
-                                val solidNotes = selectedNotes.filter { !it.note.isGradient }
-                                if (solidNotes.isNotEmpty()) {
-                                    val changes = solidNotes.map { sel ->
-                                        val twoStopGradient = listOf(
-                                            NoteGradientStop(0f, sel.note.led.red, sel.note.led.green, sel.note.led.blue),
-                                            NoteGradientStop(1f, 0f, 0f, 0f)
-                                        )
-                                        TimelineEditedNote(
-                                            before = sel.note,
-                                            after = sel.note.copy(led = sel.note.led.copy(gradient = twoStopGradient))
-                                        )
-                                    }
-                                    applyNoteChanges(changes)
+                        val selectedNotes = SelectionManager.selections.value
+                            .filterIsInstance<Selectable.PianoRollNote>()
+                            .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
+                        if (selectedNotes.isNotEmpty()) {
+                            val referenceGradient = selectedNotes
+                                .firstNotNullOfOrNull { it.note.led.gradient?.takeIf { stops -> stops.size >= 2 } }
+                                ?: selectedNotes.first().note.let { note ->
+                                    listOf(
+                                        NoteGradientStop(0f, note.led.red, note.led.green, note.led.blue),
+                                        NoteGradientStop(1f, 0f, 0f, 0f),
+                                    )
                                 }
-
-                                val firstGradientNote = selectedNotes.firstOrNull { it.note.isGradient }
-                                    ?: selectedNotes.firstOrNull()
-                                workingGradient = firstGradientNote?.note?.led?.gradient
+                            val normalizedGradient = GradientInterpolator.normalize(referenceGradient)
+                            workingGradient = normalizedGradient
+                            selectedGradientStopUUID = normalizedGradient.firstOrNull()?.selectionUUID
+                            normalizedGradient.firstOrNull()?.let { stop ->
+                                selectedColor = Color(stop.r, stop.g, stop.b)
                             }
                             gradientMode = true
+                            applyGradientToNotes(normalizedGradient, true)
                         }
                     },
                     enabled = selectedPianoNotes.isNotEmpty(),
@@ -933,10 +1099,12 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                         val sel = SelectionManager.selections.value
                             .filterIsInstance<Selectable.PianoRollNote>()
                             .filter { it.entryStartMs == entryStartMs && it.trackIndex == trackIndex }
-                        val colorPool = listOf(
-                            Triple(1f, 0f, 0f), Triple(0f, 1f, 0f), Triple(0f, 0f, 1f),
-                            Triple(1f, 1f, 0f), Triple(0f, 1f, 1f), Triple(1f, 0f, 1f)
-                        )
+                        val colorPool = WorkspaceRepository.recentColors.value.ifEmpty {
+                            listOf(
+                                Triple(1f, 0f, 0f), Triple(0f, 1f, 0f), Triple(0f, 0f, 1f),
+                                Triple(1f, 1f, 0f), Triple(0f, 1f, 1f), Triple(1f, 0f, 1f)
+                            )
+                        }
                         val changes = sel.map { selectable ->
                             val (r, g, b) = colorPool.random()
                             TimelineEditedNote(
@@ -1024,7 +1192,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                                 viewport = viewport,
                                 onViewportChange = applyViewportChange,
                                 gridResolution = this@PianoRollWorkspaceMode.gridResolution,
-                                currentBpm = ::currentBpm,
+                                bpm = editorBpm,
                                 pressedKeysState = this@PianoRollWorkspaceMode.pressedKeysState,
                                 selectedTimeMs = this@PianoRollWorkspaceMode.selectedTimeMs,
                                 playheadPositionMs = if (this@PianoRollWorkspaceMode.clipContext != null) playheadPositionMs - entryStartMs else null,
@@ -1072,26 +1240,38 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                 }
             } else {
                 when (event.key) {
-                    Key.Delete, Key.Backspace -> return deleteSelectedNotes()
+                    Key.Delete, Key.Backspace -> {
+                        if (selectedGradientStopUUID != null) {
+                            deleteSelectedGradientStopHandler?.invoke()
+                            return true
+                        }
+                        return deleteSelectedNotes()
+                    }
                     Key.Spacebar -> {
                         handleTogglePlayPause()
                         return true
                     }
-                    Key.V -> {
-                        activeTool = TimelineEditorTool.SELECT
-                        return true
-                    }
                     Key.B -> {
-                        activeTool = TimelineEditorTool.DRAW
+                        activeTool = if (activeTool == TimelineEditorTool.DRAW) {
+                            TimelineEditorTool.NORMAL
+                        } else {
+                            TimelineEditorTool.DRAW
+                        }
                         return true
                     }
-                    Key.E -> {
-                        activeTool = TimelineEditorTool.ERASE
-                        return true
-                    }
-                    Key.DirectionLeft -> return nudgePlayhead(-1)
-                    Key.DirectionRight -> return nudgePlayhead(1)
+                    Key.DirectionLeft -> return nudgeSelectedNotes(timeDirection = -1) || nudgePlayhead(-1)
+                    Key.DirectionRight -> return nudgeSelectedNotes(timeDirection = 1) || nudgePlayhead(1)
+                    Key.DirectionUp -> return nudgeSelectedNotes(pitchDirection = 1)
+                    Key.DirectionDown -> return nudgeSelectedNotes(pitchDirection = -1)
                     Key.Escape -> {
+                        if (activeTool == TimelineEditorTool.DRAW) {
+                            activeTool = TimelineEditorTool.NORMAL
+                            return true
+                        }
+                        if (selectedNotes().isNotEmpty()) {
+                            SelectionManager.clear()
+                            return true
+                        }
                         requestClose()
                         return true
                     }
@@ -1109,7 +1289,12 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
     private fun nudgePlayhead(direction: Int): Boolean {
         val entry = currentEntry ?: return false
         val currentMs = selectedTimeMs ?: 0L
-        val nextMs = stepClipTimeOnGrid(currentMs, gridResolution, direction)
+        val nextMs = stepClipTimeOnGrid(
+            currentMs,
+            gridResolution,
+            direction,
+            millisecondsPerBeat(currentBpm()),
+        )
             .coerceIn(0L, entry.durationMs)
         selectedTimeMs = nextMs
         return true
@@ -1132,7 +1317,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
             val noteHeightPx = 22f
             val pitch = data.pitch
             val color = if (gradientMode && workingGradient != null) Color.White else selectedColor
-            val noteDurationMs = currentCellDurationMs(gridResolution)
+            val noteDurationMs = currentCellDurationMs(gridResolution, currentBpm())
 
             val startTimeMs = selectedTimeMs ?: 0L
 
@@ -1174,5 +1359,5 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
     }
 }
 
-private fun currentCellDurationMs(currentResolution: GridResolution): Long =
-    (MS_PER_BEAT / currentResolution.snapDivisionsPerBeat).coerceAtLeast(1L)
+private fun currentCellDurationMs(currentResolution: GridResolution, bpm: Double): Long =
+    (millisecondsPerBeat(bpm) / currentResolution.snapDivisionsPerBeat).toLong().coerceAtLeast(1L)
