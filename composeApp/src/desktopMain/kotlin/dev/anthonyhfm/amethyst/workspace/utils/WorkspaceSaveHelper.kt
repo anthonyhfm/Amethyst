@@ -52,14 +52,15 @@ object WorkspaceSaveHelper {
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun writeToPath(rawPath: String): Boolean {
         val path = if (rawPath.endsWith(".ame", ignoreCase = true)) rawPath else "$rawPath.ame"
-        val bytes = Zip.encode(
-            data = AmethystProtoBuf
-                .encodeToByteArray(
-                    value = WorkspaceRepository.saveWorkspace()
-                )
-        )
+        val workspace = WorkspaceRepository.saveWorkspace()
 
         return runCatching {
+            val bytes = withContext(Dispatchers.Default) {
+                Zip.encode(
+                    data = AmethystProtoBuf.encodeToByteArray(value = workspace)
+                )
+            }
+
             withContext(Dispatchers.IO) {
                 val outputPath = Paths.get(path)
                 outputPath.parent?.let { Files.createDirectories(it) }

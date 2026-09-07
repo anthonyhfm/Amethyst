@@ -12,7 +12,7 @@ import kotlinx.serialization.protobuf.ProtoNumber
  * Never modified after creation — all edits (cuts, trims) only adjust the
  * sample indices in [AudioEntry].
  */
-@Serializable
+@Serializable(with = AudioSourceFlacSerializer::class)
 data class AudioSource(
     @ProtoNumber(1)
     val id: String,

@@ -30,8 +30,10 @@ import io.github.vinceglb.filekit.dialogs.openFileSaver
 import io.github.vinceglb.filekit.path
 import io.github.vinceglb.filekit.write
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 
@@ -324,13 +326,15 @@ object ShortcutManager {
 
         WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = path)
             ?: WorkspaceRepository.workspaceMeta
+        val workspace = WorkspaceRepository.saveWorkspace()
+        val bytes = withContext(Dispatchers.Default) {
+            Zip.encode(
+                data = AmethystProtoBuf.encodeToByteArray(value = workspace)
+            )
+        }
 
         PlatformFile(path).write(
-            bytes = Zip.encode(
-                data = AmethystProtoBuf.encodeToByteArray(
-                    value = WorkspaceRepository.saveWorkspace()
-                )
-            )
+            bytes = bytes
         )
 
         HomeRepository.rememberRecentWorkspace(

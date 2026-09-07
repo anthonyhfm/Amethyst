@@ -8,6 +8,7 @@ rust-version = "1.85"
 uniffi = "0.29.4"
 cpal = { version = "0.18.1", features = ["realtime"] }
 symphonia = { version = "0.5.4", features = ["all-codecs", "all-formats"] }
+libflac-rs = "0.143.1"
 audio_thread_priority = { version = "0.35.1", default-features = false }
 
 [target.'cfg(target_os = "macos")'.dependencies]
