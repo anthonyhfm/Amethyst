@@ -376,6 +376,7 @@
     <string name="settings_general_reduced_motion_title">减弱动态效果</string>
     <string name="settings_general_refresh_rate_label">%1$d 赫兹</string>
     <string name="settings_general_refresh_rate_title">刷新率</string>
+    <string name="settings_general_simple_mode_title">简单模式</string>
     <string name="settings_general_simplified_graphics_title">简化图形</string>
     <string name="settings_slider_percent_label">%1$d%%</string>
     <string name="settings_subtitle">微调你的设备性能、音频、软件集成以及实验性功能。</string>

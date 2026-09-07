@@ -380,6 +380,7 @@
     <string name="settings_general_reduced_motion_title">Reduced Motion</string>
     <string name="settings_general_refresh_rate_label">%1$d Hz</string>
     <string name="settings_general_refresh_rate_title">Refresh rate</string>
+    <string name="settings_general_simple_mode_title">Simple Mode</string>
     <string name="settings_general_simplified_graphics_title">Simplified Graphics</string>
     <string name="settings_slider_percent_label">%1$d%%</string>
     <string name="settings_subtitle">Tune performance, audio, integrations, and experimental features for your setup.</string>

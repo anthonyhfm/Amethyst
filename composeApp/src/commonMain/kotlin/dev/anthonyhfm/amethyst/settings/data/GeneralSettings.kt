@@ -18,6 +18,13 @@ object GeneralSettings : SettingsGroup("General", Res.string.settings_general_gr
         label = { it.displayName },
     )
 
+    val simpleMode: Setting.Toggle = toggle(
+        key = "simpleMode",
+        title = "Simple Mode",
+        titleRes = Res.string.settings_general_simple_mode_title,
+        default = false,
+    )
+
     val performanceFPS: Setting.Select<Int> = select(
         key = "framesPerSecond",
         title = "Refresh rate",
