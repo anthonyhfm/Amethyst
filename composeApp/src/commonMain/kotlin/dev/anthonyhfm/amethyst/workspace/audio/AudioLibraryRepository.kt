@@ -30,6 +30,17 @@ import kotlin.time.TimeSource
  * workspace clears it and stops any library preview.
  */
 object AudioLibraryRepository {
+    data class RemovedSource(
+        val source: AudioSource,
+        val originalIndex: Int,
+    )
+
+    data class Removal(
+        val sources: List<RemovedSource>,
+    ) {
+        val sourceIds: Set<String> = sources.mapTo(linkedSetOf()) { it.source.id }
+    }
+
     data class PreviewState(
         val sourceId: String? = null,
         val positionFrame: Long = 0L,
@@ -102,23 +113,97 @@ object AudioLibraryRepository {
     fun hasStems(parentSourceId: String): Boolean =
         _sources.value.values.any { it.stemMetadata?.parentSourceId == parentSourceId }
 
-    /** Adds a complete four-stem result in one observable update. */
-    fun addStemGroup(parentSourceId: String, stems: List<AudioSource>) {
-        require(get(parentSourceId) != null) { "Unknown parent audio source '$parentSourceId'" }
-        require(!hasStems(parentSourceId)) { "Audio source '$parentSourceId' already has stems" }
-        require(stems.size == STEM_ORDER.size)
-        require(stems.mapNotNull { it.stemMetadata?.kind }.toSet() == STEM_ORDER.toSet())
+    fun missingStemKinds(parentSourceId: String): Set<StemKind> {
+        val existingKinds = stemsFor(parentSourceId).mapNotNullTo(mutableSetOf()) { it.stemMetadata?.kind }
+        return STEM_ORDER.filterTo(linkedSetOf()) { it !in existingKinds }
+    }
+
+    /** Adds new stems without replacing already extracted kinds. */
+    fun addMissingStems(parentSourceId: String, stems: List<AudioSource>) {
+        if (stems.isEmpty()) return
+        val parent = get(parentSourceId)
+        require(parent != null && parent.stemMetadata == null) {
+            "Unknown parent audio source '$parentSourceId'"
+        }
+        val kinds = stems.mapNotNull { it.stemMetadata?.kind }
+        require(kinds.size == stems.size && kinds.toSet().size == stems.size)
         require(stems.all { it.stemMetadata?.parentSourceId == parentSourceId })
+        require(kinds.all { it in missingStemKinds(parentSourceId) }) {
+            "Audio source '$parentSourceId' already contains one of the supplied stems"
+        }
 
         val additions = stems.associateBy(AudioSource::id)
         require(additions.size == stems.size)
         require(additions.keys.none(_sources.value::containsKey))
         _sources.update { it + additions }
         _sourceOrder.update { current ->
-            val parentIndex = current.indexOf(parentSourceId)
-            if (parentIndex == -1) current + stems.map(AudioSource::id)
-            else current.toMutableList().apply { addAll(parentIndex + 1, stems.map(AudioSource::id)) }
+            val updatedSources = _sources.value
+            val withoutChildren = current.filterNot { id ->
+                updatedSources[id]?.stemMetadata?.parentSourceId == parentSourceId
+            }.toMutableList()
+            val parentIndex = withoutChildren.indexOf(parentSourceId)
+            val childIds = STEM_ORDER.mapNotNull { kind ->
+                updatedSources.values.firstOrNull {
+                    it.stemMetadata?.parentSourceId == parentSourceId && it.stemMetadata.kind == kind
+                }?.id
+            }
+            if (parentIndex == -1) withoutChildren + childIds
+            else withoutChildren.apply { addAll(parentIndex + 1, childIds) }
         }
+    }
+
+    /** Adds a complete four-stem result in one observable update. */
+    fun addStemGroup(parentSourceId: String, stems: List<AudioSource>) {
+        require(!hasStems(parentSourceId)) { "Audio source '$parentSourceId' already has stems" }
+        require(stems.size == STEM_ORDER.size)
+        require(stems.mapNotNull { it.stemMetadata?.kind }.toSet() == STEM_ORDER.toSet())
+        addMissingStems(parentSourceId, stems)
+    }
+
+    /** IDs removed by a user action: a root includes all of its extracted stems. */
+    fun removalSourceIds(sourceId: String): Set<String> {
+        val source = get(sourceId) ?: return emptySet()
+        return if (source.stemMetadata == null) {
+            buildSet {
+                add(sourceId)
+                stemsFor(sourceId).mapTo(this) { it.id }
+            }
+        } else {
+            setOf(sourceId)
+        }
+    }
+
+    fun remove(sourceId: String): Removal? = removeIds(removalSourceIds(sourceId))
+
+    fun remove(removal: Removal): Removal? = removeIds(removal.sourceIds)
+
+    fun restore(removal: Removal) {
+        if (removal.sources.isEmpty()) return
+        val additions = removal.sources.associate { it.source.id to it.source }
+        require(additions.keys.none(_sources.value::containsKey))
+        _sources.update { it + additions }
+        _sourceOrder.update { current ->
+            current.toMutableList().apply {
+                removal.sources.sortedBy(RemovedSource::originalIndex).forEach { removed ->
+                    add(removed.originalIndex.coerceIn(0, size), removed.source.id)
+                }
+            }
+        }
+    }
+
+    private fun removeIds(sourceIds: Set<String>): Removal? {
+        if (sourceIds.isEmpty()) return null
+        val currentSources = _sources.value
+        val currentOrder = _sourceOrder.value
+        val removed = currentOrder.mapIndexedNotNull { index, id ->
+            currentSources[id]?.takeIf { id in sourceIds }?.let { RemovedSource(it, index) }
+        }
+        if (removed.isEmpty()) return null
+        if (_previewState.value.sourceId in sourceIds) stopPreview(resetPosition = true)
+        PreparedAudioSourceCache.clear()
+        _sources.value = currentSources - removed.map { it.source.id }.toSet()
+        _sourceOrder.value = currentOrder.filterNot(sourceIds::contains)
+        return Removal(removed)
     }
 
     /** Moves a source inside the user-defined library order. */

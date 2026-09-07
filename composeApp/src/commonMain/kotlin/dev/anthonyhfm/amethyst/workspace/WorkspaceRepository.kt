@@ -17,6 +17,7 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.audio.sample.resolvedRawData
@@ -74,6 +75,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 object WorkspaceRepository {
+    sealed interface AudioSourceRemovalResult {
+        data object Removed : AudioSourceRemovalResult
+        data object NotFound : AudioSourceRemovalResult
+        data class InUse(
+            val timelineClipCount: Int,
+            val sampleDeviceCount: Int,
+        ) : AudioSourceRemovalResult
+    }
+
     private fun Throwable.isRecoverablePlatformInitFailure(): Boolean {
         val typeName = this::class.simpleName.orEmpty()
         return this is IllegalStateException ||
@@ -186,6 +196,28 @@ object WorkspaceRepository {
 
     fun closeAudioLibrary() {
         _showAudioLibrary.value = false
+    }
+
+    fun removeAudioSource(sourceId: String): AudioSourceRemovalResult {
+        val source = AudioLibraryRepository.get(sourceId) ?: return AudioSourceRemovalResult.NotFound
+        val sourceIds = AudioLibraryRepository.removalSourceIds(sourceId)
+        val timelineClipCount = TimelineRepository.tracks.value
+            .filterIsInstance<AudioTimelineTrack>()
+            .sumOf { track -> track.entries.values.count { it.sourceId in sourceIds } }
+        val sampleDeviceCount = samplingChain.devicesDepthFirst()
+            .filterIsInstance<SampleChainDevice>()
+            .count { it.state.value.sourceId in sourceIds }
+
+        if (timelineClipCount > 0 || sampleDeviceCount > 0) {
+            return AudioSourceRemovalResult.InUse(timelineClipCount, sampleDeviceCount)
+        }
+
+        val parentSourceId = source.stemMetadata?.parentSourceId ?: source.id
+        StemExtractionRepository.cancelForSource(parentSourceId)
+        val removal = AudioLibraryRepository.remove(sourceId)
+            ?: return AudioSourceRemovalResult.NotFound
+        UndoManager.addAction(UndoableAction.AudioLibrarySourceRemoval(removal))
+        return AudioSourceRemovalResult.Removed
     }
 
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

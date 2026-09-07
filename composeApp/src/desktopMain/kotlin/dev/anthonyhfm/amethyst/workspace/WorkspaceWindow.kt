@@ -37,6 +37,7 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
+import dev.anthonyhfm.amethyst.workspace.ui.SavingProgressDialog
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
 import kotlinx.coroutines.launch
@@ -62,6 +63,7 @@ fun WorkspaceWindow(
     var pendingCancelAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val projectName by WorkspaceRepository.projectName.collectAsState()
+    val saveProgress by WorkspaceSaveHelper.saveProgress.collectAsState()
     val windowTitle = "Amethyst - [${projectName ?: stringResource(Res.string.workspace_window_untitled_project)}]"
 
     fun closeWorkspace(afterClose: () -> Unit) {
@@ -74,6 +76,11 @@ fun WorkspaceWindow(
         afterClose: () -> Unit,
         afterCancel: () -> Unit = { }
     ) {
+        if (WorkspaceSaveHelper.isSaving) {
+            afterCancel()
+            return
+        }
+
         if (WorkspaceRepository.hasUnsavedChanges()) {
             pendingCloseAction = afterClose
             pendingCancelAction = afterCancel
@@ -172,6 +179,7 @@ fun WorkspaceWindow(
                 AppLocaleRefreshBoundary {
                     SaveChangesDialog(
                         onSave = {
+                            showSaveDialog = false
                             coroutineScope.launch {
                                 val saved = WorkspaceSaveHelper.saveWorkspace()
                                 if (saved) {
@@ -180,6 +188,8 @@ fun WorkspaceWindow(
                                     pendingCloseAction = null
                                     pendingCancelAction = null
                                     closeAction?.let(::closeWorkspace)
+                                } else {
+                                    showSaveDialog = true
                                 }
                             }
                         },
@@ -198,6 +208,12 @@ fun WorkspaceWindow(
                             cancelAction?.invoke()
                         }
                     )
+                }
+            }
+
+            saveProgress?.let { progress ->
+                AppLocaleRefreshBoundary {
+                    SavingProgressDialog(progress)
                 }
             }
         }

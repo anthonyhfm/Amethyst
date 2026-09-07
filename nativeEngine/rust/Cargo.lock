@@ -35,7 +35,6 @@ dependencies = [
  "coremidi-sys",
  "cpal",
  "jni 0.21.1",
- "libflac-rs",
  "ndk-context",
  "symphonia",
  "uniffi",
@@ -544,12 +543,6 @@ name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
-
-[[package]]
-name = "libflac-rs"
-version = "0.143.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "103950d4bbd33a11347d4442989989dd5b89a36248267690feb9cef4b3a51ab3"
 
 [[package]]
 name = "linux-raw-sys"

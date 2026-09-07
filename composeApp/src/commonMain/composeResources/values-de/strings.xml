@@ -692,6 +692,12 @@
 </string>
     <string name="workspace_save_failed_title">Speichern fehlgeschlagen</string>
     <string name="workspace_save_untitled">Unbenannt</string>
+    <string name="workspace_saving_title">Workspace wird gespeichert…</string>
+    <string name="workspace_saving_description">Lass Amethyst geöffnet, bis der Workspace vollständig gespeichert wurde.</string>
+    <string name="workspace_saving_preparing">Workspace wird vorbereitet</string>
+    <string name="workspace_saving_compressing">Projektdaten werden komprimiert</string>
+    <string name="workspace_saving_writing">Am ausgewählten Speicherort wird geschrieben</string>
+    <string name="workspace_saving_finishing">Speichern wird abgeschlossen</string>
     <string name="workspace_savechanges_description">Du hast ungespeicherte Änderungen. Möchtest du sie vor dem Schließen speichern?</string>
     <string name="workspace_savechanges_dont_save">Nicht speichern</string>
     <string name="workspace_savechanges_keep_editing">Weiterbearbeiten</string>
@@ -761,6 +767,11 @@
     <string name="audio_library_play">Audio-Vorschau abspielen</string>
     <string name="audio_library_pause">Audio-Vorschau pausieren</string>
     <string name="audio_library_reorder">Audio in der Library neu anordnen</string>
+    <string name="audio_library_remove_source">Audioquelle entfernen</string>
+    <string name="audio_library_remove_stem">Extrahierten Stem entfernen</string>
+    <string name="audio_library_remove_in_use_title">Audioquelle wird verwendet</string>
+    <string name="audio_library_remove_in_use_description">„%1$s“ wird von %2$d Timeline-Clip(s) und %3$d Sample-Device(s) verwendet. Entferne zuerst diese Verwendungen.</string>
+    <string name="audio_library_remove_in_use_ok">OK</string>
     <string name="stem_vocals">Gesang</string>
     <string name="stem_drums">Schlagzeug</string>
     <string name="stem_bass">Bass</string>
@@ -769,6 +780,8 @@
     <string name="stem_collapse">Extrahierte Stems einklappen</string>
     <string name="stem_extract">Gesang, Schlagzeug, Bass und andere Spuren extrahieren</string>
     <string name="stem_separate">Stems separieren</string>
+    <string name="stem_extract_missing">Fehlende Stems extrahieren</string>
+    <string name="stem_all_extracted">Alle Stems extrahiert</string>
     <string name="stem_cancel">Stem-Extraktion abbrechen</string>
     <string name="stem_try_cpu">Mit CPU versuchen</string>
     <string name="stem_dismiss">Ausblenden</string>

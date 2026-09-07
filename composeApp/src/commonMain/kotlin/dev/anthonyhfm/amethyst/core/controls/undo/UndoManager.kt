@@ -11,6 +11,7 @@ import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.node
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +69,11 @@ object UndoManager {
             val action = undoStack.removeAt(undoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.AudioLibrarySourceRemoval -> {
+                    AudioLibraryRepository.restore(action.removal)
+                    redoStack.add(action)
+                }
+
                 is UndoableAction.WorkspaceModeChange -> {
                     WorkspaceRepository.switchMode(action.beforeMode, undoable = false)
                     redoStack.add(action)
@@ -681,6 +687,11 @@ object UndoManager {
             val action = redoStack.removeAt(redoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.AudioLibrarySourceRemoval -> {
+                    AudioLibraryRepository.remove(action.removal)
+                    undoStack.add(action)
+                }
+
                 is UndoableAction.WorkspaceModeChange -> {
                     WorkspaceRepository.switchMode(action.afterMode, undoable = false)
                     undoStack.add(action)

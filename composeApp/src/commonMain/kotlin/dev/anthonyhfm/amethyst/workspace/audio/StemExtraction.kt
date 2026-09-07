@@ -117,14 +117,23 @@ object StemExtractionRepository {
     fun enqueue(sourceId: String, forceCpu: Boolean = false, installCuda: Boolean = false): String? {
         if (!isAvailable || requiresModelConsent) return null
         val source = AudioLibraryRepository.get(sourceId) ?: return null
-        if (source.stemMetadata != null || AudioLibraryRepository.hasStems(sourceId)) return null
+        if (source.stemMetadata != null || AudioLibraryRepository.missingStemKinds(sourceId).isEmpty()) return null
         if (_jobs.value.any { it.sourceId == sourceId && !it.isTerminal }) return null
 
         val id = UUID.randomUUID()
         waiting.addLast(Request(id, source, forceCpu, installCuda))
-        _jobs.update { it + StemExtractionJob(id, source.id, source.fileName, forceCpu = forceCpu) }
+        _jobs.update { jobs ->
+            jobs.filterNot { it.sourceId == sourceId && it.stage == StemExtractionStage.COMPLETE } +
+                StemExtractionJob(id, source.id, source.fileName, forceCpu = forceCpu)
+        }
         pump()
         return id
+    }
+
+    fun cancelForSource(sourceId: String) {
+        _jobs.value
+            .filter { it.sourceId == sourceId && !it.isTerminal }
+            .forEach { cancel(it.id) }
     }
 
     fun cancel(jobId: String) {
@@ -177,7 +186,11 @@ object StemExtractionRepository {
                     }
                 }
                 updateJob(request.jobId) { it.copy(stage = StemExtractionStage.IMPORTING_STEMS, progress = 0.96f) }
-                val sources = results.map { stem ->
+                val missingKinds = AudioLibraryRepository.missingStemKinds(request.source.id)
+                require(results.mapTo(mutableSetOf()) { it.kind }.containsAll(missingKinds)) {
+                    "Stem extraction did not return every missing stem"
+                }
+                val sources = results.filter { it.kind in missingKinds }.map { stem ->
                     AudioSource(
                         id = UUID.randomUUID(),
                         fileName = "${request.source.fileName.substringBeforeLast('.', request.source.fileName)} [${stem.kind.displayName()}].wav",
@@ -188,7 +201,7 @@ object StemExtractionRepository {
                         stemMetadata = StemMetadata(request.source.id, stem.kind, DEMUCS_MODEL_ID),
                     )
                 }
-                AudioLibraryRepository.addStemGroup(request.source.id, sources)
+                AudioLibraryRepository.addMissingStems(request.source.id, sources)
                 updateJob(request.jobId) { it.copy(stage = StemExtractionStage.COMPLETE, progress = 1f) }
             } catch (_: CancellationException) {
                 updateJob(request.jobId) { it.copy(stage = StemExtractionStage.CANCELLED, progress = 0f) }

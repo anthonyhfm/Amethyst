@@ -15,8 +15,13 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 
 sealed interface UndoableAction {
+    data class AudioLibrarySourceRemoval(
+        val removal: AudioLibraryRepository.Removal,
+    ) : UndoableAction
+
     data class ChainDeviceCreation(
         val parent: Chain,
         val device: GenericChainDevice<*>,

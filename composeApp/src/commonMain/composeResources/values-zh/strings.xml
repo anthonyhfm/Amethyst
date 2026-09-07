@@ -686,6 +686,12 @@
     <string name="workspace_save_failed_message">无法保存工作区：\n</string>
     <string name="workspace_save_failed_title">保存失败</string>
     <string name="workspace_save_untitled">未命名</string>
+    <string name="workspace_saving_title">正在保存工作区…</string>
+    <string name="workspace_saving_description">请保持 Amethyst 打开，直到工作区完全保存。</string>
+    <string name="workspace_saving_preparing">正在准备工作区</string>
+    <string name="workspace_saving_compressing">正在压缩项目数据</string>
+    <string name="workspace_saving_writing">正在写入所选位置</string>
+    <string name="workspace_saving_finishing">正在完成保存</string>
     <string name="workspace_savechanges_description">你有未保存的更改。要在关闭前保存吗？</string>
     <string name="workspace_savechanges_dont_save">不保存</string>
     <string name="workspace_savechanges_keep_editing">继续编辑</string>
@@ -750,4 +756,11 @@
     <string name="audio_library_play">播放音频预览</string>
     <string name="audio_library_pause">暂停音频预览</string>
     <string name="audio_library_reorder">在音频库中重新排序</string>
+    <string name="audio_library_remove_source">移除音频源</string>
+    <string name="audio_library_remove_stem">移除已提取的分轨</string>
+    <string name="audio_library_remove_in_use_title">音频源正在使用</string>
+    <string name="audio_library_remove_in_use_description">“%1$s”正被 %2$d 个时间线片段和 %3$d 个采样设备使用。请先移除这些引用。</string>
+    <string name="audio_library_remove_in_use_ok">确定</string>
+    <string name="stem_extract_missing">提取缺失的分轨</string>
+    <string name="stem_all_extracted">已提取所有分轨</string>
 </resources>

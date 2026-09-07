@@ -48,6 +48,7 @@ import com.composables.icons.lucide.Pause
 import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Scissors
+import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
 import com.composeunstyled.Icon
 import com.composeunstyled.Text
@@ -66,6 +67,8 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.ui.components.primitives.Progress
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialog
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogAction
@@ -81,6 +84,7 @@ import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.card
 import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.destructive
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.h4
 import dev.anthonyhfm.amethyst.ui.theme.muted
@@ -100,6 +104,8 @@ import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionJob
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionRepository
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionStage
 import dev.anthonyhfm.amethyst.workspace.audio.displayName
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.AudioSourceRemovalResult
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
@@ -108,6 +114,12 @@ import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.extension
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+
+private data class BlockedAudioRemoval(
+    val sourceName: String,
+    val timelineClipCount: Int,
+    val sampleDeviceCount: Int,
+)
 
 @Composable
 fun AudioLibraryPanel(modifier: Modifier = Modifier) {
@@ -125,6 +137,14 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
     var importFailed by remember { mutableStateOf(false) }
     var pendingExtractionSourceId by remember { mutableStateOf<String?>(null) }
     var expandedGroups by remember { mutableStateOf(emptySet<String>()) }
+    var blockedRemoval by remember { mutableStateOf<BlockedAudioRemoval?>(null) }
+
+    blockedRemoval?.let { blocked ->
+        AudioRemovalBlockedDialog(
+            blocked = blocked,
+            onDismiss = { blockedRemoval = null },
+        )
+    }
 
     val pendingSource = pendingExtractionSourceId?.let(sources::get)
     if (pendingSource != null) {
@@ -163,6 +183,20 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                 importFailed = true
             } finally {
                 isImporting = false
+            }
+        }
+    }
+
+    fun removeSource(source: AudioSource) {
+        when (val result = WorkspaceRepository.removeAudioSource(source.id)) {
+            AudioSourceRemovalResult.Removed,
+            AudioSourceRemovalResult.NotFound -> Unit
+            is AudioSourceRemovalResult.InUse -> {
+                blockedRemoval = BlockedAudioRemoval(
+                    sourceName = source.fileName,
+                    timelineClipCount = result.timelineClipCount,
+                    sampleDeviceCount = result.sampleDeviceCount,
+                )
             }
         }
     }
@@ -243,7 +277,10 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                             val itemProgress = if (preview.sourceId == source.id) preview.progress(source) else 0f
                             val isPlaying = preview.sourceId == source.id && preview.isPlaying
                             val stemChildren = AudioLibraryRepository.stemsFor(source.id)
-                            val extractionJob = extractionJobs.lastOrNull { it.sourceId == source.id }
+                            val extractionJob = extractionJobs.lastOrNull {
+                                it.sourceId == source.id && it.stage != StemExtractionStage.COMPLETE
+                            }
+                            val missingStemCount = AudioLibraryRepository.missingStemKinds(source.id).size
                             val stemsExpanded = source.id in expandedGroups && stemChildren.isNotEmpty()
                             Column(
                                 modifier = if (stemsExpanded) {
@@ -298,6 +335,8 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                                                 }
                                                 else pendingExtractionSourceId = source.id
                                             },
+                                            onRemove = { removeSource(source) },
+                                            missingStemCount = missingStemCount,
                                             reorderHandleModifier = reorderHandle,
                                         )
                                     } else {
@@ -334,6 +373,8 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                                                     }
                                                     else pendingExtractionSourceId = source.id
                                                 },
+                                                onRemove = { removeSource(source) },
+                                                missingStemCount = missingStemCount,
                                                 exportDragModifier = exportDragArea,
                                                 reorderHandleModifier = reorderHandle,
                                                 modifier = Modifier.alpha(
@@ -358,6 +399,7 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                                                     source = stem,
                                                     progress = stemProgress,
                                                     isPlaying = stemPlaying,
+                                                    onRemove = { removeSource(stem) },
                                                 )
                                             } else {
                                                 DraggableItem(
@@ -371,6 +413,7 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                                                         source = stem,
                                                         progress = stemProgress,
                                                         isPlaying = stemPlaying,
+                                                        onRemove = { removeSource(stem) },
                                                         exportDragModifier = Modifier.dragAnchor(),
                                                     )
                                                 }
@@ -404,47 +447,65 @@ private fun AudioLibraryStemItem(
     source: AudioSource,
     progress: Float,
     isPlaying: Boolean,
+    onRemove: () -> Unit,
     exportDragModifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = exportDragModifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Button(
-            onClick = { AudioLibraryRepository.togglePreview(source.id) },
-            variant = ButtonVariant.Secondary,
-            size = ButtonSize.Icon,
-            shape = CircleShape,
-            modifier = Modifier.size(44.dp),
+    val rowContent: @Composable () -> Unit = {
+        Row(
+            modifier = exportDragModifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Button(
+                onClick = { AudioLibraryRepository.togglePreview(source.id) },
+                variant = ButtonVariant.Secondary,
+                size = ButtonSize.Icon,
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Lucide.Pause else Lucide.Play,
+                    contentDescription = stringResource(
+                        if (isPlaying) Res.string.audio_library_pause else Res.string.audio_library_play
+                    ),
+                    tint = Theme[colors][secondaryForeground],
+                    modifier = Modifier.size(17.dp),
+                )
+            }
+
+            Text(
+                text = source.stemMetadata?.kind?.localizedDisplayName() ?: source.fileName,
+                style = Theme[typography][small].copy(fontWeight = FontWeight.SemiBold),
+                color = Theme[colors][foreground],
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.width(74.dp),
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .clip(DefaultShape)
+                    .background(Theme[colors][muted]),
+            ) {
+                AudioLibraryWaveform(source, progress, Modifier.fillMaxSize())
+            }
+        }
+    }
+
+    ContextMenu(modifier = Modifier.fillMaxWidth(), trigger = rowContent) {
+        ContextMenuItem(
+            onClick = onRemove,
+            variant = ContextMenuItemVariant.Destructive,
         ) {
             Icon(
-                imageVector = if (isPlaying) Lucide.Pause else Lucide.Play,
-                contentDescription = stringResource(
-                    if (isPlaying) Res.string.audio_library_pause else Res.string.audio_library_play
-                ),
-                tint = Theme[colors][secondaryForeground],
-                modifier = Modifier.size(17.dp),
+                Lucide.Trash2,
+                contentDescription = null,
+                tint = Theme[colors][destructive],
+                modifier = Modifier.size(16.dp),
             )
-        }
-
-        Text(
-            text = source.stemMetadata?.kind?.localizedDisplayName() ?: source.fileName,
-            style = Theme[typography][small].copy(fontWeight = FontWeight.SemiBold),
-            color = Theme[colors][foreground],
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(74.dp),
-        )
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(44.dp)
-                .clip(DefaultShape)
-                .background(Theme[colors][muted]),
-        ) {
-            AudioLibraryWaveform(source, progress, Modifier.fillMaxSize())
+            Text(stringResource(Res.string.audio_library_remove_stem), modifier = Modifier.weight(1f))
         }
     }
 }
@@ -460,6 +521,8 @@ private fun AudioLibraryItem(
     inStemGroup: Boolean = false,
     onToggleExpanded: () -> Unit = {},
     onExtract: () -> Unit = {},
+    onRemove: () -> Unit = {},
+    missingStemCount: Int = 4,
     isStem: Boolean = false,
     modifier: Modifier = Modifier,
     exportDragModifier: Modifier = Modifier,
@@ -564,7 +627,7 @@ private fun AudioLibraryItem(
     if (isStem) {
         cardContent()
     } else {
-        val canSeparateStems = extractionJob == null && !hasStems && StemExtractionRepository.isAvailable
+        val canSeparateStems = extractionJob == null && missingStemCount > 0 && StemExtractionRepository.isAvailable
         ContextMenu(
             modifier = Modifier.fillMaxWidth(),
             trigger = cardContent,
@@ -583,7 +646,55 @@ private fun AudioLibraryItem(
                     },
                     modifier = Modifier.size(16.dp),
                 )
-                Text(stringResource(Res.string.stem_separate), modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(
+                        when {
+                            missingStemCount == 4 -> Res.string.stem_separate
+                            missingStemCount > 0 -> Res.string.stem_extract_missing
+                            else -> Res.string.stem_all_extracted
+                        }
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            ContextMenuSeparator()
+            ContextMenuItem(
+                onClick = onRemove,
+                variant = ContextMenuItemVariant.Destructive,
+            ) {
+                Icon(
+                    Lucide.Trash2,
+                    contentDescription = null,
+                    tint = Theme[colors][destructive],
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(stringResource(Res.string.audio_library_remove_source), modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioRemovalBlockedDialog(
+    blocked: BlockedAudioRemoval,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberDialogState(initiallyVisible = true)
+    AlertDialog(state = state, onDismiss = onDismiss) {
+        AlertDialogHeader {
+            AlertDialogTitle(stringResource(Res.string.audio_library_remove_in_use_title))
+            AlertDialogDescription(
+                stringResource(
+                    Res.string.audio_library_remove_in_use_description,
+                    blocked.sourceName,
+                    blocked.timelineClipCount,
+                    blocked.sampleDeviceCount,
+                )
+            )
+        }
+        AlertDialogFooter {
+            AlertDialogAction(onClick = onDismiss) {
+                Text(stringResource(Res.string.audio_library_remove_in_use_ok))
             }
         }
     }

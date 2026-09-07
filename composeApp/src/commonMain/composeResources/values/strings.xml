@@ -691,6 +691,12 @@
     <string name="workspace_save_failed_message">Unable to save workspace:n</string>
     <string name="workspace_save_failed_title">Save Workspace Failed</string>
     <string name="workspace_save_untitled">Untitled</string>
+    <string name="workspace_saving_title">Saving workspace…</string>
+    <string name="workspace_saving_description">Keep Amethyst open until the workspace has been saved completely.</string>
+    <string name="workspace_saving_preparing">Preparing workspace</string>
+    <string name="workspace_saving_compressing">Compressing project data</string>
+    <string name="workspace_saving_writing">Writing to selected location</string>
+    <string name="workspace_saving_finishing">Finishing save</string>
     <string name="workspace_savechanges_description">You have unsaved changes. Do you want to save them before closing?</string>
     <string name="workspace_savechanges_dont_save">Don't Save</string>
     <string name="workspace_savechanges_keep_editing">Keep Editing</string>
@@ -760,6 +766,11 @@
     <string name="audio_library_play">Play audio preview</string>
     <string name="audio_library_pause">Pause audio preview</string>
     <string name="audio_library_reorder">Reorder audio in the library</string>
+    <string name="audio_library_remove_source">Remove audio source</string>
+    <string name="audio_library_remove_stem">Remove extracted stem</string>
+    <string name="audio_library_remove_in_use_title">Audio source is in use</string>
+    <string name="audio_library_remove_in_use_description">“%1$s” is used by %2$d timeline clip(s) and %3$d sample device(s). Remove those usages first.</string>
+    <string name="audio_library_remove_in_use_ok">OK</string>
     <string name="stem_vocals">Vocals</string>
     <string name="stem_drums">Drums</string>
     <string name="stem_bass">Bass</string>
@@ -768,6 +779,8 @@
     <string name="stem_collapse">Collapse extracted stems</string>
     <string name="stem_extract">Extract vocals, drums, bass and other</string>
     <string name="stem_separate">Separate Stems</string>
+    <string name="stem_extract_missing">Extract missing stems</string>
+    <string name="stem_all_extracted">All stems extracted</string>
     <string name="stem_cancel">Cancel stem extraction</string>
     <string name="stem_try_cpu">Try CPU</string>
     <string name="stem_dismiss">Dismiss</string>

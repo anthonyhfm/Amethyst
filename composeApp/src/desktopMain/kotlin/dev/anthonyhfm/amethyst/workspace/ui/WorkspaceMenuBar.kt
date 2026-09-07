@@ -51,6 +51,8 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
     val recentProjects by viewModel.recentProjects.collectAsState()
     val timelineTracks by TimelineRepository.tracks.collectAsState()
     val isTimelinePlaying by TimelineRepository.isPlaying.collectAsState()
+    val saveProgress by WorkspaceSaveHelper.saveProgress.collectAsState()
+    val isSaving = saveProgress != null
 
     val editState = remember(mode, selections, clipboard, undoState) {
         WorkspaceMenuCommandSurface.editState(
@@ -130,6 +132,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
         Menu(text = fileLabel) {
             Item(
                 text = "Open Project...",
+                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("o"),
                 onClick = {
                     requestProjectChange {
@@ -149,6 +152,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
                     recentProjects.take(12).forEach { project ->
                         Item(
                             text = project.title.ifBlank { project.path.substringAfterLast('/') },
+                            enabled = !isSaving,
                             onClick = {
                                 requestProjectChange {
                                     viewModel.openRecentProject(project)
@@ -163,6 +167,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
             Item(
                 text = saveLabel,
+                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("s"),
                 onClick = {
                     viewModel.saveProject()
@@ -171,6 +176,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
             Item(
                 text = saveAsLabel,
+                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("s", shift = true),
                 onClick = {
                     viewModel.saveProjectAs()
@@ -181,6 +187,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
             Item(
                 text = "Close Project",
+                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("w", shift = true),
                 onClick = onRequestClose,
             )
@@ -465,12 +472,14 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
                 description = "You have unsaved changes. Do you want to save them before opening another project?",
                 onSave = {
                     val pendingAction = pendingProjectChangeAction
+                    showProjectChangeDialog = false
                     coroutineScope.launch {
                         val saved = WorkspaceSaveHelper.saveWorkspace()
                         if (saved) {
-                            showProjectChangeDialog = false
                             pendingProjectChangeAction = null
                             pendingAction?.invoke()
+                        } else {
+                            showProjectChangeDialog = true
                         }
                     }
                 },
