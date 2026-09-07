@@ -26,6 +26,8 @@ data class AudioSource(
     val channels: Int,
     @ProtoNumber(6)
     val bitDepth: Int,
+    @ProtoNumber(7)
+    val stemMetadata: StemMetadata? = null,
 ) {
     val bytesPerSample: Int get() = (bitDepth / 8) * channels
     val totalSamples: Long get() = rawData.size.toLong() / bytesPerSample
@@ -38,6 +40,25 @@ data class AudioSource(
     }
 
     override fun hashCode(): Int = id.hashCode()
+}
+
+/** Provenance for an audio source produced by local stem separation. */
+@Serializable
+data class StemMetadata(
+    @ProtoNumber(1)
+    val parentSourceId: String,
+    @ProtoNumber(2)
+    val kind: StemKind,
+    @ProtoNumber(3)
+    val modelId: String,
+)
+
+@Serializable
+enum class StemKind {
+    VOCALS,
+    DRUMS,
+    BASS,
+    OTHER,
 }
 
 /** A non-destructive, end-exclusive region inside a full project audio asset. */

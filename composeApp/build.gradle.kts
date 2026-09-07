@@ -2,6 +2,7 @@ import dev.nucleusframework.desktop.application.dsl.DmgContentType
 import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.tasks.Exec
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -218,6 +219,7 @@ nucleus.application {
         targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
 
         includeAllModules = true
+        appResourcesRootDir.set(layout.buildDirectory.dir("generated/stemRuntime"))
 
         macOS {
             iconFile.set(project.file("../icons/amethyst_macos.icns"))
@@ -253,5 +255,76 @@ nucleus.application {
             windowsIconFile = project.file("../icons/ame_file.ico"),
             linuxIconFile = project.file("../icons/ame_file.png")
         )
+    }
+}
+
+val buildStemRuntime by tasks.registering(Exec::class) {
+    group = "distribution"
+    description = "Builds the bundled Demucs v4 desktop worker"
+    val runtimeDir = rootProject.layout.projectDirectory.dir("stem-runtime")
+    inputs.files(
+        runtimeDir.file("amethyst_stems.py"),
+        runtimeDir.file("build.py"),
+        runtimeDir.file("requirements.txt"),
+        runtimeDir.file("THIRD_PARTY_NOTICES.txt"),
+    )
+    outputs.dir(layout.buildDirectory.dir("generated/stemRuntime"))
+    commandLine(
+        providers.gradleProperty("amethyst.stems.python").getOrElse("python3"),
+        runtimeDir.file("build.py").asFile.absolutePath,
+    )
+}
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn(buildStemRuntime)
+}
+
+if (!System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+    val macOS = System.getProperty("os.name").startsWith("Mac", ignoreCase = true)
+    fun runtimeBinPath(variant: String): String {
+        val appPath = if (macOS) {
+            "Amethyst.app/Contents/app/resources/stems/runtime/bin"
+        } else {
+            "Amethyst/lib/app/resources/stems/runtime/bin"
+        }
+        return layout.buildDirectory.dir("compose/binaries/$variant/app/$appPath").get().asFile.absolutePath
+    }
+
+    val fixStemRuntimePermissions by tasks.registering(Exec::class) {
+        dependsOn("createDistributable")
+        commandLine("chmod", "-R", "a+x", runtimeBinPath("main"))
+    }
+    val fixReleaseStemRuntimePermissions by tasks.registering(Exec::class) {
+        dependsOn("createReleaseDistributable")
+        commandLine("chmod", "-R", "a+x", runtimeBinPath("main-release"))
+    }
+    tasks.matching {
+        it.name in setOf("packageDmg", "packageDeb", "packageRpm", "packageAppImage", "runDistributable")
+    }.configureEach { dependsOn(fixStemRuntimePermissions) }
+    tasks.matching {
+        it.name in setOf(
+            "packageReleaseDmg",
+            "packageReleaseDeb",
+            "packageReleaseRpm",
+            "packageReleaseAppImage",
+            "runReleaseDistributable",
+        )
+    }.configureEach { dependsOn(fixReleaseStemRuntimePermissions) }
+}
+
+tasks.configureEach {
+    val desktopPackage = listOf("Dmg", "Msi", "Deb", "Rpm", "AppImage")
+        .any { format -> name == "package$format" || name == "packageRelease$format" }
+    val desktopDistribution = name in setOf(
+        "createDistributable",
+        "createReleaseDistributable",
+        "packageDistributionForCurrentOS",
+        "packageReleaseDistributionForCurrentOS",
+        "runDistributable",
+        "runReleaseDistributable",
+    )
+    val desktopDevelopmentRun = name in setOf("run", "desktopRun", "hotRunDesktop", "desktopRunHot")
+    if (desktopPackage || desktopDistribution || desktopDevelopmentRun) {
+        dependsOn(buildStemRuntime)
     }
 }

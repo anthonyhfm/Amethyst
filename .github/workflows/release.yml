@@ -93,6 +93,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup stem runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
       - name: Install Linux native dependencies
         if: runner.os == 'Linux'
         shell: bash
@@ -102,7 +107,7 @@ jobs:
         shell: bash
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: ./gradlew :composeApp:desktopTest :composeApp:${{ matrix.task }} -Pamethyst.native.variant=release
+        run: ./gradlew :composeApp:desktopTest :composeApp:${{ matrix.task }} -Pamethyst.native.variant=release -Pamethyst.stems.python=python
 
       - name: Rename artifact
         shell: bash

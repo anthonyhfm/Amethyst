@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
+import dev.anthonyhfm.amethyst.timeline.data.StemKind
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
@@ -94,16 +95,50 @@ object AudioLibraryRepository {
         return _sourceOrder.value.mapNotNull(current::get)
     }
 
+    fun stemsFor(parentSourceId: String): List<AudioSource> = all()
+        .filter { it.stemMetadata?.parentSourceId == parentSourceId }
+        .sortedBy { STEM_ORDER.indexOf(it.stemMetadata?.kind) }
+
+    fun hasStems(parentSourceId: String): Boolean =
+        _sources.value.values.any { it.stemMetadata?.parentSourceId == parentSourceId }
+
+    /** Adds a complete four-stem result in one observable update. */
+    fun addStemGroup(parentSourceId: String, stems: List<AudioSource>) {
+        require(get(parentSourceId) != null) { "Unknown parent audio source '$parentSourceId'" }
+        require(!hasStems(parentSourceId)) { "Audio source '$parentSourceId' already has stems" }
+        require(stems.size == STEM_ORDER.size)
+        require(stems.mapNotNull { it.stemMetadata?.kind }.toSet() == STEM_ORDER.toSet())
+        require(stems.all { it.stemMetadata?.parentSourceId == parentSourceId })
+
+        val additions = stems.associateBy(AudioSource::id)
+        require(additions.size == stems.size)
+        require(additions.keys.none(_sources.value::containsKey))
+        _sources.update { it + additions }
+        _sourceOrder.update { current ->
+            val parentIndex = current.indexOf(parentSourceId)
+            if (parentIndex == -1) current + stems.map(AudioSource::id)
+            else current.toMutableList().apply { addAll(parentIndex + 1, stems.map(AudioSource::id)) }
+        }
+    }
+
     /** Moves a source inside the user-defined library order. */
     fun move(sourceId: String, toIndex: Int) {
         _sourceOrder.update { current ->
-            val fromIndex = current.indexOf(sourceId)
-            if (fromIndex == -1 || current.size < 2) return@update current
-            val destination = toIndex.coerceIn(0, current.lastIndex)
+            val sourceMap = _sources.value
+            val rootIds = current.filter { sourceMap[it]?.stemMetadata == null }.toMutableList()
+            val fromIndex = rootIds.indexOf(sourceId)
+            if (fromIndex == -1 || rootIds.size < 2) return@update current
+            val destination = toIndex.coerceIn(0, rootIds.lastIndex)
             if (fromIndex == destination) return@update current
-            current.toMutableList().apply {
-                val id = removeAt(fromIndex)
-                add(destination, id)
+            rootIds.add(destination, rootIds.removeAt(fromIndex))
+            buildList {
+                rootIds.forEach { rootId ->
+                    add(rootId)
+                    addAll(
+                        current.filter { id -> sourceMap[id]?.stemMetadata?.parentSourceId == rootId }
+                    )
+                }
+                addAll(current.filter { id -> id !in this })
             }
         }
     }
@@ -263,4 +298,5 @@ object AudioLibraryRepository {
     private const val PREVIEW_REFRESH_MILLIS = 16L
     private const val NANOS_PER_SECOND = 1_000_000_000L
     private const val PREVIEW_ORIGIN = "AudioLibraryPreview"
+    private val STEM_ORDER = listOf(StemKind.VOCALS, StemKind.DRUMS, StemKind.BASS, StemKind.OTHER)
 }

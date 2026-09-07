@@ -1,0 +1,5 @@
+# Torch and torchaudio are installed separately by build.py so the base package
+# stays MPS-capable on macOS and CPU-only on Windows/Linux.
+numpy<2
+setuptools==80.9.0
+demucs==4.0.1

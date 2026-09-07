@@ -48,6 +48,7 @@ import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
+import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.WorkspaceMeta
@@ -995,6 +996,7 @@ object WorkspaceRepository {
         Echo.reset()
         Heaven.clear()
         AudioLibraryRepository.clear()
+        StemExtractionRepository.reset()
         TransmitChainDevice.clearReceiversForTesting()
         AutomappingManager.reset()
 
