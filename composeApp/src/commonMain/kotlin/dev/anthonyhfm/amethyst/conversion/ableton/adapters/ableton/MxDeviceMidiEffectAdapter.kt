@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator3Ada
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator4Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.WormholeLiteAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.nev.WormholeAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.nyrk.BlackholeAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DelayAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.DepthsSelectorAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.FlipAdapter
@@ -82,8 +83,12 @@ class MxDeviceMidiEffectAdapter(
                 "fe1b005361b8f099ca487aae25cc16d6",
                 "fe575828d488675752a087c80401af63",
                 "e8726f6b3088125c4c6aaff083b1730b",
-                "9a7f0ac3bc4d354c2a560427b6093f87"-> {
+                "9a7f0ac3bc4d354c2a560427b6093f87" -> {
                     return TwistAdapter(blob).toDeviceStates()
+                }
+
+                "4dad8b910bb0747a8839961bc6354a1a" -> {
+                    return BlackholeAdapter(device).toDeviceStates()
                 }
 
                 "14783922241a74cd4da95beed0f57b95",
@@ -175,7 +180,8 @@ class MxDeviceMidiEffectAdapter(
                 "5aa613617ae0b0e24cbe715dbe3960e2",
                 "f004d757e3910cc81b317a55e4dd6263",
                 "d53dcb292a173ab7853183f3cab7620c",
-                "f2504fe314d81dcc9b57e2466a157033" -> {
+                "f2504fe314d81dcc9b57e2466a157033",
+                "ffd72babd9b6051d8b3b0a4a5602d5fe" -> {
                     return GenericMidiExtAdapter(device, offset).toDeviceStates()
                 }
 
