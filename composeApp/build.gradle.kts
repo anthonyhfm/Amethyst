@@ -260,7 +260,7 @@ nucleus.application {
 
 val buildStemRuntime by tasks.registering(Exec::class) {
     group = "distribution"
-    description = "Builds the bundled Demucs v4 desktop worker"
+    description = "Builds the bundled desktop stem-separation worker"
     val runtimeDir = rootProject.layout.projectDirectory.dir("stem-runtime")
     inputs.files(
         runtimeDir.file("amethyst_stems.py"),

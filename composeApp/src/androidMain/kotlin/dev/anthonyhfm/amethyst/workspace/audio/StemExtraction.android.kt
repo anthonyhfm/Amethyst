@@ -6,12 +6,13 @@ actual fun createStemExtractionPlatformBackend(): StemExtractionPlatformBackend 
 
 private object UnsupportedStemBackend : StemExtractionPlatformBackend {
     override val isAvailable: Boolean = false
-    override val isModelReady: Boolean = false
     override val canInstallCuda: Boolean = false
     override val isCudaReady: Boolean = false
+    override fun isModelReady(modelId: String): Boolean = false
 
     override suspend fun extract(
         source: AudioSource,
+        modelId: String,
         forceCpu: Boolean,
         installCuda: Boolean,
         onProgress: (StemExtractionProgress) -> Unit,

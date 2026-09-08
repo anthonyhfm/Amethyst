@@ -17,9 +17,59 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-const val DEMUCS_MODEL_ID = "htdemucs"
-const val DEMUCS_MODEL_DOWNLOAD_BYTES = 84_141_911L
 const val CUDA_RUNTIME_DOWNLOAD_BYTES = 2_700_000_000L
+
+enum class StemSeparationModel(
+    val standardModelId: String,
+    val standardDownloadBytes: Long,
+    val highQualityModelId: String? = null,
+    val highQualityDownloadBytes: Long? = null,
+) {
+    HYBRID_TRANSFORMER(
+        standardModelId = "htdemucs",
+        standardDownloadBytes = 84_141_911L,
+        highQualityModelId = "htdemucs_ft",
+        highQualityDownloadBytes = 336_565_084L,
+    ),
+    HYBRID_DEMUCS(
+        standardModelId = "hdemucs_mmi",
+        standardDownloadBytes = 167_407_275L,
+    ),
+    MDX(
+        standardModelId = "mdx",
+        standardDownloadBytes = 691_349_536L,
+        highQualityModelId = "mdx_extra",
+        highQualityDownloadBytes = 669_581_740L,
+    ),
+    MDX_QUANTIZED(
+        standardModelId = "mdx_q",
+        standardDownloadBytes = 209_090_706L,
+        highQualityModelId = "mdx_extra_q",
+        highQualityDownloadBytes = 167_578_560L,
+    ),
+    BS_ROFORMER(
+        standardModelId = "bs_roformer_4stem",
+        standardDownloadBytes = 527_385_512L,
+    ),
+}
+
+data class StemSeparationConfig(
+    val model: StemSeparationModel = StemSeparationModel.HYBRID_TRANSFORMER,
+    val highQuality: Boolean = false,
+) {
+    val supportsHighQuality: Boolean
+        get() = model.highQualityModelId != null
+
+    val resolvedModelId: String
+        get() = if (highQuality) model.highQualityModelId ?: model.standardModelId else model.standardModelId
+
+    val downloadBytes: Long
+        get() = if (highQuality) {
+            model.highQualityDownloadBytes ?: model.standardDownloadBytes
+        } else {
+            model.standardDownloadBytes
+        }
+}
 
 enum class StemExtractionStage {
     QUEUED,
@@ -42,6 +92,7 @@ data class StemExtractionJob(
     val backend: String? = null,
     val error: String? = null,
     val forceCpu: Boolean = false,
+    val config: StemSeparationConfig = StemSeparationConfig(),
 ) {
     val isTerminal: Boolean
         get() = stage == StemExtractionStage.COMPLETE ||
@@ -65,12 +116,14 @@ data class ExtractedStem(
 
 interface StemExtractionPlatformBackend {
     val isAvailable: Boolean
-    val isModelReady: Boolean
     val canInstallCuda: Boolean
     val isCudaReady: Boolean
 
+    fun isModelReady(modelId: String): Boolean
+
     suspend fun extract(
         source: AudioSource,
+        modelId: String,
         forceCpu: Boolean,
         installCuda: Boolean,
         onProgress: (StemExtractionProgress) -> Unit,
@@ -84,6 +137,7 @@ object StemExtractionRepository {
     private data class Request(
         val jobId: String,
         val source: AudioSource,
+        val config: StemSeparationConfig,
         val forceCpu: Boolean,
         val installCuda: Boolean,
     )
@@ -97,34 +151,39 @@ object StemExtractionRepository {
     private val _jobs = MutableStateFlow<List<StemExtractionJob>>(emptyList())
     val jobs: StateFlow<List<StemExtractionJob>> = _jobs.asStateFlow()
     val isAvailable: Boolean get() = backend.isAvailable
-    val requiresModelConsent: Boolean get() = !backend.isModelReady && !_modelConsentGranted.value
+    fun requiresModelConsent(config: StemSeparationConfig): Boolean =
+        !backend.isModelReady(config.resolvedModelId) && config.resolvedModelId !in _consentedModelIds.value
     val shouldOfferCuda: Boolean
         get() = backend.canInstallCuda && !backend.isCudaReady && !_cudaDeclinedForSession.value
 
-    private val _modelConsentGranted = MutableStateFlow(false)
-    val modelConsentGranted: StateFlow<Boolean> = _modelConsentGranted.asStateFlow()
+    private val _consentedModelIds = MutableStateFlow<Set<String>>(emptySet())
     private val _cudaDeclinedForSession = MutableStateFlow(false)
     val cudaDeclinedForSession: StateFlow<Boolean> = _cudaDeclinedForSession.asStateFlow()
 
-    fun grantModelConsent() {
-        _modelConsentGranted.value = true
+    fun grantModelConsent(config: StemSeparationConfig) {
+        _consentedModelIds.update { it + config.resolvedModelId }
     }
 
     fun declineCudaForSession() {
         _cudaDeclinedForSession.value = true
     }
 
-    fun enqueue(sourceId: String, forceCpu: Boolean = false, installCuda: Boolean = false): String? {
-        if (!isAvailable || requiresModelConsent) return null
+    fun enqueue(
+        sourceId: String,
+        config: StemSeparationConfig = StemSeparationConfig(),
+        forceCpu: Boolean = false,
+        installCuda: Boolean = false,
+    ): String? {
+        if (!isAvailable || requiresModelConsent(config)) return null
         val source = AudioLibraryRepository.get(sourceId) ?: return null
         if (source.stemMetadata != null || AudioLibraryRepository.missingStemKinds(sourceId).isEmpty()) return null
         if (_jobs.value.any { it.sourceId == sourceId && !it.isTerminal }) return null
 
         val id = UUID.randomUUID()
-        waiting.addLast(Request(id, source, forceCpu, installCuda))
+        waiting.addLast(Request(id, source, config, forceCpu, installCuda))
         _jobs.update { jobs ->
             jobs.filterNot { it.sourceId == sourceId && it.stage == StemExtractionStage.COMPLETE } +
-                StemExtractionJob(id, source.id, source.fileName, forceCpu = forceCpu)
+                StemExtractionJob(id, source.id, source.fileName, forceCpu = forceCpu, config = config)
         }
         pump()
         return id
@@ -154,7 +213,7 @@ object StemExtractionRepository {
         val failed = _jobs.value.firstOrNull { it.id == jobId && it.stage == StemExtractionStage.FAILED }
             ?: return null
         _jobs.update { jobs -> jobs.filterNot { it.id == jobId } }
-        return enqueue(failed.sourceId, forceCpu = true)
+        return enqueue(failed.sourceId, config = failed.config, forceCpu = true)
     }
 
     fun dismiss(jobId: String) {
@@ -175,7 +234,12 @@ object StemExtractionRepository {
         activeRequest = request
         val launchedJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val results = backend.extract(request.source, request.forceCpu, request.installCuda) { progress ->
+                val results = backend.extract(
+                    request.source,
+                    request.config.resolvedModelId,
+                    request.forceCpu,
+                    request.installCuda,
+                ) { progress ->
                     updateJob(request.jobId) {
                         it.copy(
                             stage = progress.stage,
@@ -198,7 +262,7 @@ object StemExtractionRepository {
                         sampleRate = stem.sampleRate,
                         channels = stem.channels,
                         bitDepth = stem.bitDepth,
-                        stemMetadata = StemMetadata(request.source.id, stem.kind, DEMUCS_MODEL_ID),
+                        stemMetadata = StemMetadata(request.source.id, stem.kind, request.config.resolvedModelId),
                     )
                 }
                 AudioLibraryRepository.addMissingStems(request.source.id, sources)

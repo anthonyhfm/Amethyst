@@ -35,11 +35,14 @@ actual fun createStemExtractionPlatformBackend(): StemExtractionPlatformBackend 
 private class DesktopStemBackend : StemExtractionPlatformBackend {
     override val isAvailable: Boolean
         get() = resolveSidecarCommand() != null
-    override val isModelReady: Boolean
-        get() = runCatching {
-            val model = modelDirectory().resolve(MODEL_FILE_NAME)
-            model.exists() && Files.size(model) == DEMUCS_MODEL_DOWNLOAD_BYTES && sha256(model) == MODEL_SHA256
-        }.getOrDefault(false)
+    override fun isModelReady(modelId: String): Boolean = runCatching {
+        val descriptor = modelDescriptor(modelId)
+        val directory = modelDirectory()
+        descriptor.checkpoints.all { checkpoint ->
+            val file = directory.resolve(checkpoint.fileName)
+            file.exists() && Files.size(file) == checkpoint.bytes
+        }
+    }.getOrDefault(false)
     override val canInstallCuda: Boolean by lazy {
         val os = System.getProperty("os.name").lowercase()
         if (os.contains("mac")) return@lazy false
@@ -56,12 +59,13 @@ private class DesktopStemBackend : StemExtractionPlatformBackend {
 
     override suspend fun extract(
         source: AudioSource,
+        modelId: String,
         forceCpu: Boolean,
         installCuda: Boolean,
         onProgress: (StemExtractionProgress) -> Unit,
     ): List<ExtractedStem> = withContext(Dispatchers.IO) {
         if (installCuda && !isCudaReady) installCudaPack(onProgress)
-        val model = ensureModel(onProgress)
+        val modelRepository = ensureModel(modelId, onProgress)
         val tempDirectory = Files.createTempDirectory("amethyst-stems-")
         try {
             onProgress(StemExtractionProgress(StemExtractionStage.PREPARING_AUDIO, 0.09f))
@@ -72,7 +76,7 @@ private class DesktopStemBackend : StemExtractionPlatformBackend {
             val command = resolveSidecarCommand()
                 ?: error("The bundled Amethyst stem runtime could not be found")
             val cudaOverlay = cudaDirectory().takeIf { !forceCpu && canInstallCuda && isCudaReady }
-            runSidecar(command, input, output, model, forceCpu, cudaOverlay, onProgress)
+            runSidecar(command, input, output, modelId, modelRepository, forceCpu, cudaOverlay, onProgress)
             onProgress(StemExtractionProgress(StemExtractionStage.IMPORTING_STEMS, 0.94f))
             STEM_FILES.map { (kind, fileName) ->
                 val path = output.resolve(fileName)
@@ -141,18 +145,50 @@ private class DesktopStemBackend : StemExtractionPlatformBackend {
     }
 
     private suspend fun ensureModel(
+        modelId: String,
         onProgress: (StemExtractionProgress) -> Unit,
     ): Path {
+        val descriptor = modelDescriptor(modelId)
         val directory = modelDirectory()
         Files.createDirectories(directory)
-        val target = directory.resolve(MODEL_FILE_NAME)
-        if (isModelReady) return target
-        target.deleteIfExists()
-        val partial = directory.resolve("$MODEL_FILE_NAME.part")
-        partial.deleteIfExists()
-        onProgress(StemExtractionProgress(StemExtractionStage.DOWNLOADING_MODEL, 0f))
+        if (isModelReady(modelId) && descriptor.checkpoints.all { checkpoint ->
+                sha256(directory.resolve(checkpoint.fileName)).startsWith(checkpoint.sha256)
+            }
+        ) {
+            descriptor.yaml?.let { directory.resolve("$modelId.yaml").toFile().writeText(it) }
+            return directory
+        }
 
-        val connection = URI(MODEL_URL).toURL().openConnection() as HttpURLConnection
+        onProgress(StemExtractionProgress(StemExtractionStage.DOWNLOADING_MODEL, 0f))
+        var completedBytes = 0L
+        descriptor.checkpoints.forEach { checkpoint ->
+            val target = directory.resolve(checkpoint.fileName)
+            if (
+                target.exists() &&
+                Files.size(target) == checkpoint.bytes &&
+                sha256(target).startsWith(checkpoint.sha256)
+            ) {
+                completedBytes += checkpoint.bytes
+                return@forEach
+            }
+            target.deleteIfExists()
+            downloadCheckpoint(checkpoint, target, completedBytes, descriptor.downloadBytes, onProgress)
+            completedBytes += checkpoint.bytes
+        }
+        descriptor.yaml?.let { directory.resolve("$modelId.yaml").toFile().writeText(it) }
+        return directory
+    }
+
+    private suspend fun downloadCheckpoint(
+        checkpoint: ModelCheckpoint,
+        target: Path,
+        completedBytes: Long,
+        totalBytes: Long,
+        onProgress: (StemExtractionProgress) -> Unit,
+    ) {
+        val partial = target.resolveSibling("${target.fileName}.part")
+        partial.deleteIfExists()
+        val connection = URI(checkpoint.url).toURL().openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
         connection.instanceFollowRedirects = true
@@ -173,20 +209,21 @@ private class DesktopStemBackend : StemExtractionPlatformBackend {
                         onProgress(
                             StemExtractionProgress(
                                 StemExtractionStage.DOWNLOADING_MODEL,
-                                (downloaded.toDouble() / DEMUCS_MODEL_DOWNLOAD_BYTES).toFloat() * 0.08f,
+                                ((completedBytes + downloaded).toDouble() / totalBytes).toFloat() * 0.08f,
                             )
                         )
                     }
                 }
             }
-            require(Files.size(partial) == DEMUCS_MODEL_DOWNLOAD_BYTES) { "Downloaded model has an unexpected size" }
-            require(sha256(partial) == MODEL_SHA256) { "Downloaded model failed its SHA-256 check" }
+            require(Files.size(partial) == checkpoint.bytes) { "Downloaded model has an unexpected size" }
+            require(sha256(partial).startsWith(checkpoint.sha256)) {
+                "Downloaded model failed its SHA-256 check"
+            }
             try {
                 Files.move(partial, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
             } catch (_: AtomicMoveNotSupportedException) {
                 Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING)
             }
-            return target
         } finally {
             connection.disconnect()
             if (!target.exists()) partial.deleteIfExists()
@@ -197,7 +234,8 @@ private class DesktopStemBackend : StemExtractionPlatformBackend {
         baseCommand: List<String>,
         input: Path,
         output: Path,
-        model: Path,
+        modelId: String,
+        modelRepository: Path,
         forceCpu: Boolean,
         cudaOverlay: Path?,
         onProgress: (StemExtractionProgress) -> Unit,
@@ -205,7 +243,8 @@ private class DesktopStemBackend : StemExtractionPlatformBackend {
         val command = baseCommand + listOf(
             "--input", input.absolutePathString(),
             "--output", output.absolutePathString(),
-            "--model", model.absolutePathString(),
+            "--model", modelId,
+            "--model-repository", modelRepository.absolutePathString(),
             "--device", if (forceCpu) "cpu" else "auto",
         )
         val processBuilder = ProcessBuilder(command).redirectErrorStream(true)
@@ -254,7 +293,7 @@ private class DesktopStemBackend : StemExtractionPlatformBackend {
             if (exitCode != 0) {
                 reportedError?.let(::error)
                 val detail = diagnostics.lastOrNull { it.isNotBlank() }.orEmpty()
-                error(if (detail.isBlank()) "Demucs exited with code $exitCode" else detail)
+                error(if (detail.isBlank()) "Stem worker exited with code $exitCode" else detail)
             }
         } finally {
             cancellationHandle.dispose()
@@ -326,7 +365,7 @@ private fun runtimeCommand(stemsDirectory: Path): List<String>? {
 }
 
 private fun modelDirectory(): Path {
-    return appDataDirectory().resolve("models").resolve(DEMUCS_MODEL_ID)
+    return appDataDirectory().resolve("models").resolve("htdemucs")
 }
 
 private fun cudaDirectory(): Path = appDataDirectory().resolve("stem-runtime").resolve("cuda-cu118")
@@ -379,9 +418,6 @@ private fun writePcmWave(path: Path, source: AudioSource) {
     }
 }
 
-private const val MODEL_FILE_NAME = "955717e8-8726e21a.th"
-private const val MODEL_URL = "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/$MODEL_FILE_NAME"
-private const val MODEL_SHA256 = "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4"
 private const val DEVELOPMENT_ROOT_SEARCH_DEPTH = 5
 private const val CUDA_WHEEL_INDEX = "https://download.pytorch.org/whl/cu118"
 private const val CUDA_TORCH_VERSION = "2.0.1+cu118"
@@ -392,4 +428,119 @@ private val STEM_FILES = listOf(
     StemKind.DRUMS to "drums.wav",
     StemKind.BASS to "bass.wav",
     StemKind.OTHER to "other.wav",
+)
+
+private data class ModelCheckpoint(
+    val url: String,
+    val fileName: String,
+    val bytes: Long,
+    val sha256: String,
+)
+
+private data class ModelDescriptor(
+    val yaml: String? = null,
+    val checkpoints: List<ModelCheckpoint>,
+) {
+    val downloadBytes: Long = checkpoints.sumOf(ModelCheckpoint::bytes)
+}
+
+private fun checkpoint(directory: String, fileName: String, bytes: Long) =
+    ModelCheckpoint(
+        url = "https://dl.fbaipublicfiles.com/demucs/$directory/$fileName",
+        fileName = fileName,
+        bytes = bytes,
+        sha256 = fileName.substringAfter('-', "").substringBefore('.'),
+    )
+
+private fun modelDescriptor(modelId: String): ModelDescriptor = MODEL_DESCRIPTORS[modelId]
+    ?: error("Unsupported stem-separation model: $modelId")
+
+private val MODEL_DESCRIPTORS = mapOf(
+    "htdemucs" to ModelDescriptor(
+        yaml = "models: ['955717e8']\n",
+        checkpoints = listOf(
+            checkpoint("hybrid_transformer", "955717e8-8726e21a.th", 84_141_911L),
+        ),
+    ),
+    "htdemucs_ft" to ModelDescriptor(
+        yaml = """models: ['f7e0c4bc', 'd12395a8', '92cfc3b6', '04573f0d']
+weights:
+  - [1., 0., 0., 0.]
+  - [0., 1., 0., 0.]
+  - [0., 0., 1., 0.]
+  - [0., 0., 0., 1.]
+""",
+        checkpoints = listOf(
+            checkpoint("hybrid_transformer", "f7e0c4bc-ba3fe64a.th", 84_141_271L),
+            checkpoint("hybrid_transformer", "d12395a8-e57c48e6.th", 84_141_271L),
+            checkpoint("hybrid_transformer", "92cfc3b6-ef3bcb9c.th", 84_141_271L),
+            checkpoint("hybrid_transformer", "04573f0d-f3cf25b2.th", 84_141_271L),
+        ),
+    ),
+    "hdemucs_mmi" to ModelDescriptor(
+        yaml = "models: ['75fc33f5']\nsegment: 44\n",
+        checkpoints = listOf(
+            checkpoint("hybrid_transformer", "75fc33f5-1941ce65.th", 167_407_275L),
+        ),
+    ),
+    "mdx" to ModelDescriptor(
+        yaml = """models: ['0d19c1c6', '7ecf8ec1', 'c511e2ab', '7d865c68']
+weights:
+  - [1., 1., 0., 0.]
+  - [0., 1., 0., 0.]
+  - [1., 0., 1., 1.]
+  - [1., 0., 1., 1.]
+segment: 44
+""",
+        checkpoints = listOf(
+            checkpoint("mdx_final", "0d19c1c6-0f06f20e.th", 178_048_329L),
+            checkpoint("mdx_final", "7ecf8ec1-70f50cc9.th", 178_048_329L),
+            checkpoint("mdx_final", "c511e2ab-fe698775.th", 167_334_095L),
+            checkpoint("mdx_final", "7d865c68-3d5dd56b.th", 167_918_783L),
+        ),
+    ),
+    "mdx_extra" to ModelDescriptor(
+        yaml = "models: ['e51eebcc', 'a1d90b5c', '5d2d6c55', 'cfa93e08']\nsegment: 44\n",
+        checkpoints = listOf(
+            checkpoint("mdx_final", "e51eebcc-c1b80bdd.th", 167_399_275L),
+            checkpoint("mdx_final", "a1d90b5c-ae9d2452.th", 167_391_595L),
+            checkpoint("mdx_final", "5d2d6c55-db83574e.th", 167_391_595L),
+            checkpoint("mdx_final", "cfa93e08-61801ae1.th", 167_399_275L),
+        ),
+    ),
+    "mdx_q" to ModelDescriptor(
+        yaml = """models: ['6b9c2ca1', 'b72baf4e', '42e558d4', '305bc58f']
+weights:
+  - [1., 1., 0., 0.]
+  - [0., 1., 0., 0.]
+  - [1., 0., 1., 1.]
+  - [1., 0., 1., 1.]
+segment: 44
+""",
+        checkpoints = listOf(
+            checkpoint("mdx_final", "6b9c2ca1-3fd82607.th", 59_648_321L),
+            checkpoint("mdx_final", "b72baf4e-8778635e.th", 44_368_175L),
+            checkpoint("mdx_final", "42e558d4-196e0e1b.th", 58_227_087L),
+            checkpoint("mdx_final", "305bc58f-18378783.th", 46_847_123L),
+        ),
+    ),
+    "mdx_extra_q" to ModelDescriptor(
+        yaml = "models: ['83fc094f', '464b36d7', '14fc6a69', '7fd6ef75']\nsegment: 44\n",
+        checkpoints = listOf(
+            checkpoint("mdx_final", "83fc094f-4a16d450.th", 50_756_993L),
+            checkpoint("mdx_final", "464b36d7-e5a9386e.th", 38_893_153L),
+            checkpoint("mdx_final", "14fc6a69-a89dd0ee.th", 38_491_885L),
+            checkpoint("mdx_final", "7fd6ef75-a905dd85.th", 39_436_529L),
+        ),
+    ),
+    "bs_roformer_4stem" to ModelDescriptor(
+        checkpoints = listOf(
+            ModelCheckpoint(
+                url = "https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/download/v1.0.12/model_bs_roformer_ep_17_sdr_9.6568.ckpt",
+                fileName = "model_bs_roformer_ep_17_sdr_9.6568.ckpt",
+                bytes = 527_385_512L,
+                sha256 = "3e9daecd70aaed5b5a0d1f861cc4d77eaa45afb3fc6301b1cf32c1be0f5868fb",
+            ),
+        ),
+    ),
 )

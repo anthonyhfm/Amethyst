@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -30,9 +31,12 @@ import com.composeunstyled.theme.Theme
 import com.mohamedrejeb.compose.dnd.DragAndDropContainer
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
 import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
+import dev.anthonyhfm.amethyst.core.util.isMobile
+import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.ui.components.ActivityToastOverlay
+import dev.anthonyhfm.amethyst.workspace.ui.components.AudioLibraryDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.AudioLibraryPanel
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceDialog
@@ -78,7 +82,7 @@ fun Workspace(onBack: () -> Unit = {}) {
                     state = audioLibraryDragState,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    if (!mode.selectableMode) {
+                    if (!mode.selectableMode || platform.isMobile) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -118,10 +122,20 @@ fun Workspace(onBack: () -> Unit = {}) {
                                     animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                                 ),
                             ) {
-                                AudioLibraryPanel()
+                                AudioLibraryPanel(
+                                    modifier = Modifier
+                                        .width(350.dp)
+                                        .fillMaxHeight(),
+                                )
                             }
                         }
                     }
+                }
+
+                if (mode.selectableMode && platform.isMobile && showAudioLibrary) {
+                    AudioLibraryDialog(
+                        onDismiss = WorkspaceRepository::closeAudioLibrary,
+                    )
                 }
             }
 

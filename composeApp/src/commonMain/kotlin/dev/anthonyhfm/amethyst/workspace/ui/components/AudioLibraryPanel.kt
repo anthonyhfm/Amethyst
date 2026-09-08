@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,7 +81,11 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dialog
+import dev.anthonyhfm.amethyst.ui.components.primitives.DialogContent
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
+import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.Switch
 import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -98,8 +105,9 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
-import dev.anthonyhfm.amethyst.workspace.audio.DEMUCS_MODEL_DOWNLOAD_BYTES
 import dev.anthonyhfm.amethyst.workspace.audio.CUDA_RUNTIME_DOWNLOAD_BYTES
+import dev.anthonyhfm.amethyst.workspace.audio.StemSeparationConfig
+import dev.anthonyhfm.amethyst.workspace.audio.StemSeparationModel
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionJob
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionRepository
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionStage
@@ -121,13 +129,44 @@ private data class BlockedAudioRemoval(
     val sampleDeviceCount: Int,
 )
 
+private data class PendingStemExtraction(
+    val sourceId: String,
+    val config: StemSeparationConfig,
+)
+
 @Composable
-fun AudioLibraryPanel(modifier: Modifier = Modifier) {
+fun AudioLibraryDialog(
+    onDismiss: () -> Unit,
+) {
+    val state = rememberDialogState(initiallyVisible = true)
+
+    Dialog(
+        state = state,
+        onDismiss = onDismiss,
+    ) {
+        DialogContent(
+            modifier = Modifier
+                .width(420.dp)
+                .fillMaxHeight(0.9f),
+            showCloseButton = false,
+        ) {
+            AudioLibraryPanel(
+                modifier = Modifier.fillMaxSize(),
+                onDismiss = onDismiss,
+            )
+        }
+    }
+}
+
+@Composable
+fun AudioLibraryPanel(
+    modifier: Modifier = Modifier,
+    onDismiss: (() -> Unit)? = null,
+) {
     val sources by AudioLibraryRepository.sources.collectAsState()
     val sourceOrder by AudioLibraryRepository.sourceOrder.collectAsState()
     val preview by AudioLibraryRepository.previewState.collectAsState()
     val extractionJobs by StemExtractionRepository.jobs.collectAsState()
-    val modelConsentGranted by StemExtractionRepository.modelConsentGranted.collectAsState()
     val cudaDeclinedForSession by StemExtractionRepository.cudaDeclinedForSession.collectAsState()
     val dragState = LocalAudioLibraryDragAndDropState.current
     val reorderState = rememberReorderState<AudioSource>()
@@ -135,7 +174,8 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
     var isFileHovering by remember { mutableStateOf(false) }
     var isImporting by remember { mutableStateOf(false) }
     var importFailed by remember { mutableStateOf(false) }
-    var pendingExtractionSourceId by remember { mutableStateOf<String?>(null) }
+    var configurationSourceId by remember { mutableStateOf<String?>(null) }
+    var pendingExtraction by remember { mutableStateOf<PendingStemExtraction?>(null) }
     var expandedGroups by remember { mutableStateOf(emptySet<String>()) }
     var blockedRemoval by remember { mutableStateOf<BlockedAudioRemoval?>(null) }
 
@@ -146,27 +186,63 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
         )
     }
 
-    val pendingSource = pendingExtractionSourceId?.let(sources::get)
-    if (pendingSource != null) {
-        StemModelConsentDialog(
-            sourceName = pendingSource.fileName,
-            offerCuda = StemExtractionRepository.shouldOfferCuda && !cudaDeclinedForSession,
-            onDismiss = { pendingExtractionSourceId = null },
-            onCpu = {
-                StemExtractionRepository.grantModelConsent()
-                StemExtractionRepository.declineCudaForSession()
-                StemExtractionRepository.enqueue(pendingSource.id, forceCpu = true)
-                pendingExtractionSourceId = null
-            },
-            onAccelerated = {
-                StemExtractionRepository.grantModelConsent()
-                StemExtractionRepository.enqueue(
-                    pendingSource.id,
-                    installCuda = StemExtractionRepository.shouldOfferCuda,
-                )
-                pendingExtractionSourceId = null
+    LaunchedEffect(extractionJobs) {
+        expandedGroups = expandedGroups + extractionJobs
+            .asSequence()
+            .filter { it.stage == StemExtractionStage.COMPLETE }
+            .map(StemExtractionJob::sourceId)
+            .toSet()
+    }
+
+    val configurationSource = configurationSourceId?.let(sources::get)
+    if (configurationSource != null) {
+        StemSeparationDialog(
+            sourceName = configurationSource.fileName,
+            onDismiss = { configurationSourceId = null },
+            onStart = { config ->
+                configurationSourceId = null
+                if (
+                    StemExtractionRepository.requiresModelConsent(config) ||
+                    StemExtractionRepository.shouldOfferCuda
+                ) {
+                    pendingExtraction = PendingStemExtraction(configurationSource.id, config)
+                } else {
+                    StemExtractionRepository.enqueue(configurationSource.id, config = config)
+                }
             },
         )
+    }
+
+    val consentRequest = pendingExtraction
+    if (consentRequest != null) {
+        val pendingSource = sources[consentRequest.sourceId]
+        if (pendingSource != null) {
+            StemModelConsentDialog(
+                sourceName = pendingSource.fileName,
+                config = consentRequest.config,
+                offerCuda = StemExtractionRepository.shouldOfferCuda && !cudaDeclinedForSession,
+                onDismiss = { pendingExtraction = null },
+                onCpu = {
+                    StemExtractionRepository.grantModelConsent(consentRequest.config)
+                    StemExtractionRepository.declineCudaForSession()
+                    StemExtractionRepository.enqueue(
+                        pendingSource.id,
+                        config = consentRequest.config,
+                        forceCpu = true,
+                    )
+                    pendingExtraction = null
+                },
+                onAccelerated = {
+                    StemExtractionRepository.grantModelConsent(consentRequest.config)
+                    StemExtractionRepository.enqueue(
+                        pendingSource.id,
+                        config = consentRequest.config,
+                        installCuda = StemExtractionRepository.shouldOfferCuda,
+                    )
+                    pendingExtraction = null
+                },
+            )
+        }
     }
 
     fun importFiles(files: List<PlatformFile>) {
@@ -203,8 +279,6 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
 
     Column(
         modifier = modifier
-            .width(350.dp)
-            .fillMaxHeight()
             .background(Theme[colors][background])
             .then(if (isFileHovering) Modifier.border(2.dp, Theme[colors][primary]) else Modifier)
             .fileDropTarget(
@@ -245,6 +319,13 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                 contentDescription = importLabel,
                 enabled = !isImporting,
             )
+            if (onDismiss != null) {
+                WorkspaceToolbarIconButton(
+                    onClick = onDismiss,
+                    imageVector = Lucide.X,
+                    contentDescription = stringResource(Res.string.audio_library_close),
+                )
+            }
         }
 
         if (isImporting || importFailed) {
@@ -327,13 +408,7 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                                                 }
                                             },
                                             onExtract = {
-                                                if (
-                                                    (modelConsentGranted || !StemExtractionRepository.requiresModelConsent) &&
-                                                    !StemExtractionRepository.shouldOfferCuda
-                                                ) {
-                                                    StemExtractionRepository.enqueue(source.id)
-                                                }
-                                                else pendingExtractionSourceId = source.id
+                                                configurationSourceId = source.id
                                             },
                                             onRemove = { removeSource(source) },
                                             missingStemCount = missingStemCount,
@@ -365,13 +440,7 @@ fun AudioLibraryPanel(modifier: Modifier = Modifier) {
                                                     }
                                                 },
                                                 onExtract = {
-                                                    if (
-                                                        (modelConsentGranted || !StemExtractionRepository.requiresModelConsent) &&
-                                                        !StemExtractionRepository.shouldOfferCuda
-                                                    ) {
-                                                        StemExtractionRepository.enqueue(source.id)
-                                                    }
-                                                    else pendingExtractionSourceId = source.id
+                                                    configurationSourceId = source.id
                                                 },
                                                 onRemove = { removeSource(source) },
                                                 missingStemCount = missingStemCount,
@@ -744,24 +813,120 @@ private fun StemExtractionStatus(job: StemExtractionJob) {
 }
 
 @Composable
+private fun StemSeparationDialog(
+    sourceName: String,
+    onDismiss: () -> Unit,
+    onStart: (StemSeparationConfig) -> Unit,
+) {
+    val state = rememberDialogState(initiallyVisible = true)
+    var selectedModel by remember { mutableStateOf(StemSeparationModel.HYBRID_TRANSFORMER) }
+    var highQuality by remember { mutableStateOf(false) }
+    val modelNames = StemSeparationModel.entries.associateWith { it.localizedDisplayName() }
+
+    AlertDialog(state = state, onDismiss = onDismiss) {
+        AlertDialogHeader {
+            AlertDialogTitle(stringResource(Res.string.stem_configuration_title))
+            AlertDialogDescription(
+                stringResource(Res.string.stem_configuration_description, sourceName)
+            )
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = stringResource(Res.string.stem_model_label),
+                    style = Theme[typography][small].copy(fontWeight = FontWeight.Medium),
+                    color = Theme[colors][foreground],
+                )
+                Select(
+                    value = modelNames.getValue(selectedModel),
+                    onValueChange = { selectedName ->
+                        selectedModel = modelNames.entries.first { it.value == selectedName }.key
+                        if (selectedModel.highQualityModelId == null) highQuality = false
+                    },
+                    options = StemSeparationModel.entries.map(modelNames::getValue),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (selectedModel.highQualityModelId != null) {
+                val highQualityLabel = stringResource(Res.string.stem_high_quality)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = highQualityLabel,
+                            style = Theme[typography][small].copy(fontWeight = FontWeight.Medium),
+                            color = Theme[colors][foreground],
+                        )
+                        Text(
+                            text = stringResource(Res.string.stem_high_quality_description),
+                            style = Theme[typography][mutedText],
+                            color = Theme[colors][mutedForeground],
+                        )
+                    }
+                    Switch(
+                        checked = highQuality,
+                        onCheckedChange = { highQuality = it },
+                        modifier = Modifier.semantics { contentDescription = highQualityLabel },
+                    )
+                }
+            }
+        }
+        AlertDialogFooter {
+            AlertDialogCancel(onClick = onDismiss) {
+                Text(stringResource(Res.string.workspace_exit_dialog_cancel))
+            }
+            AlertDialogAction(
+                onClick = {
+                    onStart(StemSeparationConfig(selectedModel, highQuality))
+                },
+            ) {
+                Text(stringResource(Res.string.stem_start))
+            }
+        }
+    }
+}
+
+@Composable
 private fun StemModelConsentDialog(
     sourceName: String,
+    config: StemSeparationConfig,
     offerCuda: Boolean,
     onDismiss: () -> Unit,
     onCpu: () -> Unit,
     onAccelerated: () -> Unit,
 ) {
     val state = rememberDialogState(initiallyVisible = true)
-    val sizeMiB = DEMUCS_MODEL_DOWNLOAD_BYTES / (1024 * 1024)
+    val sizeMiB = config.downloadBytes / (1024 * 1024)
+    val modelName = config.model.localizedDisplayName()
     AlertDialog(state = state, onDismiss = onDismiss) {
         AlertDialogHeader {
             AlertDialogTitle(stringResource(if (offerCuda) Res.string.stem_cuda_consent_title else Res.string.stem_consent_title))
             AlertDialogDescription(
                 if (offerCuda) {
                     val cudaGiB = CUDA_RUNTIME_DOWNLOAD_BYTES.toDouble() / (1024 * 1024 * 1024)
-                    stringResource(Res.string.stem_cuda_consent_description, sourceName, sizeMiB, cudaGiB)
+                    stringResource(
+                        Res.string.stem_cuda_consent_description,
+                        sourceName,
+                        modelName,
+                        sizeMiB,
+                        cudaGiB,
+                    )
                 } else {
-                    stringResource(Res.string.stem_consent_description, sourceName, sizeMiB)
+                    stringResource(
+                        Res.string.stem_consent_description,
+                        sourceName,
+                        modelName,
+                        sizeMiB,
+                    )
                 }
             )
         }
@@ -778,6 +943,17 @@ private fun StemModelConsentDialog(
         }
     }
 }
+
+@Composable
+private fun StemSeparationModel.localizedDisplayName(): String = stringResource(
+    when (this) {
+        StemSeparationModel.HYBRID_TRANSFORMER -> Res.string.stem_model_hybrid_transformer
+        StemSeparationModel.HYBRID_DEMUCS -> Res.string.stem_model_hybrid_demucs
+        StemSeparationModel.MDX -> Res.string.stem_model_mdx
+        StemSeparationModel.MDX_QUANTIZED -> Res.string.stem_model_mdx_quantized
+        StemSeparationModel.BS_ROFORMER -> Res.string.stem_model_bs_roformer
+    }
+)
 
 @Composable
 private fun StemExtractionStage.displayName(backend: String?): String {

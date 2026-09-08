@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Amethyst's small, relocatable Demucs runtime.
+"""Build Amethyst's small, relocatable stem-separation runtime.
 
 The runtime deliberately uses a stripped python-build-standalone distribution
 instead of the machine's Python or a relocatability-fragile virtualenv. CUDA is
@@ -32,8 +32,15 @@ OUTPUT_ROOT = BUILD_ROOT / "generated" / "stemRuntime"
 CACHE = BUILD_ROOT / "stemRuntimeCache"
 PYTHON_RELEASE = "20260510"
 PYTHON_VERSION = "3.10.20"
-PYTORCH_VERSION = "2.0.1"
-TORCHAUDIO_VERSION = "2.0.2"
+PYTORCH_VERSION = "2.11.0"
+TORCHAUDIO_VERSION = "2.11.0"
+INTEL_MAC_PYTORCH_VERSION = "2.0.1"
+INTEL_MAC_TORCHAUDIO_VERSION = "2.0.2"
+BS_ROFORMER_SOURCE_COMMIT = "aef04b2e52fb3beaf25e333199f5a7236e628e7b"
+BS_ROFORMER_SOURCES = {
+    "attend.py": "0459d799ade55541df2994b0becf7aec12214491360c5a06e346f6d615eaed15",
+    "bs_roformer.py": "93408c7254c60c48e47be0657a64745065396b0b1c6da4e02c75aca57eb62bf3",
+}
 
 
 @dataclass(frozen=True)
@@ -111,6 +118,36 @@ def download_python(target: Target) -> Path:
     return archive
 
 
+def download_bs_roformer_sources() -> dict[str, Path]:
+    source_cache = CACHE / "bs-roformer" / BS_ROFORMER_SOURCE_COMMIT
+    source_cache.mkdir(parents=True, exist_ok=True)
+    downloaded = {}
+    for file_name, expected_sha256 in BS_ROFORMER_SOURCES.items():
+        target = source_cache / file_name
+        if not target.exists() or sha256(target) != expected_sha256:
+            target.unlink(missing_ok=True)
+            partial = target.with_suffix(target.suffix + ".part")
+            partial.unlink(missing_ok=True)
+            url = (
+                "https://raw.githubusercontent.com/ZFTurbo/Music-Source-Separation-Training/"
+                f"{BS_ROFORMER_SOURCE_COMMIT}/models/bs_roformer/{file_name}"
+            )
+            print(f"Downloading pinned BS-RoFormer source {file_name}...")
+            request = urllib.request.Request(url, headers={"User-Agent": "Amethyst stem-runtime builder"})
+            with urllib.request.urlopen(request) as source, partial.open("wb") as destination:
+                shutil.copyfileobj(source, destination)
+            actual = sha256(partial)
+            if actual != expected_sha256:
+                partial.unlink(missing_ok=True)
+                raise RuntimeError(
+                    f"BS-RoFormer source SHA-256 mismatch for {file_name}: "
+                    f"expected {expected_sha256}, got {actual}"
+                )
+            partial.replace(target)
+        downloaded[file_name] = target
+    return downloaded
+
+
 def safe_extract(archive: Path, destination: Path) -> None:
     destination = destination.resolve()
     with tarfile.open(archive, "r:gz") as bundle:
@@ -130,14 +167,21 @@ def install_packages(runtime: Path, target: Target) -> None:
     python = runtime / target.python_relative
     python.chmod(python.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     pip = [str(python), "-m", "pip", "install", "--disable-pip-version-check", "--no-cache-dir", "--no-compile"]
+    torch_version, torchaudio_version = torch_versions(target)
     if target.torch_index:
         run(pip + [
             "--index-url", target.torch_index,
-            f"torch=={PYTORCH_VERSION}+cpu", f"torchaudio=={TORCHAUDIO_VERSION}+cpu",
+            f"torch=={torch_version}+cpu", f"torchaudio=={torchaudio_version}+cpu",
         ])
     else:
-        run(pip + [f"torch=={PYTORCH_VERSION}", f"torchaudio=={TORCHAUDIO_VERSION}"])
+        run(pip + [f"torch=={torch_version}", f"torchaudio=={torchaudio_version}"])
     run(pip + ["-r", str(ROOT / "requirements.txt")])
+
+
+def torch_versions(target: Target) -> tuple[str, str]:
+    if target.name == "macos-x64":
+        return INTEL_MAC_PYTORCH_VERSION, INTEL_MAC_TORCHAUDIO_VERSION
+    return PYTORCH_VERSION, TORCHAUDIO_VERSION
 
 
 def prune(runtime: Path) -> None:
@@ -152,20 +196,22 @@ def prune(runtime: Path) -> None:
     for relative in ("idlelib", "tkinter", "turtledemo", "unittest/test", "test"):
         shutil.rmtree(stdlib / relative, ignore_errors=True)
     site_packages = stdlib / "site-packages"
-    for relative in ("torch/include", "torch/share", "torchgen"):
+    for relative in ("torch/include", "torch/share"):
         shutil.rmtree(site_packages / relative, ignore_errors=True)
     shutil.rmtree(stdlib / "ensurepip", ignore_errors=True)
 
 
 def write_manifest(destination: Path, target: Target) -> None:
+    torch_version, torchaudio_version = torch_versions(target)
     manifest = {
         "format": 1,
         "target": target.name,
         "python": PYTHON_VERSION,
         "pythonBuild": PYTHON_RELEASE,
-        "torch": PYTORCH_VERSION,
-        "torchaudio": TORCHAUDIO_VERSION,
+        "torch": torch_version,
+        "torchaudio": torchaudio_version,
         "demucs": "4.0.1",
+        "bsRoFormerSource": BS_ROFORMER_SOURCE_COMMIT,
         "baseAcceleration": "mps" if target.name.startswith("macos-") else "cpu",
         "cudaBundled": False,
     }
@@ -182,6 +228,7 @@ def main() -> int:
         raise RuntimeError("The portable runtime must be built on its target operating system and architecture")
 
     archive = download_python(target)
+    bs_roformer_sources = download_bs_roformer_sources()
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="amethyst-stem-runtime-", dir=BUILD_ROOT) as temporary:
         staging = Path(temporary)
@@ -200,8 +247,9 @@ def main() -> int:
                 str(runtime / target.python_relative), "-c",
                 "import pkg_resources, torch, torchaudio; "
                 "from demucs.apply import apply_model; "
-                "from demucs.audio import convert_audio, save_audio; "
+                "from demucs.audio import convert_audio; "
                 "from demucs.pretrained import get_model; "
+                "import beartype, einops, packaging, rotary_embedding_torch; "
                 "print(torch.__version__)",
             ],
             environment=validation_environment,
@@ -211,8 +259,25 @@ def main() -> int:
         stems.mkdir()
         runtime.replace(stems / "runtime")
         shutil.copy2(ROOT / "amethyst_stems.py", stems / "amethyst_stems.py")
+        models = stems / "models"
+        bs_roformer = models / "bs_roformer"
+        bs_roformer.mkdir(parents=True)
+        (models / "__init__.py").write_text("", encoding="utf-8")
+        (bs_roformer / "__init__.py").write_text("", encoding="utf-8")
+        for file_name, source in bs_roformer_sources.items():
+            shutil.copy2(source, bs_roformer / file_name)
         shutil.copy2(ROOT / "THIRD_PARTY_NOTICES.txt", stems / "THIRD_PARTY_NOTICES.txt")
         write_manifest(stems, target)
+        bundled_environment = validation_environment.copy()
+        bundled_environment["PYTHONPATH"] = str(stems)
+        run(
+            [
+                str(stems / "runtime" / target.python_relative), "-c",
+                "from models.bs_roformer.bs_roformer import BSRoformer; "
+                "print('BS-RoFormer import OK')",
+            ],
+            environment=bundled_environment,
+        )
 
         shutil.rmtree(output, ignore_errors=True)
         stems.replace(output)
