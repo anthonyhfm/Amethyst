@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -12,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
@@ -31,6 +33,12 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.Automat
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -104,11 +112,14 @@ class FilterChainDevice : AudioChainDevice<FilterChainDeviceState>(), ParameterO
             title = "Filter",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
             isDragging = isDragging.value,
-            modifier = Modifier.width(430.dp),
+            modifier = Modifier.width(340.dp),
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     LabeledFilterSelect("Type", deviceState.type.label, FilterType.entries.map { it.label }) { label ->
                         val before = state.value
                         state.update { it.copy(type = FilterType.entries.first { type -> type.label == label }) }
@@ -120,18 +131,23 @@ class FilterChainDevice : AudioChainDevice<FilterChainDeviceState>(), ParameterO
                         pushStateChange(before, state.value)
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    FilterDial("cutoff", "Cutoff", PARAMETERS[0].normalize(deviceState.cutoffHz), "${deviceState.cutoffHz.roundToInt()} Hz") {
-                        state.update { s -> s.copy(cutoffHz = PARAMETERS[0].denormalize(it)) }
+                Separator(Modifier.height(168.dp), orientation = SeparatorOrientation.Vertical)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        FilterDial("cutoff", "Cutoff", PARAMETERS[0].normalize(deviceState.cutoffHz), "${deviceState.cutoffHz.roundToInt()} Hz") {
+                            state.update { s -> s.copy(cutoffHz = PARAMETERS[0].denormalize(it)) }
+                        }
+                        FilterDial("resonance", "Resonance", PARAMETERS[1].normalize(deviceState.resonance), "${(deviceState.resonance * 100).roundToInt() / 100f}") {
+                            state.update { s -> s.copy(resonance = PARAMETERS[1].denormalize(it)) }
+                        }
                     }
-                    FilterDial("resonance", "Resonance", PARAMETERS[1].normalize(deviceState.resonance), "${(deviceState.resonance * 100).roundToInt() / 100f}") {
-                        state.update { s -> s.copy(resonance = PARAMETERS[1].denormalize(it)) }
-                    }
-                    FilterDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%") {
-                        state.update { s -> s.copy(dryWet = it) }
-                    }
-                    FilterDial("drive", "Drive", deviceState.driveDb / 24f, "${deviceState.driveDb.roundToInt()} dB") {
-                        state.update { s -> s.copy(driveDb = it * 24f) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        FilterDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%") {
+                            state.update { s -> s.copy(dryWet = it) }
+                        }
+                        FilterDial("drive", "Drive", deviceState.driveDb / 24f, "${deviceState.driveDb.roundToInt()} dB") {
+                            state.update { s -> s.copy(driveDb = it * 24f) }
+                        }
                     }
                 }
             }
@@ -177,9 +193,19 @@ private fun FilterType.toBiquad(): BiquadType = when (this) {
 }
 
 @Composable
-private fun LabeledFilterSelect(label: String, value: String, options: List<String>, onValue: (String) -> Unit) {
-    Column(Modifier.width(155.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label)
+private fun LabeledFilterSelect(
+    label: String,
+    value: String,
+    options: List<String>,
+    modifier: Modifier = Modifier,
+    onValue: (String) -> Unit,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            label,
+            style = Theme[typography][small],
+            color = Theme[colors][mutedForeground],
+        )
         Select(value = value, options = options, triggerHeight = 32.dp, onValueChange = onValue)
     }
 }

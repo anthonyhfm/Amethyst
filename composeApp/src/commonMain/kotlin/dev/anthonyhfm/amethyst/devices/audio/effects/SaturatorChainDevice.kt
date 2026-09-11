@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
@@ -29,6 +30,8 @@ import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -92,10 +95,10 @@ class SaturatorChainDevice : AudioChainDevice<SaturatorChainDeviceState>(), Para
             title = "Saturator",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
             isDragging = isDragging.value,
-            modifier = Modifier.width(360.dp),
+            modifier = Modifier.width(220.dp),
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     EffectDial("drive", "Drive", deviceState.driveDb / 36f, "${deviceState.driveDb.roundToInt()} dB") {
                         state.update { s -> s.copy(driveDb = it * 36f) }
@@ -114,7 +117,10 @@ class SaturatorChainDevice : AudioChainDevice<SaturatorChainDeviceState>(), Para
                         size = 22.dp,
                         iconSize = 16.dp,
                     )
-                    Text(if (deviceState.outputCompensation) "Output compensation · On" else "Output compensation · Off")
+                    Text(
+                        text = "Output compensation",
+                        color = Theme[colors][foreground],
+                    )
                 }
             }
         }

@@ -4,12 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
@@ -22,6 +22,7 @@ import dev.anthonyhfm.amethyst.core.parameter.ParameterScale
 import dev.anthonyhfm.amethyst.core.parameter.ParameterSmoothing
 import dev.anthonyhfm.amethyst.core.parameter.SmoothedParameter
 import dev.anthonyhfm.amethyst.core.parameter.resolveRealtimeParameter
+import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
@@ -31,8 +32,11 @@ import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.DialType
+import dev.anthonyhfm.amethyst.ui.components.TimeDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
+import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
@@ -40,7 +44,6 @@ import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -48,6 +51,7 @@ import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 @Serializable
 enum class AudioDelayTimeMode(val label: String) { Milliseconds("ms"), Sync("Sync") }
@@ -96,7 +100,7 @@ class AudioDelayChainDevice : AudioChainDevice<AudioDelayChainDeviceState>(), Pa
         var frame = 0
         while (frame < block.frameCount) {
             val absoluteFrame = context.absoluteFrame + frame
-            val automatedTime = if (snapshot.timeMode == AudioDelayTimeMode.Milliseconds) {
+            val automatedTime = if (snapshot.resolvedTiming() is Timing.Duration) {
                 resolveRealtimeParameter(PARAMETERS[0], selectedTimeMs, absoluteFrame)
             } else selectedTimeMs
             delayFrames.setTarget((automatedTime * configuration.sampleRate / 1_000f).coerceIn(1f, leftDelay.size - 2f))
@@ -164,61 +168,45 @@ class AudioDelayChainDevice : AudioChainDevice<AudioDelayChainDeviceState>(), Pa
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
-        val tail by produceState(initialValue = isTailActive) {
-            while (true) {
-                value = isTailActive
-                delay(50)
-            }
-        }
         ChainDeviceShell(
             title = "Delay",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
             isDragging = isDragging.value,
-            modifier = Modifier.width(470.dp),
+            modifier = Modifier.width(340.dp),
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DelaySelect("Time", deviceState.timeMode.label, AudioDelayTimeMode.entries.map { it.label }) { label ->
-                        changeState { copy(timeMode = AudioDelayTimeMode.entries.first { it.label == label }) }
-                    }
-                    DelaySelect("Stereo", deviceState.stereoMode.label, AudioDelayStereoMode.entries.map { it.label }) { label ->
+            Row(
+                Modifier.fillMaxWidth().padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(Modifier.width(104.dp)) {
+                    DelaySelect("Mode", deviceState.stereoMode.label, AudioDelayStereoMode.entries.map { it.label }) { label ->
                         changeState { copy(stereoMode = AudioDelayStereoMode.entries.first { it.label == label }) }
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    val timeValue = if (deviceState.timeMode == AudioDelayTimeMode.Sync) {
-                        deviceState.noteValue.ordinal.toFloat() / (AudioDelayNoteValue.entries.size - 1)
-                    } else PARAMETERS[0].normalize(deviceState.timeMs)
-                    val timeText = if (deviceState.timeMode == AudioDelayTimeMode.Sync) {
-                        deviceState.noteValue.label
-                    } else "${deviceState.timeMs.roundToInt()} ms"
-                    EffectDial("timeMs", "Time", timeValue, timeText) { normalized ->
-                        state.update { current ->
-                            if (current.timeMode == AudioDelayTimeMode.Sync) {
-                                val index = (normalized * (AudioDelayNoteValue.entries.size - 1)).roundToInt()
-                                    .coerceIn(AudioDelayNoteValue.entries.indices)
-                                current.copy(noteValue = AudioDelayNoteValue.entries[index])
-                            } else {
-                                current.copy(timeMs = PARAMETERS[0].denormalize(normalized))
-                            }
+                Separator(Modifier.height(168.dp), orientation = SeparatorOrientation.Vertical)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        TimeDial(
+                            title = "Time",
+                            timing = deviceState.resolvedTiming(),
+                            onSelectTiming = { timing, milliseconds ->
+                                state.update { current -> current.withTiming(timing, milliseconds) }
+                            },
+                        )
+                        EffectDial("feedback", "Feedback", deviceState.feedback, "${(deviceState.feedback * 100).roundToInt()}%") {
+                            state.update { s -> s.copy(feedback = it) }
                         }
                     }
-                    EffectDial("feedback", "Feedback", deviceState.feedback, "${(deviceState.feedback * 100).roundToInt()}%") {
-                        state.update { s -> s.copy(feedback = it) }
-                    }
-                    EffectDial("filter", "Filter", PARAMETERS[3].normalize(deviceState.filterHz), "${deviceState.filterHz.roundToInt()} Hz") {
-                        state.update { s -> s.copy(filterHz = PARAMETERS[3].denormalize(it)) }
-                    }
-                    EffectDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%") {
-                        state.update { s -> s.copy(dryWet = it) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        EffectDial("filter", "Filter", PARAMETERS[3].normalize(deviceState.filterHz), "${deviceState.filterHz.roundToInt()} Hz") {
+                            state.update { s -> s.copy(filterHz = PARAMETERS[3].denormalize(it)) }
+                        }
+                        EffectDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%") {
+                            state.update { s -> s.copy(dryWet = it) }
+                        }
                     }
                 }
-                Text(
-                    if (tail) "Tail active" else "Tail idle",
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                )
             }
         }
     }
@@ -256,10 +244,38 @@ data class AudioDelayChainDeviceState(
     val filterHz: Float = 8_000f,
     val stereoMode: AudioDelayStereoMode = AudioDelayStereoMode.Stereo,
     override val automations: Map<String, DialAutomationLane> = emptyMap(),
+    /** Nullable keeps the serialized layout and values of pre-TimeDial projects intact. */
+    val timing: Timing? = null,
 ) : DeviceState() {
-    fun resolvedTimeMs(bpm: Double): Float = if (timeMode == AudioDelayTimeMode.Sync) {
-        (60_000.0 / bpm.coerceAtLeast(1.0) * noteValue.beats).toFloat()
-    } else timeMs
+    fun resolvedTiming(): Timing = timing ?: if (timeMode == AudioDelayTimeMode.Sync) {
+        val rhythm = Timing.Rythm.RythmTiming.entries.firstOrNull { it.text == noteValue.label }
+            ?: Timing.Rythm.RythmTiming._1_4
+        Timing.Rythm(rhythm)
+    } else {
+        Timing.Duration(timeMs.roundToInt().milliseconds)
+    }
+
+    fun resolvedTimeMs(bpm: Double): Float = when (val resolved = resolvedTiming()) {
+        is Timing.Duration -> resolved.duration.inWholeMilliseconds.toFloat()
+        is Timing.Rythm -> {
+            val beats = resolved.timing.factor * 4.0
+            (60_000.0 / bpm.coerceAtLeast(1.0) * beats).toFloat()
+        }
+    }
+
+    fun withTiming(value: Timing, milliseconds: Long): AudioDelayChainDeviceState {
+        val legacyNote = if (value is Timing.Rythm) {
+            AudioDelayNoteValue.entries.minBy { candidate ->
+                kotlin.math.abs(candidate.beats - value.timing.factor * 4.0)
+            }
+        } else noteValue
+        return copy(
+            timing = value,
+            timeMode = if (value is Timing.Duration) AudioDelayTimeMode.Milliseconds else AudioDelayTimeMode.Sync,
+            timeMs = milliseconds.toFloat(),
+            noteValue = legacyNote,
+        )
+    }
 
     override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState = copy(automations = automations)
 }
@@ -279,9 +295,19 @@ internal fun EffectDial(id: String, title: String, value: Float, text: String, o
 }
 
 @Composable
-private fun DelaySelect(label: String, value: String, options: List<String>, onValue: (String) -> Unit) {
-    Column(Modifier.width(138.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = Theme[typography][small])
+private fun DelaySelect(
+    label: String,
+    value: String,
+    options: List<String>,
+    modifier: Modifier = Modifier,
+    onValue: (String) -> Unit,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            label,
+            style = Theme[typography][small],
+            color = Theme[colors][mutedForeground],
+        )
         Select(value = value, options = options, triggerHeight = 32.dp, onValueChange = onValue)
     }
 }

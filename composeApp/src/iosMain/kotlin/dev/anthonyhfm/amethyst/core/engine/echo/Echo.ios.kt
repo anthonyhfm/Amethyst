@@ -131,6 +131,14 @@ actual object Echo {
         return playback.play(audioSignal)
     }
 
+    actual fun prepareSources(sourceIds: List<String>) {
+        if (sourceIds.isEmpty()) return
+        withLifecycleLock {
+            if (!initialize()) return@withLifecycleLock
+            playback.prepareSources(sourceIds.mapNotNull(::libraryPcmSource))
+        }
+    }
+
     actual fun playSource(
         sourceId: String,
         startFrame: Long,
@@ -151,33 +159,39 @@ actual object Echo {
         )
     ).firstOrNull()
 
-    actual fun playSources(sources: List<AudioSourcePlayback>): List<String?> {
-        if (sources.isEmpty()) return emptyList()
-        if (!initialize()) return List(sources.size) { null }
-        playback.setMasterGain(AudioSettings.masterVolume.value)
-        val targetFrame = playback.renderer.absoluteFrame
-        return sources.map { request ->
-            val source = AudioLibraryRepository.get(request.sourceId)
-                ?: return@map null
-            val pcm = runCatching {
-                ByteArrayPcmAudioSource(
-                    id = source.id,
-                    sampleRate = source.sampleRate,
-                    channels = source.channels,
-                    bitDepth = source.bitDepth,
-                    rawData = source.rawData,
+    actual fun playSources(sources: List<AudioSourcePlayback>): List<String?> =
+        withLifecycleLock {
+            if (sources.isEmpty()) return@withLifecycleLock emptyList()
+            if (!initialize()) return@withLifecycleLock List(sources.size) { null }
+            playback.setMasterGain(AudioSettings.masterVolume.value)
+            val pcmSources = sources.map { request -> libraryPcmSource(request.sourceId) }
+            playback.prepareSources(pcmSources.filterNotNull())
+            val targetFrame = playback.renderer.absoluteFrame
+            sources.mapIndexed { index, request ->
+                val pcm = pcmSources[index] ?: return@mapIndexed null
+                playback.play(
+                    source = pcm,
+                    sourceStartFrame = request.startFrame,
+                    sourceEndFrameExclusive = request.endFrameExclusive,
+                    origin = request.origin,
+                    gain = request.gain,
+                    pan = request.pan,
+                    targetFrame = targetFrame,
                 )
-            }.getOrNull() ?: return@map null
-            playback.play(
-                source = pcm,
-                sourceStartFrame = request.startFrame,
-                sourceEndFrameExclusive = request.endFrameExclusive,
-                origin = request.origin,
-                gain = request.gain,
-                pan = request.pan,
-                targetFrame = targetFrame,
-            )
+            }
         }
+
+    private fun libraryPcmSource(sourceId: String): ByteArrayPcmAudioSource? {
+        val source = AudioLibraryRepository.get(sourceId) ?: return null
+        return runCatching {
+            ByteArrayPcmAudioSource(
+                id = source.id,
+                sampleRate = source.sampleRate,
+                channels = source.channels,
+                bitDepth = source.bitDepth,
+                rawData = source.rawData,
+            )
+        }.getOrNull()
     }
 
     actual fun playMultiple(signals: List<Signal.AudioSignal>): List<String?> {

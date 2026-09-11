@@ -142,6 +142,7 @@ fun MidiClip(
     var dragPointerInRoot by remember { mutableStateOf(Offset.Unspecified) }
     val snapEnabled = !ModifierKeysState.isAltPressed
     val currentSnapEnabled = rememberUpdatedState(snapEnabled)
+    val currentViewport = rememberUpdatedState(viewport)
 
     var resizeLeftDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
     var resizeRightDeltaPx by remember(midiEntry.startTimeMs) { mutableStateOf(0f) }
@@ -212,8 +213,11 @@ fun MidiClip(
         contentEndPx = previewEndOffsetPx,
         viewport = viewport,
         screenOffsetPx = visualDragOffsetPx,
-        retainOffscreen = dragCallbacks != null && isSelected,
+        retainOffscreen = rangeActive || (dragCallbacks != null && isSelected),
     )
+    // Keep the gesture tied to the pointer's screen position while scrolling.
+    val currentClipScreenLeftPx = rememberUpdatedState(clipWindow?.visibleLeftPx ?: 0)
+
     if (clipWindow == null || clipWindow.visibleWidthPx <= 0) return
 
     val clipShape = RoundedCornerShape(
@@ -377,8 +381,10 @@ fun MidiClip(
                     detectDragGestures(
                         onDragStart = { offset ->
                             val startMs = computeSnappedTimeFromContentX(
-                                x = clipWindow.visibleContentStartPx + offset.x,
-                                zoomLevel = zoomLevel,
+                                x = currentViewport.value.screenToContentX(
+                                    currentClipScreenLeftPx.value + offset.x
+                                ),
+                                zoomLevel = currentViewport.value.zoomX,
                                 bpm = bpm,
                                 gridType = gridType,
                                 snapEnabled = currentSnapEnabled.value,
@@ -390,8 +396,10 @@ fun MidiClip(
                         onDrag = { change, _ ->
                             if (rangeActive && rangeStartMs != null) {
                                 val currentMs = computeSnappedTimeFromContentX(
-                                    x = clipWindow.visibleContentStartPx + change.position.x,
-                                    zoomLevel = zoomLevel,
+                                    x = currentViewport.value.screenToContentX(
+                                        currentClipScreenLeftPx.value + change.position.x
+                                    ),
+                                    zoomLevel = currentViewport.value.zoomX,
                                     bpm = bpm,
                                     gridType = gridType,
                                     snapEnabled = currentSnapEnabled.value,

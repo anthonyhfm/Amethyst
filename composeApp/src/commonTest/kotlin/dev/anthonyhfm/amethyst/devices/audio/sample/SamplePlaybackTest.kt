@@ -30,6 +30,32 @@ class SamplePlaybackTest {
     private val keyB = PadTriggerKey("launchpad-b", 1, 2)
 
     @Test
+    fun playheadProgressAccountsForRendererResampling() {
+        val durationSeconds = 180L
+        val sourceFrames = 44_100L * durationSeconds
+
+        assertEquals(
+            170f / 180f,
+            samplePlayheadProgress(
+                renderedFrame = 48_000L * 170L,
+                renderedSampleRate = 48_000,
+                sourceFrameCount = sourceFrames,
+                sourceSampleRate = 44_100,
+            )!!,
+            0.0001f,
+        )
+        assertEquals(
+            1f,
+            samplePlayheadProgress(
+                renderedFrame = 48_000L * durationSeconds,
+                renderedSampleRate = 48_000,
+                sourceFrameCount = sourceFrames,
+                sourceSampleRate = 44_100,
+            ),
+        )
+    }
+
+    @Test
     fun constantPowerPanPreservesStereoPower() {
         val center = renderSnapshot(snapshot(state(pan = 0f)), frames = 8)
         val halfRight = renderSnapshot(snapshot(state(pan = 50f)), frames = 8)
@@ -130,6 +156,25 @@ class SamplePlaybackTest {
 
         assertEquals(1, first.activeVoiceCount)
         assertEquals(1, second.activeVoiceCount)
+    }
+
+    @Test
+    fun chokeOffStillRestartsTheSameSampleDeviceMonophonically() {
+        val sample = SampleChainDevice().apply { state.value = state(chokeGroup = 0) }
+        val runtime = prepareRuntime(sample)
+        val block = AudioProcessingBlock(FloatArray(128), 2, 64)
+
+        runtime.publishFrame(0)
+        sample.signalEnter(listOf(Signal.Midi("launchpad-a", 1, 1, 127)))
+        processSources(block, runtime, 0, sample)
+        assertEquals(8L, sample.playheadFrame)
+
+        runtime.publishFrame(8)
+        sample.signalEnter(listOf(Signal.Midi("launchpad-b", 2, 2, 127)))
+        processSources(block, runtime, 8, sample)
+
+        assertEquals(1, sample.activeVoiceCount)
+        assertEquals(8L, sample.playheadFrame)
     }
 
     @Test

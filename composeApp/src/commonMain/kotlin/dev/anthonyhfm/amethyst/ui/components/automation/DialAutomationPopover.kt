@@ -67,6 +67,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationCurve
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationRetriggerMode
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationTimingUnit
 import dev.anthonyhfm.amethyst.core.util.Timing
@@ -76,6 +77,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.Tabs
 import dev.anthonyhfm.amethyst.ui.components.primitives.TabsList
 import dev.anthonyhfm.amethyst.ui.components.primitives.TabsTrigger
+import dev.anthonyhfm.amethyst.ui.components.primitives.Select
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
@@ -266,7 +268,7 @@ fun ParameterAutomationPopover(
                                 )
 
                                  AutomationCanvas(
-                                    points = lane.points,
+                                    lane = lane,
                                     parameter = parameter,
                                     selectedPointId = selectedPointId,
                                     panelBgColor = editorPanelBg,
@@ -277,7 +279,10 @@ fun ParameterAutomationPopover(
                                     onAdd = { p, value ->
                                         val before = lane.points
                                         val after = before + CompositionAutomationPoint(p, value)
-                                        onUpdateLane(lane.copy(points = after))
+                                        onUpdateLane(lane.copy(
+                                            points = after,
+                                            settings = lane.settings.copy(curve = LiveAutomationCurve.Bezier),
+                                        ))
                                         dev.anthonyhfm.amethyst.core.controls.undo.UndoManager.addAction(
                                             dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction.DialAutomationPointChange(
                                                 parameterId = lane.parameterId,
@@ -292,9 +297,12 @@ fun ParameterAutomationPopover(
                                             dragStartPoints = lane.points
                                         }
                                         onUpdateLane(
-                                            lane.copy(points = lane.points.map {
+                                            lane.copy(
+                                                points = lane.points.map {
                                                 if (it.pointId == id) it.copy(progress = p, value = value) else it
-                                            })
+                                                },
+                                                settings = lane.settings.copy(curve = LiveAutomationCurve.Bezier),
+                                            )
                                         )
                                     },
                                     onMoveHandle = { id, incoming, time, value ->
@@ -302,7 +310,8 @@ fun ParameterAutomationPopover(
                                             dragStartPoints = lane.points
                                         }
                                         onUpdateLane(
-                                            lane.copy(points = lane.points.map { point ->
+                                            lane.copy(
+                                                points = lane.points.map { point ->
                                                 if (point.pointId != id) point
                                                 else if (incoming) point.copy(
                                                     inHandleTime = time, inHandleValue = value,
@@ -311,7 +320,9 @@ fun ParameterAutomationPopover(
                                                     outHandleTime = time, outHandleValue = value,
                                                     inHandleTime = 1f - time, inHandleValue = (2f * point.value - value).coerceIn(-1f, 1f),
                                                 )
-                                            })
+                                                },
+                                                settings = lane.settings.copy(curve = LiveAutomationCurve.Bezier),
+                                            )
                                         )
                                     },
                                     onDragFinished = {
@@ -332,6 +343,41 @@ fun ParameterAutomationPopover(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxHeight()
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "Curve",
+                                    style = Theme[typography][small],
+                                    color = Theme[colors][mutedForeground],
+                                )
+                                val curveOptions = listOf("Linear", "Exponential", "S-Curve", "Custom")
+                                val curveLabel = when (lane.settings.curve) {
+                                    LiveAutomationCurve.Linear -> "Linear"
+                                    LiveAutomationCurve.Exponential -> "Exponential"
+                                    LiveAutomationCurve.SCurve -> "S-Curve"
+                                    LiveAutomationCurve.Bezier -> "Custom"
+                                    LiveAutomationCurve.Logarithmic -> "Exponential"
+                                }
+                                Select(
+                                    value = curveLabel,
+                                    options = curveOptions,
+                                    modifier = Modifier.width(148.dp),
+                                    triggerHeight = 30.dp,
+                                    onValueChange = { selected ->
+                                        val curve = when (selected) {
+                                            "Exponential" -> LiveAutomationCurve.Exponential
+                                            "S-Curve" -> LiveAutomationCurve.SCurve
+                                            "Custom" -> LiveAutomationCurve.Bezier
+                                            else -> LiveAutomationCurve.Linear
+                                        }
+                                        onUpdateLane(lane.copy(settings = lane.settings.copy(curve = curve)))
+                                    },
                                 )
                             }
 
@@ -390,11 +436,11 @@ fun ParameterAutomationPopover(
                                 )
 
                                 // Retrigger Mode Tabs (shadcn style)
-                                val isGated = lane.settings.retriggerMode == DialAutomationRetriggerMode.IgnoreWhileRunning
-                                val selectedTabKey = if (isGated) "Gated" else "Trigger"
+                                val ignoresRetrigger = lane.settings.retriggerMode == DialAutomationRetriggerMode.IgnoreWhileRunning
+                                val selectedTabKey = if (ignoresRetrigger) "Ignore" else "Restart"
                                 Tabs(
                                     selectedTab = selectedTabKey,
-                                    tabs = listOf("Gated", "Trigger"),
+                                    tabs = listOf("Ignore", "Restart"),
                                     modifier = Modifier.weight(1f),
                                 ) {
                                     TabsList(
@@ -402,34 +448,34 @@ fun ParameterAutomationPopover(
                                             .fillMaxWidth()
                                     ) {
                                         TabsTrigger(
-                                            key = "Gated",
-                                            selected = isGated,
+                                            key = "Ignore",
+                                            selected = ignoresRetrigger,
                                             onSelected = {
-                                                if (!isGated) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.IgnoreWhileRunning)))
+                                                if (!ignoresRetrigger) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.IgnoreWhileRunning)))
                                             },
                                             modifier = Modifier.weight(1f),
                                         ) {
                                             Text(
-                                                text = "Gated",
+                                                text = "Ignore",
                                                 style = Theme[typography][small],
-                                                fontWeight = if (isGated) FontWeight.SemiBold else FontWeight.Normal,
+                                                fontWeight = if (ignoresRetrigger) FontWeight.SemiBold else FontWeight.Normal,
                                                 modifier = Modifier.fillMaxWidth(),
                                                 textAlign = TextAlign.Center,
                                             )
                                         }
 
                                         TabsTrigger(
-                                            key = "Trigger",
-                                            selected = !isGated,
+                                            key = "Restart",
+                                            selected = !ignoresRetrigger,
                                             onSelected = {
-                                                if (isGated) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.Restart)))
+                                                if (ignoresRetrigger) onUpdateLane(lane.copy(settings = lane.settings.copy(retriggerMode = DialAutomationRetriggerMode.Restart)))
                                             },
                                             modifier = Modifier.weight(1f),
                                         ) {
                                             Text(
-                                                text = "Trigger",
+                                                text = "Restart",
                                                 style = Theme[typography][small],
-                                                fontWeight = if (!isGated) FontWeight.SemiBold else FontWeight.Normal,
+                                                fontWeight = if (!ignoresRetrigger) FontWeight.SemiBold else FontWeight.Normal,
                                                 modifier = Modifier.fillMaxWidth(),
                                                 textAlign = TextAlign.Center,
                                             )
@@ -493,7 +539,7 @@ fun DialAutomationPopover(
 
 @Composable
 private fun AutomationCanvas(
-    points: List<CompositionAutomationPoint>,
+    lane: DialAutomationLane,
     parameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter? = null,
     selectedPointId: String?,
     panelBgColor: Color = Theme[colors][secondary],
@@ -505,7 +551,7 @@ private fun AutomationCanvas(
     modifier: Modifier,
 ) {
     var draggedTarget by remember { mutableStateOf<AutomationDragTarget?>(null) }
-    val currentPoints = rememberUpdatedState(points)
+    val currentPoints = rememberUpdatedState(lane.points)
     val currentSelectedPointId = rememberUpdatedState(selectedPointId)
     val currentOnSelect = rememberUpdatedState(onSelect)
     val currentOnAdd = rememberUpdatedState(onAdd)
@@ -640,23 +686,33 @@ private fun AutomationCanvas(
             )
         }
 
-        val sorted = points.sortedBy(CompositionAutomationPoint::progress)
+        val sorted = lane.points.sortedBy(CompositionAutomationPoint::progress)
         if (sorted.size > 1) {
             val canvasWidth = size.width
             val canvasHeight = size.height
-            val curvePoints = buildList {
-                sorted.zipWithNext().forEach { (start, end) ->
-                    (0..24).forEach { step ->
-                        if (isEmpty() || step > 0) {
-                            val p = step / 24f
-                            add(
-                                Offset(
-                                    progressToX(start.progress + (end.progress - start.progress) * p, canvasWidth),
-                                    valueToY(start.segmentValueAt(end, p), canvasHeight)
+            val curvePoints = if (lane.settings.curve == LiveAutomationCurve.Bezier) {
+                buildList {
+                    sorted.zipWithNext().forEach { (start, end) ->
+                        (0..24).forEach { step ->
+                            if (isEmpty() || step > 0) {
+                                val p = step / 24f
+                                add(
+                                    Offset(
+                                        progressToX(start.progress + (end.progress - start.progress) * p, canvasWidth),
+                                        valueToY(start.segmentValueAt(end, p), canvasHeight)
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
+                }
+            } else {
+                (0..96).map { step ->
+                    val progress = step / 96f
+                    Offset(
+                        progressToX(progress, canvasWidth),
+                        valueToY(lane.valueAt(progress, lane.startValue), canvasHeight),
+                    )
                 }
             }
             val strokePath = Path().apply {

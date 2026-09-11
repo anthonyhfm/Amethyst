@@ -14,9 +14,6 @@ import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.delay.LightDelayRouting
 import dev.anthonyhfm.amethyst.devices.effects.delay.applyLightDelay
-import dev.anthonyhfm.amethyst.devices.effects.reverb.LightReverbChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.reverb.LightReverbChainDeviceState
-import dev.anthonyhfm.amethyst.devices.effects.reverb.diffused
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
@@ -51,15 +48,6 @@ class LightAudioInspiredEffectsTest {
     }
 
     @Test
-    fun lightReverbDiffusionIsBoundedAndDecaysOpacity() {
-        val diffused = led.diffused(step = 8, amount = 1f, opacityMultiplier = 0.2f) as Signal.LED
-        assertTrue(diffused.x in 0..7)
-        assertTrue(diffused.y in 0..7)
-        assertEquals(0.16f, diffused.opacity, 0.0001f)
-        assertTrue(LightReverbChainDevice.decaySteps(1f) <= LightReverbChainDevice.MAX_STEPS)
-    }
-
-    @Test
     fun heavenJobsAreHardLimitedAndChokeable() {
         val delay = DelayChainDevice().apply {
             state.value = DelayChainDeviceState(repeats = DelayChainDevice.MAX_REPEATS)
@@ -68,18 +56,10 @@ class LightAudioInspiredEffectsTest {
         assertTrue(delay.activeJobCount <= DelayChainDevice.MAX_ACTIVE_JOBS)
         delay.onChoke()
         assertEquals(0, delay.activeJobCount)
-
-        val reverb = LightReverbChainDevice().apply {
-            state.value = LightReverbChainDeviceState(size = 1f)
-        }
-        repeat(20) { reverb.signalEnter(emptyList()) }
-        assertTrue(reverb.activeJobCount <= LightReverbChainDevice.MAX_ACTIVE_JOBS)
-        reverb.onChoke()
-        assertEquals(0, reverb.activeJobCount)
     }
 
     @Test
-    fun legacyDelayAndNewLightStatesRoundTrip() {
+    fun legacyDelayAndLightDelayStateRoundTrip() {
         val legacy = LegacyDelayState(Timing.Rythm(Timing.Rythm.RythmTiming._1_8), 250, 0.75f)
         val restored = ProtoBuf.decodeFromByteArray<DelayChainDeviceState>(
             ProtoBuf.encodeToByteArray(legacy),
@@ -90,9 +70,7 @@ class LightAudioInspiredEffectsTest {
         assertEquals(LightDelayRouting.Direct, restored.routing)
 
         val delay = DelayChainDeviceState(feedback = 0.8f, repeats = 6, routing = LightDelayRouting.PingPongSides)
-        val reverb = LightReverbChainDeviceState(size = 0.8f, decay = 0.9f)
         assertEquals(delay, DeviceRegistry.deepCopyState(delay))
-        assertEquals(reverb, DeviceRegistry.deepCopyState(reverb))
     }
 
     @Test

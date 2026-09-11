@@ -32,8 +32,14 @@ fun main(args: Array<String>) {
 
     val platform = DesktopPlatform.get()
 
-    nucleusApplication(backend = NucleusBackend.Tao) {
+    nucleusApplication(args = args, backend = NucleusBackend.Tao) {
         FileKit.init(appId = "Amethyst")
+
+        onDeepLink { uri ->
+            if (uri.scheme.equals("amethyst", ignoreCase = true)) {
+                println("Received amethyst deep link: $uri")
+            }
+        }
 
         var showEditor: Boolean by remember { mutableStateOf(false) }
         var macQuitRequest by remember { mutableIntStateOf(0) }

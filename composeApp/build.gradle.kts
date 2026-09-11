@@ -220,6 +220,7 @@ nucleus.application {
 
         includeAllModules = true
         appResourcesRootDir.set(layout.buildDirectory.dir("generated/stemRuntime"))
+        protocol("Amethyst", "amethyst")
 
         macOS {
             iconFile.set(project.file("../icons/amethyst_macos.icns"))

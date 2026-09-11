@@ -28,6 +28,7 @@ fun <T> Dial(
     automationParameter: dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter? = null,
     isAutomated: Boolean = false,
     hasAutomation: Boolean = false,
+    statusIndicatorColor: Color = Color.Unspecified,
 ) = dev.anthonyhfm.amethyst.ui.components.Dial(
     type = type,
     value = value,
@@ -45,6 +46,7 @@ fun <T> Dial(
     automationParameter = automationParameter,
     isAutomated = isAutomated,
     hasAutomation = hasAutomation,
+    statusIndicatorColor = statusIndicatorColor,
 )
 
 @Composable

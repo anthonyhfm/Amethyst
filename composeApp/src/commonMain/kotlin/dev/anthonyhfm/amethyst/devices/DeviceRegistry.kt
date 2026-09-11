@@ -19,7 +19,6 @@ import dev.anthonyhfm.amethyst.devices.effects.color_filter.ColorFilterChainDevi
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.reverb.LightReverbChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.flip.FlipChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -62,7 +61,6 @@ object DeviceRegistry {
         register(CoordinateFilterChainDevice)
         register(CopyChainDevice)
         register(DelayChainDevice)
-        register(LightReverbChainDevice)
         register(FlipChainDevice)
         register(GradientChainDevice)
         register(GroupChainDevice)

@@ -51,6 +51,8 @@ class AudioRenderContext(
     absoluteFrame: Long,
     transportFrame: Long = absoluteFrame,
 ) {
+    internal var sidechainAudioProvider: SidechainAudioProvider? = null
+
     var sampleRate: Int = sampleRate
         private set
     var absoluteFrame: Long = absoluteFrame
@@ -66,7 +68,22 @@ class AudioRenderContext(
         this.sampleRate = sampleRate
         this.absoluteFrame = absoluteFrame
         this.transportFrame = transportFrame
+        sidechainAudioProvider = null
     }
+
+    internal fun sidechainInput(sourceId: String): AudioProcessingBlock? =
+        sidechainAudioProvider?.sourceBlock(sourceId)
+}
+
+/** Read-only access to source audio rendered for the current callback. */
+internal fun interface SidechainAudioProvider {
+    fun sourceBlock(sourceId: String): AudioProcessingBlock?
+}
+
+/** Receives source ids that do not already feed the consumer's audible input. */
+interface SidechainAudioConsumer {
+    val sidechainSourceId: String?
+    fun replaceEligibleSidechainSources(sourceIds: Set<String>)
 }
 
 abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalReceiver(), Selectable {
@@ -245,6 +262,13 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
         return if (runtime.lane.settings.isAdditive) {
             (manualNormalizedValue + automated * 0.5f).coerceIn(0f, 1f)
         } else ((automated + 1f) * 0.5f).coerceIn(0f, 1f)
+    }
+
+    fun isDialAutomationRunning(parameterId: String): Boolean =
+        dialAutomationRuntimes[parameterId]?.isRunning == true
+
+    fun stopDialAutomations() {
+        dialAutomationRuntimes.values.forEach { it.stop() }
     }
 
     protected fun pushStateChange(before: State, after: State) {

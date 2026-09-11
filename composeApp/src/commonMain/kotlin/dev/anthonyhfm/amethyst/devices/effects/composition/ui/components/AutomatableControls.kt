@@ -11,7 +11,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -22,6 +27,12 @@ import kotlin.math.PI
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalAutomationHandler
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSub
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSubContent
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSubTrigger
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem as PrimitiveContextMenuItem
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +43,7 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.destructive
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
@@ -49,7 +61,6 @@ import kotlin.math.pow
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LinePoint
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledSlider as PrimitiveLabeledSlider
 import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledRangeSlider as PrimitiveLabeledRangeSlider
-
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,17 +73,13 @@ import dev.anthonyhfm.amethyst.ui.components.automation.ParameterMappingDialog
 import dev.anthonyhfm.amethyst.core.parameter.ParameterAddress
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
-import dev.anthonyhfm.amethyst.workspace.data.ParameterMappingMode
-
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import kotlin.math.roundToInt
-
 import dev.anthonyhfm.amethyst.ui.components.FlatDial
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
 import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
+import dev.anthonyhfm.amethyst.ui.theme.foreground
 
 @Composable
 fun <T> AutomatableDial(
@@ -208,6 +215,12 @@ fun <T> AutomatableDial(
             ContextMenu(
                 trigger = { RenderDial() }
             ) {
+                val availableMacros = workspaceMacros.withIndex()
+                    .filter { (_, macro) ->
+                        parameterAddress == null || parameterMappings.none { mapping ->
+                            mapping.macroId == macro.id && mapping.target == parameterAddress
+                        }
+                    }
                 AutomatableContextMenuItem(
                     label = if (dialLane != null) "Edit $title Automation" else "Automate $title",
                     icon = if (dialLane != null) Lucide.Pencil else Lucide.Plus,
@@ -250,36 +263,95 @@ fun <T> AutomatableDial(
                     )
                 }
                 if (parameterAddress != null && descriptor?.macroMappable != false) {
-                    workspaceMacros.filter { macro -> parameterMappings.none { it.macroId == macro.id } }
-                        .forEachIndexed { index, macro ->
-                            AutomatableContextMenuItem(
-                                label = "Map to Macro… · ${macro.name.ifBlank { "Macro ${index + 1}" }}",
-                                icon = Lucide.Plus,
-                                onClick = {
-                                    WorkspaceRepository.setParameterMappings(
-                                        workspaceMappings + ParameterMapping(
-                                            macroId = macro.id,
-                                            target = parameterAddress,
-                                        ),
-                                    )
-                                },
-                            )
+                    val validMappings = parameterMappings.mapNotNull { mapping ->
+                        val macroIndex = workspaceMacros.indexOfFirst { it.id == mapping.macroId }
+                        if (macroIndex >= 0) Triple(mapping, macroIndex, workspaceMacros[macroIndex]) else null
+                    }
+                    val invalidMappings = parameterMappings.filter { mapping ->
+                        workspaceMacros.none { it.id == mapping.macroId }
+                    }
+
+                    if (availableMacros.isNotEmpty() || validMappings.isNotEmpty() || invalidMappings.isNotEmpty()) {
+                        ContextMenuSeparator()
+                    }
+                    if (availableMacros.isNotEmpty()) {
+                        ContextMenuSub {
+                            ContextMenuSubTrigger {
+                                Icon(
+                                    imageVector = Icons.Default.Link,
+                                    contentDescription = null,
+                                    tint = Theme[colors][foreground],
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text("Bind to macro")
+                            }
+                            ContextMenuSubContent {
+                                ScrollArea(
+                                    modifier = Modifier
+                                        .width(220.dp)
+                                        .height(minOf(availableMacros.size * 32, 240).dp),
+                                ) {
+                                    Column(modifier = Modifier.width(220.dp)) {
+                                        availableMacros.forEach { (index, macro) ->
+                                            AutomatableContextMenuItem(
+                                                label = macro.name.ifBlank { "Macro ${index + 1}" },
+                                                onClick = {
+                                                    WorkspaceRepository.setParameterMappings(
+                                                        workspaceMappings + ParameterMapping(
+                                                            macroId = macro.id,
+                                                            target = parameterAddress,
+                                                        ),
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    parameterMappings.forEach { mapping ->
-                        val macroLabel = workspaceMacros.firstOrNull { it.id == mapping.macroId }
-                            ?.name?.ifBlank { null }
-                            ?: "Missing macro"
+                    }
+                    validMappings.forEach { (mapping, macroIndex, macro) ->
+                        val macroLabel = macro.name.ifBlank { "Macro ${macroIndex + 1}" }
+                        ContextMenuSub {
+                            ContextMenuSubTrigger {
+                                Icon(
+                                    imageVector = Icons.Default.Link,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text("$macroLabel · ${mapping.mode.name}")
+                            }
+                            ContextMenuSubContent {
+                                AutomatableContextMenuItem(
+                                    label = "Edit mapping…",
+                                    icon = Lucide.Pencil,
+                                    onClick = { editingMapping = mapping },
+                                )
+                                AutomatableContextMenuItem(
+                                    label = "Remove binding",
+                                    icon = Lucide.Trash2,
+                                    variant = ContextMenuItemVariant.Destructive,
+                                    onClick = {
+                                        WorkspaceRepository.setParameterMappings(
+                                            workspaceMappings.filterNot { it.id == mapping.id },
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    if (invalidMappings.isNotEmpty()) {
                         AutomatableContextMenuItem(
-                            label = "Edit mapping… · $macroLabel · ${mapping.mode.name}",
-                            icon = Lucide.Pencil,
-                            onClick = { editingMapping = mapping },
-                        )
-                        AutomatableContextMenuItem(
-                            label = "Remove mapping · $macroLabel",
+                            label = if (invalidMappings.size == 1) {
+                                "Remove invalid binding"
+                            } else {
+                                "Remove ${invalidMappings.size} invalid bindings"
+                            },
                             icon = Lucide.Trash2,
+                            variant = ContextMenuItemVariant.Destructive,
                             onClick = {
                                 WorkspaceRepository.setParameterMappings(
-                                    workspaceMappings.filterNot { it.id == mapping.id },
+                                    workspaceMappings.filterNot { it in invalidMappings },
                                 )
                             },
                         )
@@ -725,18 +797,24 @@ fun AutomatableContextMenuItem(
     onClick: () -> Unit,
     icon: ImageVector? = null,
     enabled: Boolean = true,
+    variant: ContextMenuItemVariant = ContextMenuItemVariant.Default,
 ) {
     PrimitiveContextMenuItem(
         onClick = onClick,
         enabled = enabled,
-        dismissOnClick = true,
+        variant = variant,
     ) {
+        val iconTint = when {
+            !enabled -> Theme[colors][mutedForeground]
+            variant == ContextMenuItemVariant.Destructive -> Theme[colors][destructive]
+            else -> Theme[colors][popoverForeground]
+        }
         if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = if (enabled) Theme[colors][popoverForeground] else Theme[colors][mutedForeground],
+                tint = iconTint,
             )
         } else {
             Spacer(modifier = Modifier.size(16.dp))

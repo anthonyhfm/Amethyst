@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
-import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.EqThreeChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.FilterChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.AudioDelayChainDevice
@@ -50,7 +49,6 @@ import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.copy.CopyChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.reverb.LightReverbChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.flip.FlipChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.gradient.GradientChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
@@ -119,23 +117,21 @@ fun ChainDevicePicker(
     ) { onNavigate, _, level ->
         val samplingEntries = if (sampling) {
             listOf(
-                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_sample), Icons.TwoTone.AudioFile, "sources", SampleChainDevice::class, SampleChainDevice),
-                SamplingPickerEntry("Ducker", Icons.TwoTone.Contrast, "audio-effects", DuckerChainDevice::class, DuckerChainDevice),
-                SamplingPickerEntry("Saturator", Icons.TwoTone.Science, "audio-effects", SaturatorChainDevice::class, SaturatorChainDevice),
-                SamplingPickerEntry("EQ Three", Icons.TwoTone.Tune, "filter", EqThreeChainDevice::class, EqThreeChainDevice),
-                SamplingPickerEntry("Filter", Icons.TwoTone.Filter, "filter", FilterChainDevice::class, FilterChainDevice),
-                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_coordinate_filter), Icons.TwoTone.MyLocation, "filter", CoordinateFilterChainDevice::class, CoordinateFilterChainDevice),
-                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_macro_filter), Icons.TwoTone.FilterTiltShift, "filter", MacroFilterChainDevice::class, MacroFilterChainDevice),
-                SamplingPickerEntry("Audio Delay", Icons.TwoTone.Timer, "timing", AudioDelayChainDevice::class, AudioDelayChainDevice),
-                SamplingPickerEntry("Reverb", Icons.TwoTone.BlurOn, "timing", ReverbChainDevice::class, ReverbChainDevice),
-                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_delay), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, DelayChainDevice),
-                SamplingPickerEntry("Light Reverb", Icons.TwoTone.BlurOn, "timing", LightReverbChainDevice::class, LightReverbChainDevice),
-                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_hold), Icons.TwoTone.Pause, "timing", HoldChainDevice::class, HoldChainDevice),
-                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_loop), Icons.TwoTone.Loop, "timing", LoopChainDevice::class, LoopChainDevice),
-                SamplingPickerEntry("Live Automation", Icons.TwoTone.Tune, "modulation", AutomationChainDevice::class, AutomationChainDevice),
-                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_macro_control), Icons.TwoTone.Adjust, "modulation", MacroControlChainDevice::class, MacroControlChainDevice),
                 SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_group), Icons.TwoTone.Group, "container", GroupChainDevice::class, GroupChainDevice),
                 SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_multi), Icons.TwoTone._123, "container", MultiGroupChainDevice::class, MultiGroupChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_coordinate_filter), Icons.TwoTone.MyLocation, "filter", CoordinateFilterChainDevice::class, CoordinateFilterChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_macro_filter), Icons.TwoTone.FilterTiltShift, "filter", MacroFilterChainDevice::class, MacroFilterChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_sample), Icons.TwoTone.AudioFile, "sources", SampleChainDevice::class, SampleChainDevice),
+                SamplingPickerEntry("EQ Three", Icons.TwoTone.Tune, "audio-effects", EqThreeChainDevice::class, EqThreeChainDevice),
+                SamplingPickerEntry("Filter", Icons.TwoTone.Filter, "audio-effects", FilterChainDevice::class, FilterChainDevice),
+                SamplingPickerEntry("Compressor", Icons.TwoTone.Contrast, "audio-effects", DuckerChainDevice::class, DuckerChainDevice),
+                SamplingPickerEntry("Saturator", Icons.TwoTone.Science, "audio-effects", SaturatorChainDevice::class, SaturatorChainDevice),
+                SamplingPickerEntry("Delay", Icons.TwoTone.Timer, "audio-effects", AudioDelayChainDevice::class, AudioDelayChainDevice),
+                SamplingPickerEntry("Reverb", Icons.TwoTone.BlurOn, "audio-effects", ReverbChainDevice::class, ReverbChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_delay), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, DelayChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_hold), Icons.TwoTone.Pause, "timing", HoldChainDevice::class, HoldChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_loop), Icons.TwoTone.Loop, "timing", LoopChainDevice::class, LoopChainDevice),
+                SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_macro_control), Icons.TwoTone.Adjust, "modulation", MacroControlChainDevice::class, MacroControlChainDevice),
                 SamplingPickerEntry(stringResource(Res.string.workspace_chain_devicepicker_clear), Icons.TwoTone.LayersClear, "misc", ClearChainDevice::class, ClearChainDevice),
             )
         } else {
@@ -196,7 +192,7 @@ fun ChainDevicePicker(
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_filter), Icons.TwoTone.Filter, "filter", CoordinateFilterChainDevice::class, LayerFilterChainDevice::class, MacroFilterChainDevice::class, ColorFilterChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_color), Icons.TwoTone.ColorLens, "color", ColorChainDevice::class, GradientChainDevice::class, ShiftChainDevice::class, AdjustChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_shape), Icons.TwoTone.ShapeLine, "shape", CopyChainDevice::class, CompositionChainDevice::class, KeyframesChainDevice::class, PianoRollChainDevice::class)
-                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, LightReverbChainDevice::class, HoldChainDevice::class, LoopChainDevice::class)
+                    submenuItem(stringResource(Res.string.workspace_chain_devicepicker_timing), Icons.TwoTone.Timer, "timing", DelayChainDevice::class, HoldChainDevice::class, LoopChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_transform), Icons.TwoTone.Transform, "transform", OffsetChainDevice::class, LayerChainDevice::class, FlipChainDevice::class, RotateChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_effects), Icons.TwoTone.Science, "effects", BlurChainDevice::class, MaskChainDevice::class, OpacityChainDevice::class)
                     submenuItem(stringResource(Res.string.workspace_chain_devicepicker_misc), Icons.TwoTone.Adjust, "misc", ClearChainDevice::class, MacroControlChainDevice::class, PreviewChainDevice::class, TransmitChainDevice::class)
@@ -226,7 +222,6 @@ fun ChainDevicePicker(
                 }
                 "timing" -> {
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_delay), Icons.TwoTone.Timer, DelayChainDevice::class, ::DelayChainDevice)
-                    pickerItem("Light Reverb", Icons.TwoTone.BlurOn, LightReverbChainDevice::class, ::LightReverbChainDevice)
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_hold), Icons.TwoTone.Pause, HoldChainDevice::class, ::HoldChainDevice)
                     pickerItem(stringResource(Res.string.workspace_chain_devicepicker_loop), Icons.TwoTone.Loop, LoopChainDevice::class, ::LoopChainDevice)
                 }
@@ -252,20 +247,20 @@ fun ChainDevicePicker(
             // Sampling Menu
             when (level) {
                 "main" -> {
+                    samplingCategory("Container", Icons.TwoTone.Group, "container", "container")
+                    samplingCategory("Filter", Icons.TwoTone.Filter, "filter", "filter")
                     samplingCategory("Sources", Icons.TwoTone.AudioFile, "sources", "sources")
                     samplingCategory("Audio Effects", Icons.TwoTone.Science, "audio-effects", "audio-effects")
-                    samplingCategory("Filter", Icons.TwoTone.Filter, "filter", "filter")
                     samplingCategory("Timing", Icons.TwoTone.Timer, "timing", "timing")
                     samplingCategory("Modulation", Icons.TwoTone.Tune, "modulation", "modulation")
-                    samplingCategory("Container", Icons.TwoTone.Group, "container", "container")
                     samplingCategory("Misc", Icons.TwoTone.Adjust, "misc", "misc")
                 }
+                "container" -> samplingEntries("container")
+                "filter" -> samplingEntries("filter")
                 "sources" -> samplingEntries("sources")
                 "audio-effects" -> samplingEntries("audio-effects")
-                "filter" -> samplingEntries("filter")
                 "timing" -> samplingEntries("timing")
                 "modulation" -> samplingEntries("modulation")
-                "container" -> samplingEntries("container")
                 "misc" -> samplingEntries("misc")
             }
         }

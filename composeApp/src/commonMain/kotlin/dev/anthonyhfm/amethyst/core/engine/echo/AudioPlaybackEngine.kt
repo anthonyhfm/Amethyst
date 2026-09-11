@@ -43,6 +43,22 @@ class AudioPlaybackEngine(
         playbacks.value = emptyMap()
     }
 
+    /**
+     * Converts sources to the active hardware rate ahead of playback.
+     *
+     * Source preparation can be expensive for long clips. Keeping it out of the
+     * voice-enqueue loop prevents tracks in the same batch from starting at
+     * different render frames while later sources are still being converted.
+     */
+    fun prepareSources(sources: List<AudioSource>) {
+        val outputRate = renderer.configuration?.sampleRate ?: return
+        sources.forEach { source ->
+            runCatching {
+                PreparedAudioSourceCache.getOrPrepare(source, outputRate)
+            }
+        }
+    }
+
     fun play(
         signal: Signal.AudioSignal,
         targetFrame: Long = renderer.absoluteFrame,

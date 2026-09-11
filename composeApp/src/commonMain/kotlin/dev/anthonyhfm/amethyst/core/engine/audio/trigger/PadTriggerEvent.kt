@@ -59,8 +59,8 @@ class AudioTriggerRuntime {
     private val publishedFrame = atomic(0L)
     private val sources = atomic(emptyArray<ChokeSourceRegistration>())
     private val automationSources = atomic(emptyArray<LiveAutomationSource>())
-    private val sidechainSinks = atomic(emptyArray<SidechainTriggerRegistration>())
     private val publishedSampleRate = atomic(44_100)
+    private val automationSequence = atomic(0L)
 
     val currentFrame: Long get() = publishedFrame.value
     val sampleRate: Int get() = publishedSampleRate.value
@@ -81,33 +81,35 @@ class AudioTriggerRuntime {
         automationSources.value = registrations.copyOf()
     }
 
-    fun replaceSidechainSinks(registrations: Array<SidechainTriggerRegistration>) {
-        sidechainSinks.value = registrations.copyOf()
-    }
-
     fun automationValue(target: LiveAutomationTarget, frame: Long): Float? {
         val snapshot = automationSources.value
-        var index = snapshot.lastIndex
-        while (index >= 0) {
+        var selected: LiveAutomationSource? = null
+        var index = 0
+        while (index < snapshot.size) {
             val source = snapshot[index]
             if (source.target == target && source.isAutomationRunning) {
-                return source.automationValueAt(frame)
+                if (selected == null || source.activationSequence >= selected.activationSequence) {
+                    selected = source
+                }
             }
-            index--
+            index++
         }
-        return null
+        return selected?.automationValueAt(frame)
+    }
+
+    fun nextAutomationSequence(): Long = automationSequence.incrementAndGet()
+
+    fun clearAutomationTarget(target: LiveAutomationTarget) {
+        automationSources.value.forEach { source ->
+            if (source.target == target) source.clearAutomationOverride()
+        }
+    }
+
+    fun clearAutomationOverrides() {
+        automationSources.value.forEach(LiveAutomationSource::clearAutomationOverride)
     }
 
     fun onSourceTriggered(sourceId: String, chokeGroup: Int, targetFrame: Long) {
-        val sinks = sidechainSinks.value
-        var sinkIndex = 0
-        while (sinkIndex < sinks.size) {
-            val registration = sinks[sinkIndex]
-            if (sourceId in registration.allowedSourceIds) {
-                registration.sink.enqueueSidechainTrigger(sourceId, targetFrame)
-            }
-            sinkIndex++
-        }
         if (chokeGroup !in 1..16) return
         val snapshot = sources.value
         var index = 0
@@ -132,18 +134,10 @@ interface AudioTriggerRuntimeAware {
 interface LiveAutomationSource {
     val target: LiveAutomationTarget
     val isAutomationRunning: Boolean
+    val activationSequence: Long get() = 0L
     fun automationValueAt(frame: Long): Float
+    fun clearAutomationOverride() = Unit
 }
-
-interface SidechainTriggerSink {
-    val sidechainSourceId: String?
-    fun enqueueSidechainTrigger(sourceId: String, targetFrame: Long)
-}
-
-data class SidechainTriggerRegistration(
-    val sink: SidechainTriggerSink,
-    val allowedSourceIds: Set<String>,
-)
 
 /** Bounded single-producer/single-consumer frame queue used by trigger-rate audio controls. */
 class AudioFrameTriggerQueue(private val capacity: Int = 32) {

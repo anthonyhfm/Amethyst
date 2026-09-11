@@ -1,15 +1,6 @@
 {
-  "originHash" : "263c703ac54e95c4294706591db270f8dc3c65e1d21bf68178316b6bea4c4820",
+  "originHash" : "dd717711d96f4f44f17637324e5a83ffd4957f48de57611d6b9f224cf4304a77",
   "pins" : [
-    {
-      "identity" : "ogg-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/HealsCodes/ogg-swift",
-      "state" : {
-        "revision" : "b26219bc2229234a07a5e57c3d4fbeb7afbdd98a",
-        "version" : "1.3.5"
-      }
-    },
     {
       "identity" : "sentry-cocoa",
       "kind" : "remoteSourceControl",
@@ -17,15 +8,6 @@
       "state" : {
         "revision" : "dad229c665bfd043c5d80ac7aa77717cbd19a1c3",
         "version" : "8.58.3"
-      }
-    },
-    {
-      "identity" : "vorbis-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/HealsCodes/vorbis-swift.git",
-      "state" : {
-        "revision" : "a3e2493aa5afb23633f3a7e4e673b503de021b6b",
-        "version" : "1.3.7"
       }
     }
   ],

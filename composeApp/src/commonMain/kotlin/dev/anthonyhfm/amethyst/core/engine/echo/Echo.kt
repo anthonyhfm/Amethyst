@@ -71,6 +71,8 @@ expect object Echo {
     val outputStatus: StateFlow<AudioOutputStatus>
     fun setMasterGain(gain: Float)
     fun attachAudioChain(chain: AudioChain)
+    /** Prepares library sources for gapless, synchronized playback. */
+    fun prepareSources(sourceIds: List<String>)
     fun play(audioSignal: Signal.AudioSignal): String?
     fun playSource(
         sourceId: String,

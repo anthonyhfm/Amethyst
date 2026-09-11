@@ -10,7 +10,11 @@ import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
 import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
 import dev.anthonyhfm.amethyst.devices.DeviceRegistry
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMappingMode
 import kotlin.math.abs
@@ -199,6 +203,69 @@ class LiveAutomationTest {
         block.configure(1, 2)
         chain.processAudio(block, AudioRenderContext(1_000, 2))
         assertFalse(device.isAutomationRunning)
+    }
+
+    @Test
+    fun macroControlAutomationUsesAudioFramesAndLatchesItsEndValue() {
+        val previousMacros = WorkspaceRepository.macros.value
+        val macro = Macro(value = 23, id = "macro-live", name = "Live")
+        try {
+            WorkspaceRepository.setMacros(listOf(macro), undoable = false)
+            val device = MacroControlChainDevice().apply {
+                state.value = MacroControlChainDeviceState(macroId = macro.id, value = 12)
+                setDialAutomation(
+                    "value",
+                    LiveAutomation(
+                        parameterId = "value",
+                        settings = LiveAutomationSettings(
+                            durationValue = 100f,
+                            timingUnit = LiveAutomationTimingUnit.Milliseconds,
+                            retriggerMode = LiveAutomationRetriggerMode.Restart,
+                        ),
+                    ),
+                )
+            }
+            val chain = AudioChain().apply {
+                add(device, fromUser = false)
+                prepareAudio(AudioConfiguration(1_000, 2, 64))
+            }
+            val target = LiveAutomationTarget.Macro(macro.id)
+
+            device.signalEnter(listOf(Signal.Midi("pad", 1, 1, 127)))
+
+            assertEquals(0f, checkNotNull(chain.automationValue(target, 0)), 0.0001f)
+            assertEquals(0.5f, checkNotNull(chain.automationValue(target, 50)), 0.0001f)
+            assertEquals(1f, checkNotNull(chain.automationValue(target, 100)), 0.0001f)
+            assertEquals(1f, checkNotNull(chain.automationValue(target, 200)), 0.0001f)
+            assertEquals(23, WorkspaceRepository.macros.value.single().value)
+
+            device.clearAutomationOverride()
+            assertEquals(null, chain.automationValue(target, 200))
+        } finally {
+            WorkspaceRepository.setMacros(previousMacros, undoable = false)
+        }
+    }
+
+    @Test
+    fun editingMacroClearsLatchedSourceBeforeAudioPreparation() {
+        val previousMacros = WorkspaceRepository.macros.value
+        val macro = Macro(value = 23, id = "macro-unprepared", name = "Unprepared")
+        try {
+            WorkspaceRepository.setMacros(listOf(macro), undoable = false)
+            val device = MacroControlChainDevice().apply {
+                state.value = MacroControlChainDeviceState(macroId = macro.id, value = 12)
+            }
+            val chain = AudioChain().apply { add(device, fromUser = false) }
+            val target = LiveAutomationTarget.Macro(macro.id)
+
+            device.signalEnter(listOf(Signal.Midi("pad", 1, 1, 127)))
+            assertTrue(device.isAutomationRunning)
+
+            chain.clearAutomation(target)
+            assertFalse(device.isAutomationRunning)
+        } finally {
+            WorkspaceRepository.setMacros(previousMacros, undoable = false)
+        }
     }
 
     @Test

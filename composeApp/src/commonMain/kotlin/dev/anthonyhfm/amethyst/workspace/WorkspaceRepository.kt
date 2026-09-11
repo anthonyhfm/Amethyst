@@ -44,6 +44,7 @@ import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.core.data.settings.RecentColorRGB
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
@@ -392,6 +393,7 @@ object WorkspaceRepository {
         }
 
         val before = _macros.value
+        samplingChain.clearAutomation(LiveAutomationTarget.Macro(before[index].id))
         val after = before.toMutableList().apply {
             this[index] = macro
         }
@@ -414,6 +416,12 @@ object WorkspaceRepository {
      */
     fun setMacros(macros: List<Macro>, fromRemote: Boolean = false, undoable: Boolean = true) {
         val before = _macros.value
+        before.forEach { previous ->
+            val replacement = macros.firstOrNull { it.id == previous.id }
+            if (replacement == null || replacement.value != previous.value) {
+                samplingChain.clearAutomation(LiveAutomationTarget.Macro(previous.id))
+            }
+        }
         if (undoable && !fromRemote && before != macros) {
             UndoManager.addAction(
                 UndoableAction.WorkspaceMacrosChange(
@@ -475,7 +483,11 @@ object WorkspaceRepository {
         fromRemote: Boolean = false,
         undoable: Boolean = true,
     ) {
-        val orderedMappings = mappings.sortedBy(ParameterMapping::id)
+        // One macro can control a parameter only once. Sorting first makes cleanup of
+        // malformed/imported duplicate data deterministic across connected clients.
+        val orderedMappings = mappings
+            .sortedBy(ParameterMapping::id)
+            .distinctBy { it.macroId to it.target }
         val before = _parameterMappings.value
         if (before == orderedMappings) {
             if (fromRemote) isApplyingRemoteParameterMappingsUpdate = false

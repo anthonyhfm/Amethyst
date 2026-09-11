@@ -2,16 +2,20 @@ package dev.anthonyhfm.amethyst.core.engine.audio.graph
 
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
+import dev.anthonyhfm.amethyst.devices.AudioChainDeviceRole
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
 import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.SidechainAudioProvider
 import kotlinx.atomicfu.atomic
 
 /** Immutable, allocation-free audio graph compiled from an editable [Chain]. */
 class AudioExecutionPlan private constructor(
     private val root: SerialAudioNode,
+    private val sources: Array<RenderedAudioSource>,
+    private val sidechainAudioProvider: SidechainAudioProvider,
     val devices: Array<AudioChainDevice<*>>,
     val latencyFrames: Int,
     val tailFrames: Long,
@@ -19,6 +23,12 @@ class AudioExecutionPlan private constructor(
     val metrics: AudioRenderMetrics,
 ) {
     fun process(block: AudioProcessingBlock, context: AudioRenderContext) {
+        var sourceIndex = 0
+        while (sourceIndex < sources.size) {
+            sources[sourceIndex].render(block.frameCount, block.frameOffset, context)
+            sourceIndex++
+        }
+        context.sidechainAudioProvider = sidechainAudioProvider
         root.process(block, context)
     }
 
@@ -40,6 +50,8 @@ class AudioExecutionPlan private constructor(
             val root = compiler.compileSerial(chain.devices.value)
             return AudioExecutionPlan(
                 root = root,
+                sources = compiler.sources.toTypedArray(),
+                sidechainAudioProvider = compiler.sidechainAudioProvider(),
                 devices = compiler.devices.toTypedArray(),
                 latencyFrames = root.latencyFrames,
                 tailFrames = root.tailFrames,
@@ -80,11 +92,37 @@ private class DeviceAudioNode(
     private val device: AudioChainDevice<*>,
     private val enabled: Boolean,
     private val metrics: AudioRenderMetrics,
+    private val renderedSource: RenderedAudioSource? = null,
 ) : AudioPlanNode {
     override val latencyFrames: Int = device.latencyFrames
     override val tailFrames: Long = device.tailFrames
 
     override fun process(block: AudioProcessingBlock, context: AudioRenderContext) {
+        if (renderedSource != null) {
+            if (enabled) sumInto(renderedSource.block, block)
+        } else if (enabled) {
+            device.processAudio(block, context)
+            sanitizeFinite(block, metrics)
+        }
+    }
+}
+
+/** A generator is advanced once per callback, then reused by audio and detector paths. */
+private class RenderedAudioSource(
+    val device: AudioChainDevice<*>,
+    private val enabled: Boolean,
+    configuration: AudioConfiguration,
+    private val metrics: AudioRenderMetrics,
+) {
+    val block = AudioProcessingBlock(
+        samples = FloatArray(configuration.maximumBlockFrames * configuration.channels),
+        channels = configuration.channels,
+        maximumFrames = configuration.maximumBlockFrames,
+    )
+
+    fun render(frameCount: Int, frameOffset: Long, context: AudioRenderContext) {
+        block.configure(frameCount, frameOffset)
+        block.clear()
         if (enabled) {
             device.processAudio(block, context)
             sanitizeFinite(block, metrics)
@@ -121,7 +159,13 @@ private class AudioGraphCompiler(
     private val metrics: AudioRenderMetrics,
 ) {
     val devices = mutableListOf<AudioChainDevice<*>>()
+    val sources = mutableListOf<RenderedAudioSource>()
     val diagnostics = mutableListOf<AudioGraphDiagnostic>()
+
+    fun sidechainAudioProvider(): SidechainAudioProvider {
+        val sourceBlocks = sources.associate { it.device.selectionUUID to it.block }
+        return SidechainAudioProvider(sourceBlocks::get)
+    }
 
     fun compileSerial(editableDevices: List<GenericChainDevice<*>>): SerialAudioNode {
         val nodes = mutableListOf<AudioPlanNode>()
@@ -131,7 +175,20 @@ private class AudioGraphCompiler(
                     if (devices.none { it === device }) {
                         devices += device
                     }
-                    nodes += DeviceAudioNode(device, enabled = !device.isMuted, metrics = metrics)
+                    val renderedSource = if (device.audioRole == AudioChainDeviceRole.Generator) {
+                        sources.firstOrNull { it.device === device } ?: RenderedAudioSource(
+                            device = device,
+                            enabled = !device.isMuted,
+                            configuration = configuration,
+                            metrics = metrics,
+                        ).also(sources::add)
+                    } else null
+                    nodes += DeviceAudioNode(
+                        device,
+                        enabled = !device.isMuted,
+                        metrics = metrics,
+                        renderedSource = renderedSource,
+                    )
                 }
 
                 is NestedChainDevice -> {

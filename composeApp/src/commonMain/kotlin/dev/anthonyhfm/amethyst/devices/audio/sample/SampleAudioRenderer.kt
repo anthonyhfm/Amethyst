@@ -607,7 +607,10 @@ internal class SampleVoiceRenderer {
     }
 }
 
-internal class SampleVoicePool(maximumVoices: Int = DEFAULT_MAXIMUM_VOICES) {
+internal class SampleVoicePool(
+    maximumVoices: Int = DEFAULT_MAXIMUM_VOICES,
+    private val monophonic: Boolean = false,
+) {
     private val voices = Array(maximumVoices) { SampleVoiceRenderer() }
     private val publishedActiveVoices = atomic(0)
     private val steals = atomic(0L)
@@ -644,6 +647,22 @@ internal class SampleVoicePool(maximumVoices: Int = DEFAULT_MAXIMUM_VOICES) {
     }
 
     private fun start(command: SampleVoiceCommand.Start) {
+        if (monophonic) {
+            val activeIndex = latestVoiceIndex
+                .takeIf { voices.getOrNull(it)?.isActive == true }
+                ?: voices.indexOfFirst(SampleVoiceRenderer::isActive)
+                    .takeIf { it >= 0 }
+            val targetIndex = activeIndex ?: 0
+            voices.forEachIndexed { index, voice ->
+                if (index != targetIndex && voice.isActive) voice.stopImmediately()
+            }
+            triggerSequence++
+            voices[targetIndex].trigger(command.snapshot, command.key, triggerSequence)
+            latestVoiceIndex = targetIndex
+            publishActiveCount()
+            return
+        }
+
         var targetIndex = -1
         var oldestIndex = 0
         var oldestSequence = Long.MAX_VALUE

@@ -52,6 +52,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.TabsList
 import dev.anthonyhfm.amethyst.ui.components.primitives.TabsTrigger
 import dev.anthonyhfm.amethyst.ui.theme.chart2
 import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.atomicfu.atomic
@@ -71,6 +72,7 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
     override val capabilities = setOf(DeviceCapability.Modulation)
     override val target: LiveAutomationTarget get() = state.value.target
     override val isAutomationRunning: Boolean get() = runtime.isRunning
+    override val activationSequence: Long get() = activeSequence.value
 
     private val runtime = LiveAutomationRuntime(state.value.automation)
     private val configuration = atomic(AudioConfiguration(44_100, 2, 128))
@@ -80,6 +82,8 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
     private val pendingStopFrame = atomic(-1L)
     private val pendingTriggerKey = atomic<PadTriggerKey?>(null)
     private val activeTriggerKey = atomic<PadTriggerKey?>(null)
+    private val activeSequence = atomic(0L)
+    private val editorMode = AutomationWorkspaceMode(this)
 
     val currentNormalizedValue: Float?
         get() = if (isAutomationRunning) {
@@ -105,6 +109,7 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
             pendingBpm.value = WorkspaceRepository.bpm.value.toFloat()
             pendingTriggerKey.value = event.key
             pendingFrame.value = event.targetFrame
+            activeSequence.value = audioTriggerRuntime?.nextAutomationSequence() ?: 0L
         }
         if (state.value.automation.settings.stopOnPadUp) {
             n.filterIsInstance<Signal.Midi>().firstOrNull { it.velocity == 0 }?.let { signal ->
@@ -155,10 +160,77 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
         activeTriggerKey.value = null
     }
 
+    override fun clearAutomationOverride() {
+        resetAudio()
+    }
+
     @Composable
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        val macros by WorkspaceRepository.macros.collectAsState()
+        WorkspaceRepository.samplingChain.devices.value
+        val targetLabel = when (val target = deviceState.target) {
+            is LiveAutomationTarget.Macro -> macros.firstOrNull { it.id == target.macroId }
+                ?.name?.ifBlank { "Macro" } ?: "Missing macro"
+            is LiveAutomationTarget.Parameter -> WorkspaceRepository.samplingChain.devicesDepthFirst()
+                .firstOrNull { it.selectionUUID == target.address.deviceId }
+                ?.let { device ->
+                    val parameter = (device as? ParameterOwner)?.parameterDescriptors
+                        ?.firstOrNull { it.id == target.address.parameterId }
+                    "${device.title} / ${parameter?.label ?: target.address.parameterId}"
+                } ?: "Missing parameter"
+        }
+
+        ChainDeviceShell(
+            title = "Live Automation",
+            isSelected = selections.any { it.selectionUUID == selectionUUID },
+            isDragging = isDragging.value,
+            modifier = Modifier.width(260.dp),
+            titleBarModifier = LocalTitleBarModifier.current,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    targetLabel,
+                    maxLines = 1,
+                    color = Theme[colors][mutedForeground],
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    EndpointDial("From", deviceState.automation.startValue) { value ->
+                        updateStateWithHistory { it.copy(automation = it.automation.withEndpoints(value, it.automation.endValue)) }
+                    }
+                    EndpointDial("To", deviceState.automation.endValue) { value ->
+                        updateStateWithHistory { it.copy(automation = it.automation.withEndpoints(it.automation.startValue, value)) }
+                    }
+                    FlatDial(
+                        type = DialType.Continuous,
+                        title = "Duration",
+                        text = durationText(deviceState.automation),
+                        value = (deviceState.automation.settings.durationValue / 16f).coerceIn(0f, 1f),
+                        onValueChange = { normalized ->
+                            updateStateWithHistory {
+                                it.copy(automation = it.automation.copy(settings = it.automation.settings.copy(
+                                    durationValue = (normalized * 16f).coerceAtLeast(0.01f),
+                                )))
+                            }
+                        },
+                    )
+                }
+                AutomationCurvePreview(deviceState.automation, Modifier.fillMaxWidth().height(42.dp))
+                Button(
+                    onClick = { WorkspaceRepository.switchMode(editorMode) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Edit automation") }
+            }
+        }
+    }
+
+    @Composable
+    internal fun EditorContent(modifier: Modifier = Modifier) {
+        val deviceState by state.collectAsState()
         val macros by WorkspaceRepository.macros.collectAsState()
         // Reading the Compose state keeps target options current when devices are added/removed.
         WorkspaceRepository.samplingChain.devices.value
@@ -183,17 +255,10 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
         var curveEditorMode by remember { mutableStateOf("Simple") }
         var showAdvancedEditor by remember { mutableStateOf(false) }
 
-        ChainDeviceShell(
-            title = "Live Automation",
-            isSelected = selections.any { it.selectionUUID == selectionUUID },
-            isDragging = isDragging.value,
-            modifier = Modifier.width(360.dp),
-            titleBarModifier = LocalTitleBarModifier.current,
+        Column(
+            modifier = modifier.width(420.dp).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
                 val isMacro = deviceState.target is LiveAutomationTarget.Macro
                 LabeledSelect("Target type", if (isMacro) "Macro" else "Parameter", listOf("Macro", "Parameter")) { value ->
                     updateStateWithHistory {
@@ -306,19 +371,12 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
                     updateStateWithHistory { it.copy(automation = it.automation.copy(settings = it.automation.settings.copy(stopOnPadUp = value == "Stop automation"))) }
                 }
 
-                Canvas(Modifier.fillMaxWidth().height(92.dp)) {
-                    val path = Path()
-                    repeat(49) { index ->
-                        val progress = index / 48f
-                        val normalized = (deviceState.automation.valueAt(progress, 0f) + 1f) * 0.5f
-                        val point = Offset(progress * size.width, (1f - normalized) * size.height)
-                        if (index == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
-                    }
-                    drawPath(path, curveColor, style = Stroke(width = 2.dp.toPx()))
-                }
-                Text(if (isAutomationRunning) "AUTO · running" else "AUTO · ready")
+                AutomationCurvePreview(deviceState.automation, Modifier.fillMaxWidth().height(140.dp), curveColor)
+                Text(
+                    if (isAutomationRunning) "AUTO · running" else "AUTO · ready",
+                    color = Theme[colors][mutedForeground],
+                )
             }
-        }
     }
 
     companion object : ChainDeviceFactory<AutomationChainDeviceState> {
@@ -336,9 +394,30 @@ data class AutomationChainDeviceState(
 ) : DeviceState()
 
 @Composable
+private fun AutomationCurvePreview(
+    automation: LiveAutomation,
+    modifier: Modifier,
+    color: androidx.compose.ui.graphics.Color = Theme[colors][chart2],
+) {
+    Canvas(modifier) {
+        val path = Path()
+        repeat(49) { index ->
+            val progress = index / 48f
+            val normalized = (automation.valueAt(progress, 0f) + 1f) * 0.5f
+            val point = Offset(progress * size.width, (1f - normalized) * size.height)
+            if (index == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
+        }
+        drawPath(path, color, style = Stroke(width = 2.dp.toPx()))
+    }
+}
+
+@Composable
 private fun LabeledSelect(label: String, value: String, options: List<String>, onValueChange: (String) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label)
+        Text(
+            label,
+            color = Theme[colors][mutedForeground],
+        )
         Select(value = value, options = options, triggerHeight = 32.dp, onValueChange = onValueChange)
     }
 }

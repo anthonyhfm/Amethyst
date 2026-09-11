@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -19,10 +20,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.width
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.ui.components.TimelineRuler
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun TimelineView(
@@ -35,6 +40,17 @@ fun TimelineView(
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
     val openChainEffectClipId by viewModel.openChainEffectClipId.collectAsState()
+    val timelineSourceIds = tracks
+        .filterIsInstance<AudioTimelineTrack>()
+        .flatMap { track -> track.entries.values.map { it.sourceId } }
+        .filter(String::isNotBlank)
+        .distinct()
+
+    LaunchedEffect(timelineSourceIds) {
+        withContext(Dispatchers.Default) {
+            Echo.prepareSources(timelineSourceIds)
+        }
+    }
 
     Column(
         modifier = Modifier

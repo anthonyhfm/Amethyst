@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
         Echo.setPreferredBufferFrames(AudioSettings.renderBufferFrames.value)
         ProcessLifecycleOwner.get().lifecycle.addObserver(AndroidAudioLifecycleObserver)
 
-        handleFileIntent(intent)
+        handleIntent(intent)
 
         setContent {
             val darkMode = true
@@ -98,24 +98,33 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleFileIntent(intent)
+        handleIntent(intent)
     }
 
-    private fun handleFileIntent(intent: Intent?) {
+    private fun handleIntent(intent: Intent?) {
         val uri = intent?.data ?: return
         val action = intent.action
-        if (action == Intent.ACTION_VIEW || action == Intent.ACTION_EDIT) {
-            lifecycleScope.launch(Dispatchers.IO) {
-                runCatching {
-                    val inputStream = contentResolver.openInputStream(uri) ?: return@runCatching
-                    val bytes = inputStream.use { it.readBytes() }
-                    val filename = resolveFileName(uri) ?: "imported_project.ame"
-                    val persistentFile = MobileFileStorage.copyBytesToPersistentStorage(bytes, filename)
-                    val workspace = HomeRepository.loadWorkspaceData(persistentFile)
-                    HomeRepository.openWorkspace(workspace, rememberRecent = true)
-                }
+        if (action != Intent.ACTION_VIEW && action != Intent.ACTION_EDIT) return
+
+        if (uri.scheme.equals(DEEP_LINK_SCHEME, ignoreCase = true)) {
+            handleDeepLink(uri)
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                val inputStream = contentResolver.openInputStream(uri) ?: return@runCatching
+                val bytes = inputStream.use { it.readBytes() }
+                val filename = resolveFileName(uri) ?: "imported_project.ame"
+                val persistentFile = MobileFileStorage.copyBytesToPersistentStorage(bytes, filename)
+                val workspace = HomeRepository.loadWorkspaceData(persistentFile)
+                HomeRepository.openWorkspace(workspace, rememberRecent = true)
             }
         }
+    }
+
+    private fun handleDeepLink(uri: Uri) {
+        println("Received amethyst deep link: $uri")
     }
 
     private fun resolveFileName(uri: Uri): String? {
@@ -143,6 +152,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val BLUETOOTH_MIDI_PERMISSION_REQUEST = 4101
+        const val DEEP_LINK_SCHEME = "amethyst"
     }
 }
 

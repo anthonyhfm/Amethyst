@@ -188,8 +188,17 @@ struct ContentView: View {
             }
         }
         .onOpenURL { url in
-            viewModel.openFile(url: url)
+            handleIncomingURL(url)
         }
+    }
+
+    private func handleIncomingURL(_ url: URL) {
+        if url.scheme?.caseInsensitiveCompare("amethyst") == .orderedSame {
+            print("Received amethyst deep link: \(url.absoluteString)")
+            return
+        }
+
+        viewModel.openFile(url: url)
     }
 
     // MARK: - Home tab bar

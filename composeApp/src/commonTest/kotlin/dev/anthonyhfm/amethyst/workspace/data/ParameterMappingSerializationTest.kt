@@ -56,4 +56,24 @@ class ParameterMappingSerializationTest {
             UndoManager.clear()
         }
     }
+
+    @Test
+    fun duplicateMacroTargetBindingsAreCollapsedDeterministically() {
+        val target = ParameterAddress("device-a", "gain")
+        val duplicateB = ParameterMapping(id = "mapping-b", macroId = "macro-a", target = target)
+        val duplicateA = ParameterMapping(id = "mapping-a", macroId = "macro-a", target = target)
+
+        WorkspaceRepository.setParameterMappings(emptyList(), fromRemote = true, undoable = false)
+        try {
+            WorkspaceRepository.setParameterMappings(
+                listOf(duplicateB, duplicateA),
+                fromRemote = true,
+                undoable = false,
+            )
+
+            assertEquals(listOf(duplicateA), WorkspaceRepository.parameterMappings.value)
+        } finally {
+            WorkspaceRepository.setParameterMappings(emptyList(), fromRemote = true, undoable = false)
+        }
+    }
 }

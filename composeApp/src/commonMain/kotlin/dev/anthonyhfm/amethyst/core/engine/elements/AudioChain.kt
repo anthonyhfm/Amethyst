@@ -8,15 +8,17 @@ import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntimeAwar
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.ChokeSourceRegistration
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.ChokeVoiceSource
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.LiveAutomationSource
-import dev.anthonyhfm.amethyst.core.engine.audio.trigger.SidechainTriggerRegistration
-import dev.anthonyhfm.amethyst.core.engine.audio.trigger.SidechainTriggerSink
+import dev.anthonyhfm.amethyst.devices.AudioChainDevice
+import dev.anthonyhfm.amethyst.devices.AudioChainDeviceRole
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
 import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
-import dev.anthonyhfm.amethyst.devices.audio.effects.DuckerChainDevice
+import dev.anthonyhfm.amethyst.devices.SidechainAudioConsumer
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
+import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
+import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import kotlinx.atomicfu.atomic
 import kotlin.time.TimeSource
 
@@ -46,7 +48,6 @@ class AudioChain : Chain() {
                     voiceDrops += device.voiceStealCount
                     commandDrops += device.commandQueueDropCount
                 }
-                is DuckerChainDevice -> commandDrops += device.droppedTriggerCount
             }
         }
         return AudioDiagnosticsSnapshot(
@@ -94,9 +95,27 @@ class AudioChain : Chain() {
 
     fun resetAudio() {
         executionPlan.value?.reset()
+        triggerRuntime.clearAutomationOverrides()
+    }
+
+    fun automationValue(
+        target: LiveAutomationTarget,
+        frame: Long = triggerRuntime.currentFrame,
+    ): Float? = triggerRuntime.automationValue(target, frame)
+
+    fun clearAutomation(target: LiveAutomationTarget) {
+        triggerRuntime.clearAutomationTarget(target)
+        // The UI can edit a macro before audio preparation has registered the
+        // current topology with the runtime. Clear those sources directly too,
+        // otherwise a stale latched value can keep masking the edited macro.
+        devicesDepthFirst()
+            .filterIsInstance<LiveAutomationSource>()
+            .filter { it.target == target }
+            .forEach(LiveAutomationSource::clearAutomationOverride)
     }
 
     fun releaseAudio() {
+        triggerRuntime.clearAutomationOverrides()
         executionPlan.value?.release()
         retiredPlans.flatMap { it.devices.asList() }
             .distinctBy { it }
@@ -113,7 +132,8 @@ class AudioChain : Chain() {
         val configuration = preparedConfiguration.value ?: return
         val previous = executionPlan.value
         val next = AudioExecutionPlan.compile(this, configuration, renderMetrics)
-        next.devices.filterIsInstance<AudioTriggerRuntimeAware>().forEach {
+        val runtimeDevices = devicesDepthFirst()
+        runtimeDevices.filterIsInstance<AudioTriggerRuntimeAware>().forEach {
             it.audioTriggerRuntime = triggerRuntime
         }
         triggerRuntime.replaceSources(
@@ -123,19 +143,17 @@ class AudioChain : Chain() {
             }.toTypedArray(),
         )
         triggerRuntime.replaceAutomationSources(
-            next.devices.filterIsInstance<LiveAutomationSource>().toTypedArray(),
+            runtimeDevices.filterIsInstance<LiveAutomationSource>().toTypedArray(),
         )
-        triggerRuntime.replaceSidechainSinks(
-            next.devices.mapIndexedNotNull { index, device ->
-                val sink = device as? SidechainTriggerSink ?: return@mapIndexedNotNull null
-                val allowed = next.devices.asSequence().take(index)
-                    .filterIsInstance<ChokeVoiceSource>()
-                    .map(ChokeVoiceSource::persistentSourceId)
-                    .filter { it == sink.sidechainSourceId }
-                    .toSet()
-                SidechainTriggerRegistration(sink, allowed)
-            }.toTypedArray(),
-        )
+        val allSourceIds = next.devices.asSequence()
+            .filter { it.audioRole == AudioChainDeviceRole.Generator }
+            .map { it.selectionUUID }
+            .toSet()
+        next.devices.filterIsInstance<SidechainAudioConsumer>().forEach { consumer ->
+            consumer.replaceEligibleSidechainSources(
+                allSourceIds - programSourceIdsBefore(consumer as GenericChainDevice<*>),
+            )
+        }
         next.devices.forEach { device ->
             if (previous?.devices?.none { it === device } != false) {
                 device.prepareAudio(configuration)
@@ -143,6 +161,33 @@ class AudioChain : Chain() {
         }
         executionPlan.getAndSet(next)?.let(retiredPlans::add)
         reclaimRetiredPlans(next)
+    }
+
+    /** Sources already mixed into [target]'s input cannot be external sidechains. */
+    private fun programSourceIdsBefore(target: GenericChainDevice<*>): Set<String> {
+        data class SearchResult(val found: Boolean, val outputSources: Set<String>)
+
+        fun search(chain: Chain): SearchResult {
+            val upstream = linkedSetOf<String>()
+            chain.devices.value.forEach { device ->
+                if (device === target) return SearchResult(true, upstream)
+                if (device is AudioChainDevice<*> && device.audioRole == AudioChainDeviceRole.Generator) {
+                    upstream += device.selectionUUID
+                }
+                if (device is NestedChainDevice) {
+                    val nestedOutputs = linkedSetOf<String>()
+                    device.audioNestedChains().forEach { nested ->
+                        val result = search(nested)
+                        if (result.found) return result
+                        nestedOutputs += result.outputSources
+                    }
+                    upstream += nestedOutputs
+                }
+            }
+            return SearchResult(false, upstream)
+        }
+
+        return search(this).takeIf(SearchResult::found)?.outputSources.orEmpty()
     }
 
     private fun reclaimRetiredPlans(current: AudioExecutionPlan) {

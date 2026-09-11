@@ -9,11 +9,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.composeunstyled.Text
-import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
@@ -29,13 +26,8 @@ import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
-import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
-import dev.anthonyhfm.amethyst.ui.theme.small
-import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
@@ -139,20 +131,14 @@ class ReverbChainDevice : AudioChainDevice<ReverbChainDeviceState>(), ParameterO
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
-        val tail by produceState(initialValue = isTailActive) {
-            while (true) {
-                value = isTailActive
-                delay(50)
-            }
-        }
         ChainDeviceShell(
             title = "Reverb",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
             isDragging = isDragging.value,
-            modifier = Modifier.width(470.dp),
+            modifier = Modifier.width(250.dp),
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     EffectDial("preDelay", "Pre-delay", deviceState.preDelayMs / MAX_PRE_DELAY_MS, "${deviceState.preDelayMs.roundToInt()} ms") {
                         state.update { s -> s.copy(preDelayMs = it * MAX_PRE_DELAY_MS) }
@@ -163,6 +149,8 @@ class ReverbChainDevice : AudioChainDevice<ReverbChainDeviceState>(), ParameterO
                     EffectDial("decay", "Decay", deviceState.decay, "${formatDecay(deviceState.decay)} s") {
                         state.update { s -> s.copy(decay = it) }
                     }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     EffectDial("damping", "Damping", deviceState.damping, "${(deviceState.damping * 100).roundToInt()}%") {
                         state.update { s -> s.copy(damping = it) }
                     }
@@ -170,11 +158,6 @@ class ReverbChainDevice : AudioChainDevice<ReverbChainDeviceState>(), ParameterO
                         state.update { s -> s.copy(dryWet = it) }
                     }
                 }
-                Text(
-                    if (tail) "Tail active" else "Tail idle",
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                )
             }
         }
     }

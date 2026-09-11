@@ -58,11 +58,13 @@ class AudioExecutionPlanTest {
         }
         assertEquals(1, source.prepareCount)
         assertTrue(render(chain).all { it == 1f })
+        assertEquals(1, source.processCount)
 
         chain.add(GainDevice(0.25f), fromUser = false)
 
         assertEquals(1, source.prepareCount)
         assertTrue(render(chain).all { it == 0.25f })
+        assertEquals(2, source.processCount)
     }
 
     @Test
@@ -109,12 +111,14 @@ private class ConstantDevice(
     override val state = MutableStateFlow(TestAudioState())
     override val audioRole = AudioChainDeviceRole.Generator
     var prepareCount = 0
+    var processCount = 0
 
     override fun prepareAudio(configuration: AudioConfiguration) {
         prepareCount++
     }
 
     override fun processAudio(block: AudioProcessingBlock, context: AudioRenderContext) {
+        processCount++
         var index = 0
         while (index < block.frameCount * block.channels) {
             block.samples[index] += value

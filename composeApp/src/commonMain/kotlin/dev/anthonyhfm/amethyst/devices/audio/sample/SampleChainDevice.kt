@@ -140,7 +140,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         get() = if (state.value.warpMode == SampleWarpMode.Warp) WARP_LATENCY_FRAMES else 0
 
     private val triggerQueue = SampleTriggerQueue()
-    private val voicePool = SampleVoicePool()
+    private val voicePool = SampleVoicePool(monophonic = true)
     private val publishedPlayheadFrame = atomic(-1L)
     private val audioConfiguration = atomic<AudioConfiguration?>(null)
     private val renderCache = atomic<SampleRenderCache?>(null)
@@ -225,7 +225,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
             isSelected = isSelected,
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(if (deviceState.isLoaded) 480.dp else 220.dp)
+                .width(if (deviceState.isLoaded) 540.dp else 220.dp)
                 .then(
                     if (audioLibraryDragState != null) {
                         Modifier.dropTarget(
@@ -265,7 +265,6 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     @Composable
     private fun AudioView() {
         val deviceState by state.collectAsState()
-        var showDetails by remember { mutableStateOf(false) }
         val resolvedRawData = deviceState.resolvedRawData()
         val livePlayheadFrame by produceState(initialValue = playheadFrame) {
             while (true) {
@@ -279,9 +278,12 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         } else {
             0
         }
-        val playheadPosition = livePlayheadFrame
-            .takeIf { it >= 0L && totalFrames > 0 }
-            ?.let { it.toFloat() / totalFrames.toFloat() }
+        val playheadPosition = samplePlayheadProgress(
+            renderedFrame = livePlayheadFrame,
+            renderedSampleRate = audioConfiguration.value?.sampleRate ?: deviceState.sampleRate,
+            sourceFrameCount = totalFrames.toLong(),
+            sourceSampleRate = deviceState.sampleRate,
+        )
         val activeDurationMs = (deviceState.totalDurationMs * (deviceState.endPosition - deviceState.startPosition)).coerceAtLeast(1f)
 
         var beforeState by remember { mutableStateOf(deviceState) }
@@ -297,7 +299,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                     .padding(4.dp)
                     .fillMaxWidth()
                     .weight(1f)
-                    .heightIn(min = 180.dp)
+                    .heightIn(min = 72.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(Theme[colors][secondary])
                     .border(1.dp, Theme[colors][border], RoundedCornerShape(6.dp))
@@ -424,10 +426,6 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                 volumeMinDb = VOLUME_MIN_DB,
                 volumeRangeDb = VOLUME_RANGE_DB,
                 volumeMaxDb = VOLUME_MAX_DB,
-                activeVoiceCount = activeVoiceCount,
-                droppedVoiceCount = droppedTriggerCount,
-                showDetails = showDetails,
-                onToggleDetails = { showDetails = !showDetails },
                 onPushStateChange = { before, after ->
                     pushStateChange(before = before, after = after)
                 }
@@ -644,7 +642,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         }
     }
 
-    private fun formatDuration(durationMs: Long): String {
+private fun formatDuration(durationMs: Long): String {
         val totalSeconds = durationMs / 1000L
         val remainderMs = durationMs % 1000L
         return if (durationMs < 10_000L) {
@@ -928,6 +926,29 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
             }
         }
     }
+}
+
+/**
+ * Converts the renderer's playhead into progress through the original asset.
+ * The render source may have been resampled to the output device's sample rate,
+ * while the waveform still represents frames at [sourceSampleRate].
+ */
+internal fun samplePlayheadProgress(
+    renderedFrame: Long,
+    renderedSampleRate: Int,
+    sourceFrameCount: Long,
+    sourceSampleRate: Int,
+): Float? {
+    if (
+        renderedFrame < 0L || renderedSampleRate <= 0 ||
+        sourceFrameCount <= 0L || sourceSampleRate <= 0
+    ) return null
+
+    val renderedFrameCount = sourceFrameCount.toDouble() *
+        renderedSampleRate.toDouble() / sourceSampleRate.toDouble()
+    return (renderedFrame.toDouble() / renderedFrameCount)
+        .toFloat()
+        .coerceIn(0f, 1f)
 }
 
 @Serializable

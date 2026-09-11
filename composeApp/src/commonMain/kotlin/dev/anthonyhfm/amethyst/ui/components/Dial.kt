@@ -92,7 +92,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import kotlin.math.roundToInt
 
-internal val DialSurfaceSize = 52.dp
+internal val DialSurfaceSize = 48.dp
 internal val DialReadoutWidth = 56.dp
 private val DialReadoutHeight = 20.dp
 private val DialOuterPadding = 6.dp
@@ -125,6 +125,7 @@ fun <T> Dial(
     automationParameter: AutomationParameter? = null,
     isAutomated: Boolean = false,
     hasAutomation: Boolean = false,
+    statusIndicatorColor: Color = Color.Unspecified,
     isAutomatable: Boolean = true,
 ) {
     val chainDevice = LocalChainDevice.current
@@ -185,6 +186,7 @@ fun <T> Dial(
             modifier = modifier,
             enabled = enabled,
             isAutomated = hasAutomation,
+            statusIndicatorColor = statusIndicatorColor,
         )
 
         DialType.Knob -> ContinuousDial(
@@ -202,6 +204,7 @@ fun <T> Dial(
             modifier = modifier,
             enabled = enabled,
             isAutomated = hasAutomation,
+            statusIndicatorColor = statusIndicatorColor,
         )
 
         is DialType.Steps<*> -> SteppedDial(
@@ -219,6 +222,7 @@ fun <T> Dial(
             modifier = modifier,
             enabled = enabled,
             isAutomated = hasAutomation,
+            statusIndicatorColor = statusIndicatorColor,
         )
     }
 }
@@ -239,6 +243,7 @@ private fun ContinuousDial(
     modifier: Modifier,
     enabled: Boolean,
     isAutomated: Boolean = false,
+    statusIndicatorColor: Color = Color.Unspecified,
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
@@ -267,6 +272,7 @@ private fun ContinuousDial(
             enabled = enabled,
             knob = knob,
             isAutomated = isAutomated,
+            statusIndicatorColor = statusIndicatorColor,
             onDoubleClick = {
                 isDragging = false
                 dragValue = defaultValue.coerceIn(0f, 1f)
@@ -303,6 +309,7 @@ private fun <T> SteppedDial(
     onFinishValueChange: (T) -> Unit, defaultValue: T?, title: String?, text: String?,
     onResolveTextValue: ((String) -> Unit)?, containerColor: Color, dialColor: Color,
     modifier: Modifier, enabled: Boolean, isAutomated: Boolean = false,
+    statusIndicatorColor: Color = Color.Unspecified,
 ) {
     var isDragging by remember { mutableStateOf(false) }
     val currentIndex = values.indexOf(value).coerceAtLeast(0)
@@ -335,6 +342,7 @@ private fun <T> SteppedDial(
             },
             containerColor = containerColor, dialColor = dialColor, modifier = dialModifier, enabled = enabled,
             isAutomated = isAutomated,
+            statusIndicatorColor = statusIndicatorColor,
             onDoubleClick = {
                 val target = defaultValue ?: values.first()
                 val targetIndex = values.indexOf(target).coerceAtLeast(0)
@@ -381,6 +389,7 @@ internal fun DialSurface(
     enabled: Boolean = true,
     knob: Boolean = false,
     isAutomated: Boolean = false,
+    statusIndicatorColor: Color = Color.Unspecified,
     onDoubleClick: () -> Unit = { },
     onIncrement: (() -> Unit)? = null,
     onDecrement: (() -> Unit)? = null,
@@ -405,6 +414,11 @@ internal fun DialSurface(
     val centerColor = Theme[colors][background]
     val outlineColor = Theme[colors][input]
     val indicatorColor = Theme[colors][foreground].copy(alpha = 0.9f)
+    val resolvedStatusIndicatorColor = if (statusIndicatorColor == Color.Unspecified) {
+        Color(0xFFFF3B30)
+    } else {
+        statusIndicatorColor
+    }
     val innerOutlineColor = Theme[colors][foreground].copy(alpha = 0.06f)
 
     val borderColor = if (isFocused) Color.Transparent else outlineColor
@@ -585,7 +599,7 @@ internal fun DialSurface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .size(8.dp)
-                    .background(Color(0xFFFF3B30), CircleShape)
+                    .background(resolvedStatusIndicatorColor, CircleShape)
                     .border(1.dp, centerColor, CircleShape)
             )
         }

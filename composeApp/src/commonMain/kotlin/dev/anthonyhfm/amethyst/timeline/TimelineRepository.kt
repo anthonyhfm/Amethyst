@@ -635,10 +635,16 @@ object TimelineRepository {
 
     fun play() {
         if (_isPlaying.value) return
+        rebuildSortedEntries()
+        Echo.prepareSources(
+            sortedAudioEntries
+                .map { it.entry.sourceId }
+                .filter(String::isNotBlank)
+                .distinct()
+        )
         _isPlaying.value = true
         baselinePlayheadMs = _playheadPositionMs.value
         baselineMark = TimeSource.Monotonic.markNow()
-        rebuildSortedEntries()
         nextStartIndex = binarySearchFirst(sortedAudioEntries) { it.entry.startTimeUs >= msToUs(baselinePlayheadMs) }
         nextMidiStartIndex = binarySearchFirst(sortedMidiEntries) { it.entry.startTimeMs >= baselinePlayheadMs }
         nextChainEffectStartIndex = binarySearchFirst(sortedChainEffectEntries) { it.entry.startTimeMs >= baselinePlayheadMs }

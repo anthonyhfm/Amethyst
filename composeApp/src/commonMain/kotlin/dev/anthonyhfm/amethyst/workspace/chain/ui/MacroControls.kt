@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
@@ -58,6 +59,7 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollBarOrientation
 import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.cardForeground
+import dev.anthonyhfm.amethyst.ui.theme.chart2
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.secondary
@@ -75,7 +77,6 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.card
 import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
-import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
 import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import kotlinx.coroutines.delay
 import com.composeunstyled.rememberDialogState
@@ -87,7 +88,6 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
 import dev.anthonyhfm.amethyst.ui.components.primitives.Input
-import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 
 private val MacroControlsButtonWidth = 136.dp
@@ -223,15 +223,13 @@ fun MacroList(
 ) {
     val mappings by WorkspaceRepository.parameterMappings.collectAsState()
     val automationDevices by WorkspaceRepository.samplingChain.devices
-    val automatedMacroValues by produceState(emptyMap<String, Float>(), automationDevices) {
+    val automatedMacroValues by produceState(emptyMap<String, Float>(), automationDevices, macros) {
         while (true) {
-            value = WorkspaceRepository.samplingChain.devicesDepthFirst()
-                .filterIsInstance<AutomationChainDevice>()
-                .mapNotNull { device ->
-                    val macroId = (device.target as? LiveAutomationTarget.Macro)?.macroId
-                    val current = device.currentNormalizedValue
-                    if (macroId != null && current != null) macroId to current else null
-                }.toMap()
+            value = macros.mapNotNull { macro ->
+                WorkspaceRepository.samplingChain
+                    .automationValue(LiveAutomationTarget.Macro(macro.id))
+                    ?.let { macro.id to it }
+            }.toMap()
             delay(50)
         }
     }
@@ -248,40 +246,42 @@ fun MacroList(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         macros.forEachIndexed { index, macro ->
+            val isMapped = mappings.any { it.macroId == macro.id }
+            val automatedValue = automatedMacroValues[macro.id]
+            val effectiveValue = automatedValue
+                ?.let { (it * 127f).toInt().coerceIn(0, 127) }
+                ?: macro.value
             ContextMenu(
                 trigger = {
                     Dial(
                         title = macro.name.ifBlank { "Macro ${index + 1}" },
-                        text = buildString {
-                            automatedMacroValues[macro.id]?.let { automated ->
-                                append("AUTO ${((automated * 127f).toInt()).coerceIn(0, 127)} · base ")
-                            }
-                            append("${macro.value} · ${mappings.count { it.macroId == macro.id }} map")
-                        },
+                        text = effectiveValue.toString(),
                         type = DialType.Steps(IntArray(128) { it }.toList()),
-                        value = macro.value,
+                        value = effectiveValue,
                         containerColor = Theme[colors][secondary],
                         dialColor = Theme[colors][primary],
+                        hasAutomation = automatedValue != null || isMapped,
+                        statusIndicatorColor = if (automatedValue == null && isMapped) {
+                            Theme[colors][chart2]
+                        } else {
+                            Color.Unspecified
+                        },
                         onResolveTextValue = {
                             val valueText = it.trim().toIntOrNull()
 
                             valueText?.let { value ->
                                 WorkspaceRepository.setMacroValue(
                                     index = index,
-                                    macro = macro.copy(
-                                        value = value.coerceIn(0, 127)
-                                    )
+                                    macro = macro.copy(value = value.coerceIn(0, 127)),
                                 )
                             }
                         },
                         onValueChange = {
                             WorkspaceRepository.setMacroValue(
                                 index = index,
-                                macro = macro.copy(
-                                    value = it
-                                )
+                                macro = macro.copy(value = it),
                             )
-                        }
+                        },
                     )
                 }
             ) {

@@ -169,6 +169,7 @@ fun AudioClip(
     var rangeEndMs by remember { mutableStateOf<Long?>(null) }
     val snapEnabled = !ModifierKeysState.isAltPressed
     val currentSnapEnabled = rememberUpdatedState(snapEnabled)
+    val currentViewport = rememberUpdatedState(viewport)
 
     var resizeLeftDeltaPx by remember(audioEntry.sourceId, audioEntry.startTimeMs) { mutableStateOf(0f) }
     var resizeRightDeltaPx by remember(audioEntry.sourceId, audioEntry.startTimeMs) { mutableStateOf(0f) }
@@ -302,9 +303,14 @@ fun AudioClip(
         contentEndPx = endOffsetPx,
         viewport = viewport,
         screenOffsetPx = visualDragOffsetPx,
-        retainOffscreen = dragCallbacks != null && isSelected,
+        retainOffscreen = rangeActive || (dragCallbacks != null && isSelected),
     )
-    
+
+    // Range gestures live longer than a single viewport snapshot. Resolve their
+    // clip-local pointer through the current on-screen clip origin and viewport,
+    // matching the coordinate conversion used by an empty lane.
+    val currentClipScreenLeftPx = rememberUpdatedState(clipWindow?.visibleLeftPx ?: 0)
+
     // Visibility culling: skip layout entirely if clip is off-screen.
     // All state above must be declared before this return so Compose hook order stays stable.
     if (clipWindow == null || clipWindow.visibleWidthPx <= 0) return
@@ -513,11 +519,13 @@ fun AudioClip(
                     .then(
                         if (interactionEnabled) {
                             Modifier.pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
-                                        detectDragGestures(
-                                            onDragStart = { offset ->
+                                detectDragGestures(
+                                    onDragStart = { offset ->
                                         val startMs = computeSnappedTimeFromContentX(
-                                            x = clipWindow.visibleContentStartPx + offset.x,
-                                            zoomLevel = zoomLevel,
+                                            x = currentViewport.value.screenToContentX(
+                                                currentClipScreenLeftPx.value + offset.x
+                                            ),
+                                            zoomLevel = currentViewport.value.zoomX,
                                             bpm = bpm,
                                             gridType = gridType,
                                             snapEnabled = currentSnapEnabled.value,
@@ -529,8 +537,10 @@ fun AudioClip(
                                     onDrag = { change, _ ->
                                         if (rangeActive && rangeStartMs != null) {
                                             val currentMs = computeSnappedTimeFromContentX(
-                                                x = clipWindow.visibleContentStartPx + change.position.x,
-                                                zoomLevel = zoomLevel,
+                                                x = currentViewport.value.screenToContentX(
+                                                    currentClipScreenLeftPx.value + change.position.x
+                                                ),
+                                                zoomLevel = currentViewport.value.zoomX,
                                                 bpm = bpm,
                                                 gridType = gridType,
                                                 snapEnabled = currentSnapEnabled.value,

@@ -131,11 +131,14 @@ actual fun WorkspaceTopAppBar(
             PianoRollOptions(mode)
         }
 
-        WorkspaceToolbarSlideFromTopControls(
-            visible = mode is TimelineWorkspaceMode,
-        ) {
-            TimelinePlaybackControls()
-            TimelineGridPicker()
+        if (mode is TimelineWorkspaceMode) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TimelinePlaybackControls()
+                TimelineGridPicker()
+            }
         }
 
         if (mode is KeyframesWorkspaceMode) {

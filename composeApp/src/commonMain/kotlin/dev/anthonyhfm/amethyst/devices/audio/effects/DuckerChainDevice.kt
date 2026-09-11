@@ -15,8 +15,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioFrameTriggerQueue
-import dev.anthonyhfm.amethyst.core.engine.audio.trigger.SidechainTriggerSink
+import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
 import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
 import dev.anthonyhfm.amethyst.core.parameter.ParameterScale
@@ -28,8 +27,9 @@ import dev.anthonyhfm.amethyst.devices.AudioRenderContext
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceCapability
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.SidechainAudioConsumer
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
-import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
@@ -41,29 +41,28 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kotlinx.atomicfu.atomic
 import kotlin.math.roundToInt
 
 @Serializable
 enum class DuckerDetectorMode { Trigger, AudioEnvelope }
 
-class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterOwner, SidechainTriggerSink {
+class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterOwner, SidechainAudioConsumer {
     override val state = MutableStateFlow(DuckerChainDeviceState())
-    override val helpRef = "Ducker"
+    // Keep the persisted Kotlin type names stable for backwards compatibility;
+    // the device is presented to users as Compressor everywhere in the UI.
+    override val helpRef = "Compressor"
     override val parameterDescriptors get() = PARAMETERS
     override val sidechainSourceId: String? get() = state.value.sidechainSourceId
 
     private var configuration = AudioConfiguration(44_100, 2, 128)
-    private val triggers = AudioFrameTriggerQueue()
     private var reduction = 0f
-    private var attacking = false
+    private val eligibleSourceIds = atomic(emptySet<String>())
 
-    val droppedTriggerCount: Long get() = triggers.droppedCount
     val currentGainReduction: Float get() = reduction.coerceIn(0f, 1f)
 
-    override fun enqueueSidechainTrigger(sourceId: String, targetFrame: Long) {
-        if (sourceId == state.value.sidechainSourceId && state.value.detectorMode == DuckerDetectorMode.Trigger) {
-            triggers.offer(targetFrame)
-        }
+    override fun replaceEligibleSidechainSources(sourceIds: Set<String>) {
+        eligibleSourceIds.value = sourceIds.toSet()
     }
 
     override fun prepareAudio(configuration: AudioConfiguration) {
@@ -73,27 +72,18 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
 
     override fun processAudio(block: AudioProcessingBlock, context: AudioRenderContext) {
         val snapshot = state.value
+        val source = snapshot.sidechainSourceId
+            ?.takeIf { it in eligibleSourceIds.value }
+            ?.let(context::sidechainInput)
         var frame = 0
         while (frame < block.frameCount) {
             val absoluteFrame = context.absoluteFrame + frame
-            var trigger = triggers.peek()
-            while (trigger != null && trigger <= absoluteFrame) {
-                triggers.poll()
-                attacking = true
-                trigger = triggers.peek()
-            }
-
             val attackMs = resolveRealtimeParameter(PARAMETERS[0], snapshot.attackMs, absoluteFrame).coerceAtLeast(0f)
             val releaseMs = resolveRealtimeParameter(PARAMETERS[1], snapshot.releaseMs, absoluteFrame).coerceAtLeast(1f)
             val strength = resolveRealtimeParameter(PARAMETERS[2], snapshot.strength, absoluteFrame).coerceIn(0f, 1f)
-            if (attacking) {
-                val attackFrames = attackMs * configuration.sampleRate / 1_000f
-                reduction = if (attackFrames <= 1f) 1f else (reduction + 1f / attackFrames).coerceAtMost(1f)
-                if (reduction >= 1f) attacking = false
-            } else if (reduction > 0f) {
-                val releaseFrames = (releaseMs * configuration.sampleRate / 1_000f).coerceAtLeast(1f)
-                reduction = (reduction - 1f / releaseFrames).coerceAtLeast(0f)
-            }
+            val detector = source?.peakAt(frame)?.coerceIn(0f, 1f) ?: 0f
+            val smoothingMs = if (detector > reduction) attackMs else releaseMs
+            reduction = smoothEnvelope(reduction, detector, smoothingMs, configuration.sampleRate)
             val gain = (1f - reduction * strength).coerceIn(0f, 1f)
             val offset = frame * block.channels
             var channel = 0
@@ -106,34 +96,31 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
     }
 
     override fun resetAudio() {
-        triggers.clear()
         reduction = 0f
-        attacking = false
     }
 
     @Composable
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
-        val upstreamSamples = WorkspaceRepository.samplingChain.devicesDepthFirst()
-            .takeWhile { it !== this }
-            .filterIsInstance<SampleChainDevice>()
-        val options = upstreamSamples.map { sample ->
-            sample.selectionUUID to "${sample.title} · ${sample.selectionUUID.take(8)}"
-        }
+        val options = WorkspaceRepository.samplingChain.sampleOptions(eligibleSourceIds.value)
         val selectedLabel = options.firstOrNull { it.first == deviceState.sidechainSourceId }?.second
             ?: if (deviceState.sidechainSourceId == null) "None" else "Missing source"
 
         ChainDeviceShell(
-            title = "Ducker",
+            title = "Compressor",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
             isDragging = isDragging.value,
-            modifier = Modifier.width(410.dp),
+            modifier = Modifier.width(250.dp),
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column(Modifier.width(260.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Sidechain From", style = Theme[typography][small])
+            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "Sidechain From",
+                        style = Theme[typography][small],
+                        color = Theme[colors][mutedForeground],
+                    )
                     Select(
                         value = selectedLabel,
                         options = listOf("None") + options.map { it.second },
@@ -143,7 +130,6 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
                             val id = options.firstOrNull { it.second == label }?.first
                             state.update { it.copy(sidechainSourceId = id) }
                             pushStateChange(before, state.value)
-                            parentChain?.onDeviceRuntimeStateChanged()
                         },
                     )
                 }
@@ -160,7 +146,7 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
                 }
                 if (deviceState.sidechainSourceId != null && options.none { it.first == deviceState.sidechainSourceId }) {
                     Text(
-                        "Source missing or not upstream. Choose an earlier sample to repair this routing.",
+                        "Source missing or part of the compressed signal. Choose an external sample.",
                         style = Theme[typography][small],
                         color = Theme[colors][mutedForeground],
                     )
@@ -188,8 +174,52 @@ data class DuckerChainDeviceState(
     val attackMs: Float = 5f,
     val releaseMs: Float = 180f,
     val strength: Float = 0.8f,
-    val detectorMode: DuckerDetectorMode = DuckerDetectorMode.Trigger,
+    val detectorMode: DuckerDetectorMode = DuckerDetectorMode.AudioEnvelope,
     override val automations: Map<String, DialAutomationLane> = emptyMap(),
 ) : DeviceState() {
     override fun withAutomations(automations: Map<String, DialAutomationLane>): DeviceState = copy(automations = automations)
+}
+
+private fun AudioProcessingBlock.peakAt(frame: Int): Float {
+    if (frame !in 0 until frameCount) return 0f
+    val offset = frame * channels
+    var peak = 0f
+    var channel = 0
+    while (channel < channels) {
+        peak = maxOf(peak, kotlin.math.abs(samples[offset + channel]))
+        channel++
+    }
+    return peak
+}
+
+private fun smoothEnvelope(current: Float, target: Float, milliseconds: Float, sampleRate: Int): Float {
+    if (milliseconds <= 0f) return target
+    val frames = milliseconds * sampleRate.coerceAtLeast(1) / 1_000f
+    val coefficient = kotlin.math.exp(-1f / frames.coerceAtLeast(1f))
+    return (target + (current - target) * coefficient).coerceIn(0f, 1f)
+}
+
+private fun Chain.sampleOptions(eligibleIds: Set<String>): List<Pair<String, String>> {
+    val raw = buildList {
+        fun visit(chain: Chain, path: List<String>) {
+            chain.devices.value.forEach { device ->
+                if (device is SampleChainDevice && device.selectionUUID in eligibleIds) {
+                    add(device.selectionUUID to (path + device.title).joinToString(" / "))
+                }
+                if (device is NestedChainDevice) {
+                    device.nestedChains().forEachIndexed { index, nested ->
+                        visit(nested, path + "${device.title} ${index + 1}")
+                    }
+                }
+            }
+        }
+        visit(this@sampleOptions, emptyList())
+    }
+    val counts = raw.groupingBy { it.second }.eachCount()
+    val occurrences = mutableMapOf<String, Int>()
+    return raw.map { (id, title) ->
+        val occurrence = (occurrences[title] ?: 0) + 1
+        occurrences[title] = occurrence
+        id to if (counts[title] == 1) title else "$title ($occurrence)"
+    }
 }
