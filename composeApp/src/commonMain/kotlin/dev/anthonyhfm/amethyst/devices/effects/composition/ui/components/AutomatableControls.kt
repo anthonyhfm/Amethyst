@@ -262,6 +262,7 @@ fun <T> AutomatableDial(
                         }
                     )
                 }
+
                 if (parameterAddress != null && descriptor?.macroMappable != false) {
                     val validMappings = parameterMappings.mapNotNull { mapping ->
                         val macroIndex = workspaceMacros.indexOfFirst { it.id == mapping.macroId }
