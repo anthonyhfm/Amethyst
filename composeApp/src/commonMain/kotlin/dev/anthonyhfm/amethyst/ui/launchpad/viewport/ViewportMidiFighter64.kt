@@ -159,7 +159,7 @@ class ViewportMidiFighter64(
 
     @Composable
     override fun Content() {
-        val previewGrid by previewState.grid
+        val previewGridState = previewState.grid
         val density = LocalDensity.current
         val graphicsState by LaunchpadGraphicsRepository.graphicsState.collectAsState()
         val mfGraphics = graphicsState.midiFighter
@@ -178,6 +178,7 @@ class ViewportMidiFighter64(
                         modifier = Modifier
                             .fillMaxSize(),
                     ) {
+                        val previewGrid = previewGridState.value
                         drawRect(
                             color = Color(0xFF202020),
                             topLeft = Offset(

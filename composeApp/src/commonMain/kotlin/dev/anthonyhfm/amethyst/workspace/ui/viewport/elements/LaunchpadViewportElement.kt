@@ -25,10 +25,6 @@ import dev.anthonyhfm.amethyst.workspace.AutoPlayState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportElement
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 
 abstract class LaunchpadViewportElement(
     override var position: MutableState<Offset> = mutableStateOf(Offset(0f, 0f)),
@@ -43,8 +39,6 @@ abstract class LaunchpadViewportElement(
     var launchpadId: String = UUID.randomUUID()
 
     val rotationDegrees = mutableFloatStateOf(0f)
-
-    val renderScope = CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     var launchpadDevice: LaunchpadDevice? = null
     var savedMidiDeviceId: String? = null
@@ -69,7 +63,6 @@ abstract class LaunchpadViewportElement(
         launchpadDevice?.close()
         launchpadDevice = null
         screen.close()
-        renderScope.cancel()
     }
 
     init {
@@ -77,9 +70,9 @@ abstract class LaunchpadViewportElement(
             val rotatedUpdates = rotateMidiUpdates(u, layout, rotationDegrees.floatValue)
             launchpadDevice?.sendUpdate(rotatedUpdates, c)
 
-            renderScope.launch {
-                previewState.sendToPreview(u)
-            }
+            // Screen.draw() runs on Heaven's UI dispatcher. Keep Compose state
+            // on that dispatcher so TAO applies the invalidation in this pump.
+            previewState.sendToPreview(u)
         }
     }
 

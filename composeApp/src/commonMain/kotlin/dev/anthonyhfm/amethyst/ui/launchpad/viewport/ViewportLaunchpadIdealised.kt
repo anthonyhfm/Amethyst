@@ -50,7 +50,7 @@ class ViewportLaunchpadIdealised(
     @OptIn(InternalResourceApi::class)
     @Composable
     override fun Content() {
-        val previewGrid by previewState.grid
+        val previewGridState = previewState.grid
         val density = LocalDensity.current
         val graphicsState by LaunchpadGraphicsRepository.graphicsState.collectAsState()
         val idealisedGraphics = graphicsState.idealised
@@ -71,6 +71,7 @@ class ViewportLaunchpadIdealised(
                         modifier = Modifier
                             .fillMaxSize(),
                     ) {
+                        val previewGrid = previewGridState.value
                         drawRect(
                             color = Color(0xFF303030),
                             topLeft = Offset(
