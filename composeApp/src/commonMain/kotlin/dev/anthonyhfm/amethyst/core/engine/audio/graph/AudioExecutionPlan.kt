@@ -6,9 +6,13 @@ import dev.anthonyhfm.amethyst.devices.AudioChainDeviceRole
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
 import dev.anthonyhfm.amethyst.devices.AudioRenderContext
+import dev.anthonyhfm.amethyst.devices.AudioOutputActivity
+import dev.anthonyhfm.amethyst.devices.AudioSourceRouting
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 import dev.anthonyhfm.amethyst.devices.SidechainAudioProvider
+import dev.anthonyhfm.amethyst.devices.EMPTY_AUDIO_PROCESSING_BLOCKS
+import dev.anthonyhfm.amethyst.core.engine.audio.trigger.ChokeVoiceSource
 import kotlinx.atomicfu.atomic
 
 /** Immutable, allocation-free audio graph compiled from an editable [Chain]. */
@@ -17,6 +21,7 @@ class AudioExecutionPlan private constructor(
     private val sources: Array<RenderedAudioSource>,
     private val sidechainAudioProvider: SidechainAudioProvider,
     val devices: Array<AudioChainDevice<*>>,
+    val enabledChokeSources: Array<ChokeVoiceSource>,
     val latencyFrames: Int,
     val tailFrames: Long,
     val diagnostics: List<AudioGraphDiagnostic>,
@@ -33,6 +38,7 @@ class AudioExecutionPlan private constructor(
     }
 
     fun reset() {
+        root.resetRoutingState()
         devices.forEach(AudioChainDevice<*>::resetAudio)
     }
 
@@ -53,6 +59,9 @@ class AudioExecutionPlan private constructor(
                 sources = compiler.sources.toTypedArray(),
                 sidechainAudioProvider = compiler.sidechainAudioProvider(),
                 devices = compiler.devices.toTypedArray(),
+                enabledChokeSources = compiler.sources.mapNotNull { source ->
+                    if (source.enabled) source.device as? ChokeVoiceSource else null
+                }.toTypedArray(),
                 latencyFrames = root.latencyFrames,
                 tailFrames = root.tailFrames,
                 diagnostics = compiler.diagnostics.toList(),
@@ -70,7 +79,9 @@ data class AudioGraphDiagnostic(
 private interface AudioPlanNode {
     val latencyFrames: Int
     val tailFrames: Long
+    val hasPotentialOutput: Boolean
     fun process(block: AudioProcessingBlock, context: AudioRenderContext)
+    fun resetRoutingState() = Unit
 }
 
 private class SerialAudioNode(
@@ -78,6 +89,8 @@ private class SerialAudioNode(
 ) : AudioPlanNode {
     override val latencyFrames: Int = nodes.sumOf(AudioPlanNode::latencyFrames)
     override val tailFrames: Long = nodes.sumOf(AudioPlanNode::tailFrames)
+    override val hasPotentialOutput: Boolean
+        get() = nodes.any { it.hasPotentialOutput }
 
     override fun process(block: AudioProcessingBlock, context: AudioRenderContext) {
         var index = 0
@@ -85,6 +98,10 @@ private class SerialAudioNode(
             nodes[index].process(block, context)
             index++
         }
+    }
+
+    override fun resetRoutingState() {
+        nodes.forEach(AudioPlanNode::resetRoutingState)
     }
 }
 
@@ -96,10 +113,12 @@ private class DeviceAudioNode(
 ) : AudioPlanNode {
     override val latencyFrames: Int = device.latencyFrames
     override val tailFrames: Long = device.tailFrames
+    override val hasPotentialOutput: Boolean
+        get() = enabled && (renderedSource?.hasMainOutput ?: true)
 
     override fun process(block: AudioProcessingBlock, context: AudioRenderContext) {
         if (renderedSource != null) {
-            if (enabled) sumInto(renderedSource.block, block)
+            if (enabled && renderedSource.contributesToMainOutput) sumInto(renderedSource.block, block)
         } else if (enabled) {
             device.processAudio(block, context)
             sanitizeFinite(block, metrics)
@@ -110,7 +129,7 @@ private class DeviceAudioNode(
 /** A generator is advanced once per callback, then reused by audio and detector paths. */
 private class RenderedAudioSource(
     val device: AudioChainDevice<*>,
-    private val enabled: Boolean,
+    val enabled: Boolean,
     configuration: AudioConfiguration,
     private val metrics: AudioRenderMetrics,
 ) {
@@ -119,14 +138,28 @@ private class RenderedAudioSource(
         channels = configuration.channels,
         maximumFrames = configuration.maximumBlockFrames,
     )
+    var hasOutput: Boolean = false
+        private set
+    val contributesToMainOutput: Boolean
+        get() = (device as? AudioSourceRouting)?.contributesToMainOutput ?: true
+    val sidechainBusId: String?
+        get() = (device as? AudioSourceRouting)?.sidechainBusId
+    val hasMainOutput: Boolean
+        get() = hasOutput && contributesToMainOutput
 
     fun render(frameCount: Int, frameOffset: Long, context: AudioRenderContext) {
         block.configure(frameCount, frameOffset)
-        block.clear()
-        if (enabled) {
-            device.processAudio(block, context)
-            sanitizeFinite(block, metrics)
+        if (!enabled || (device as? AudioOutputActivity)?.mayProduceAudio == false) {
+            // Sidechain consumers retain this block reference. Clear the final
+            // active contents once so an idle source cannot expose stale PCM.
+            if (hasOutput) block.clear()
+            hasOutput = false
+            return
         }
+        block.clear()
+        device.processAudio(block, context)
+        sanitizeFinite(block, metrics)
+        hasOutput = true
     }
 }
 
@@ -135,24 +168,68 @@ private class ParallelAudioNode(
 ) : AudioPlanNode {
     override val latencyFrames: Int = branches.maxOfOrNull { it.node.latencyFrames } ?: 0
     override val tailFrames: Long = branches.maxOfOrNull { it.node.tailFrames } ?: 0L
+    override val hasPotentialOutput: Boolean
+        get() = branches.any(AudioBranch::hasPotentialOutput)
 
     override fun process(block: AudioProcessingBlock, context: AudioRenderContext) {
         var branchIndex = 0
         while (branchIndex < branches.size) {
             val branch = branches[branchIndex]
-            branch.block.configure(block.frameCount, block.frameOffset)
-            branch.block.clear()
-            branch.node.process(branch.block, context)
-            sumInto(branch.block, block)
+            if (branch.hasPotentialOutput) {
+                branch.block.configure(block.frameCount, block.frameOffset)
+                branch.block.clear()
+                if (branch.node.hasPotentialOutput) {
+                    branch.node.process(branch.block, context)
+                }
+                branch.applyLatencyCompensation()
+                sumInto(branch.block, block)
+            }
             branchIndex++
         }
     }
+
+
+    override fun resetRoutingState() {
+        branches.forEach(AudioBranch::reset)
+    }
 }
 
-private data class AudioBranch(
+private class AudioBranch(
     val node: SerialAudioNode,
     val block: AudioProcessingBlock,
-)
+    private val compensationFrames: Int,
+) {
+    private val delay = FloatArray(compensationFrames * block.channels)
+    private var delayFrameIndex = 0
+
+    val hasPotentialOutput: Boolean
+        get() = node.hasPotentialOutput || compensationFrames > 0
+
+    fun applyLatencyCompensation() {
+        if (compensationFrames <= 0) return
+        var frame = 0
+        while (frame < block.frameCount) {
+            val blockOffset = frame * block.channels
+            val delayOffset = delayFrameIndex * block.channels
+            var channel = 0
+            while (channel < block.channels) {
+                val delayed = delay[delayOffset + channel]
+                delay[delayOffset + channel] = block.samples[blockOffset + channel]
+                block.samples[blockOffset + channel] = delayed
+                channel++
+            }
+            delayFrameIndex++
+            if (delayFrameIndex == compensationFrames) delayFrameIndex = 0
+            frame++
+        }
+    }
+
+    fun reset() {
+        node.resetRoutingState()
+        delay.fill(0f)
+        delayFrameIndex = 0
+    }
+}
 
 private class AudioGraphCompiler(
     private val configuration: AudioConfiguration,
@@ -164,37 +241,54 @@ private class AudioGraphCompiler(
 
     fun sidechainAudioProvider(): SidechainAudioProvider {
         val sourceBlocks = sources.associate { it.device.selectionUUID to it.block }
-        return SidechainAudioProvider(sourceBlocks::get)
+        val busBlocks = sources
+            .mapNotNull { source -> source.sidechainBusId?.takeIf(String::isNotBlank)?.let { it to source.block } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, blocks) -> blocks.toTypedArray() }
+        return object : SidechainAudioProvider {
+            override fun sourceBlock(sourceId: String): AudioProcessingBlock? = sourceBlocks[sourceId]
+            override fun busBlocks(busId: String): Array<AudioProcessingBlock> =
+                busBlocks[busId] ?: EMPTY_AUDIO_PROCESSING_BLOCKS
+        }
     }
 
-    fun compileSerial(editableDevices: List<GenericChainDevice<*>>): SerialAudioNode {
+    fun compileSerial(
+        editableDevices: List<GenericChainDevice<*>>,
+        ancestorEnabled: Boolean = true,
+    ): SerialAudioNode {
         val nodes = mutableListOf<AudioPlanNode>()
         editableDevices.forEach { device ->
             when (device) {
                 is AudioChainDevice<*> -> {
+                    val enabled = ancestorEnabled && !device.isMuted
                     if (devices.none { it === device }) {
                         devices += device
                     }
                     val renderedSource = if (device.audioRole == AudioChainDeviceRole.Generator) {
                         sources.firstOrNull { it.device === device } ?: RenderedAudioSource(
                             device = device,
-                            enabled = !device.isMuted,
+                            enabled = enabled,
                             configuration = configuration,
                             metrics = metrics,
                         ).also(sources::add)
                     } else null
                     nodes += DeviceAudioNode(
                         device,
-                        enabled = !device.isMuted,
+                        enabled = enabled,
                         metrics = metrics,
                         renderedSource = renderedSource,
                     )
                 }
 
                 is NestedChainDevice -> {
-                    val branches = device.audioNestedChains().map { child ->
+                    val enabled = ancestorEnabled && !device.isMuted
+                    val childNodes = device.audioNestedChains().map { child ->
+                        compileSerial(child.devices.value, ancestorEnabled = enabled)
+                    }
+                    val maximumLatency = childNodes.maxOfOrNull(SerialAudioNode::latencyFrames) ?: 0
+                    val branches = childNodes.map { childNode ->
                         AudioBranch(
-                            node = compileSerial(child.devices.value),
+                            node = childNode,
                             block = AudioProcessingBlock(
                                 samples = FloatArray(
                                     configuration.maximumBlockFrames * configuration.channels,
@@ -202,6 +296,7 @@ private class AudioGraphCompiler(
                                 channels = configuration.channels,
                                 maximumFrames = configuration.maximumBlockFrames,
                             ),
+                            compensationFrames = maximumLatency - childNode.latencyFrames,
                         )
                     }
                     if (branches.isNotEmpty()) nodes += ParallelAudioNode(branches.toTypedArray())

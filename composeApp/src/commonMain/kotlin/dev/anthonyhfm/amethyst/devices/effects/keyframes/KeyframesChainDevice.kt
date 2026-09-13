@@ -57,11 +57,20 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import kotlinx.coroutines.runBlocking
 import kotlin.math.pow
+import kotlin.math.roundToLong
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
 import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.snapshotFlow
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
+
+private fun keyframeLoopTargetTimeNanos(
+    epochNanos: Long,
+    iteration: Long,
+    totalDurationMs: Double,
+    eventTimeMs: Double,
+): Long = epochNanos + ((iteration * totalDurationMs + eventTimeMs) * 1_000_000.0).roundToLong()
 
 class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokeable, dev.anthonyhfm.amethyst.devices.TimelineTriggerable {
     private fun timelineTrigger(color: Color): Signal.LED {
@@ -76,7 +85,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
         val current = state.value
-        if (current.playbackMode == PlaybackMode.Loop) return TimelineDuration.Unbounded
+        if (current.playbackMode == PlaybackMode.Loop || current.playbackMode == PlaybackMode.Continuous) {
+            return TimelineDuration.Unbounded
+        }
         // Mirrors renderAnimation(): every rendered transition is delayed by the
         // previous frame's timing and the entering frame's gate. The synthetic
         // terminal frame uses the default 0.5 gate.
@@ -880,7 +891,13 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private fun KeyframesEntry.resolveToSignal(color: Color): Signal.LED? {
         val (gx, gy) = resolveGlobal() ?: return null
-        return Signal.LED(origin = this, x = gx, y = gy, color = color, layer = 0)
+        val origin = resolveLaunchpadOrigin(
+            origin = null,
+            x = gx,
+            y = gy,
+            launchpadId = launchpadId.takeIf { isDeviceAnchored },
+        ) ?: this
+        return Signal.LED(origin = origin, x = gx, y = gy, color = color, layer = 0)
     }
 
     /** Returns true when [other] occupies the same physical position as this entry. */
@@ -897,6 +914,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     private fun KeyframesEntry.toOffSignal(): Signal.LED? = resolveToSignal(Color.Black)
 
     private val heldSignals = mutableSetOf<Int>() // Signals currently held in Loop mode
+    private val continuousLoopIdentifier = Int.MIN_VALUE
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
         val state = state.value
@@ -922,6 +940,12 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                         if (heldSignals.add(identifier)) {
                             Heaven.cancelJobsForOwner(this, identifier)
                             startLoopPlayback(signal, identifier)
+                        }
+                    }
+                    PlaybackMode.Continuous -> {
+                        if (heldSignals.add(continuousLoopIdentifier)) {
+                            Heaven.cancelJobsForOwner(this, continuousLoopIdentifier)
+                            startLoopPlayback(signal, continuousLoopIdentifier)
                         }
                     }
                 }
@@ -963,13 +987,26 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         val stateSnapshot = state.value
         val animation = stateSnapshot.renderedAnimation
         val totalDuration = (animation.lastOrNull()?.first ?: 0).toDouble()
-        if (totalDuration <= 0) return
+        if (totalDuration <= 0) {
+            heldSignals.remove(identifier)
+            return
+        }
+        val epochNanos = Heaven.timeNanos
+        var iteration = 0L
 
-        fun playOnce(loopOffset: Double) {
+        fun playOnce() {
             if (!heldSignals.contains(identifier)) return
-
             animation.forEach { (time, signals) ->
-                Heaven.schedule(loopOffset + time, owner = this, identifier = identifier) {
+                Heaven.scheduleAt(
+                    targetTimeNanos = keyframeLoopTargetTimeNanos(
+                        epochNanos = epochNanos,
+                        iteration = iteration,
+                        totalDurationMs = totalDuration,
+                        eventTimeMs = time.toDouble(),
+                    ),
+                    owner = this,
+                    identifier = identifier,
+                ) {
                     val s = state.value
                     val transformed = transformSignals(signals, triggerSignal)
                     val outgoing = if (s.useOwnershipTracking && s.ownershipId.isNotEmpty()) {
@@ -981,13 +1018,14 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     
                     // If this is the last frame of the animation, schedule the next loop
                     if (time.toDouble() == totalDuration && heldSignals.contains(identifier)) {
-                        playOnce(loopOffset + totalDuration)
+                        iteration += 1
+                        playOnce()
                     }
                 }
             }
         }
 
-        playOnce(0.0)
+        playOnce()
     }
 
     private fun resolveBounds(signal: Signal.LED, isolate: Boolean): Pair<androidx.compose.ui.unit.IntOffset, androidx.compose.ui.unit.IntSize> {
@@ -1008,12 +1046,30 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private fun transformSignals(signals: List<Signal>, triggerSignal: Signal.LED): List<Signal> {
         val state = state.value
-        val rootKey = state.rootKey ?: return signals
+        val rootKey = state.rootKey
+
+        if (rootKey == null) {
+            return signals.map { signal ->
+                if (signal is Signal.LED) {
+                    signal.copy(macroValues = triggerSignal.macroValues)
+                } else {
+                    signal
+                }
+            }
+        }
         
         val dx = triggerSignal.x - (rootKey % 10)
         val dy = triggerSignal.y - (rootKey / 10)
         
-        if (dx == 0 && dy == 0 && !state.isolate && !state.wrap) return signals
+        if (dx == 0 && dy == 0 && !state.isolate && !state.wrap) {
+            return signals.map { signal ->
+                if (signal is Signal.LED) {
+                    signal.copy(macroValues = triggerSignal.macroValues)
+                } else {
+                    signal
+                }
+            }
+        }
 
         val bounds = resolveBounds(triggerSignal, state.isolate)
         val minX = bounds.first.x
@@ -1034,9 +1090,18 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 }
                 
                 if (newX in minX..maxX && newY in minY..maxY) {
-                    signal.copy(x = newX, y = newY, origin = signal.origin)
+                    signal.copy(
+                        x = newX,
+                        y = newY,
+                        origin = signal.origin,
+                        macroValues = triggerSignal.macroValues,
+                    )
                 } else {
-                    signal.copy(color = Color.Black, origin = signal.origin)
+                    signal.copy(
+                        color = Color.Black,
+                        origin = signal.origin,
+                        macroValues = triggerSignal.macroValues,
+                    )
                 }
             } else signal
         }
@@ -1158,7 +1223,13 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     override fun onStateRestored() {
         super.onStateRestored()
+        onChoke()
         renderAnimation()
+    }
+
+    override fun onRemovedFromChain() {
+        onChoke()
+        super.onRemovedFromChain()
     }
 
     companion object : ChainDeviceFactory<KeyframesChainDeviceContract.KeyframesChainDeviceState> {

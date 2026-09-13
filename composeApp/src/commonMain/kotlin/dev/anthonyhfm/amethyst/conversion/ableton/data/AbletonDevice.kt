@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.data
 
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Compressor2
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Eq8
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiArpeggiator
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiChord
@@ -12,6 +14,8 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceInstrument
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxParameter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Limiter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.StereoGain
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn
 import kotlinx.serialization.SerialName
@@ -38,6 +42,10 @@ interface AbletonDevice {
                 subclass(MidiPitcher::class)
                 subclass(MidiChord::class)
                 subclass(MidiArpeggiator::class)
+                subclass(Eq8::class)
+                subclass(StereoGain::class)
+                subclass(Limiter::class)
+                subclass(Compressor2::class)
             }
 
             polymorphic(MxParameter::class) {
@@ -59,13 +67,38 @@ data class OriginalSimpler(
 
     @XmlElement
     val player: Player,
+    @XmlElement
+    val pitch: Pitch = Pitch(),
     val volumeAndPan: VolumeAndPan
 ) : AbletonDevice {
     @Serializable
+    data class Pitch(
+        @XmlElement
+        @XmlSerialName("TransposeKey")
+        val transposeKey: TransposeData = TransposeData(),
+    ) {
+        @Serializable
+        data class TransposeData(
+            val manual: AbletonManual<Float> = AbletonManual(0f),
+        )
+    }
+
+    @Serializable
     data class Player(
         @XmlElement
-        val multiSampleMap: MultiSampleMap
+        val multiSampleMap: MultiSampleMap,
+
+        @XmlElement
+        @XmlSerialName("LoopModulators")
+        val loopModulators: LoopModulators = LoopModulators(),
     ) {
+        @Serializable
+        data class LoopModulators(
+            @XmlElement
+            @XmlSerialName("LoopOn")
+            val loopOn: AbletonOn = AbletonOn(manual = dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual(false)),
+        )
+
         @Serializable
         data class MultiSampleMap(
             @XmlElement

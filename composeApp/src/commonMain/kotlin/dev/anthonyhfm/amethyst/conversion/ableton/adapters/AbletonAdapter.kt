@@ -2,6 +2,8 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters
 
 import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.DrumGroupDeviceAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.Compressor2Adapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.Eq8Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.InstrumentGroupAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiArpeggiatorAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiChordAdapter
@@ -12,8 +14,12 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MidiVelocityA
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceInstrumentAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.LimiterAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.StereoGainAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Compressor2
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Eq8
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceInstrument
@@ -25,6 +31,8 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiNoteLength
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiPitcher
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Limiter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.StereoGain
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import kotlinx.serialization.json.Json
 
@@ -95,6 +103,10 @@ abstract class AbletonAdapter {
                     is MidiPitcher -> MidiPitcherAdapter(device)
                     is MidiChord -> MidiChordAdapter(device)
                     is MidiArpeggiator -> MidiArpeggiatorAdapter(device)
+                    is Eq8 -> Eq8Adapter(device)
+                    is StereoGain -> StereoGainAdapter(device)
+                    is Limiter -> LimiterAdapter(device)
+                    is Compressor2 -> Compressor2Adapter(device)
 
                     else -> {
                         println("Unsupported Ableton device type: ${device::class.simpleName}")

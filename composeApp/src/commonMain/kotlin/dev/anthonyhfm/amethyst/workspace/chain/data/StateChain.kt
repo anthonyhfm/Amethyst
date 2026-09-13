@@ -12,6 +12,7 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
@@ -151,6 +152,11 @@ private fun DeviceState.withoutNestedDeviceIds(): DeviceState = when (this) {
 
     is ChokeChainDeviceState -> copy(
         stateChain = stateChain.withoutDeviceIdsRecursively(),
+    )
+
+    is MaskChainDeviceState -> copy(
+        colorStateChain = colorStateChain.withoutDeviceIdsRecursively(),
+        shapeStateChain = shapeStateChain.withoutDeviceIdsRecursively(),
     )
 
     else -> this

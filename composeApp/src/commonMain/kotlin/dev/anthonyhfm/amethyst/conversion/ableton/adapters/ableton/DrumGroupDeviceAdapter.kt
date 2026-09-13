@@ -13,12 +13,19 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.getFileHash
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonPageIndexing
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.color.ColorChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import io.github.vinceglb.filekit.PlatformFile
@@ -29,24 +36,43 @@ class DrumGroupDeviceAdapter(
     val outputOffset: IntOffset = IntOffset.Zero,
     private val chainDepth: Int = 0
 ) : AbletonAdapter() {
+    private val drumRackChokeScopeId = UUID.randomUUID()
+
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<DrumGroupDevice.Branches.DrumBranch> = device.branches.branches
 
-        val hasPageSwitching = chainDepth == 0 && (
-            device.chainSelector.keyMidi != null ||
-            branches.any { branch ->
-                branch.branchSelectorRange.min.value > 0 || branch.branchSelectorRange.max.value > 0 ||
-                branch.deviceChain.deviceChain.devices.devices.any { subDevice ->
-                    when (subDevice) {
-                        is InstrumentGroupDevice -> subDevice.chainSelector.keyMidi != null || subDevice.branches.branches.any { it.branchSelectorRange.min.value > 0 || it.branchSelectorRange.max.value > 0 }
-                        is MidiEffectGroupDevice -> subDevice.chainSelector.keyMidi != null || subDevice.branches.branches.any { it.branchSelectorRange.min.value > 0 || it.branchSelectorRange.max.value > 0 }
-                        else -> false
-                    }
+        val ownSelectorControlsPages = AbletonPageIndexing.controlsPages(
+            hasKeyMidiMapping = device.chainSelector.keyMidi != null,
+            selectorRanges = branches.map {
+                it.branchSelectorRange.min.value to it.branchSelectorRange.max.value
+            },
+        )
+        val nestedSelectorControlsPages = branches.any { branch ->
+            branch.deviceChain.deviceChain.devices.devices.any { subDevice ->
+                when (subDevice) {
+                    is InstrumentGroupDevice -> AbletonPageIndexing.controlsPages(
+                        hasKeyMidiMapping = subDevice.chainSelector.keyMidi != null,
+                        selectorRanges = subDevice.branches.branches.map {
+                            it.branchSelectorRange.min.value to it.branchSelectorRange.max.value
+                        },
+                    )
+                    is MidiEffectGroupDevice -> AbletonPageIndexing.controlsPages(
+                        hasKeyMidiMapping = subDevice.chainSelector.keyMidi != null,
+                        selectorRanges = subDevice.branches.branches.map {
+                            it.branchSelectorRange.min.value to it.branchSelectorRange.max.value
+                        },
+                    )
+                    else -> false
                 }
             }
+        }
+        val hasPageSwitching = chainDepth == 0 && (
+            ownSelectorControlsPages || nestedSelectorControlsPages
         )
 
         val groups = branches.mapIndexed { index, branch ->
+            val chokeGroup = branch.branchInfo.chokeGroup.value
+            val chokeOwnerId = "$drumRackChokeScopeId:branch:$index:${branch.id}"
             Group(
                 name = branch.name.effectiveName.let {
                     if (it?.value != null) {
@@ -121,14 +147,20 @@ class DrumGroupDeviceAdapter(
                                                 device = potentialMultiDevice,
                                                 midiContainer = null,
                                                 instrumentContainer = instrumentContainer,
-                                                drumContainer = drumContainer
+                                                drumContainer = drumContainer,
+                                                offset = offset,
+                                                outputOffset = outputOffset,
+                                                chainDepth = chainDepth,
                                             ).toDeviceStates()
                                         } else if (kaskobiMultiHashMatches) {
                                             MultiEffectAdapter(
                                                 device = potentialMultiDevice,
                                                 midiContainer = null,
                                                 instrumentContainer = instrumentContainer,
-                                                drumContainer = drumContainer
+                                                drumContainer = drumContainer,
+                                                offset = offset,
+                                                outputOffset = outputOffset,
+                                                chainDepth = chainDepth,
                                             ).toDeviceStates()
                                         } else {
                                             listOf()
@@ -174,12 +206,19 @@ class DrumGroupDeviceAdapter(
                             }
                         )
                     }
+                        .withMuteState(branch.masterDevice.speaker.manual.value)
+                        .withAbletonDrumChoke(
+                            chokeGroup = chokeGroup,
+                            chokeScopeId = drumRackChokeScopeId,
+                            chokeOwnerId = chokeOwnerId,
+                        )
                 )
             )
         }.toMutableList()
 
         if (hasPageSwitching) {
             groups.add(
+                0,
                 Group(
                     name = "Page Switching",
                     stateChain = StateChain(
@@ -198,7 +237,7 @@ class DrumGroupDeviceAdapter(
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,
-                                                            value = i
+                                                            value = i,
                                                         ),
                                                         ColorChainDeviceState(
                                                             r = 0f,
@@ -223,7 +262,7 @@ class DrumGroupDeviceAdapter(
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,
-                                                            value = i + 8
+                                                            value = i + 8,
                                                         ),
                                                         ColorChainDeviceState(
                                                             r = 0f,
@@ -249,4 +288,102 @@ class DrumGroupDeviceAdapter(
             )
         ).withMuteState(device.on.manual.value)
     }
+}
+
+private fun List<DeviceState>.withAbletonDrumChoke(
+    chokeGroup: Int,
+    chokeScopeId: String,
+    chokeOwnerId: String,
+): List<DeviceState> {
+    if (chokeGroup !in 1..16) return this
+    return map { state ->
+        state.withAbletonDrumChoke(chokeGroup, chokeScopeId, chokeOwnerId)
+    }
+}
+
+private fun DeviceState.withAbletonDrumChoke(
+    chokeGroup: Int,
+    chokeScopeId: String,
+    chokeOwnerId: String,
+): DeviceState = when (this) {
+    is SampleChainDeviceState -> preserveDisplayState(
+        copy(
+            chokeGroup = chokeGroup,
+            chokeScopeId = chokeScopeId,
+            chokeOwnerId = chokeOwnerId,
+        ),
+    )
+
+    is GroupChainDeviceState -> preserveDisplayState(
+        copy(
+            groups = groups.map { group ->
+                group.copy(
+                    stateChain = group.stateChain.withAbletonDrumChoke(
+                        chokeGroup,
+                        chokeScopeId,
+                        chokeOwnerId,
+                    ),
+                )
+            },
+        ),
+    )
+
+    is MultiGroupChainDeviceState -> preserveDisplayState(
+        copy(
+            groups = groups.map { group ->
+                group.copy(
+                    stateChain = group.stateChain.withAbletonDrumChoke(
+                        chokeGroup,
+                        chokeScopeId,
+                        chokeOwnerId,
+                    ),
+                )
+            },
+            preprocessChain = preprocessChain.withAbletonDrumChoke(
+                chokeGroup,
+                chokeScopeId,
+                chokeOwnerId,
+            ),
+        ),
+    )
+
+    is ChokeChainDeviceState -> preserveDisplayState(
+        copy(
+            stateChain = stateChain.withAbletonDrumChoke(
+                chokeGroup,
+                chokeScopeId,
+                chokeOwnerId,
+            ),
+        ),
+    )
+
+    is MaskChainDeviceState -> preserveDisplayState(
+        copy(
+            colorStateChain = colorStateChain.withAbletonDrumChoke(
+                chokeGroup,
+                chokeScopeId,
+                chokeOwnerId,
+            ),
+            shapeStateChain = shapeStateChain.withAbletonDrumChoke(
+                chokeGroup,
+                chokeScopeId,
+                chokeOwnerId,
+            ),
+        ),
+    )
+
+    else -> this
+}
+
+private fun StateChain.withAbletonDrumChoke(
+    chokeGroup: Int,
+    chokeScopeId: String,
+    chokeOwnerId: String,
+): StateChain = copy(
+    devices = devices.withAbletonDrumChoke(chokeGroup, chokeScopeId, chokeOwnerId),
+)
+
+private fun <T : DeviceState> DeviceState.preserveDisplayState(copy: T): T = copy.also {
+    it.isMuted = isMuted
+    it.isCollapsed = isCollapsed
 }

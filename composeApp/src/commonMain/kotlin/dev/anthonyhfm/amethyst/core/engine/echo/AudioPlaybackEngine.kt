@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.core.engine.echo
 
 import dev.anthonyhfm.amethyst.core.engine.audio.AudioRenderer
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioRenderCommand
+import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioStopTicket
 import dev.anthonyhfm.amethyst.core.engine.audio.source.AudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache
@@ -183,18 +184,22 @@ class AudioPlaybackEngine(
         updatePlaybacks { current -> current - matches.keys }
     }
 
-    fun stopAll(fadeOutFrames: Int = DEFAULT_STOP_FADE_FRAMES) {
+    fun stopAll(fadeOutFrames: Int = DEFAULT_STOP_FADE_FRAMES): AudioStopTicket {
         if (renderer.configuration == null) {
             playbacks.value = emptyMap()
-            return
+            return AudioStopTicket.completed()
         }
-        renderer.enqueue(
+        val ticket = AudioStopTicket()
+        val enqueued = renderer.enqueue(
             AudioRenderCommand.StopAll(
                 targetFrame = renderer.absoluteFrame,
                 fadeOutFrames = fadeOutFrames.coerceAtLeast(0),
+                ticket = ticket,
             )
         )
+        if (!enqueued) renderer.requestEmergencyStop(ticket)
         playbacks.value = emptyMap()
+        return ticket
     }
 
     fun setMasterGain(

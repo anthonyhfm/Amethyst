@@ -7,6 +7,11 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
 
 object AbletonLayoutDetector {
+    data class AudibleAudioTracks(
+        val left: List<MidiTrack>,
+        val right: List<MidiTrack> = emptyList(),
+    )
+
     fun detectLayout(tracks: List<MidiTrack>): AbletonLayout {
         val audioTracks: List<Pair<Int, MidiTrack>> = tracks.filterNot {
             it.deviceChain.devices.firstOrNull { it is OriginalSimpler } == null &&
@@ -67,6 +72,39 @@ object AbletonLayoutDetector {
                 lightsTrack = lightsTracks.firstOrNull()?.second
             )
         }
+    }
+
+    fun findAudibleAudioTracks(
+        layout: AbletonLayout,
+        tracks: List<MidiTrack>,
+    ): AudibleAudioTracks {
+        val (leftPrimary, rightPrimary) = when (layout) {
+            is AbletonLayout.Single -> layout.audioTrack to null
+            is AbletonLayout.Dual2Light -> layout.audioLeft to layout.audioRight
+            is AbletonLayout.Dual4Light -> layout.audioLeft to layout.audioRight
+        }
+
+        val audibleSampleTracks = tracks.filter { track ->
+            track.deviceChain.mixer.on.manual.value &&
+                track.deviceChain.mixer.speaker.manual.value &&
+                MidiChainReader.getAllDevicesOfType<OriginalSimpler>(track).isNotEmpty()
+        }
+
+        fun forPrimary(primary: MidiTrack?): List<MidiTrack> {
+            if (primary == null) return emptyList()
+            val input = primary.deviceChain.midiInputRouting.target.value
+            return audibleSampleTracks.filter { candidate ->
+                candidate.id == primary.id ||
+                    (input.isNotBlank() && candidate.deviceChain.midiInputRouting.target.value == input)
+            }.let { selected ->
+                if (selected.any { it.id == primary.id }) selected else listOf(primary) + selected
+            }.distinctBy(MidiTrack::id)
+        }
+
+        return AudibleAudioTracks(
+            left = forPrimary(leftPrimary),
+            right = forPrimary(rightPrimary),
+        )
     }
 }
 

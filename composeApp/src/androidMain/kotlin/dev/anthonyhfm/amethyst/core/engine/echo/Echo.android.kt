@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.engine.echo
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
+import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioStopTicket
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -323,7 +324,7 @@ actual object Echo {
 
     actual fun stop(sourceId: String) = playback.stop(sourceId)
 
-    actual fun stopAll() = playback.stopAll()
+    actual fun stopAll(): AudioStopTicket = playback.stopAll()
 
     actual fun stopByOrigin(origin: Any?) = playback.stopByOrigin(origin)
 

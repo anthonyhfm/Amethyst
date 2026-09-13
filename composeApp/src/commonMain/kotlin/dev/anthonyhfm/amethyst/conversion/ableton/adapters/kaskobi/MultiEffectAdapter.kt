@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
@@ -12,11 +14,14 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState.TYPE
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
-class MultiEffectAdapter (
+class MultiEffectAdapter(
     private val device: MxDevice,
     private val midiContainer: MidiEffectGroupDevice?,
     private val instrumentContainer: InstrumentGroupDevice?,
-    private val drumContainer: DrumGroupDevice?
+    private val drumContainer: DrumGroupDevice?,
+    private val offset: IntOffset,
+    private val outputOffset: IntOffset,
+    private val chainDepth: Int,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val parameter: MxParameter.MxDIntParameter? = device.parameterList.parameterList.parameters.find {
@@ -24,6 +29,11 @@ class MultiEffectAdapter (
         } as? MxParameter.MxDIntParameter
 
         val steps = parameter?.timeable?.manual?.value ?: 1
+        val resetGroupId = Regex("\\\"MIDI Extension Choke\\\"\\s*:\\s*\\[\\s*(\\d+)")
+            .find(device.decodeBlob())
+            ?.groupValues?.get(1)
+            ?.toIntOrNull()
+            ?.takeIf { it > 0 }
 
         println("Multi Effect with $steps steps found.")
 
@@ -78,6 +88,7 @@ class MultiEffectAdapter (
         return listOf(
             MultiGroupChainDeviceState(
                 type = TYPE.FORWARD,
+                resetGroupId = resetGroupId,
                 groups = List(steps) { step ->
                     when {
                         instrumentContainer != null -> {
@@ -86,13 +97,7 @@ class MultiEffectAdapter (
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         instrumentBranches.getOrNull(step)?.let { br ->
-                                            addAll(
-                                                elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                    resolveAdapter(child)
-                                                        ?.toDeviceStates()
-                                                        ?.firstOrNull()
-                                                }
-                                            )
+                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
                                         }
                                     }
                                 )
@@ -104,13 +109,7 @@ class MultiEffectAdapter (
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         midiBranches.getOrNull(step)?.let { br ->
-                                            addAll(
-                                                elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                    resolveAdapter(child)
-                                                        ?.toDeviceStates()
-                                                        ?.firstOrNull()
-                                                }
-                                            )
+                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
                                         }
                                     }
                                 )
@@ -122,13 +121,7 @@ class MultiEffectAdapter (
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         drumBranches.getOrNull(step)?.let { br ->
-                                            addAll(
-                                                elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                    resolveAdapter(child)
-                                                        ?.toDeviceStates()
-                                                        ?.firstOrNull()
-                                                }
-                                            )
+                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
                                         }
                                     }
                                 )
@@ -140,4 +133,11 @@ class MultiEffectAdapter (
             )
         ).withMuteState(containerOnState)
     }
+
+    private fun resolveChildren(devices: List<AbletonDevice>) =
+        devices.flatMap { child ->
+            resolveAdapter(child, offset, outputOffset, chainDepth + 1)
+                ?.toDeviceStates()
+                .orEmpty()
+        }
 }

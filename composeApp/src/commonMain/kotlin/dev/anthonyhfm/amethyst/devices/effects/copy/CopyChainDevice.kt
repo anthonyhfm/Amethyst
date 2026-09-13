@@ -245,13 +245,13 @@ class CopyChainDevice : LEDChainDevice<CopyChainDeviceState>(), Chokeable {
 
         val wrapBoundsMode = if (boundsMode != CopyBoundsMode.NONE) boundsMode else CopyBoundsMode.FULL
         val wrapBounds = if (state.wrap) {
-            resolveCopyCoordinateBounds(signal.origin, wrapBoundsMode)
+            resolveCopyCoordinateBounds(signal.origin, signal.x, signal.y, wrapBoundsMode)
         } else {
             null
         }
 
         val isolateBounds = if (!state.wrap && boundsMode != CopyBoundsMode.NONE) {
-            resolveCopyCoordinateBounds(signal.origin, boundsMode)
+            resolveCopyCoordinateBounds(signal.origin, signal.x, signal.y, boundsMode)
         } else {
             null
         }

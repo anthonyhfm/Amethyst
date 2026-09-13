@@ -195,10 +195,24 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                 else -> false
             }
         }
+        val macroIndex = resolvedMacroIndex()
+        val targetValue = state.value.value
 
-        if (down && resolvedMacroId() != null) {
+        if (down && macroIndex != null) {
+            WorkspaceRepository.macros.value.getOrNull(macroIndex)?.let { macro ->
+                WorkspaceRepository.setMacroValue(
+                    index = macroIndex,
+                    macro = macro.copy(value = targetValue),
+                    undoable = false,
+                )
+            }
+
             val runtime = audioTriggerRuntime
-            val frame = runtime?.currentFrame ?: 0L
+            val currentFrame = runtime?.currentFrame ?: 0L
+            val requestedFrame = n.filterIsInstance<Signal.Midi>()
+                .firstNotNullOfOrNull { it.audioTriggerBatch?.requestedTargetFrame }
+                ?: currentFrame
+            val frame = maxOf(requestedFrame, currentFrame)
             activeSequence.value = runtime?.nextAutomationSequence() ?: activeSequence.value + 1L
             latchedValue.value = Float.NaN
             if (getDialAutomation(VALUE_PARAMETER_ID) != null) {
@@ -208,9 +222,10 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                     bpm = WorkspaceRepository.bpm.value.toFloat(),
                 )
             } else {
-                latchedValue.value = state.value.value / 127f
+                latchedValue.value = targetValue / 127f
             }
         }
+
         signalExit?.invoke(n)
     }
 
@@ -229,10 +244,16 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
     }
 
     private fun resolvedMacroId(): String? {
+        val index = resolvedMacroIndex() ?: return null
+        return WorkspaceRepository.macros.value.getOrNull(index)?.id
+    }
+
+    private fun resolvedMacroIndex(): Int? {
         val macros = WorkspaceRepository.macros.value
         if (macros.isEmpty()) return null
-        return macros.firstOrNull { it.id == state.value.macroId }?.id
-            ?: macros.getOrNull(state.value.macro.coerceIn(macros.indices))?.id
+        return macros.indexOfFirst { it.id == state.value.macroId }
+            .takeIf { it >= 0 }
+            ?: state.value.macro.takeIf { it in macros.indices }
     }
 
     companion object : ChainDeviceFactory<MacroControlChainDeviceState> {

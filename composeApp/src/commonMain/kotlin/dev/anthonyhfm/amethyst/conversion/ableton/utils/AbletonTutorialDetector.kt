@@ -9,60 +9,77 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import kotlin.math.roundToInt
 
 object AbletonTutorialDetector {
+    private data class AutoPlayTarget(
+        val offset: IntOffset,
+        val launchpadId: String?,
+    )
+
     internal fun beatsToMilliseconds(beats: Double, bpm: Double): Double =
         beats * (60_000.0 / bpm)
 
+    private fun dedupePageAutomationEvents(
+        events: List<AutomationEnvelopes.FloatEvent>,
+    ): List<AutomationEnvelopes.FloatEvent> {
+        val sortedEvents = events.withIndex()
+            .sortedWith(compareBy<IndexedValue<AutomationEnvelopes.FloatEvent>> { it.value.time }.thenBy { it.index })
+            .map(IndexedValue<AutomationEnvelopes.FloatEvent>::value)
+        val result = mutableListOf<AutomationEnvelopes.FloatEvent>()
+        for (event in sortedEvents) {
+            if (result.lastOrNull()?.time == event.time) {
+                result[result.lastIndex] = event
+            } else {
+                result += event
+            }
+        }
+        return result
+    }
+
     fun getAutoPlayData(layout: AbletonLayout, tracks: List<MidiTrack>): AutoPlayData {
-        println("=== TutorialDetector: START ===")
-        println("Layout: ${layout::class.simpleName}")
-        println("Total tracks: ${tracks.size}")
-        tracks.forEach { println("  Track: \"${it.name}\" | clips: ${it.takeLanes?.takeLanes?.lanes?.firstOrNull()?.clipAutomation?.events?.clips?.size ?: 0}") }
 
         var tutorialTracks = detectPossibleTutorialTracks(layout, tracks)
-        println("Tutorial-named tracks found: ${tutorialTracks.map { it.name }}")
 
         if (tutorialTracks.isEmpty()) {
-            println("No tutorial-named tracks → falling back to layout tracks (sampling/lights)")
             tutorialTracks = detectTutorialInLayoutTracks(layout)
-            println("Layout fallback tracks: ${tutorialTracks.map { it.name }}")
         }
 
         if (tutorialTracks.isEmpty()) {
-            println("=== TutorialDetector: No tutorial tracks found at all → empty AutoPlayData ===")
             return AutoPlayData(emptyMap())
         }
 
         var tutorialStartBeats = findTutorialStartBeats(tutorialTracks)
+        var tutorialEndBeats = findTutorialEndBeats(tutorialTracks)
         var rawActions: Map<Double, List<AutoPlayData.Action>> = buildActions(
             layout = layout,
             tutorialTracks = tutorialTracks,
             tutorialStartBeats = tutorialStartBeats
         )
-        println("rawActions after primary tracks: ${rawActions.size} time entries")
 
         if (rawActions.isEmpty()) {
-            println("Primary tracks yielded no actions → falling back to layout tracks (sampling/lights)")
             val fallbackTracks = detectTutorialInLayoutTracks(layout)
-            println("Layout fallback tracks: ${fallbackTracks.map { it.name }}")
             if (fallbackTracks.isNotEmpty()) {
                 tutorialStartBeats = findTutorialStartBeats(fallbackTracks)
+                tutorialEndBeats = findTutorialEndBeats(fallbackTracks)
                 rawActions = buildActions(
                     layout = layout,
                     tutorialTracks = fallbackTracks,
                     tutorialStartBeats = tutorialStartBeats
                 )
-                println("rawActions after fallback tracks: ${rawActions.size} time entries")
             }
         }
 
-        val macroActions = detectMacroAutomationActions(layout, tracks, tutorialStartBeats)
+        val macroActions = detectMacroAutomationActions(
+            layout = layout,
+            tracks = tracks,
+            tutorialStartBeats = tutorialStartBeats,
+            tutorialEndBeats = tutorialEndBeats,
+        )
         if (macroActions.isNotEmpty()) {
-            println("=== TutorialDetector: Merging ${macroActions.size} macro automation timestamps into AutoPlay ===")
             val combined = rawActions.toMutableMap()
             for ((timeMs, actionList) in macroActions) {
                 val existing = combined.getOrElse(timeMs) { emptyList() }
@@ -74,11 +91,9 @@ object AbletonTutorialDetector {
         val deduped = rawActions.mapValues { (_, list) -> list.distinct() }
 
         if (deduped.isEmpty()) {
-            println("=== TutorialDetector: deduped is empty → empty AutoPlayData ===")
             return AutoPlayData(emptyMap())
         }
 
-        println("=== TutorialDetector: SUCCESS → ${deduped.size} time entries, first few: ${deduped.keys.take(5)} ===")
         return AutoPlayData(deduped)
     }
 
@@ -103,24 +118,21 @@ object AbletonTutorialDetector {
         tutorialTracks: List<MidiTrack>,
         tutorialStartBeats: Double
     ): Map<Double, List<AutoPlayData.Action>> {
-        return if (layout is AbletonLayout.Single || tutorialTracks.size == 1) {
-            getTutorialForTrack(tutorialTracks.first(), IntOffset.Zero, tutorialStartBeats)
-        } else {
-            val leftActions = getTutorialForTrack(tutorialTracks[0], IntOffset.Zero, tutorialStartBeats)
-            val rightActions = getTutorialForTrack(tutorialTracks[1], IntOffset(x = 10, y = 0), tutorialStartBeats)
-
-            val allTimes = (leftActions.keys + rightActions.keys).toSet().sorted()
-            val combined = mutableMapOf<Double, List<AutoPlayData.Action>>()
-
-            for (time in allTimes) {
-                val leftList = leftActions[time].orEmpty()
-                val rightList = rightActions[time].orEmpty()
-                if (leftList.isNotEmpty() || rightList.isNotEmpty()) {
-                    combined[time] = leftList + rightList
-                }
+        val trackActions = tutorialTracks.map { track ->
+            val target = autoPlayTarget(layout, track)
+            getTutorialForTrack(
+                track = track,
+                offset = target.offset,
+                tutorialStartBeats = tutorialStartBeats,
+                launchpadId = target.launchpadId,
+            )
+        }
+        val allTimes = trackActions.flatMap { it.keys }.toSortedSet()
+        return buildMap {
+            allTimes.forEach { time ->
+                val actions = trackActions.flatMap { it[time].orEmpty() }
+                if (actions.isNotEmpty()) put(time, actions)
             }
-
-            combined
         }
     }
 
@@ -129,13 +141,14 @@ object AbletonTutorialDetector {
             .minOfOrNull { it.currentStart.value }
             ?: return emptyMap()
 
-        return getTutorialForTrack(track, offset, tutorialStartBeats)
+        return getTutorialForTrack(track, offset, tutorialStartBeats, launchpadId = null)
     }
 
     private fun getTutorialForTrack(
         track: MidiTrack,
         offset: IntOffset,
-        tutorialStartBeats: Double
+        tutorialStartBeats: Double,
+        launchpadId: String?,
     ): Map<Double, List<AutoPlayData.Action>> {
         data class NoteEvent(
             val startBeats: Double,
@@ -145,31 +158,22 @@ object AbletonTutorialDetector {
 
         val notes = mutableListOf<NoteEvent>()
 
-        val trackName = track.name
-
-        println("Trying to get tutorial from Track \"$trackName\"")
 
         val clips = findTutorialClips(track)
 
         if (clips.isEmpty()) {
-            println("No usable clips found in track \"$trackName\"")
             return emptyMap()
         }
 
-        println("Processing ${clips.size} clip(s) from track \"$trackName\"")
 
         val bpm = AbletonConverter.bpm
         if (bpm <= 0.0) {
-            println("AbletonConverter.bpm is <= 0 ($bpm). Cannot convert beats to ms.")
             return emptyMap()
         }
 
         val msPerBeat = beatsToMilliseconds(beats = 1.0, bpm = bpm)
         clips.forEach { clip ->
             val clipStartBeats = clip.currentStart.value
-            val clipEndBeats = clip.currentEnd.value
-
-            println("Using MidiClip (start=$clipStartBeats, end=$clipEndBeats) in track \"$trackName\"")
 
             val keyTracks = clip.notes.keyTracks.tracks
 
@@ -203,7 +207,6 @@ object AbletonTutorialDetector {
         }
 
         if (notes.isEmpty()) {
-            println("No qualifying MidiNoteEvent (velocity > 0) in tutorial clips of track \"$trackName\"")
             return emptyMap()
         }
 
@@ -216,7 +219,8 @@ object AbletonTutorialDetector {
             val action = AutoPlayData.Action(
                 x = x,
                 y = y,
-                down = down
+                down = down,
+                launchpadId = launchpadId,
             )
 
             val list = result.getOrPut(timeMs) { mutableListOf() }
@@ -273,6 +277,12 @@ object AbletonTutorialDetector {
             .minOfOrNull { it.currentStart.value }
             ?: 0.0
 
+    private fun findTutorialEndBeats(tracks: List<MidiTrack>): Double =
+        tracks
+            .flatMap(::findTutorialClips)
+            .maxOfOrNull { it.currentEnd.value }
+            ?: Double.POSITIVE_INFINITY
+
     private fun findTutorialClips(track: MidiTrack): List<MidiClip> {
         val takeLaneClips = track.takeLanes?.takeLanes?.lanes
             ?.flatMap { it.clipAutomation.events.clips }
@@ -281,13 +291,6 @@ object AbletonTutorialDetector {
         // Arrangement clips are the audible timeline. Take lanes are alternatives and
         // must only be considered when the track has no arrangement clips at all.
         val timelineClips = clipTimeableClips.ifEmpty { takeLaneClips }
-
-        println("  findTutorialClips(\"${track.name}\"): takeLanes=${track.takeLanes != null}, takeLaneClips=${takeLaneClips.size}, clipTimeableClips=${clipTimeableClips.size}")
-        timelineClips.forEach { clip ->
-            val keyTrackCount = clip.notes.keyTracks.tracks.size
-            val noteCount = clip.notes.keyTracks.tracks.sumOf { it.notes.notes.size }
-            println("    Clip id=${clip.id} name=\"${clip.clipName.value}\" start=${clip.currentStart.value} end=${clip.currentEnd.value} keyTracks=$keyTrackCount notes=$noteCount")
-        }
 
         if (timelineClips.isEmpty()) return emptyList()
 
@@ -300,47 +303,66 @@ object AbletonTutorialDetector {
                 it.clipName.value.contains("tutorial", ignoreCase = true)
             }
             if (namedTutorialClips.isNotEmpty()) {
-                println("  → Using ${namedTutorialClips.size} tutorial-named timeline clip(s)")
                 return namedTutorialClips
             }
         }
 
-        println("  → Using all ${nonEmptyClips.size} non-empty timeline clip(s)")
         return nonEmptyClips
     }
 
-    fun extractPageMacroAutomationTargets(tracks: List<MidiTrack>): Set<Int> {
-        val targetIds = mutableSetOf<Int>()
+    private fun pageAutomationTargetsByTrack(tracks: List<MidiTrack>): Map<Int, MidiTrack> {
+        val targets = mutableMapOf<Int, MidiTrack>()
+
+        // Page Switcher's Live API parameter 9/17 is the rack Chain Selector after
+        // 8/16 macros. Bind only the selector of the rack immediately following it.
         for (track in tracks) {
-            val allDevices = collectAllDevices(track.deviceChain.devices)
-            for (device in allDevices) {
+            val explicitTargets = track.deviceChain.devices.zipWithNext().mapNotNull { (candidate, following) ->
+                if (candidate is MxDeviceMidiEffect && isPageSwitcher(candidate)) {
+                    chainSelectorTarget(following)
+                } else null
+            }
+
+            if (explicitTargets.isNotEmpty()) {
+                explicitTargets.forEach { targets[it] = track }
+                continue
+            }
+
+            // Compatibility fallback for tracks whose Page Switcher file is unavailable.
+            // Keep this per-track: an explicit Page Switcher on one controller track must
+            // not suppress the restricted legacy targets on another controller track.
+            for (device in collectAllDevices(track.deviceChain.devices)) {
                 when (device) {
                     is InstrumentGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targetIds.add(it) }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targetIds.add(it) }
-                        device.macros.forEach { macro ->
-                            macro.automationTarget?.id?.let { targetIds.add(it) }
-                        }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = track }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = track }
                     }
                     is MidiEffectGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targetIds.add(it) }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targetIds.add(it) }
-                        device.macros.forEach { macro ->
-                            macro.automationTarget?.id?.let { targetIds.add(it) }
-                        }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = track }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = track }
                     }
                     is DrumGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targetIds.add(it) }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targetIds.add(it) }
-                        device.macros.forEach { macro ->
-                            macro.automationTarget?.id?.let { targetIds.add(it) }
-                        }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = track }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = track }
                     }
                     else -> {}
                 }
             }
         }
-        return targetIds
+        return targets
+    }
+
+    private fun isPageSwitcher(device: MxDeviceMidiEffect): Boolean {
+        val fileRef = device.patchSlot.value.patchRef?.fileRef ?: return false
+        val path = fileRef.relativePath.value ?: fileRef.path?.value.orEmpty()
+        return path.substringAfterLast('/').substringAfterLast('\\')
+            .equals("Page Switcher.amxd", ignoreCase = true)
+    }
+
+    private fun chainSelectorTarget(device: AbletonDevice): Int? = when (device) {
+        is InstrumentGroupDevice -> device.chainSelector.automationTarget?.id
+        is MidiEffectGroupDevice -> device.chainSelector.automationTarget?.id
+        is DrumGroupDevice -> device.chainSelector.automationTarget?.id
+        else -> null
     }
 
     private fun collectAllDevices(devices: List<AbletonDevice>): List<AbletonDevice> {
@@ -369,15 +391,51 @@ object AbletonTutorialDetector {
         return result
     }
 
+    private fun autoPlayTarget(layout: AbletonLayout, track: MidiTrack): AutoPlayTarget {
+        val index = sourceLaunchpadIndex(layout, track)
+        val fallbackOffset = IntOffset(x = index * 10, y = 0)
+        val launchpad = runCatching { AbletonConverter.launchpadTarget(fallbackOffset) }.getOrNull()
+        return AutoPlayTarget(
+            offset = launchpad?.offset ?: fallbackOffset,
+            launchpadId = launchpad?.launchpad?.id,
+        )
+    }
+
+    private fun sourceLaunchpadIndex(layout: AbletonLayout, track: MidiTrack): Int {
+        val leftTracks: List<MidiTrack?>
+        val rightTracks: List<MidiTrack?>
+        when (layout) {
+            is AbletonLayout.Single -> return 0
+            is AbletonLayout.Dual2Light -> {
+                leftTracks = listOf(layout.audioLeft, layout.lightsLeft)
+                rightTracks = listOf(layout.audioRight, layout.lightsRight)
+            }
+            is AbletonLayout.Dual4Light -> {
+                leftTracks = listOf(layout.audioLeft, layout.lightsLeft, layout.lightsLeftToRight)
+                rightTracks = listOf(layout.audioRight, layout.lightsRightToLeft, layout.lightsRight)
+            }
+        }
+
+        if (rightTracks.any { it?.id == track.id }) return 1
+        if (leftTracks.any { it?.id == track.id }) return 0
+
+        val input = track.deviceChain.midiInputRouting.target.value
+        val rightInputs = rightTracks.mapNotNull { it?.deviceChain?.midiInputRouting?.target?.value }
+            .filter(String::isNotBlank)
+            .toSet()
+        if (input.isNotBlank() && input in rightInputs) return 1
+
+        return 0
+    }
+
     fun detectMacroAutomationActions(
         layout: AbletonLayout,
         tracks: List<MidiTrack>,
-        tutorialStartBeats: Double
+        tutorialStartBeats: Double,
+        tutorialEndBeats: Double = Double.POSITIVE_INFINITY,
     ): Map<Double, List<AutoPlayData.Action>> {
-        val targetIds = extractPageMacroAutomationTargets(tracks)
-        if (targetIds.isEmpty()) return emptyMap()
-
-        println("Found Page Switch Macro automation target IDs: $targetIds")
+        val targetTracksById = pageAutomationTargetsByTrack(tracks)
+        if (targetTracksById.isEmpty()) return emptyMap()
 
         val bpm = AbletonConverter.bpm
         if (bpm <= 0.0) return emptyMap()
@@ -385,26 +443,22 @@ object AbletonTutorialDetector {
         val msPerBeat = beatsToMilliseconds(beats = 1.0, bpm = bpm)
         val result = mutableMapOf<Double, MutableList<AutoPlayData.Action>>()
 
-        val offset = IntOffset.Zero
-
         for (track in tracks) {
             val envelopes = track.automationEnvelopes?.envelopes?.envelopes.orEmpty()
             for (envelope in envelopes) {
                 val pointeeId = envelope.envelopeTarget?.pointeeId?.value
-                if (pointeeId != null && pointeeId in targetIds) {
+                val targetTrack = pointeeId?.let(targetTracksById::get)
+                if (targetTrack != null) {
+                    val target = autoPlayTarget(layout, targetTrack)
+                    val offset = target.offset
                     val rawEvents = envelope.automation?.events?.floatEvents.orEmpty()
                     if (rawEvents.isEmpty()) continue
 
-                    val sortedEvents = rawEvents
-                        .sortedWith(compareBy<AutomationEnvelopes.FloatEvent> { it.time }.thenBy { it.id ?: 0 })
-                    val dedupedEvents = mutableListOf<AutomationEnvelopes.FloatEvent>()
-                    for (ev in sortedEvents) {
-                        if (dedupedEvents.isNotEmpty() && dedupedEvents.last().time == ev.time) {
-                            dedupedEvents[dedupedEvents.lastIndex] = ev
-                        } else {
-                            dedupedEvents.add(ev)
-                        }
-                    }
+                    val dedupedEvents = pageAutomationEventsWithinTutorial(
+                        events = rawEvents,
+                        tutorialStartBeats = tutorialStartBeats,
+                        tutorialEndBeats = tutorialEndBeats,
+                    )
 
                     var lastEmittedPage = -1
 
@@ -421,18 +475,32 @@ object AbletonTutorialDetector {
                         val padX = if (targetPage < 8) 9 + offset.x else 0 + offset.x
                         val padY = 1 + (targetPage % 8) + offset.y
 
-                        val pressAction = AutoPlayData.Action(x = padX, y = padY, down = true)
-                        val releaseAction = AutoPlayData.Action(x = padX, y = padY, down = false)
+                        val pressAction = AutoPlayData.Action(
+                            x = padX,
+                            y = padY,
+                            down = true,
+                            launchpadId = target.launchpadId,
+                        )
+                        val releaseAction = pressAction.copy(down = false)
 
                         result.getOrPut(timeMs) { mutableListOf() }.add(pressAction)
                         result.getOrPut(timeMs + 50.0) { mutableListOf() }.add(releaseAction)
 
-                        println("  [Macro Automation] Page switch to Page ${targetPage + 1} (value=$targetPage) at beat ${event.time} (timeline beats=$timeBeats, ms=$timeMs) -> Pad ($padX, $padY)")
                     }
                 }
             }
         }
 
         return result
+    }
+
+    private fun pageAutomationEventsWithinTutorial(
+        events: List<AutomationEnvelopes.FloatEvent>,
+        tutorialStartBeats: Double,
+        tutorialEndBeats: Double,
+    ): List<AutomationEnvelopes.FloatEvent> {
+        val eventsByTime = dedupePageAutomationEvents(events)
+        return listOfNotNull(eventsByTime.lastOrNull { it.time <= tutorialStartBeats }) +
+            eventsByTime.filter { it.time > tutorialStartBeats && it.time <= tutorialEndBeats }
     }
 }

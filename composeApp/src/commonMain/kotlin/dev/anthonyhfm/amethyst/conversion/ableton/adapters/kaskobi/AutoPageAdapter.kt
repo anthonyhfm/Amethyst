@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi
 import dev.anthonyhfm.amethyst.conversion.ableton.AbletonConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak.utils.rythmIndexToDuration
-import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDevice
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.delay.DelayChainDeviceState
@@ -11,10 +10,7 @@ import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceSta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-class AutoPageAdapter(
-    val blob: String,
-    val xml: MxDevice
-) : AbletonAdapter() {
+class AutoPageAdapter(private val blob: String) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val data = jsonDecoder.decodeFromString<AutoPageData>(blob)
 
@@ -38,13 +34,13 @@ class AutoPageAdapter(
             add(
                 MacroControlChainDeviceState(
                     macro = 0,
-                    value = data.targetPage.first() - 1
+                    value = data.targetPage.first() - 1,
                 )
             )
         }
     }
 
-    val timeSplits = listOf<Pair<Int, Int>>(
+    private val timeSplits = listOf(
         Pair(0, 0),
         Pair(1, 1024),
         Pair(1, 512),
@@ -62,7 +58,7 @@ class AutoPageAdapter(
     )
 
     @Serializable
-    data class AutoPageData(
+    private data class AutoPageData(
         @SerialName("live.numbox")
         val targetPage: List<Int>,
 

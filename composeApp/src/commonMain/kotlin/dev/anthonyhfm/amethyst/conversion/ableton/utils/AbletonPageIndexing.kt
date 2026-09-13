@@ -1,8 +1,14 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.utils
 
 internal object AbletonPageIndexing {
-    fun sourceOffset(chainDepth: Int, selectorMinimum: Int?): Int =
-        if (chainDepth == 0 && selectorMinimum == 1) 1 else 0
+    fun controlsPages(
+        hasKeyMidiMapping: Boolean,
+        selectorRanges: Iterable<Pair<Int, Int>>,
+    ): Boolean = hasKeyMidiMapping || selectorRanges.any { (minimum, maximum) ->
+        minimum != 0 || (maximum != 0 && maximum != 127)
+    }
+
+    fun sourceOffset(selectorMinimum: Int?): Int = if (selectorMinimum == 1) 1 else 0
 
     fun normalizeSelectorValue(value: Int, sourceOffset: Int): Int =
         value - sourceOffset

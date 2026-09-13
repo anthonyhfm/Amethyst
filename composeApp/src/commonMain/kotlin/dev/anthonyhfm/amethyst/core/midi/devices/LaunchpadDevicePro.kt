@@ -3,11 +3,31 @@ package dev.anthonyhfm.amethyst.core.midi.devices
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiDeviceConnection
+import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
+
+private fun launchpadProControlChangeInput(inputData: ByteArray): MidiInputData? {
+    if (inputData.size != 3 || (inputData[0].toInt() and 0xF0) != 0xB0) return null
+
+    val controller = inputData[1].toInt() and 0x7F
+    val isPerimeterButton = controller in 1..8 ||
+        controller in 91..98 ||
+        (controller in 10..80 && controller % 10 == 0) ||
+        (controller in 19..89 && controller % 10 == 9)
+    if (!isPerimeterButton) return null
+
+    return MidiInputData(
+        pitch = controller,
+        velocity = inputData[2].toInt() and 0x7F,
+    )
+}
 
 class LaunchpadDevicePro(
     connection: AmethystMidiDeviceConnection,
     firmware: LaunchpadFirmware = LaunchpadFirmware.Original,
 ) : LaunchpadDevice(connection, firmware) {
+    override fun handleMidiInput(inputData: ByteArray): MidiInputData? =
+        launchpadProControlChangeInput(inputData) ?: super.handleMidiInput(inputData)
+
     override fun prepareFastLedUpdates(
         updates: List<RawLEDUpdate>,
     ): List<RawLEDUpdate> = updates.filter { update ->

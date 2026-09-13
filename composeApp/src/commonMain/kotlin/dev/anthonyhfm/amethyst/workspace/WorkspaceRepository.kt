@@ -66,6 +66,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.midi.AmethystMidiManager
 import dev.anthonyhfm.amethyst.core.network.presence.CollaborationPresence
+import dev.anthonyhfm.amethyst.core.engine.elements.updateSignalMacroValues
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import kotlinx.coroutines.CoroutineScope
@@ -134,6 +135,11 @@ object WorkspaceRepository {
 
     private val _macros: MutableStateFlow<List<Macro>> = MutableStateFlow(listOf(Macro(1)))
     val macros: StateFlow<List<Macro>> = _macros.asStateFlow()
+
+    private fun publishMacros(macros: List<Macro>) {
+        updateSignalMacroValues(macros.map(Macro::value))
+        _macros.value = macros
+    }
 
     private val _parameterMappings = MutableStateFlow<List<ParameterMapping>>(emptyList())
     val parameterMappings: StateFlow<List<ParameterMapping>> = _parameterMappings.asStateFlow()
@@ -406,7 +412,7 @@ object WorkspaceRepository {
             )
         }
         isApplyingRemoteMacrosUpdate = fromRemote
-        _macros.update { after }
+        publishMacros(after)
         if (!fromRemote) isApplyingRemoteMacrosUpdate = false
     }
 
@@ -431,7 +437,7 @@ object WorkspaceRepository {
             )
         }
         isApplyingRemoteMacrosUpdate = fromRemote
-        _macros.update { macros }
+        publishMacros(macros)
         if (!fromRemote) isApplyingRemoteMacrosUpdate = false
     }
 
@@ -596,17 +602,19 @@ object WorkspaceRepository {
         }
     }
 
-    fun resetMulti() {
+    fun resetMulti(targetId: Int? = null) {
         fun recursiveResetMulti(chain: Chain) {
             chain.devices.value.forEach { device ->
                 when (device) {
                     is MultiGroupChainDevice -> {
-                        device.state.update {
-                            it.copy(
-                                currentMultiIndex = if (it.type == MultiGroupChainDeviceState.TYPE.BACKWARD) {
-                                    it.groups.lastIndex
-                                } else { 0 }
-                            )
+                        device.state.update { state ->
+                            if (targetId == null || state.resetGroupId == targetId) {
+                                state.copy(
+                                    currentMultiIndex = if (state.type == MultiGroupChainDeviceState.TYPE.BACKWARD) {
+                                        state.groups.lastIndex
+                                    } else { 0 }
+                                )
+                            } else state
                         }
                     }
                 }
@@ -679,7 +687,7 @@ object WorkspaceRepository {
         if (fromRemote) {
             syncMacrosSize(workspaceData.macros, fromRemote = true)
         } else {
-            _macros.update { workspaceData.macros }
+            publishMacros(workspaceData.macros)
         }
         setParameterMappings(
             workspaceData.parameterMappings,
@@ -1041,7 +1049,7 @@ object WorkspaceRepository {
         Heaven.clear()
         AudioLibraryRepository.clear()
         StemExtractionRepository.reset()
-        TransmitChainDevice.clearReceiversForTesting()
+        TransmitChainDevice.clearReceivers()
         AutomappingManager.reset()
 
         // Reset chains
@@ -1061,7 +1069,7 @@ object WorkspaceRepository {
         // Reset state
         bounds = Pair(IntOffset(0, 0), IntSize(0, 0))
         workspaceMeta = null
-        _macros.update { listOf(Macro(1)) }
+        publishMacros(listOf(Macro(1)))
         _parameterMappings.value = emptyList()
         replaceMode(LayoutWorkspaceMode())
         _bpm.update { 120.00 }

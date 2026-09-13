@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.conversion.ableton
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.AmethystConverter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceInstrumentAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.MxDeviceMidiEffectAdapter
@@ -7,14 +8,20 @@ import dev.anthonyhfm.amethyst.conversion.apollo.ApolloConverter
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
 import dev.anthonyhfm.amethyst.core.util.determineFormat
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton.OriginalSimplerAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.Ableton
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
+import dev.anthonyhfm.amethyst.conversion.ableton.data.GroupTrack
+import dev.anthonyhfm.amethyst.conversion.ableton.data.MidiTrack
+import dev.anthonyhfm.amethyst.conversion.ableton.data.OriginalSimpler
+import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Compressor2
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiChainReader
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayout
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonLayoutDetector
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.AbletonTutorialDetector
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.Dual2LightLayoutScanner
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.OriginalSimplerPrerenderer
+import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiExtensionMaskRouter
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.PaletteFileParser
 import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.core.util.FileHelper
@@ -24,10 +31,12 @@ import dev.anthonyhfm.amethyst.core.util.ZipEntry
 import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
 import dev.anthonyhfm.amethyst.core.util.getProjectArchiveEntries
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
+import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.chain.data.findMaxMacroIndex
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
@@ -167,10 +176,7 @@ object AbletonConverter : AmethystConverter {
         val readingAlsMsg = runCatching { runBlocking { getString(Res.string.home_loading_reading_als) } }.getOrDefault("Reading Ableton Live-Set...")
         reporter?.update(0.12f, statusText = readingAlsMsg, detailText = "$projectName.als")
 
-        val decodedAlsBytes = Zip.decode(alsEntry.data)
-        val sanitizedAlsString = sanitizeAlsXml(decodedAlsBytes.decodeToString())
-
-        val abletonData = xml.decodeFromString<Ableton>(sanitizedAlsString)
+        val abletonData = decodeAbletonAls(alsEntry.data)
 
         zipEntries.remove(alsEntry.path)
 
@@ -245,9 +251,9 @@ object AbletonConverter : AmethystConverter {
         val readingMsg = runCatching { runBlocking { getString(Res.string.home_loading_reading_als) } }.getOrDefault("Reading Ableton Live-Set...")
         reporter?.update(0.08f, statusText = readingMsg, detailText = file.name)
 
-        val liveSetBytes = Zip.decode(runBlocking { AbletonConverter.file?.readBytes() ?: ByteArray(0) })
-        val sanitizedAlsString = sanitizeAlsXml(liveSetBytes.decodeToString())
-        val abletonData = xml.decodeFromString<Ableton>(sanitizedAlsString)
+        val abletonData = decodeAbletonAls(
+            runBlocking { AbletonConverter.file?.readBytes() ?: ByteArray(0) },
+        )
 
         loadPalette(palettePath)
 
@@ -281,186 +287,422 @@ object AbletonConverter : AmethystConverter {
         this.launchpadLayout = launchpadLayout
         val leftLaunchpadOffset = launchpadLayout.target(index = 0).offset
 
-        liveVersion = when {
-            abletonData.minorVersion.startsWith("9") -> LiveVersion.LIVE_9
-            abletonData.minorVersion.startsWith("10") -> LiveVersion.LIVE_10
-            abletonData.minorVersion.startsWith("11") -> LiveVersion.LIVE_11
-            abletonData.minorVersion.startsWith("12") -> LiveVersion.LIVE_12
-            else -> null
-        }
-
-        val autoPlayData: AutoPlayData = AbletonTutorialDetector.getAutoPlayData(layout, abletonData.liveSet.tracks.midiTracks)
-
-        val audioTracks = when (layout) {
-            is AbletonLayout.Single -> listOfNotNull(layout.audioTrack)
-            is AbletonLayout.Dual2Light -> listOfNotNull(layout.audioLeft, layout.lightsLeft, layout.audioRight, layout.lightsRight)
-            is AbletonLayout.Dual4Light -> listOfNotNull(layout.audioLeft, layout.lightsLeft, layout.lightsLeftToRight, layout.audioRight, layout.lightsRight, layout.lightsRightToLeft)
-        }
-
-        val decodingSamplesMsg = runCatching { runBlocking { getString(Res.string.home_loading_decoding_audio_samples) } }.getOrDefault("Decoding audio samples...")
-        reporter?.update(0.25f, statusText = decodingSamplesMsg, detailText = null)
-        val audioReporter = reporter?.subReporter(0.25f, 0.75f)
-        val renderedAudio = audioRenderer.decodeAll(audioTracks, reporter = audioReporter)
-        audioMap = renderedAudio.states
-        audioSources = renderedAudio.sources
-
-        val analyzingLightsMsg = runCatching { runBlocking { getString(Res.string.home_loading_analyzing_light_chains) } }.getOrDefault("Analyzing light chains...")
-        reporter?.update(0.78f, statusText = analyzingLightsMsg, detailText = null)
-
-        if (layout is AbletonLayout.Dual2Light) {
-            layout.lightsLeft?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, leftLaunchpadOffset) }
-            layout.lightsRight?.let {
-                Dual2LightLayoutScanner.scanTrackForMixer(it, launchpadLayout.target(index = 1).offset)
+        return try {
+            MidiExtensionMaskRouter.prepare(abletonData.liveSet.tracks.midiTracks)
+            when (layout) {
+                is AbletonLayout.Single -> {
+                    MidiExtensionMaskRouter.registerOutputTarget(layout.lightsTrack, leftLaunchpadOffset)
+                }
+                is AbletonLayout.Dual2Light -> {
+                    MidiExtensionMaskRouter.registerOutputTarget(layout.lightsLeft, leftLaunchpadOffset)
+                    MidiExtensionMaskRouter.registerOutputTarget(
+                        layout.lightsRight,
+                        launchpadLayout.target(index = 1).offset,
+                    )
+                }
+                is AbletonLayout.Dual4Light -> {
+                    MidiExtensionMaskRouter.registerOutputTarget(layout.lightsLeft, leftLaunchpadOffset)
+                    MidiExtensionMaskRouter.registerOutputTarget(layout.lightsRightToLeft, leftLaunchpadOffset)
+                    MidiExtensionMaskRouter.registerOutputTarget(
+                        layout.lightsLeftToRight,
+                        launchpadLayout.target(index = 1).offset,
+                    )
+                    MidiExtensionMaskRouter.registerOutputTarget(
+                        layout.lightsRight,
+                        launchpadLayout.target(index = 1).offset,
+                    )
+                }
             }
-        }
+            MidiExtensionMaskRouter.materializeMasks()
 
-        val rawLights = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
-            StateChain(
-                devices = listOf(
-                    GroupChainDeviceState(
-                        groups = if (layout is AbletonLayout.Dual2Light) {
-                            listOf(
-                                Group(
-                                    name = "Left",
-                                    stateChain = layout.lightsLeft?.let {
-                                        MidiChainReader(offset = leftLaunchpadOffset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                ),
-                                Group(
-                                    name = "Right",
-                                    stateChain = layout.lightsRight?.let {
-                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                )
-                            )
-                        } else if (layout is AbletonLayout.Dual4Light) {
-                            listOf(
-                                Group(
-                                    name = "Left",
-                                    stateChain = layout.lightsLeft?.let {
-                                        MidiChainReader(offset = leftLaunchpadOffset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                ),
-                                Group(
-                                    name = "Left to Right",
-                                    stateChain = layout.lightsLeftToRight?.let {
-                                        MidiChainReader(
+            liveVersion = when {
+                abletonData.minorVersion.startsWith("9") -> LiveVersion.LIVE_9
+                abletonData.minorVersion.startsWith("10") -> LiveVersion.LIVE_10
+                abletonData.minorVersion.startsWith("11") -> LiveVersion.LIVE_11
+                abletonData.minorVersion.startsWith("12") -> LiveVersion.LIVE_12
+                else -> null
+            }
+
+            val autoPlayData: AutoPlayData = AbletonTutorialDetector.getAutoPlayData(layout, abletonData.liveSet.tracks.midiTracks)
+
+            val audibleAudioTracks = AbletonLayoutDetector.findAudibleAudioTracks(
+                layout = layout,
+                tracks = abletonData.liveSet.tracks.midiTracks,
+            )
+            val sampleTracks = abletonData.liveSet.tracks.midiTracks.filter { track ->
+                MidiChainReader.getAllDevicesOfType<OriginalSimpler>(track).isNotEmpty()
+            }
+
+            val decodingSamplesMsg = runCatching { runBlocking { getString(Res.string.home_loading_decoding_audio_samples) } }.getOrDefault("Decoding audio samples...")
+            reporter?.update(0.25f, statusText = decodingSamplesMsg, detailText = null)
+            val audioReporter = reporter?.subReporter(0.25f, 0.75f)
+            val renderedAudio = audioRenderer.decodeAll(sampleTracks, reporter = audioReporter)
+            audioMap = renderedAudio.states
+            audioSources = renderedAudio.sources
+
+            val analyzingLightsMsg = runCatching { runBlocking { getString(Res.string.home_loading_analyzing_light_chains) } }.getOrDefault("Analyzing light chains...")
+            reporter?.update(0.78f, statusText = analyzingLightsMsg, detailText = null)
+
+            if (layout is AbletonLayout.Dual2Light) {
+                layout.lightsLeft?.let { Dual2LightLayoutScanner.scanTrackForMixer(it, leftLaunchpadOffset) }
+                layout.lightsRight?.let {
+                    Dual2LightLayoutScanner.scanTrackForMixer(it, launchpadLayout.target(index = 1).offset)
+                }
+            }
+
+            val rawLights = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
+                StateChain(
+                    devices = listOf(
+                        GroupChainDeviceState(
+                            groups = if (layout is AbletonLayout.Dual2Light) {
+                                listOf(
+                                    Group(
+                                        name = "Left",
+                                        stateChain = layout.lightsLeft?.let {
+                                            MidiChainReader(offset = leftLaunchpadOffset)
+                                                .readMidiChain(it)
+                                        } ?: StateChain(emptyList())
+                                    ),
+                                    Group(
+                                        name = "Right",
+                                        stateChain = layout.lightsRight?.let {
+                                            MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
+                                                .readMidiChain(it)
+                                        } ?: StateChain(emptyList())
+                                    )
+                                ) + maskGroups()
+                            } else if (layout is AbletonLayout.Dual4Light) {
+                                listOf(
+                                    Group(
+                                        name = "Left",
+                                        stateChain = layout.lightsLeft?.let {
+                                            MidiChainReader(offset = leftLaunchpadOffset)
+                                                .readMidiChain(it)
+                                        } ?: StateChain(emptyList())
+                                    ),
+                                    Group(
+                                        name = "Left to Right",
+                                        stateChain = layout.lightsLeftToRight?.let {
+                                            MidiChainReader(
+                                                offset = leftLaunchpadOffset,
+                                                outputOffset = launchpadLayout.offsetBetween(fromIndex = 0, toIndex = 1),
+                                            )
+                                                .readMidiChain(it)
+                                        } ?: StateChain(emptyList())
+                                    ),
+                                    Group(
+                                        name = "Right",
+                                        stateChain = layout.lightsRight?.let {
+                                            MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
+                                                .readMidiChain(it)
+                                        } ?: StateChain(emptyList())
+                                    ),
+                                    Group(
+                                        name = "Right to Left",
+                                        stateChain = layout.lightsRightToLeft?.let {
+                                            MidiChainReader(
+                                                offset = launchpadLayout.target(index = 1).offset,
+                                                outputOffset = launchpadLayout.offsetBetween(fromIndex = 1, toIndex = 0),
+                                            )
+                                                .readMidiChain(it)
+                                        } ?: StateChain(emptyList())
+                                    )
+                                ) + maskGroups()
+                            } else error("This should never happen")
+                        )
+                    )
+                )
+            } else {
+                val direct = (layout as AbletonLayout.Single).lightsTrack?.let {
+                    MidiChainReader(offset = leftLaunchpadOffset).readMidiChain(it)
+                } ?: StateChain(emptyList())
+                val masks = maskGroups()
+                if (masks.isEmpty()) direct else StateChain(
+                    devices = listOf(
+                        GroupChainDeviceState(
+                            groups = listOf(Group(name = "Lights", stateChain = direct)) + masks,
+                        )
+                    )
+                )
+            }
+
+            fun buildLegacyRawSamples(): StateChain = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
+                StateChain(
+                    devices = listOf(
+                        GroupChainDeviceState(
+                            groups = if (layout is AbletonLayout.Dual2Light) {
+                                listOf(
+                                    Group(
+                                        name = "Left",
+                                        stateChain = readParallelTracks(
+                                            tracks = audibleAudioTracks.left,
                                             offset = leftLaunchpadOffset,
-                                            outputOffset = launchpadLayout.offsetBetween(fromIndex = 0, toIndex = 1),
                                         )
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                ),
-                                Group(
-                                    name = "Right",
-                                    stateChain = layout.lightsRight?.let {
-                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                ),
-                                Group(
-                                    name = "Right to Left",
-                                    stateChain = layout.lightsRightToLeft?.let {
-                                        MidiChainReader(
+                                    ),
+                                    Group(
+                                        name = "Right",
+                                        stateChain = readParallelTracks(
+                                            tracks = audibleAudioTracks.right,
                                             offset = launchpadLayout.target(index = 1).offset,
-                                            outputOffset = launchpadLayout.offsetBetween(fromIndex = 1, toIndex = 0),
                                         )
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
+                                    )
                                 )
-                            )
-                        } else error("This should never happen")
+                            } else if (layout is AbletonLayout.Dual4Light) {
+                                listOf(
+                                    Group(
+                                        name = "Left",
+                                        stateChain = readParallelTracks(
+                                            tracks = audibleAudioTracks.left,
+                                            offset = leftLaunchpadOffset,
+                                        )
+                                    ),
+                                    Group(
+                                        name = "Right",
+                                        stateChain = readParallelTracks(
+                                            tracks = audibleAudioTracks.right,
+                                            offset = launchpadLayout.target(index = 1).offset,
+                                        )
+                                    )
+                                )
+                            } else error("This should never happen")
+                        )
                     )
                 )
-            )
-        } else {
-            (layout as AbletonLayout.Single).lightsTrack?.let {
-                MidiChainReader(offset = leftLaunchpadOffset).readMidiChain(it)
-            } ?: StateChain(emptyList())
-        }
-
-        val rawSamples = if (layout is AbletonLayout.Dual2Light || layout is AbletonLayout.Dual4Light) {
-            StateChain(
-                devices = listOf(
-                    GroupChainDeviceState(
-                        groups = if (layout is AbletonLayout.Dual2Light) {
-                            listOf(
-                                Group(
-                                    name = "Left",
-                                    stateChain = layout.audioLeft?.let {
-                                        MidiChainReader(offset = leftLaunchpadOffset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                ),
-                                Group(
-                                    name = "Right",
-                                    stateChain = layout.audioRight?.let {
-                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                )
-                            )
-                        } else if (layout is AbletonLayout.Dual4Light) {
-                            listOf(
-                                Group(
-                                    name = "Left",
-                                    stateChain = layout.audioLeft?.let {
-                                        MidiChainReader(offset = leftLaunchpadOffset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                ),
-                                Group(
-                                    name = "Right",
-                                    stateChain = layout.audioRight?.let {
-                                        MidiChainReader(offset = launchpadLayout.target(index = 1).offset)
-                                            .readMidiChain(it)
-                                    } ?: StateChain(emptyList())
-                                )
-                            )
-                        } else error("This should never happen")
-                    )
+            } else {
+                readParallelTracks(
+                    tracks = audibleAudioTracks.left,
+                    offset = leftLaunchpadOffset,
                 )
+            }
+
+            val rawSamples = buildAbletonAudioGraph(
+                sampleTracks = sampleTracks,
+                groupTracks = abletonData.liveSet.tracks.groupTracks,
+                masterDevices = abletonData.liveSet.masterTrack.deviceChain.devices,
+                audibleAudioTracks = audibleAudioTracks,
+                sidechainTrackIds = sidechainTrackIds(
+                    tracks = abletonData.liveSet.tracks.midiTracks,
+                    groupTracks = abletonData.liveSet.tracks.groupTracks,
+                    masterDevices = abletonData.liveSet.masterTrack.deviceChain.devices,
+                ),
+                leftOffset = leftLaunchpadOffset,
+                rightOffset = if (launchpadLayout.launchpads.size > 1) {
+                    launchpadLayout.target(index = 1).offset
+                } else {
+                    leftLaunchpadOffset
+                },
+            ) ?: buildLegacyRawSamples()
+
+            val projectAudioSources = audioSources
+
+            val maxMacroIndex = maxOf(
+                rawLights.findMaxMacroIndex(),
+                rawSamples.findMaxMacroIndex()
             )
-        } else {
-            (layout as AbletonLayout.Single).audioTrack?.let {
-                MidiChainReader(offset = leftLaunchpadOffset).readMidiChain(it)
-            } ?: StateChain(emptyList())
-        }
+            val macroCount = maxOf(maxMacroIndex + 1, 1)
+            val macros = List(macroCount) { Macro(0) }
 
-        val projectAudioSources = audioSources
-        audioMap = emptyMap()
-        audioSources = emptyList()
-        MxDeviceMidiEffectAdapter.fileHashMap.clear()
-        MxDeviceInstrumentAdapter.fileHashMap.clear()
-        projectLayout = null
-
-        val maxMacroIndex = maxOf(
-            rawLights.findMaxMacroIndex(),
-            rawSamples.findMaxMacroIndex()
-        )
-        val macroCount = maxOf(maxMacroIndex + 1, 1)
-        val macros = List(macroCount) { Macro(0) }
-
-        return SavableWorkspaceData(
-            title = name,
-            lights = rawLights,
-            sampling = rawSamples,
-            autoPlay = autoPlayData,
-            settings = WorkspaceSettings(
-                bpm = bpm
-            ),
-            launchpadDevices = launchpadLayout.launchpads,
-            macros = macros,
-            audioSources = projectAudioSources,
-        ).also {
+            SavableWorkspaceData(
+                title = name,
+                lights = rawLights,
+                sampling = rawSamples,
+                autoPlay = autoPlayData,
+                settings = WorkspaceSettings(
+                    bpm = bpm
+                ),
+                launchpadDevices = launchpadLayout.launchpads,
+                macros = macros,
+                audioSources = projectAudioSources,
+            )
+        } finally {
+            audioMap = emptyMap()
+            audioSources = emptyList()
+            MxDeviceMidiEffectAdapter.fileHashMap.clear()
+            MxDeviceInstrumentAdapter.fileHashMap.clear()
+            projectLayout = null
             this.launchpadLayout = null
+            MidiExtensionMaskRouter.clear()
         }
     }
 
-    internal fun launchpadTarget(offset: androidx.compose.ui.unit.IntOffset): AbletonLaunchpadLayout.Target =
+    private fun maskGroups(): List<Group> {
+        return MidiExtensionMaskRouter.channels.map { channel ->
+            Group(
+                name = "MIDIext Mask $channel",
+                stateChain = StateChain(devices = listOf(MidiExtensionMaskRouter.createMask(channel))),
+            )
+        }
+    }
+
+    private fun readParallelTracks(
+        tracks: List<MidiTrack>,
+        offset: IntOffset,
+    ): StateChain {
+        if (tracks.isEmpty()) return StateChain(emptyList())
+        if (tracks.size == 1) return MidiChainReader(offset = offset).readMidiChain(tracks.single())
+
+        return StateChain(
+            devices = listOf(
+                GroupChainDeviceState(
+                    groups = tracks.map { track ->
+                        Group(
+                            name = track.name,
+                            stateChain = MidiChainReader(offset = offset).readMidiChain(track),
+                        )
+                    },
+                )
+            )
+        )
+    }
+
+    private fun buildAbletonAudioGraph(
+        sampleTracks: List<MidiTrack>,
+        groupTracks: List<GroupTrack>,
+        masterDevices: List<AbletonDevice>,
+        audibleAudioTracks: AbletonLayoutDetector.AudibleAudioTracks,
+        sidechainTrackIds: Set<Int>,
+        leftOffset: IntOffset,
+        rightOffset: IntOffset,
+    ): StateChain? {
+        if (sampleTracks.isEmpty() || groupTracks.isEmpty()) return null
+
+        val graphTracks = (
+            audibleAudioTracks.left + audibleAudioTracks.right +
+                sampleTracks.filter { it.id in sidechainTrackIds }
+            )
+            .distinctBy(MidiTrack::id)
+
+        val relevantGroupIds = mutableSetOf<Int>()
+        val groupsById = groupTracks.associateBy(GroupTrack::id)
+        graphTracks.forEach { track ->
+            var parentId = track.trackGroupId.value
+            val visited = mutableSetOf<Int>()
+            while (parentId >= 0 && visited.add(parentId)) {
+                relevantGroupIds += parentId
+                parentId = groupsById[parentId]?.trackGroupId?.value ?: -1
+            }
+        }
+
+        val rightTrackIds = audibleAudioTracks.right.mapTo(mutableSetOf(), MidiTrack::id)
+        val rightInputTargets = audibleAudioTracks.right
+            .map { it.deviceChain.midiInputRouting.target.value }
+            .filter(String::isNotBlank)
+            .toSet()
+        val convertedTracks = graphTracks.associate { track ->
+            val isRightTrack = track.id in rightTrackIds ||
+                track.deviceChain.midiInputRouting.target.value in rightInputTargets
+            val offset = if (isRightTrack) rightOffset else leftOffset
+            val mainOutputEnabled = track.deviceChain.mixer.on.manual.value &&
+                track.deviceChain.mixer.speaker.manual.value
+            val busId = abletonTrackPostFxBusId(track.id)
+            track.id to MidiChainReader(offset = offset)
+                .readMidiChain(track)
+                .routeSampleOutput(
+                    audibleOutput = mainOutputEnabled,
+                    sidechainBusId = busId,
+                )
+        }
+
+        fun adaptedEffects(devices: List<AbletonDevice>): List<DeviceState> = devices.flatMap { device ->
+            AbletonAdapter.resolveAdapter(device = device)?.toDeviceStates().orEmpty()
+        }
+
+        fun buildGroup(group: GroupTrack): StateChain {
+            val branches = buildList {
+                groupTracks
+                    .filter { it.id in relevantGroupIds && it.trackGroupId.value == group.id }
+                    .forEach { child ->
+                        add(Group(name = child.name, stateChain = buildGroup(child)))
+                    }
+                graphTracks
+                    .filter { it.trackGroupId.value == group.id }
+                    .forEach { track ->
+                        add(Group(name = track.name, stateChain = convertedTracks.getValue(track.id)))
+                    }
+            }
+            val devices = mutableListOf<DeviceState>()
+            if (branches.isNotEmpty()) {
+                devices += GroupChainDeviceState(groups = branches)
+            }
+            devices += adaptedEffects(group.deviceChain.devices)
+            if (!group.deviceChain.mixer.on.manual.value || !group.deviceChain.mixer.speaker.manual.value) {
+                devices.forEach { it.isMuted = true }
+            }
+            return StateChain(devices)
+        }
+
+        val topBranches = buildList {
+            groupTracks
+                .filter { it.id in relevantGroupIds && it.trackGroupId.value < 0 }
+                .forEach { group ->
+                    add(Group(name = group.name, stateChain = buildGroup(group)))
+                }
+            graphTracks
+                .filter { it.trackGroupId.value < 0 }
+                .forEach { track ->
+                    add(Group(name = track.name, stateChain = convertedTracks.getValue(track.id)))
+                }
+        }
+        if (topBranches.isEmpty()) return null
+
+        val devices = mutableListOf<DeviceState>()
+        if (topBranches.size == 1) {
+            devices += topBranches.single().stateChain.devices
+        } else {
+            devices += GroupChainDeviceState(groups = topBranches)
+        }
+        devices += adaptedEffects(masterDevices)
+        return StateChain(devices)
+    }
+
+    private fun abletonTrackPostFxBusId(trackId: Int): String =
+        "ableton-track-$trackId-postfx"
+
+    private fun sidechainTrackIds(
+        tracks: List<MidiTrack>,
+        groupTracks: List<GroupTrack>,
+        masterDevices: List<AbletonDevice>,
+    ): Set<Int> {
+        val compressors = tracks.flatMap { track ->
+            MidiChainReader.getAllDevicesOfType<Compressor2>(track)
+        } +
+            groupTracks.flatMap { it.deviceChain.devices.filterIsInstance<Compressor2>() } +
+            masterDevices.filterIsInstance<Compressor2>()
+        return compressors.mapNotNullTo(mutableSetOf()) { compressor ->
+            Regex("^AudioIn/Track\\.(\\d+)/PostFxOut$")
+                .matchEntire(compressor.sideChain.routedInput.routable.target.value)
+                ?.groupValues?.get(1)?.toIntOrNull()
+        }
+    }
+
+    private fun StateChain.routeSampleOutput(
+        audibleOutput: Boolean,
+        sidechainBusId: String,
+    ): StateChain = copy(
+        devices = devices.map { state ->
+            val routed = when (state) {
+                is SampleChainDeviceState -> state.copy(
+                    audibleOutput = audibleOutput,
+                    sidechainBusId = sidechainBusId,
+                )
+                is GroupChainDeviceState -> state.copy(
+                    groups = state.groups.map { group ->
+                        group.copy(stateChain = group.stateChain.routeSampleOutput(audibleOutput, sidechainBusId))
+                    },
+                )
+                is MultiGroupChainDeviceState -> state.copy(
+                    groups = state.groups.map { group ->
+                        group.copy(stateChain = group.stateChain.routeSampleOutput(audibleOutput, sidechainBusId))
+                    },
+                    preprocessChain = state.preprocessChain.routeSampleOutput(audibleOutput, sidechainBusId),
+                )
+                else -> state
+            }
+            routed.also { it.isMuted = state.isMuted }
+        },
+    )
+
+    internal fun launchpadTarget(offset: IntOffset): AbletonLaunchpadLayout.Target =
         checkNotNull(launchpadLayout) { "Ableton launchpads must be allocated before converting devices" }
             .targetAt(offset)
 
@@ -479,12 +721,29 @@ object AbletonConverter : AmethystConverter {
         LIVE_9
     }
 
-    internal fun sanitizeAlsXml(raw: String): String = raw
-        .replace("> ", ">")
-        .replace(" <", "<")
-        .replace("\n", "")
-        .replace("\r", "")
-        .replace("\t", "")
-        .replace("<MainTrack", "<MasterTrack")
-        .replace("</MainTrack>", "</MasterTrack>")
+    private fun sanitizeAlsXml(raw: String): String = buildString(raw.length) {
+        var index = 0
+        while (index < raw.length) {
+            when {
+                raw.startsWith("</MainTrack>", index) -> {
+                    append("</MasterTrack>")
+                    index += "</MainTrack>".length
+                }
+                raw.startsWith("<MainTrack", index) -> {
+                    append("<MasterTrack")
+                    index += "<MainTrack".length
+                }
+                raw[index] == '\n' || raw[index] == '\r' || raw[index] == '\t' -> index++
+                raw[index] == ' ' && index > 0 && raw[index - 1] == '>' -> index++
+                raw[index] == ' ' && index + 1 < raw.length && raw[index + 1] == '<' -> index++
+                else -> append(raw[index++])
+            }
+        }
+    }
+
+    private fun decodeAbletonAls(compressedBytes: ByteArray): Ableton {
+        val decoded = Zip.decode(compressedBytes)
+        val sanitized = sanitizeAlsXml(decoded.decodeToString())
+        return xml.decodeFromString(sanitized)
+    }
 }

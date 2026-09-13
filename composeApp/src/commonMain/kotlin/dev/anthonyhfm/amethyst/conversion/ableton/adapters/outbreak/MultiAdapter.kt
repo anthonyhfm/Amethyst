@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.outbreak
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
@@ -17,7 +19,10 @@ class MultiAdapter(
     private val device: MxDeviceMidiEffect,
     private val midiContainer: MidiEffectGroupDevice?,
     private val instrumentContainer: InstrumentGroupDevice?,
-    private val drumContainer: DrumGroupDevice?
+    private val drumContainer: DrumGroupDevice?,
+    private val offset: IntOffset,
+    private val outputOffset: IntOffset,
+    private val chainDepth: Int,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
         val dataObj: MultiData = jsonDecoder.decodeFromString(device.decodeBlob())
@@ -74,13 +79,7 @@ class MultiAdapter(
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         instrumentBranches.getOrNull(step)?.let { br ->
-                                            addAll(
-                                                elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                    resolveAdapter(child)
-                                                        ?.toDeviceStates()
-                                                        ?.firstOrNull()
-                                                }
-                                            )
+                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
                                         }
                                     }
                                 )
@@ -92,13 +91,7 @@ class MultiAdapter(
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         midiBranches.getOrNull(step)?.let { br ->
-                                            addAll(
-                                                elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                    resolveAdapter(child)
-                                                        ?.toDeviceStates()
-                                                        ?.firstOrNull()
-                                                }
-                                            )
+                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
                                         }
                                     }
                                 )
@@ -110,13 +103,7 @@ class MultiAdapter(
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         drumBranches.getOrNull(step)?.let { br ->
-                                            addAll(
-                                                elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                    resolveAdapter(child)
-                                                        ?.toDeviceStates()
-                                                        ?.firstOrNull()
-                                                }
-                                            )
+                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
                                         }
                                     }
                                 )
@@ -128,6 +115,13 @@ class MultiAdapter(
             )
         ).withMuteState(containerOnState)
     }
+
+    private fun resolveChildren(devices: List<AbletonDevice>) =
+        devices.flatMap { child ->
+            resolveAdapter(child, offset, outputOffset, chainDepth + 1)
+                ?.toDeviceStates()
+                .orEmpty()
+        }
 
     @Serializable
     data class MultiData(

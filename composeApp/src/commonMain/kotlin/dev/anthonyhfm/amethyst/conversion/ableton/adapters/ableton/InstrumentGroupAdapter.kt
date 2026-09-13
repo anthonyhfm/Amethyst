@@ -34,19 +34,19 @@ class InstrumentGroupAdapter(
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<InstrumentGroupDevice.Branches.InstrumentBranch> = device.branches.branches
 
-        val hasMacroFilter = device.chainSelector.keyMidi != null || branches.any {
-            it.branchSelectorRange.min.value != 0 || (it.branchSelectorRange.max.value != 0 && it.branchSelectorRange.max.value != 127)
+        val selectorRanges = branches.map {
+            it.branchSelectorRange.min.value to it.branchSelectorRange.max.value
         }
-
-        val hasPageSwitching = !isInsideDrumRack && chainDepth == 0 && (
-            device.chainSelector.keyMidi != null || branches.any {
-                it.branchSelectorRange.min.value > 0 || it.branchSelectorRange.max.value > 0
-            }
+        val selectorControlsPages = AbletonPageIndexing.controlsPages(
+            hasKeyMidiMapping = device.chainSelector.keyMidi != null,
+            selectorRanges = selectorRanges,
         )
+        val hasMacroFilter = selectorControlsPages
+
+        val hasPageSwitching = !isInsideDrumRack && chainDepth == 0 && selectorControlsPages
 
         val pageSelectorOffset = if (hasPageSwitching) {
             AbletonPageIndexing.sourceOffset(
-                chainDepth = chainDepth,
                 selectorMinimum = device.chainSelector.midiControllerRange?.min?.value,
             )
         } else {
@@ -162,14 +162,20 @@ class InstrumentGroupAdapter(
                                                     device = potentialMultiDevice,
                                                     midiContainer = null,
                                                     instrumentContainer = if (firstContainerIsInstrument) instrumentContainer else null,
-                                                    drumContainer = if (!firstContainerIsInstrument) drumContainer else null
+                                                    drumContainer = if (!firstContainerIsInstrument) drumContainer else null,
+                                                    offset = offset,
+                                                    outputOffset = outputOffset,
+                                                    chainDepth = chainDepth,
                                                 ).toDeviceStates()
                                             } else if (kaskobiMultiHashMatches) {
                                                 MultiEffectAdapter(
                                                     device = potentialMultiDevice,
                                                     midiContainer = null,
                                                     instrumentContainer = if (firstContainerIsInstrument) instrumentContainer else null,
-                                                    drumContainer = if (!firstContainerIsInstrument) drumContainer else null
+                                                    drumContainer = if (!firstContainerIsInstrument) drumContainer else null,
+                                                    offset = offset,
+                                                    outputOffset = outputOffset,
+                                                    chainDepth = chainDepth,
                                                 ).toDeviceStates()
                                             } else {
                                                 listOf()
@@ -221,6 +227,7 @@ class InstrumentGroupAdapter(
 
         if (hasPageSwitching) {
             groups.add(
+                0,
                 Group(
                     name = "Page Switching",
                     stateChain = StateChain(
@@ -239,7 +246,7 @@ class InstrumentGroupAdapter(
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,
-                                                            value = i
+                                                            value = i,
                                                         ),
                                                         ColorChainDeviceState(
                                                             r = 0f,
@@ -264,7 +271,7 @@ class InstrumentGroupAdapter(
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,
-                                                            value = i + 8
+                                                            value = i + 8,
                                                         ),
                                                         ColorChainDeviceState(
                                                             r = 0f,

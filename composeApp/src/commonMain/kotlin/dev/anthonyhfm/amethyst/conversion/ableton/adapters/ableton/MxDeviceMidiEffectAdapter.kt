@@ -12,6 +12,9 @@ import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GenericMidiEx
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.GridFilterAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MidiLauncherAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MidiLauncherProAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MidiTransformAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.SetNotesAdapter
+import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.MultiResetAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.PageSwitcherAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator1Adapter
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.kaskobi.Resonator2Adapter
@@ -117,7 +120,7 @@ class MxDeviceMidiEffectAdapter(
                 "7bd5bf9ea8431c5697b226aa906d87ac",
                 "d56c1f4e81d50a7bfd6481099848e48a",
                 "af7c8717c232587ecea9ee2105eca17c" -> {
-                    return DepthsSelectorAdapter(blob, offset).toDeviceStates()
+                    return DepthsSelectorAdapter(blob, offset, outputOffset).toDeviceStates()
                 }
 
                 "07b41f57975c3f6b65b37be548c23377",
@@ -203,6 +206,18 @@ class MxDeviceMidiEffectAdapter(
                     return CycleLightsAdapter(device).toDeviceStates()
                 }
 
+                "b3ff29c822cdd8573e901042f68900b3" -> {
+                    return MidiTransformAdapter(device).toDeviceStates()
+                }
+
+                "24a40fbc9106a03e7cb2025754a2e8dc" -> {
+                    return SetNotesAdapter(device).toDeviceStates()
+                }
+
+                "6a03db17df474d5d526e32d4efc70eae" -> {
+                    return MultiResetAdapter(device).toDeviceStates()
+                }
+
                 "9f50358372279f946cae0fdac0cfbf56", // Wormhole Lite, unsure if this actually works!
                 "3d3de9b05506f279ad6cfe14d26e0084" -> {
                     return WormholeAdapter(blob).toDeviceStates()
@@ -215,7 +230,7 @@ class MxDeviceMidiEffectAdapter(
 
                 "c328c055ae8daf2d9a4e2c0346bcc2ee",
                 "f6c14612b30196941ee3f19b056b62b2" -> {
-                    return AutoPageAdapter(blob, device).toDeviceStates()
+                    return AutoPageAdapter(blob).toDeviceStates()
                 }
 
                 else -> {

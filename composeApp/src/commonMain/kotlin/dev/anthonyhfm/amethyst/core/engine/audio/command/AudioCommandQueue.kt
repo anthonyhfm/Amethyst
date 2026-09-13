@@ -22,7 +22,7 @@ class AudioCommandQueue(
     private val enqueuePosition = atomic(0L)
     private val dequeuePosition = atomic(0L)
     private val dropped = atomic(0L)
-    private val emergencyStop = atomic(false)
+    private val emergencyStopTickets = atomic<Set<AudioStopTicket>?>(null)
 
     val droppedCommandCount: Long
         get() = dropped.value
@@ -76,20 +76,25 @@ class AudioCommandQueue(
         return command
     }
 
-    fun requestEmergencyStop() {
-        emergencyStop.value = true
+    fun requestEmergencyStop(ticket: AudioStopTicket? = null) {
+        while (true) {
+            val previous = emergencyStopTickets.value
+            val updated = if (ticket == null) previous ?: emptySet() else previous.orEmpty() + ticket
+            if (emergencyStopTickets.compareAndSet(previous, updated)) return
+        }
     }
 
-    fun consumeEmergencyStop(): Boolean = emergencyStop.getAndSet(false)
+    internal fun consumeEmergencyStop(): Set<AudioStopTicket>? =
+        emergencyStopTickets.getAndSet(null)
 
-    /**
-     * Lifecycle-only operation. Producers must be stopped before clearing.
-     */
-    fun clear() {
-        while (poll() != null) {
-            // Drain all published slots.
+    internal fun clear(stopTickets: MutableList<AudioStopTicket>) {
+        while (true) {
+            when (val command = poll() ?: break) {
+                is AudioRenderCommand.StopAll -> stopTickets += command.ticket
+                else -> Unit
+            }
         }
-        emergencyStop.value = false
+        stopTickets += emergencyStopTickets.getAndSet(null).orEmpty()
     }
 
     companion object {

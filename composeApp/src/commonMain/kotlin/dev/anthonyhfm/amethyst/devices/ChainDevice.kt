@@ -73,11 +73,25 @@ class AudioRenderContext(
 
     internal fun sidechainInput(sourceId: String): AudioProcessingBlock? =
         sidechainAudioProvider?.sourceBlock(sourceId)
+
+    internal fun sidechainInputs(busId: String): Array<AudioProcessingBlock> =
+        sidechainAudioProvider?.busBlocks(busId) ?: EMPTY_AUDIO_PROCESSING_BLOCKS
 }
 
 /** Read-only access to source audio rendered for the current callback. */
 internal fun interface SidechainAudioProvider {
     fun sourceBlock(sourceId: String): AudioProcessingBlock?
+
+    fun busBlocks(busId: String): Array<AudioProcessingBlock> = EMPTY_AUDIO_PROCESSING_BLOCKS
+}
+
+internal val EMPTY_AUDIO_PROCESSING_BLOCKS = emptyArray<AudioProcessingBlock>()
+
+interface AudioSourceRouting {
+    val contributesToMainOutput: Boolean
+        get() = true
+    val sidechainBusId: String?
+        get() = null
 }
 
 /** Receives source ids that do not already feed the consumer's audible input. */
@@ -360,6 +374,10 @@ abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericCha
         }
         signalExit?.invoke(n)
     }
+}
+
+interface AudioOutputActivity {
+    val mayProduceAudio: Boolean
 }
 
 /**

@@ -24,7 +24,7 @@ import kotlinx.coroutines.sync.withPermit
 
 class OriginalSimplerPrerenderer {
     private companion object {
-        const val MAX_PARALLEL_AUDIO_DECODES = 16
+        const val MAX_PARALLEL_AUDIO_DECODES = 1
     }
 
     private data class FullAudio(
@@ -32,7 +32,6 @@ class OriginalSimplerPrerenderer {
         val sampleRate: Int,
         val channels: Int,
         val bitDepth: Int,
-        val totalFrames: Long
     )
 
     data class Result(
@@ -54,7 +53,6 @@ class OriginalSimplerPrerenderer {
             return Result(emptyMap(), emptyList())
         }
 
-        val limitedIO = Dispatchers.Default.limitedParallelism(MAX_PARALLEL_AUDIO_DECODES)
         val gate = Semaphore(MAX_PARALLEL_AUDIO_DECODES)
 
         return runBlocking {
@@ -68,7 +66,7 @@ class OriginalSimplerPrerenderer {
 
             coroutineScope {
                 val perPathJobs = groupedByPath.map { (path, pathSimplers) ->
-                    async(limitedIO) {
+                    async(Dispatchers.Default) {
                         gate.withPermit {
                             val full = decodeFull(path)
                                 ?: return@async Triple(path, null, emptyMap<OriginalSimplerAdapter.OriginalSimplerData, SampleChainDeviceState>())
@@ -143,15 +141,11 @@ class OriginalSimplerPrerenderer {
             return@withContext null
         }
 
-        val frameSizeBytes = (audioSignal.channels * (audioSignal.bitDepth / 8))
-        val totalFrames = if (frameSizeBytes > 0) (audioSignal.rawData?.size ?: 0) / frameSizeBytes else 0
-
         FullAudio(
             rawData = audioSignal.rawData ?: ByteArray(0),
             sampleRate = audioSignal.sampleRate,
             channels = audioSignal.channels,
             bitDepth = audioSignal.bitDepth,
-            totalFrames = totalFrames.toLong()
         )
     }
 
@@ -179,7 +173,7 @@ class OriginalSimplerPrerenderer {
         filePath: String,
         source: AudioSource,
         sampleStart: Long,
-        sampleEnd: Long
+        sampleEnd: Long,
     ): SampleChainDeviceState {
         val startF = sampleStart.coerceAtLeast(0L)
             .coerceAtMost(source.totalSamples)
@@ -215,4 +209,5 @@ class OriginalSimplerPrerenderer {
             sourceEndFrameExclusive = endF,
         )
     }
+
 }

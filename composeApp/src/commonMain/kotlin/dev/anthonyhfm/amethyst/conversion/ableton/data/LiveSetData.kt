@@ -40,7 +40,14 @@ data class LiveSetData(
 
 @Serializable
 data class Tracks(
-    val midiTracks: List<MidiTrack>
+    val midiTracks: List<MidiTrack>,
+    val groupTracks: List<GroupTrack> = emptyList(),
+)
+
+@Serializable
+data class TrackGroupId(
+    @SerialName("Value")
+    val value: Int = -1,
 )
 
 @Serializable
@@ -50,6 +57,10 @@ data class MidiTrack(
 
     private val _name: Name,
     val name: String = _name.effectiveName?.value ?: "Midi Track $id",
+
+    @XmlElement
+    @XmlSerialName("TrackGroupId")
+    val trackGroupId: TrackGroupId = TrackGroupId(),
 
     @XmlElement
     val deviceChain: DeviceChain,
@@ -108,7 +119,35 @@ data class MidiTrack(
 }
 
 @Serializable
+data class GroupTrack(
+    @SerialName("Id")
+    val id: Int,
+
+    private val _name: MidiTrack.Name,
+    val name: String = _name.effectiveName?.value ?: "Group Track $id",
+
+    @XmlElement
+    @XmlSerialName("TrackGroupId")
+    val trackGroupId: TrackGroupId = TrackGroupId(),
+
+    @XmlElement
+    val deviceChain: DeviceChain,
+)
+
+@Serializable
 data class DeviceChain(
+    @XmlElement
+    @XmlSerialName("MidiInputRouting")
+    val midiInputRouting: TrackRouting = TrackRouting(),
+
+    @XmlElement
+    @XmlSerialName("MidiOutputRouting")
+    val midiOutputRouting: TrackRouting = TrackRouting(),
+
+    @XmlElement
+    @XmlSerialName("Mixer")
+    val mixer: TrackMixer = TrackMixer(),
+
     @XmlElement
     @SerialName("DeviceChain")
     private val deviceChain: DeviceChain,
@@ -157,6 +196,31 @@ data class DeviceChain(
 }
 
 @Serializable
+data class TrackRouting(
+    @XmlElement
+    @XmlSerialName("Target")
+    val target: Target = Target(),
+) {
+    @Serializable
+    data class Target(
+        @XmlSerialName("Value")
+        val value: String = "",
+    )
+}
+
+@Serializable
+data class TrackMixer(
+    @XmlElement
+    @XmlSerialName("On")
+    val on: dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn =
+        dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn(),
+    @XmlElement
+    @XmlSerialName("Speaker")
+    val speaker: dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn =
+        dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn(),
+)
+
+@Serializable
 data class MasterTrack(
     @XmlElement
     val deviceChain: DeviceChain,
@@ -165,6 +229,11 @@ data class MasterTrack(
     data class DeviceChain(
         @XmlElement
         val mixer: Mixer,
+
+        @XmlElement
+        @SerialName("DeviceChain")
+        private val nestedDeviceChain: dev.anthonyhfm.amethyst.conversion.ableton.data.DeviceChain.DeviceChain? = null,
+        val devices: List<AbletonDevice> = nestedDeviceChain?.devices?.devices ?: emptyList(),
     )
 
     @Serializable

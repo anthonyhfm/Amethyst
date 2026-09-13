@@ -5,11 +5,14 @@ import dev.anthonyhfm.amethyst.devices.ableton.AbletonPitcherChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.EqThreeChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.EqEightChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.FilterChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.AudioDelayChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.ReverbChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.DuckerChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.SaturatorChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.LimiterChainDevice
+import dev.anthonyhfm.amethyst.devices.audio.effects.StereoGainChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.adjust.AdjustChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.blur.BlurChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
@@ -29,6 +32,7 @@ import dev.anthonyhfm.amethyst.devices.effects.layer.LayerChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.layer_filter.LayerFilterChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.loop.LoopChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.macro_refresh.MacroRefreshChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.offset.OffsetChainDevice
@@ -71,6 +75,7 @@ object DeviceRegistry {
         register(LoopChainDevice)
         register(MacroControlChainDevice)
         register(MacroFilterChainDevice)
+        register(MacroRefreshChainDevice)
         register(MaskChainDevice)
         register(MultiGroupChainDevice)
         register(OffsetChainDevice)
@@ -81,11 +86,14 @@ object DeviceRegistry {
         register(SampleChainDevice)
         register(AutomationChainDevice)
         register(EqThreeChainDevice)
+        register(EqEightChainDevice)
         register(FilterChainDevice)
         register(AudioDelayChainDevice)
         register(ReverbChainDevice)
         register(DuckerChainDevice)
         register(SaturatorChainDevice)
+        register(LimiterChainDevice)
+        register(StereoGainChainDevice)
         register(ShiftChainDevice)
         register(TransmitChainDevice)
 

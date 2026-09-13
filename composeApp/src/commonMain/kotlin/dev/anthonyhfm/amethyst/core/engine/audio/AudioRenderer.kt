@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.core.engine.audio
 
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioCommandQueue
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioRenderCommand
+import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioStopTicket
 import dev.anthonyhfm.amethyst.core.engine.audio.dsp.StereoLinkedLookaheadLimiter
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.AudioVoice
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.VoiceId
@@ -88,15 +89,17 @@ class AudioRenderer(
             transportFrame = initialAbsoluteFrame,
         )
         limiter.prepare(configuration.sampleRate)
+        val stopTickets = mutableListOf<AudioStopTicket>()
+        commandQueue.clear(stopTickets)
+        clearPendingCommands(stopTickets)
         chain.prepareAudio(configuration)
         clearVoices()
-        commandQueue.clear()
-        clearPendingCommands()
         renderedFrame.value = initialAbsoluteFrame
         masterGain = 1f
         targetMasterGain = 1f
         masterGainStep = 0f
         masterRampFramesRemaining = 0
+        stopTickets.forEach(AudioStopTicket::complete)
     }
 
     /**
@@ -111,8 +114,12 @@ class AudioRenderer(
         return commandQueue.offer(command)
     }
 
-    fun requestEmergencyStop() {
-        commandQueue.requestEmergencyStop()
+    fun requestEmergencyStop(): AudioStopTicket = AudioStopTicket().also { ticket ->
+        commandQueue.requestEmergencyStop(ticket)
+    }
+
+    internal fun requestEmergencyStop(ticket: AudioStopTicket) {
+        commandQueue.requestEmergencyStop(ticket)
     }
 
     /**
@@ -130,11 +137,18 @@ class AudioRenderer(
         require(transportFrame >= 0L)
 
         val blockStartFrame = renderedFrame.value
-        if (commandQueue.consumeEmergencyStop()) {
+        val emergencyStopTickets = commandQueue.consumeEmergencyStop()
+        drainCommandQueue()
+        if (emergencyStopTickets != null) {
+            // Apply every command already due at this boundary before publishing
+            // the emergency reset acknowledgement. A queued older StopAll must
+            // never erase work submitted by a caller after observing its ticket.
+            applyCommandsAtOrBefore(blockStartFrame)
             stopAllVoices(fadeOutFrames = 0)
             chain.resetAudio()
+            limiter.reset()
+            emergencyStopTickets.forEach(AudioStopTicket::complete)
         }
-        drainCommandQueue()
 
         var renderedInBlock = 0
         while (renderedInBlock < frameCount) {
@@ -181,8 +195,9 @@ class AudioRenderer(
      */
     fun reset(absoluteFrame: Long = 0L) {
         require(absoluteFrame >= 0L)
-        commandQueue.clear()
-        clearPendingCommands()
+        val stopTickets = mutableListOf<AudioStopTicket>()
+        commandQueue.clear(stopTickets)
+        clearPendingCommands(stopTickets)
         clearVoices()
         chain.resetAudio()
         limiter.reset()
@@ -191,6 +206,7 @@ class AudioRenderer(
         targetMasterGain = 1f
         masterGainStep = 0f
         masterRampFramesRemaining = 0
+        stopTickets.forEach(AudioStopTicket::complete)
     }
 
     fun release() {
@@ -349,6 +365,7 @@ class AudioRenderer(
             is AudioRenderCommand.StopAll -> {
                 stopAllVoices(command.fadeOutFrames)
                 chain.resetAudio()
+                command.ticket.complete()
             }
             is AudioRenderCommand.ResetAll -> {
                 stopAllVoices(fadeOutFrames = 0)
@@ -424,9 +441,11 @@ class AudioRenderer(
         }
     }
 
-    private fun clearPendingCommands() {
+    private fun clearPendingCommands(stopTickets: MutableList<AudioStopTicket>) {
         var index = 0
         while (index < pendingCommandCount) {
+            val command = pendingCommands[index]
+            if (command is AudioRenderCommand.StopAll) stopTickets += command.ticket
             pendingCommands[index] = null
             index++
         }

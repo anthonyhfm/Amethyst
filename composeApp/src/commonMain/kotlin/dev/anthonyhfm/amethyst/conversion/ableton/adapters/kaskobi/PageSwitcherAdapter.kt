@@ -18,12 +18,6 @@ class PageSwitcherAdapter(
             GroupChainDeviceState(
                 groups = listOf(
                     Group(
-                        name = "Passthrough",
-                        stateChain = StateChain(
-                            devices = listOf()
-                        )
-                    ),
-                    Group(
                         name = "Page Switching",
                         stateChain = StateChain(
                             devices = listOf(
@@ -41,7 +35,7 @@ class PageSwitcherAdapter(
                                                             ),
                                                             MacroControlChainDeviceState(
                                                                 macro = 0,
-                                                                value = i
+                                                                value = i,
                                                             ),
                                                             ColorChainDeviceState(
                                                                 r = 0f,
@@ -54,7 +48,7 @@ class PageSwitcherAdapter(
                                             )
                                         }
 
-                                        for (i in 0..7) { // Page 8-16
+                                        for (i in 0..7) { // Page 9-16
                                             add(
                                                 Group(
                                                     name = "Page ${9 + i}",
@@ -66,7 +60,7 @@ class PageSwitcherAdapter(
                                                             ),
                                                             MacroControlChainDeviceState(
                                                                 macro = 0,
-                                                                value = i + 8
+                                                                value = i + 8,
                                                             ),
                                                             ColorChainDeviceState(
                                                                 r = 0f,
@@ -81,6 +75,12 @@ class PageSwitcherAdapter(
                                     }
                                 )
                             )
+                        )
+                    ),
+                    Group(
+                        name = "Passthrough",
+                        stateChain = StateChain(
+                            devices = listOf()
                         )
                     )
                 )

@@ -57,6 +57,12 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
     override fun onRemovedFromChain() {
         isAttachedToChain = false
         unregisterReceiver()
+        super.onRemovedFromChain()
+    }
+
+    override fun onStateRestored() {
+        super.onStateRestored()
+        updateRegistration()
     }
 
     @Composable
@@ -137,7 +143,10 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
     override fun ledSignalEnter(n: List<Signal.LED>) {
         when (state.value.mode) {
             TransmitChainDeviceState.Mode.Send -> {
-                matchingReceivers(channel = state.value.channel).forEach { receiver ->
+                matchingReceivers(
+                    channel = state.value.channel,
+                    busId = state.value.busId,
+                ).forEach { receiver ->
                     receiver.receiveSignals(n)
                 }
             }
@@ -209,13 +218,17 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
         private const val MAX_CHANNELS = 16
         private val receivers: MutableMap<String, TransmitChainDevice> = mutableMapOf()
 
-        internal fun clearReceiversForTesting() {
+        internal fun clearReceivers() {
             receivers.clear()
         }
 
-        private fun matchingReceivers(channel: Int): List<TransmitChainDevice> {
+        private fun matchingReceivers(channel: Int, busId: String): List<TransmitChainDevice> {
             return receivers.values
-                .filter { it.state.value.mode == TransmitChainDeviceState.Mode.Receive && it.state.value.channel == channel }
+                .filter {
+                    it.state.value.mode == TransmitChainDeviceState.Mode.Receive &&
+                        it.state.value.channel == channel &&
+                        it.state.value.busId == busId
+                }
                 .toList()
         }
     }
@@ -230,7 +243,8 @@ private val TransmitChainDeviceState.Mode.label: String
 @Serializable
 data class TransmitChainDeviceState(
     val mode: Mode = Mode.Send,
-    val channel: Int = 1
+    val channel: Int = 1,
+    val busId: String = "",
 ) : DeviceState() {
     enum class Mode {
         Send,

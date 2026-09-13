@@ -10,6 +10,7 @@ data class AutoPlayData(
     data class Action(
         val x: Int,
         val y: Int,
-        val down: Boolean
+        val down: Boolean,
+        val launchpadId: String? = null,
     )
 }

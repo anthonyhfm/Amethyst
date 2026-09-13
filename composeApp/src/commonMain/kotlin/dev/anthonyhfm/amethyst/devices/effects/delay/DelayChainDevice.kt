@@ -213,9 +213,10 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable,
         val bpm = WorkspaceRepository.bpm.value
         val snapshot = state.value
         val baseDelay = snapshot.timing.toMsValue(bpm) * (snapshot.gate * 2f)
-        val delay = resolveControlParameter(PARAMETERS[0], baseDelay.toFloat()).toDouble()
-        val feedback = resolveControlParameter(PARAMETERS[1], snapshot.feedback).coerceIn(0f, 1f)
-        val repeats = resolveControlParameter(PARAMETERS[2], snapshot.repeats.toFloat()).roundToInt()
+        val macroValues = n.firstOrNull()?.macroValues
+        val delay = resolveControlParameter(PARAMETERS[0], baseDelay.toFloat(), macroValues).toDouble()
+        val feedback = resolveControlParameter(PARAMETERS[1], snapshot.feedback, macroValues).coerceIn(0f, 1f)
+        val repeats = resolveControlParameter(PARAMETERS[2], snapshot.repeats.toFloat(), macroValues).roundToInt()
             .coerceIn(1, MAX_REPEATS)
         var repeat = 1
         while (repeat <= repeats && activeJobs.value < MAX_ACTIVE_JOBS) {

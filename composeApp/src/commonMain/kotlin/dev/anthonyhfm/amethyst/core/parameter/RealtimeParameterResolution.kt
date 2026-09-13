@@ -57,6 +57,7 @@ fun AudioChainDevice<*>.resolveRealtimeParameter(
 fun GenericChainDevice<*>.resolveControlParameter(
     descriptor: ParameterDescriptor,
     baseValue: Float,
+    macroValues: List<Int>? = null,
 ): Float {
     val address = ParameterAddress(selectionUUID, descriptor.id)
     val mappings = WorkspaceRepository.parameterMappings.value
@@ -64,9 +65,12 @@ fun GenericChainDevice<*>.resolveControlParameter(
     var normalized = descriptor.normalize(baseValue)
     mappings.forEach { mapping ->
         if (mapping.target == address) {
-            val macro = macros.firstOrNull { it.id == mapping.macroId }
-            macro?.let {
-                val input = if (mapping.inverted) 1f - it.normalizedValue else it.normalizedValue
+            val macroIndex = macros.indexOfFirst { it.id == mapping.macroId }
+            if (macroIndex >= 0) {
+                val normalizedMacroValue = macroValues?.let { values ->
+                    values.getOrNull(macroIndex)?.div(127f) ?: return@forEach
+                } ?: macros[macroIndex].normalizedValue
+                val input = if (mapping.inverted) 1f - normalizedMacroValue else normalizedMacroValue
                 val mapped = mapping.minimum + (mapping.maximum - mapping.minimum) * input
                 normalized = when (mapping.mode) {
                     ParameterMappingMode.Absolute -> mapped

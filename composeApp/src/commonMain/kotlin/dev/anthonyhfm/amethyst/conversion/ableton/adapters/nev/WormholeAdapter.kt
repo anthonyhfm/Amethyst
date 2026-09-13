@@ -25,7 +25,7 @@ class WormholeAdapter (
                                     devices = listOf(
                                         MacroControlChainDeviceState(
                                             macro = 0,
-                                            value = dataObj.macroSwitchValue1.first().toInt()
+                                            value = dataObj.macroSwitchValue1.first().toInt(),
                                         )
                                     )
                                 )

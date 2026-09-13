@@ -33,19 +33,19 @@ class MidiEffectGroupAdapter(
     override fun toDeviceStates(): List<DeviceState> {
         val branches: List<MidiEffectGroupDevice.Branches.MidiEffectBranch> = device.branches.branches
 
-        val hasMacroFilter = device.chainSelector.keyMidi != null || branches.any {
-            it.branchSelectorRange.min.value != 0 || (it.branchSelectorRange.max.value != 0 && it.branchSelectorRange.max.value != 127)
+        val selectorRanges = branches.map {
+            it.branchSelectorRange.min.value to it.branchSelectorRange.max.value
         }
-
-        val hasPageSwitching = !isInsideDrumRack && chainDepth == 0 && (
-            device.chainSelector.keyMidi != null || branches.any {
-                it.branchSelectorRange.min.value > 0 || it.branchSelectorRange.max.value > 0
-            }
+        val selectorControlsPages = AbletonPageIndexing.controlsPages(
+            hasKeyMidiMapping = device.chainSelector.keyMidi != null,
+            selectorRanges = selectorRanges,
         )
+        val hasMacroFilter = selectorControlsPages
+
+        val hasPageSwitching = !isInsideDrumRack && chainDepth == 0 && selectorControlsPages
 
         val pageSelectorOffset = if (hasPageSwitching) {
             AbletonPageIndexing.sourceOffset(
-                chainDepth = chainDepth,
                 selectorMinimum = device.chainSelector.midiControllerRange?.min?.value,
             )
         } else {
@@ -124,24 +124,26 @@ class MidiEffectGroupAdapter(
                             val branchElements = branch.deviceChain.deviceChain.devices.devices
 
                             if (branchElements.size >= 2) {
-                                val potentialMultiDevice: MxDeviceMidiEffect? = branchElements.find {
-                                    it is MxDeviceMidiEffect
-                                } as MxDeviceMidiEffect?
-
-                                val patchSlot = potentialMultiDevice?.patchSlot
-
-                                val potentialMultiDeviceHash = potentialMultiDevice.let {
-                                    val path = patchSlot?.value?.patchRef?.fileRef?.resolvePath() ?: return@let null
-
-                                    val hash: String = if (AbletonConverter.isZip) {
-                                        AbletonConverter.zipEntries[path]?.data?.toFileHash() ?: ""
-                                    } else {
-                                        val file = PlatformFile(path)
-                                        file.getFileHash()
+                                val multiMatch = branchElements
+                                    .filterIsInstance<MxDeviceMidiEffect>()
+                                    .mapNotNull { candidate ->
+                                        val path = candidate.patchSlot.value.patchRef?.fileRef?.resolvePath()
+                                            ?: return@mapNotNull null
+                                        val hash = MxDeviceMidiEffectAdapter.fileHashMap[path] ?: (
+                                            if (AbletonConverter.isZip) {
+                                                AbletonConverter.zipEntries[path]?.data?.toFileHash() ?: ""
+                                            } else {
+                                                PlatformFile(path).getFileHash()
+                                            }
+                                        ).also { MxDeviceMidiEffectAdapter.fileHashMap[path] = it }
+                                        if (hash in MULTI_HASHES || hash in KASKOBI_MULTI_HASHES) {
+                                            Triple(candidate, hash, branchElements.indexOf(candidate))
+                                        } else null
                                     }
-
-                                    hash
-                                }
+                                    .firstOrNull()
+                                val potentialMultiDevice = multiMatch?.first
+                                val potentialMultiDeviceHash = multiMatch?.second
+                                val multiDeviceIndex = multiMatch?.third ?: -1
                                 val outbreakMultiHashMatches = MULTI_HASHES.contains(potentialMultiDeviceHash)
                                 val kaskobiMultiHashMatches = KASKOBI_MULTI_HASHES.contains(potentialMultiDeviceHash)
                                 val multiHashMatches = outbreakMultiHashMatches || kaskobiMultiHashMatches
@@ -158,20 +160,37 @@ class MidiEffectGroupAdapter(
                                     println("Found multi and container, using MultiAdapter")
 
                                     addAll(
+                                        branchElements.take(multiDeviceIndex).flatMap { prefixDevice ->
+                                            resolveAdapter(
+                                                device = prefixDevice,
+                                                offset = offset,
+                                                outputOffset = outputOffset,
+                                                chainDepth = chainDepth + 1,
+                                            )?.toDeviceStates() ?: emptyList()
+                                        }
+                                    )
+
+                                    addAll(
                                         try {
                                             if (outbreakMultiHashMatches) {
                                                 MultiAdapter(
                                                     device = potentialMultiDevice,
                                                     midiContainer = lightsContainer,
                                                     instrumentContainer = null,
-                                                    drumContainer = null
+                                                    drumContainer = null,
+                                                    offset = offset,
+                                                    outputOffset = outputOffset,
+                                                    chainDepth = chainDepth,
                                                 ).toDeviceStates()
                                             } else if (kaskobiMultiHashMatches) {
                                                 MultiEffectAdapter(
                                                     device = potentialMultiDevice,
                                                     midiContainer = lightsContainer,
                                                     instrumentContainer = null,
-                                                    drumContainer = null
+                                                    drumContainer = null,
+                                                    offset = offset,
+                                                    outputOffset = outputOffset,
+                                                    chainDepth = chainDepth,
                                                 ).toDeviceStates()
                                             } else {
                                                 listOf()
@@ -182,6 +201,20 @@ class MidiEffectGroupAdapter(
                                             listOf()
                                         }
                                     )
+
+                                    val containerIndex = branchElements.indexOf(lightsContainer)
+                                    if (containerIndex >= 0) {
+                                        addAll(
+                                            branchElements.drop(containerIndex + 1).flatMap { suffixDevice ->
+                                                resolveAdapter(
+                                                    device = suffixDevice,
+                                                    offset = offset,
+                                                    outputOffset = outputOffset,
+                                                    chainDepth = chainDepth + 1,
+                                                )?.toDeviceStates() ?: emptyList()
+                                            }
+                                        )
+                                    }
 
                                     return@apply
                                 } else if (randomDevice != null && lightsContainer != null) {
@@ -223,6 +256,7 @@ class MidiEffectGroupAdapter(
 
         if (hasPageSwitching) {
             groups.add(
+                0,
                 Group(
                     name = "Page Switching",
                     stateChain = StateChain(
@@ -241,7 +275,7 @@ class MidiEffectGroupAdapter(
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,
-                                                            value = i
+                                                            value = i,
                                                         ),
                                                         ColorChainDeviceState(
                                                             r = 0f,
@@ -266,7 +300,7 @@ class MidiEffectGroupAdapter(
                                                         ),
                                                         MacroControlChainDeviceState(
                                                             macro = 0,
-                                                            value = i + 8
+                                                            value = i + 8,
                                                         ),
                                                         ColorChainDeviceState(
                                                             r = 0f,

@@ -258,15 +258,12 @@ class MacroFilterChainDevice : GenericChainDevice<MacroFilterChainDeviceState>()
     }
 
     override fun signalEnter(n: List<Signal>) {
-        val macros = WorkspaceRepository.macros.value
-        if (macros.isEmpty()) {
-            signalExit?.invoke(n)
-            return
+        val filtered = n.filter { signal ->
+            val macroValues = signal.macroValues
+            macroValues.isEmpty() ||
+                macroValues.getOrNull(state.value.macro) in state.value.allowedValues
         }
-        val macroValue = macros.getOrNull(state.value.macro)?.value ?: return
-        if (macroValue in state.value.allowedValues) {
-            signalExit?.invoke(n)
-        }
+        if (filtered.isNotEmpty()) signalExit?.invoke(filtered)
     }
 
     companion object : ChainDeviceFactory<MacroFilterChainDeviceState> {

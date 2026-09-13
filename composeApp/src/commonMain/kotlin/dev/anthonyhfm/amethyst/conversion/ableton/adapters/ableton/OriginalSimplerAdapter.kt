@@ -15,13 +15,20 @@ class OriginalSimplerAdapter(
         val fadeInMs = device.volumeAndPan.oneShotEnvelope.fadeInTime.manual.value.coerceAtLeast(0f)
         val fadeOutMs = device.volumeAndPan.oneShotEnvelope.fadeOutTime.manual.value.coerceAtLeast(0f)
         val volumeDb = device.volumeAndPan.volume.manual.value
+        val transposeSemitones = device.pitch.transposeKey.manual.value
+        val renderedState = AbletonConverter.audioMap[data]
 
         return listOf(
-            AbletonConverter.audioMap[data]?.copy(
+            renderedState?.copy(
                 fadeInMs = fadeInMs,
                 fadeOutMs = fadeOutMs,
-                volumeDb = volumeDb
-            ) ?: SampleChainDeviceState(volumeDb = volumeDb)
+                volumeDb = volumeDb,
+                transposeSemitones = transposeSemitones,
+            ) ?: SampleChainDeviceState(
+                fileName = data.filePath,
+                volumeDb = volumeDb,
+                transposeSemitones = transposeSemitones,
+            )
         ).withMuteState(device.on.manual.value)
     }
 

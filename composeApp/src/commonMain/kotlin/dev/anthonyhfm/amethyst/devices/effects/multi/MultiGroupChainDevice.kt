@@ -461,6 +461,7 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
                 openedGroupIndex = normalizeMultiIndex(unpackedGroups, savedState.openedGroupIndex),
                 currentMultiIndex = normalizeMultiIndex(unpackedGroups, savedState.currentMultiIndex),
                 type = savedState.type,
+                resetGroupId = savedState.resetGroupId,
             )
         }
 
@@ -596,6 +597,7 @@ data class MultiGroupChainDeviceState(
     val currentMultiIndex: Int = 0,
     val groups: List<Group> = emptyList(),
     val preprocessChain: StateChain = StateChain(emptyList()),
+    val resetGroupId: Int? = null,
 ) : DeviceState() {
     enum class TYPE {
         FORWARD,

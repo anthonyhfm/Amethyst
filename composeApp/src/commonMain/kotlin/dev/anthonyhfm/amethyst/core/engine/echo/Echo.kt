@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.engine.echo
 
+import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioStopTicket
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import kotlinx.coroutines.flow.StateFlow
@@ -86,7 +87,7 @@ expect object Echo {
     fun playMultiple(signals: List<Signal.AudioSignal>): List<String?>
     fun update(sourceId: String, gain: Float, pan: Float)
     fun stop(sourceId: String)
-    fun stopAll()
+    fun stopAll(): AudioStopTicket
     fun stopByOrigin(origin: Any?)
     fun audioEnter(signals: List<Signal.AudioSignal>)
     fun cancel(signalOrigin: Any?)

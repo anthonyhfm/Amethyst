@@ -41,7 +41,7 @@ sealed interface KeyframesChainDeviceContract {
     }
 
     enum class PlaybackMode {
-        Mono, Poly, Loop
+        Mono, Poly, Loop, Continuous
     }
 
     @Serializable

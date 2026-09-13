@@ -145,12 +145,19 @@ data class DrumGroupDevice(
         ) {
             @Serializable
             data class BranchInfo(
-                val receivingNote: ReceivingNote
+                val receivingNote: ReceivingNote,
+                val chokeGroup: ChokeGroup = ChokeGroup(),
             ) {
                 @Serializable
                 data class ReceivingNote(
                     @SerialName("Value")
                     val value: Int
+                )
+
+                @Serializable
+                data class ChokeGroup(
+                    @SerialName("Value")
+                    val value: Int = 0,
                 )
             }
 

@@ -37,7 +37,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
-import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.EncodeDefault
@@ -354,7 +354,7 @@ class RotateChainDevice : LEDChainDevice<RotateChainDeviceState>() {
             ?: (IntOffset.Zero to IntSize(10, 10))
         if (!isolate) return workspaceBounds
 
-        val device = signal.origin as? LaunchpadViewportElement ?: return workspaceBounds
+        val device = resolveLaunchpadOrigin(signal.origin, signal.x, signal.y) ?: return workspaceBounds
         return Pair(
             first = IntOffset(
                 x = device.position.value.x.toInt(),

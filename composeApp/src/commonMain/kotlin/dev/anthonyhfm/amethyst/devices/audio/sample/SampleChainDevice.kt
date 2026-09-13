@@ -37,15 +37,18 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import com.mohamedrejeb.compose.dnd.drop.dropTarget
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
+import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntime
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntimeAware
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.ChokeVoiceSource
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.TriggerPhase
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.toPadTriggerEvent
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
+import dev.anthonyhfm.amethyst.core.parameter.ParameterAddress
 import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
 import dev.anthonyhfm.amethyst.core.parameter.ParameterScale
 import dev.anthonyhfm.amethyst.core.parameter.ParameterSmoothing
@@ -55,6 +58,8 @@ import dev.anthonyhfm.amethyst.devices.AudioChainDeviceRole
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
 import dev.anthonyhfm.amethyst.devices.AudioRenderContext
+import dev.anthonyhfm.amethyst.devices.AudioOutputActivity
+import dev.anthonyhfm.amethyst.devices.AudioSourceRouting
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -130,7 +135,7 @@ private data class SampleRenderCache(
 )
 
 class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
-    ParameterOwner, ChokeVoiceSource, AudioTriggerRuntimeAware {
+    ParameterOwner, ChokeVoiceSource, AudioTriggerRuntimeAware, AudioOutputActivity, AudioSourceRouting {
     override val state = MutableStateFlow(SampleChainDeviceState())
     override val helpRef = "Sample"
     override val title: String
@@ -140,7 +145,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         get() = if (state.value.warpMode == SampleWarpMode.Warp) WARP_LATENCY_FRAMES else 0
 
     private val triggerQueue = SampleTriggerQueue()
-    private val voicePool = SampleVoicePool(monophonic = true)
+    private val voicePool = SampleVoicePool(maximumVoices = 1, monophonic = true)
     private val publishedPlayheadFrame = atomic(-1L)
     private val audioConfiguration = atomic<AudioConfiguration?>(null)
     private val renderCache = atomic<SampleRenderCache?>(null)
@@ -149,6 +154,8 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
 
     override val persistentSourceId: String get() = selectionUUID
     override val chokeGroup: Int get() = state.value.chokeGroup
+    override val chokeScopeId: String? get() = state.value.chokeScopeId
+    override val chokeOwnerId: String? get() = state.value.chokeOwnerId
     override val parameterDescriptors: List<ParameterDescriptor>
         get() = PARAMETERS
 
@@ -168,6 +175,16 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     val activeVoiceCount: Int
         get() = voicePool.activeVoiceCount
 
+    override val mayProduceAudio: Boolean
+        get() = voicePool.activeVoiceCount > 0 ||
+            pendingVoiceCommand != null || triggerQueue.hasPendingCommands
+
+    override val contributesToMainOutput: Boolean
+        get() = state.value.audibleOutput
+
+    override val sidechainBusId: String?
+        get() = state.value.sidechainBusId
+
     companion object : ChainDeviceFactory<SampleChainDeviceState> {
         override val capabilities: Set<DeviceCapability> = setOf(DeviceCapability.Source)
         override val stateClass = SampleChainDeviceState::class
@@ -180,6 +197,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         private const val PLAYHEAD_REFRESH_MILLIS = 16L
         private const val RELEASE_RAMP_MILLIS = 3
         internal const val WARP_LATENCY_FRAMES = 128
+        private val SAMPLE_MODULATION_PARAMETER_IDS = arrayOf("gain", "pan", "fadeIn", "fadeOut")
 
         val PARAMETERS = listOf(
             ParameterDescriptor("gain", "Gain", "dB", -24f, 24f, 0f),
@@ -440,9 +458,10 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
             return
         }
         val snapshot = renderSnapshot(deviceState)
-        val targetFrame = audioTriggerRuntime?.currentFrame ?: 0L
         n.forEach { signal ->
             if (signal is Signal.Midi) {
+                val currentFrame = audioTriggerRuntime?.currentFrame ?: 0L
+                val targetFrame = maxOf(signal.audioTriggerBatch?.requestedTargetFrame ?: currentFrame, currentFrame)
                 val event = signal.toPadTriggerEvent(targetFrame)
                 when (event.phase) {
                     TriggerPhase.Down -> if (snapshot != null) {
@@ -455,9 +474,12 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                             sourceId = selectionUUID,
                             chokeGroup = deviceState.chokeGroup,
                             targetFrame = event.targetFrame,
+                            batch = signal.audioTriggerBatch,
+                            chokeScopeId = deviceState.chokeScopeId,
+                            chokeOwnerId = deviceState.chokeOwnerId,
                         )
                         triggerQueue.offer(
-                            SampleVoiceCommand.Start(event.targetFrame, event.key, snapshot),
+                            SampleVoiceCommand.Start(event.targetFrame, event.key, snapshot, signal.audioTriggerBatch),
                         )
                     }
                     TriggerPhase.Up -> if (deviceState.playbackMode == SamplePlaybackMode.GateLoop) {
@@ -466,6 +488,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                                 event.targetFrame,
                                 event.key,
                                 releaseRampFrames(),
+                                signal.audioTriggerBatch,
                             ),
                         )
                     }
@@ -497,7 +520,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         val blockEndFrame = context.absoluteFrame + block.frameCount
         if (
             voicePool.activeVoiceCount == 0 &&
-            (nextCommand == null || nextCommand.targetFrame >= blockEndFrame)
+            (nextCommand == null || nextCommand.scheduledFrame >= blockEndFrame)
         ) {
             publishedPlayheadFrame.value = -1L
             return
@@ -512,14 +535,14 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         while (renderedFrames < block.frameCount) {
             val cursorFrame = context.absoluteFrame + renderedFrames
             var pending = pendingVoiceCommand
-            while (pending != null && pending.targetFrame <= cursorFrame) {
+            while (pending != null && pending.scheduledFrame <= cursorFrame) {
                 voicePool.apply(pending)
                 pendingVoiceCommand = triggerQueue.poll()
                 pending = pendingVoiceCommand
             }
             val remaining = block.frameCount - renderedFrames
             val segmentFrames = pending?.let {
-                min(remaining.toLong(), (it.targetFrame - cursorFrame).coerceAtLeast(0L)).toInt()
+                min(remaining.toLong(), (it.scheduledFrame - cursorFrame).coerceAtLeast(0L)).toInt()
             } ?: remaining
             if (segmentFrames > 0) {
                 voicePool.render(block, renderedFrames, segmentFrames, modulation)
@@ -537,6 +560,29 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     }
 
     private fun fillModulation(base: SampleChainDeviceState, absoluteFrame: Long, frameCount: Int) {
+        if (!hasSampleRateModulation()) {
+            val volumeDb = resolveRealtimeParameter(PARAMETERS[0], base.volumeDb, absoluteFrame)
+            val pan = (resolveRealtimeParameter(PARAMETERS[1], base.pan, absoluteFrame) / 100f)
+                .coerceIn(-1f, 1f)
+            val angle = (pan + 1f) * (PI.toFloat() / 4f)
+            val centerCompensation = sqrt(2f)
+            val sampleRate = audioConfiguration.value?.sampleRate ?: 44_100
+            val fadeInFrames = (
+                resolveRealtimeParameter(PARAMETERS[2], base.fadeInMs, absoluteFrame) *
+                    sampleRate / 1_000f
+                ).toInt().coerceAtLeast(0)
+            val fadeOutFrames = (
+                resolveRealtimeParameter(PARAMETERS[3], base.fadeOutMs, absoluteFrame) *
+                    sampleRate / 1_000f
+                ).toInt().coerceAtLeast(0)
+            modulation.volumeGain.fill(10.0.pow(volumeDb / 20.0).toFloat(), 0, frameCount)
+            modulation.panLeftGain.fill(cos(angle) * centerCompensation, 0, frameCount)
+            modulation.panRightGain.fill(sin(angle) * centerCompensation, 0, frameCount)
+            modulation.fadeInFrames.fill(fadeInFrames, 0, frameCount)
+            modulation.fadeOutFrames.fill(fadeOutFrames, 0, frameCount)
+            return
+        }
+
         var frame = 0
         while (frame < frameCount) {
             val timelineFrame = absoluteFrame + frame
@@ -560,13 +606,51 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         }
     }
 
+    /**
+     * Static controls only need block-rate resolution. Keeping the per-frame path for an
+     * actually moving automation preserves sample accuracy without making ordinary sample
+     * playback allocate and scan the workspace thousands of times per callback.
+     */
+    private fun hasSampleRateModulation(): Boolean {
+        val parameterIds = SAMPLE_MODULATION_PARAMETER_IDS
+        var parameterIndex = 0
+        while (parameterIndex < parameterIds.size) {
+            val parameterId = parameterIds[parameterIndex]
+            if (isDialAutomationRunning(parameterId)) return true
+            val address = ParameterAddress(selectionUUID, parameterId)
+            if (audioTriggerRuntime?.isAutomationRunning(LiveAutomationTarget.Parameter(address)) == true) {
+                return true
+            }
+            parameterIndex++
+        }
+
+        val mappings = WorkspaceRepository.parameterMappings.value
+        var mappingIndex = 0
+        while (mappingIndex < mappings.size) {
+            val mapping = mappings[mappingIndex]
+            if (
+                mapping.target.deviceId == selectionUUID &&
+                mapping.target.parameterId in SAMPLE_MODULATION_PARAMETER_IDS &&
+                audioTriggerRuntime?.isAutomationRunning(
+                    LiveAutomationTarget.Macro(mapping.macroId),
+                ) == true
+            ) {
+                return true
+            }
+            mappingIndex++
+        }
+        return false
+    }
+
     override fun onChoke() {
         enqueueChoke(audioTriggerRuntime?.currentFrame ?: 0L)
     }
 
-    override fun enqueueChoke(targetFrame: Long) {
+    override fun enqueueChoke(targetFrame: Long) = enqueueChoke(targetFrame, null)
+
+    override fun enqueueChoke(targetFrame: Long, batch: AudioTriggerBatch?) {
         triggerQueue.offer(
-            SampleVoiceCommand.Choke(targetFrame, releaseRampFrames()),
+            SampleVoiceCommand.Choke(targetFrame, releaseRampFrames(), batch),
         )
     }
 
@@ -1000,6 +1084,16 @@ data class SampleChainDeviceState(
     val sourceStartFrame: Long? = null,
     @ProtoNumber(23)
     val sourceEndFrameExclusive: Long? = null,
+    @ProtoNumber(24)
+    val transposeSemitones: Float = 0f,
+    @ProtoNumber(25)
+    val audibleOutput: Boolean = true,
+    @ProtoNumber(26)
+    val sidechainBusId: String? = null,
+    @ProtoNumber(27)
+    val chokeScopeId: String? = null,
+    @ProtoNumber(28)
+    val chokeOwnerId: String? = null,
 ) : DeviceState()
 
 @Serializable

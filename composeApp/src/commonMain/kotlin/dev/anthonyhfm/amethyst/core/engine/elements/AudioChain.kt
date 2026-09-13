@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.engine.elements
 import dev.anthonyhfm.amethyst.core.engine.audio.graph.AudioExecutionPlan
 import dev.anthonyhfm.amethyst.core.engine.audio.graph.AudioRenderMetrics
 import dev.anthonyhfm.amethyst.core.engine.audio.graph.AudioRenderMetricSnapshot
+import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntime
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntimeAware
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.ChokeSourceRegistration
@@ -35,6 +36,8 @@ class AudioChain : Chain() {
     val latencyFrames: Int get() = executionPlan.value?.latencyFrames ?: 0
     val tailFrames: Long get() = executionPlan.value?.tailFrames ?: 0L
     val diagnostics get() = executionPlan.value?.diagnostics.orEmpty()
+    val currentAudioFrame: Long get() = triggerRuntime.currentFrame
+    val audioSampleRate: Int get() = triggerRuntime.sampleRate
 
     fun diagnosticsSnapshot(): AudioDiagnosticsSnapshot {
         val planDevices = executionPlan.value?.devices.orEmpty()
@@ -61,6 +64,30 @@ class AudioChain : Chain() {
         )
     }
 
+    override fun signalEnter(n: List<Signal>) {
+        dispatchSignals(n, requestedTargetFrame = null)
+    }
+
+    fun signalEnterAtFrame(n: List<Signal>, targetFrame: Long) {
+        require(targetFrame >= 0L)
+        dispatchSignals(n, requestedTargetFrame = targetFrame)
+    }
+
+    private fun dispatchSignals(n: List<Signal>, requestedTargetFrame: Long?) {
+        if (preparedConfiguration.value == null || n.none { it is Signal.Midi }) {
+            super.signalEnter(n)
+            return
+        }
+        val batch = AudioTriggerBatch(requestedTargetFrame)
+        try {
+            super.signalEnter(n.map { signal ->
+                if (signal is Signal.Midi) signal.copy(audioTriggerBatch = batch) else signal
+            })
+        } finally {
+            triggerRuntime.commitBatch(batch)
+        }
+    }
+
     override fun onDevicesChanged(
         previous: List<GenericChainDevice<*>>,
         current: List<GenericChainDevice<*>>,
@@ -70,6 +97,7 @@ class AudioChain : Chain() {
     }
 
     fun prepareAudio(configuration: AudioConfiguration) {
+        triggerRuntime.clearBatches()
         preparedConfiguration.value = configuration
         triggerRuntime.publishSampleRate(configuration.sampleRate)
         observeNestedTopology(devices.value)
@@ -77,7 +105,7 @@ class AudioChain : Chain() {
     }
 
     fun processAudio(block: AudioProcessingBlock, context: AudioRenderContext) {
-        triggerRuntime.publishFrame(context.absoluteFrame)
+        triggerRuntime.beginRenderBlock(context.absoluteFrame)
         val started = TimeSource.Monotonic.markNow()
         activeRenderReaders.incrementAndGet()
         try {
@@ -94,6 +122,7 @@ class AudioChain : Chain() {
     }
 
     fun resetAudio() {
+        triggerRuntime.clearBatches()
         executionPlan.value?.reset()
         triggerRuntime.clearAutomationOverrides()
     }
@@ -115,6 +144,7 @@ class AudioChain : Chain() {
     }
 
     fun releaseAudio() {
+        triggerRuntime.clearBatches()
         triggerRuntime.clearAutomationOverrides()
         executionPlan.value?.release()
         retiredPlans.flatMap { it.devices.asList() }
@@ -131,19 +161,23 @@ class AudioChain : Chain() {
     private fun rebuildExecutionPlan() {
         val configuration = preparedConfiguration.value ?: return
         val previous = executionPlan.value
-        val next = AudioExecutionPlan.compile(this, configuration, renderMetrics)
         val runtimeDevices = devicesDepthFirst()
         runtimeDevices.filterIsInstance<AudioTriggerRuntimeAware>().forEach {
             it.audioTriggerRuntime = triggerRuntime
         }
+        runtimeDevices.filterIsInstance<AudioChainDevice<*>>().forEach { device ->
+            if (previous?.devices?.none { it === device } != false) {
+                device.prepareAudio(configuration)
+            }
+        }
+        val next = AudioExecutionPlan.compile(this, configuration, renderMetrics)
         triggerRuntime.replaceSources(
-            next.devices.mapNotNull { device ->
-                val source = device as? ChokeVoiceSource ?: return@mapNotNull null
-                ChokeSourceRegistration(source)
-            }.toTypedArray(),
+            next.enabledChokeSources.map(::ChokeSourceRegistration).toTypedArray(),
         )
         triggerRuntime.replaceAutomationSources(
-            runtimeDevices.filterIsInstance<LiveAutomationSource>().toTypedArray(),
+            runtimeDevices.filterIsInstance<LiveAutomationSource>()
+                .filter(LiveAutomationSource::participatesInAudioAutomation)
+                .toTypedArray(),
         )
         val allSourceIds = next.devices.asSequence()
             .filter { it.audioRole == AudioChainDeviceRole.Generator }
@@ -153,11 +187,6 @@ class AudioChain : Chain() {
             consumer.replaceEligibleSidechainSources(
                 allSourceIds - programSourceIdsBefore(consumer as GenericChainDevice<*>),
             )
-        }
-        next.devices.forEach { device ->
-            if (previous?.devices?.none { it === device } != false) {
-                device.prepareAudio(configuration)
-            }
         }
         executionPlan.getAndSet(next)?.let(retiredPlans::add)
         reclaimRetiredPlans(next)

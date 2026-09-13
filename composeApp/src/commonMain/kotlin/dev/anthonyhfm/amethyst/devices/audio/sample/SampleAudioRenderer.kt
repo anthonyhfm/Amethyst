@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.devices.audio.sample
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PolyphaseSincResampler
+import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.PadTriggerKey
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
@@ -34,6 +35,7 @@ internal class SampleRenderSnapshot private constructor(
     val volumeAutomationLane: TimelineAutomationLane?,
     val warpMode: SampleWarpMode,
     val tempoRatio: Double,
+    val pitchRatio: Double,
 ) {
     val activeFrames: Long get() = endFrame - startFrame
 
@@ -172,6 +174,10 @@ internal class SampleRenderSnapshot private constructor(
                 },
                 warpMode = state.warpMode,
                 tempoRatio = sampleTempoRatio(state.warpMode, state.sourceBpm, workspaceBpm),
+                pitchRatio = 2.0.pow(
+                    (state.transposeSemitones.takeIf(Float::isFinite) ?: 0f)
+                        .coerceIn(-48f, 48f) / 12.0,
+                ),
             )
         }
 
@@ -188,22 +194,27 @@ internal class SampleRenderSnapshot private constructor(
 
 internal sealed interface SampleVoiceCommand {
     val targetFrame: Long
+    val batch: AudioTriggerBatch?
+    val scheduledFrame: Long get() = batch?.targetFrame ?: targetFrame
 
     data class Start(
         override val targetFrame: Long,
         val key: PadTriggerKey,
         val snapshot: SampleRenderSnapshot,
+        override val batch: AudioTriggerBatch? = null,
     ) : SampleVoiceCommand
 
     data class Release(
         override val targetFrame: Long,
         val key: PadTriggerKey,
         val fadeFrames: Int,
+        override val batch: AudioTriggerBatch? = null,
     ) : SampleVoiceCommand
 
     data class Choke(
         override val targetFrame: Long,
         val fadeFrames: Int,
+        override val batch: AudioTriggerBatch? = null,
     ) : SampleVoiceCommand
 }
 
@@ -233,6 +244,7 @@ internal class SampleTriggerQueue(private val capacity: Int = 32) {
     }
 
     val droppedTriggers: Long get() = droppedCount.value
+    val hasPendingCommands: Boolean get() = readSequence.value != writeSequence.value
 
     fun offer(command: SampleVoiceCommand): Boolean {
         while (true) {
@@ -241,6 +253,7 @@ internal class SampleTriggerQueue(private val capacity: Int = 32) {
             val difference = sequences[slot].value - write
             when {
                 difference == 0L -> if (writeSequence.compareAndSet(write, write + 1L)) {
+                    command.batch?.markCommandQueued()
                     slots[slot].value = command
                     sequences[slot].value = write + 1L
                     return true
@@ -308,11 +321,21 @@ internal class SampleVoiceRenderer {
 
     fun trigger(snapshot: SampleRenderSnapshot, key: PadTriggerKey, sequence: Long) {
         check(snapshot.source.sampleRate == configuration.sampleRate)
-        transitionLeft = lastLeft
-        transitionRight = lastRight
-        transitionFramesTotal = (configuration.sampleRate * RETRIGGER_TRANSITION_SECONDS)
-            .toInt().coerceAtLeast(1)
-        transitionFramesRemaining = transitionFramesTotal
+        if (isActive) {
+            transitionLeft = lastLeft
+            transitionRight = lastRight
+            transitionFramesTotal = (configuration.sampleRate * RETRIGGER_TRANSITION_SECONDS)
+                .toInt().coerceAtLeast(1)
+            transitionFramesRemaining = transitionFramesTotal
+        } else {
+            // A fresh voice already has the sample's own fade-in envelope. Applying the
+            // retrigger transition here would soften every transient, even though there
+            // is no preceding voice to crossfade away from.
+            transitionLeft = 0f
+            transitionRight = 0f
+            transitionFramesTotal = 0
+            transitionFramesRemaining = 0
+        }
         releaseFramesRemaining = 0
         releaseFramesTotal = 0
         this.snapshot = snapshot
@@ -422,8 +445,8 @@ internal class SampleVoiceRenderer {
                 }
             }
             when (active.warpMode) {
-                SampleWarpMode.Off -> sourcePosition += 1.0
-                SampleWarpMode.Repitch -> sourcePosition += tempoRatio
+                SampleWarpMode.Off -> sourcePosition += active.pitchRatio
+                SampleWarpMode.Repitch -> sourcePosition += tempoRatio * active.pitchRatio
                 SampleWarpMode.Warp -> {
                     if (warpLatencyRemaining > 0) {
                         warpLatencyRemaining--
@@ -496,10 +519,13 @@ internal class SampleVoiceRenderer {
             return
         }
         val blend = warpGrainPhase.toFloat() / WARP_GRAIN_HOP.toFloat()
-        val currentPosition = wrapWarpPosition(snapshot, warpCurrentGrainStart + warpGrainPhase)
+        val currentPosition = wrapWarpPosition(
+            snapshot,
+            warpCurrentGrainStart + warpGrainPhase * snapshot.pitchRatio,
+        )
         val previousPosition = wrapWarpPosition(
             snapshot,
-            warpPreviousGrainStart + warpGrainPhase + WARP_GRAIN_HOP,
+            warpPreviousGrainStart + (warpGrainPhase + WARP_GRAIN_HOP) * snapshot.pitchRatio,
         )
         var channel = 0
         while (channel < 2) {

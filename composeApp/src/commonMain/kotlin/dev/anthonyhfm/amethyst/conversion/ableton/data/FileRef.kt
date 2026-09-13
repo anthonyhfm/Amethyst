@@ -103,7 +103,22 @@ data class FileRef(
 
         path?.value
             ?.takeIf { it.isNotBlank() }
-            ?.let { candidates += it }
+            ?.let { absolutePath ->
+                candidates += absolutePath
+
+                // Core Library references contain the creator's installed Live version.
+                // Try other installed Suite versions so a Live 11 set can use the same
+                // bundled sample from Live 12 (and vice versa).
+                val appPattern = Regex("/Ableton Live \\d+(?:\\.\\d+)? Suite\\.app/")
+                if (appPattern.containsMatchIn(absolutePath)) {
+                    for (majorVersion in 9..20) {
+                        candidates += absolutePath.replace(
+                            appPattern,
+                            "/Ableton Live $majorVersion Suite.app/",
+                        )
+                    }
+                }
+            }
 
         return candidates.toList()
     }
