@@ -8,7 +8,10 @@ internal object AbletonPageIndexing {
         minimum != 0 || (maximum != 0 && maximum != 127)
     }
 
-    fun sourceOffset(selectorMinimum: Int?): Int = if (selectorMinimum == 1) 1 else 0
+    fun sourceOffset(
+        selectorMinimum: Int?,
+        hasOneBasedPageController: Boolean = false,
+    ): Int = if (hasOneBasedPageController || selectorMinimum == 1) 1 else 0
 
     fun normalizeSelectorValue(value: Int, sourceOffset: Int): Int =
         value - sourceOffset

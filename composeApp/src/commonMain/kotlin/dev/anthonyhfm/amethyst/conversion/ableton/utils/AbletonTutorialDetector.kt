@@ -20,6 +20,11 @@ object AbletonTutorialDetector {
         val launchpadId: String?,
     )
 
+    private data class PageAutomationTarget(
+        val track: MidiTrack,
+        val sourceOffset: Int,
+    )
+
     internal fun beatsToMilliseconds(beats: Double, bpm: Double): Double =
         beats * (60_000.0 / bpm)
 
@@ -310,20 +315,30 @@ object AbletonTutorialDetector {
         return nonEmptyClips
     }
 
-    private fun pageAutomationTargetsByTrack(tracks: List<MidiTrack>): Map<Int, MidiTrack> {
-        val targets = mutableMapOf<Int, MidiTrack>()
+    private fun pageAutomationTargetsById(tracks: List<MidiTrack>): Map<Int, PageAutomationTarget> {
+        val targets = mutableMapOf<Int, PageAutomationTarget>()
 
         // Page Switcher's Live API parameter 9/17 is the rack Chain Selector after
         // 8/16 macros. Bind only the selector of the rack immediately following it.
         for (track in tracks) {
             val explicitTargets = track.deviceChain.devices.zipWithNext().mapNotNull { (candidate, following) ->
                 if (candidate is MxDeviceMidiEffect && isPageSwitcher(candidate)) {
-                    chainSelectorTarget(following)
+                    chainSelectorTarget(following)?.let { targetId ->
+                        targetId to PageAutomationTarget(
+                            track = track,
+                            sourceOffset = AbletonPageIndexing.sourceOffset(
+                                selectorMinimum = chainSelectorMinimum(following),
+                                // Page Switcher exposes pages as 1..16 even when the
+                                // receiving rack's generic controller range is 0..127.
+                                hasOneBasedPageController = true,
+                            ),
+                        )
+                    }
                 } else null
             }
 
             if (explicitTargets.isNotEmpty()) {
-                explicitTargets.forEach { targets[it] = track }
+                explicitTargets.forEach { (targetId, target) -> targets[targetId] = target }
                 continue
             }
 
@@ -331,18 +346,24 @@ object AbletonTutorialDetector {
             // Keep this per-track: an explicit Page Switcher on one controller track must
             // not suppress the restricted legacy targets on another controller track.
             for (device in collectAllDevices(track.deviceChain.devices)) {
+                val target = PageAutomationTarget(
+                    track = track,
+                    sourceOffset = AbletonPageIndexing.sourceOffset(
+                        selectorMinimum = chainSelectorMinimum(device),
+                    ),
+                )
                 when (device) {
                     is InstrumentGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targets[it] = track }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = track }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = target }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = target }
                     }
                     is MidiEffectGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targets[it] = track }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = track }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = target }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = target }
                     }
                     is DrumGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targets[it] = track }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = track }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = target }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = target }
                     }
                     else -> {}
                 }
@@ -354,14 +375,26 @@ object AbletonTutorialDetector {
     private fun isPageSwitcher(device: MxDeviceMidiEffect): Boolean {
         val fileRef = device.patchSlot.value.patchRef?.fileRef ?: return false
         val path = fileRef.relativePath.value ?: fileRef.path?.value.orEmpty()
-        return path.substringAfterLast('/').substringAfterLast('\\')
-            .equals("Page Switcher.amxd", ignoreCase = true)
+        return isPageSwitcherPath(path)
+    }
+
+    internal fun isPageSwitcherPath(path: String): Boolean {
+        val fileName = path.substringAfterLast('/').substringAfterLast('\\')
+        return fileName.substringBeforeLast('.', missingDelimiterValue = fileName)
+            .startsWith("Page Switcher", ignoreCase = true)
     }
 
     private fun chainSelectorTarget(device: AbletonDevice): Int? = when (device) {
         is InstrumentGroupDevice -> device.chainSelector.automationTarget?.id
         is MidiEffectGroupDevice -> device.chainSelector.automationTarget?.id
         is DrumGroupDevice -> device.chainSelector.automationTarget?.id
+        else -> null
+    }
+
+    private fun chainSelectorMinimum(device: AbletonDevice): Int? = when (device) {
+        is InstrumentGroupDevice -> device.chainSelector.midiControllerRange?.min?.value
+        is MidiEffectGroupDevice -> device.chainSelector.midiControllerRange?.min?.value
+        is DrumGroupDevice -> device.chainSelector.midiControllerRange?.min?.value
         else -> null
     }
 
@@ -434,8 +467,8 @@ object AbletonTutorialDetector {
         tutorialStartBeats: Double,
         tutorialEndBeats: Double = Double.POSITIVE_INFINITY,
     ): Map<Double, List<AutoPlayData.Action>> {
-        val targetTracksById = pageAutomationTargetsByTrack(tracks)
-        if (targetTracksById.isEmpty()) return emptyMap()
+        val targetsById = pageAutomationTargetsById(tracks)
+        if (targetsById.isEmpty()) return emptyMap()
 
         val bpm = AbletonConverter.bpm
         if (bpm <= 0.0) return emptyMap()
@@ -447,9 +480,9 @@ object AbletonTutorialDetector {
             val envelopes = track.automationEnvelopes?.envelopes?.envelopes.orEmpty()
             for (envelope in envelopes) {
                 val pointeeId = envelope.envelopeTarget?.pointeeId?.value
-                val targetTrack = pointeeId?.let(targetTracksById::get)
-                if (targetTrack != null) {
-                    val target = autoPlayTarget(layout, targetTrack)
+                val pageTarget = pointeeId?.let(targetsById::get)
+                if (pageTarget != null) {
+                    val target = autoPlayTarget(layout, pageTarget.track)
                     val offset = target.offset
                     val rawEvents = envelope.automation?.events?.floatEvents.orEmpty()
                     if (rawEvents.isEmpty()) continue
@@ -464,7 +497,10 @@ object AbletonTutorialDetector {
 
                     for (event in dedupedEvents) {
                         val timeBeats = event.time - tutorialStartBeats
-                        val targetPage = event.value.roundToInt()
+                        val targetPage = AbletonPageIndexing.normalizeSelectorValue(
+                            value = event.value.roundToInt(),
+                            sourceOffset = pageTarget.sourceOffset,
+                        )
 
                         if (targetPage !in 0..15) continue
                         if (targetPage == lastEmittedPage) continue
