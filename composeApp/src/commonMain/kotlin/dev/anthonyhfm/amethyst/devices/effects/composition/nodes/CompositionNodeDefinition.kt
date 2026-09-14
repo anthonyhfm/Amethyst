@@ -38,6 +38,14 @@ interface CompositionNodeDefinition {
     val pickerCategory: CompositionNodePickerCategory? get() = null
     val automationParameters: List<CompositionAutomationParameter> get() = emptyList()
 
+    /**
+     * Source generators describe motion in their own raw 0..1 time domain. Keep only the
+     * part of that domain which actually paints a workspace LED, then stretch it back over
+     * the composition timeline. Time nodes are evaluated afterwards and can still add
+     * intentional gaps.
+     */
+    val stretchVisibleSourceTimeline: Boolean get() = !hasInput && hasOutput
+
     val bodyWidth: Dp get() = 188.dp
     val bodyHeight: Dp get() = 96.dp
 

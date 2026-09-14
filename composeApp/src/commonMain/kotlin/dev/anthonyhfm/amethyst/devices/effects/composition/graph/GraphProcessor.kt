@@ -10,11 +10,27 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.GeometryStroke
 import dev.anthonyhfm.amethyst.devices.effects.composition.Vec2
 import dev.anthonyhfm.amethyst.devices.effects.composition.distanceSquared
 import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automatedAt
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.CompositionNodeDefinition
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 object GraphProcessor {
+    private const val ACTIVE_RANGE_STEPS = 64
+    private const val ACTIVE_RANGE_REFINEMENTS = 5
+    private const val MAX_ACTIVE_RANGE_CACHE_ENTRIES = 256
+
+    private data class SourceRangeCacheKey(
+        val node: CompositionNode,
+        val bounds: Pair<IntOffset, IntSize>,
+        val triggerOrigin: Vec2?,
+    )
+
+    private val sourceRangeCacheLock = SynchronizedObject()
+    private val sourceRangeCache = mutableMapOf<SourceRangeCacheKey, Pair<Float, Float>>()
+
     fun renderFrame(
         graph: CompositionGraph,
         progress: Float,
@@ -44,7 +60,8 @@ object GraphProcessor {
         nodeId: String,
         context: EvaluationContext,
     ): List<GeometryFrame> {
-        val node = (graph.node(nodeId) ?: return emptyList()).automatedAt(context.progress)
+        val rawNode = graph.node(nodeId) ?: return emptyList()
+        val node = rawNode.automatedAt(context.progress)
         val definition = NodeRegistry.definitionFor(node) ?: return emptyList()
         val custom = definition.evaluate(graph, node, context)
         if (custom != null) return custom
@@ -57,8 +74,87 @@ object GraphProcessor {
         return if (definition.hasInput) {
             definition.transformFrames(node, context, inputFrames)
         } else {
-            definition.sourceFrames(node, context)
+            evaluateSource(definition, rawNode, context)
         }
+    }
+
+    private fun evaluateSource(
+        definition: CompositionNodeDefinition,
+        rawNode: CompositionNode,
+        context: EvaluationContext,
+    ): List<GeometryFrame> {
+        if (!definition.stretchVisibleSourceTimeline) {
+            return definition.sourceFrames(rawNode.automatedAt(context.progress), context)
+        }
+
+        val (activeStart, activeEnd) = sourceActiveRange(definition, rawNode, context)
+        val mappedProgress = if (activeEnd - activeStart < 0.0001f) {
+            activeStart
+        } else {
+            activeStart + context.progress.coerceIn(0f, 1f) * (activeEnd - activeStart)
+        }
+        val mappedContext = context.copy(progress = mappedProgress.coerceIn(0f, 1f))
+        return definition.sourceFrames(rawNode.automatedAt(mappedContext.progress), mappedContext)
+    }
+
+    private fun sourceActiveRange(
+        definition: CompositionNodeDefinition,
+        node: CompositionNode,
+        context: EvaluationContext,
+    ): Pair<Float, Float> {
+        val key = SourceRangeCacheKey(node, context.bounds, context.triggerOrigin)
+        synchronized(sourceRangeCacheLock) { sourceRangeCache[key] }?.let { return it }
+
+        fun hasContentAt(progress: Float): Boolean {
+            val sampleContext = context.copy(progress = progress.coerceIn(0f, 1f))
+            val sampleNode = node.automatedAt(sampleContext.progress)
+            return definition.sourceFrames(sampleNode, sampleContext).any { frame ->
+                frame.strokes.any { stroke -> hasVisiblePixels(stroke, context.bounds) }
+            }
+        }
+
+        var firstActiveIndex = -1
+        var lastActiveIndex = -1
+        for (index in 0..ACTIVE_RANGE_STEPS) {
+            if (hasContentAt(index.toFloat() / ACTIVE_RANGE_STEPS)) {
+                if (firstActiveIndex == -1) firstActiveIndex = index
+                lastActiveIndex = index
+            }
+        }
+
+        val range = if (firstActiveIndex == -1) {
+            0f to 1f
+        } else {
+            val start = if (firstActiveIndex == 0) {
+                0f
+            } else {
+                var invisible = (firstActiveIndex - 1).toFloat() / ACTIVE_RANGE_STEPS
+                var visible = firstActiveIndex.toFloat() / ACTIVE_RANGE_STEPS
+                repeat(ACTIVE_RANGE_REFINEMENTS) {
+                    val middle = (invisible + visible) / 2f
+                    if (hasContentAt(middle)) visible = middle else invisible = middle
+                }
+                visible
+            }
+            val end = if (lastActiveIndex == ACTIVE_RANGE_STEPS) {
+                1f
+            } else {
+                var visible = lastActiveIndex.toFloat() / ACTIVE_RANGE_STEPS
+                var invisible = (lastActiveIndex + 1).toFloat() / ACTIVE_RANGE_STEPS
+                repeat(ACTIVE_RANGE_REFINEMENTS) {
+                    val middle = (visible + invisible) / 2f
+                    if (hasContentAt(middle)) visible = middle else invisible = middle
+                }
+                visible
+            }
+            start to end.coerceAtLeast(start)
+        }
+
+        synchronized(sourceRangeCacheLock) {
+            if (sourceRangeCache.size >= MAX_ACTIVE_RANGE_CACHE_ENTRIES) sourceRangeCache.clear()
+            sourceRangeCache[key] = range
+        }
+        return range
     }
 
     internal fun hasVisiblePixels(

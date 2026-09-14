@@ -203,18 +203,8 @@ internal fun calculateTravelSpan(
 
     if (maxDx <= 0f && maxDy <= 0f) return 0f
 
-    val effectiveCurvature = curvature.coerceIn(MIN_CURVATURE, MAX_CURVATURE)
-    val c = effectiveCurvature.coerceAtLeast(2f).toDouble()
-    val baseSpan = (maxDx.toDouble().pow(c) + maxDy.toDouble().pow(c)).pow(1.0 / c).toFloat()
-    val diagonalSpan = kotlin.math.sqrt(maxDx * maxDx + maxDy * maxDy)
-
-    val span = if (effectiveCurvature < 2f) {
-        diagonalSpan + 1f
-    } else {
-        baseSpan + 1f
-    }
-
-    return span
+    val c = curvature.coerceIn(MIN_CURVATURE, MAX_CURVATURE).toDouble()
+    return (maxDx.toDouble().pow(c) + maxDy.toDouble().pow(c)).pow(1.0 / c).toFloat() + 1f
 }
 
 internal fun Pair<IntOffset, IntSize>.validOrFallbackBounds(): Pair<IntOffset, IntSize> =
@@ -234,4 +224,3 @@ private fun superellipsePoint(
         y = center.y + sine.sign * abs(sine).pow(exponent) * radius,
     )
 }
-

@@ -88,7 +88,9 @@ object TrimNode : TransformNode() {
         upstreamNodeIds: List<String>,
         context: EvaluationContext,
     ): Pair<Float, Float> {
-        val nodesHash = graph.nodes.fold(0) { acc, n -> acc * 31 + n.state.hashCode() + n.type.hashCode() }
+        val nodesHash = graph.nodes.fold(0) { acc, n ->
+            ((acc * 31 + n.type.hashCode()) * 31 + n.state.hashCode()) * 31 + n.automation.hashCode()
+        }
         val connectionsHash = graph.connections.hashCode()
         val cacheKey = RangeCacheKey(nodeId, nodesHash, connectionsHash, context.bounds, context.triggerOrigin)
 
