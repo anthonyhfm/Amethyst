@@ -10,6 +10,8 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MxDeviceMidiEffect
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonKeyMidi
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonMidiControllerRange
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import kotlin.math.roundToInt
@@ -22,8 +24,25 @@ object AbletonTutorialDetector {
 
     private data class PageAutomationTarget(
         val track: MidiTrack,
-        val sourceOffset: Int,
-    )
+        val sourceOffset: Int = 0,
+        val sourceMinimum: Int? = null,
+        val sourceMaximum: Int? = null,
+        val targetMaximum: Int? = null,
+    ) {
+        fun normalize(value: Double): Int = if (targetMaximum != null) {
+            AbletonPageIndexing.normalizeMacroValue(
+                value = value,
+                sourceMinimum = sourceMinimum,
+                sourceMaximum = sourceMaximum,
+                targetMaximum = targetMaximum,
+            )
+        } else {
+            AbletonPageIndexing.normalizeSelectorValue(
+                value = value.roundToInt(),
+                sourceOffset = sourceOffset,
+            )
+        }
+    }
 
     internal fun beatsToMilliseconds(beats: Double, bpm: Double): Double =
         beats * (60_000.0 / bpm)
@@ -345,8 +364,10 @@ object AbletonTutorialDetector {
             // Compatibility fallback for tracks whose Page Switcher file is unavailable.
             // Keep this per-track: an explicit Page Switcher on one controller track must
             // not suppress the restricted legacy targets on another controller track.
+            // Older projects commonly bind pages to Macro 1 rather than the version-specific
+            // last rack macro, so accept Macro 1 when its key/range metadata is page-sized.
             for (device in collectAllDevices(track.deviceChain.devices)) {
-                val target = PageAutomationTarget(
+                val selectorTarget = PageAutomationTarget(
                     track = track,
                     sourceOffset = AbletonPageIndexing.sourceOffset(
                         selectorMinimum = chainSelectorMinimum(device),
@@ -354,22 +375,104 @@ object AbletonTutorialDetector {
                 )
                 when (device) {
                     is InstrumentGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targets[it] = target }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = target }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = selectorTarget }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.let { macro ->
+                            registerPageMacroTarget(
+                                targets = targets,
+                                track = track,
+                                targetId = macro.automationTarget?.id,
+                                keyMidi = macro.keyMidi,
+                                controllerRange = macro.midiControllerRange,
+                                force = true,
+                            )
+                        }
+                        device.macro0?.let { macro ->
+                            registerPageMacroTarget(
+                                targets = targets,
+                                track = track,
+                                targetId = macro.automationTarget?.id,
+                                keyMidi = macro.keyMidi,
+                                controllerRange = macro.midiControllerRange,
+                            )
+                        }
                     }
                     is MidiEffectGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targets[it] = target }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = target }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = selectorTarget }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.let { macro ->
+                            registerPageMacroTarget(
+                                targets = targets,
+                                track = track,
+                                targetId = macro.automationTarget?.id,
+                                keyMidi = macro.keyMidi,
+                                controllerRange = macro.midiControllerRange,
+                                force = true,
+                            )
+                        }
+                        device.macro0?.let { macro ->
+                            registerPageMacroTarget(
+                                targets = targets,
+                                track = track,
+                                targetId = macro.automationTarget?.id,
+                                keyMidi = macro.keyMidi,
+                                controllerRange = macro.midiControllerRange,
+                            )
+                        }
                     }
                     is DrumGroupDevice -> {
-                        device.chainSelector.automationTarget?.id?.let { targets[it] = target }
-                        device.getPageMacro(AbletonConverter.liveVersion)?.automationTarget?.id?.let { targets[it] = target }
+                        device.chainSelector.automationTarget?.id?.let { targets[it] = selectorTarget }
+                        device.getPageMacro(AbletonConverter.liveVersion)?.let { macro ->
+                            registerPageMacroTarget(
+                                targets = targets,
+                                track = track,
+                                targetId = macro.automationTarget?.id,
+                                keyMidi = macro.keyMidi,
+                                controllerRange = macro.midiControllerRange,
+                                force = true,
+                            )
+                        }
+                        device.macro0?.let { macro ->
+                            registerPageMacroTarget(
+                                targets = targets,
+                                track = track,
+                                targetId = macro.automationTarget?.id,
+                                keyMidi = macro.keyMidi,
+                                controllerRange = macro.midiControllerRange,
+                            )
+                        }
                     }
                     else -> {}
                 }
             }
         }
         return targets
+    }
+
+    private fun registerPageMacroTarget(
+        targets: MutableMap<Int, PageAutomationTarget>,
+        track: MidiTrack,
+        targetId: Int?,
+        keyMidi: AbletonKeyMidi?,
+        controllerRange: AbletonMidiControllerRange?,
+        force: Boolean = false,
+    ) {
+        if (targetId == null) return
+
+        val controllerMinimum = controllerRange?.min?.value
+        val controllerMaximum = controllerRange?.max?.value
+        val targetMaximum = AbletonPageIndexing.pageTargetMaximum(
+            keyMinimum = keyMidi?.lowerRangeNote?.value,
+            keyMaximum = keyMidi?.upperRangeNote?.value,
+            controllerMinimum = controllerMinimum,
+            controllerMaximum = controllerMaximum,
+        )
+        if (!force && targetMaximum == null) return
+
+        targets[targetId] = PageAutomationTarget(
+            track = track,
+            sourceMinimum = controllerMinimum,
+            sourceMaximum = controllerMaximum,
+            targetMaximum = targetMaximum,
+        )
     }
 
     private fun isPageSwitcher(device: MxDeviceMidiEffect): Boolean {
@@ -497,10 +600,7 @@ object AbletonTutorialDetector {
 
                     for (event in dedupedEvents) {
                         val timeBeats = event.time - tutorialStartBeats
-                        val targetPage = AbletonPageIndexing.normalizeSelectorValue(
-                            value = event.value.roundToInt(),
-                            sourceOffset = pageTarget.sourceOffset,
-                        )
+                        val targetPage = pageTarget.normalize(event.value.toDouble())
 
                         if (targetPage !in 0..15) continue
                         if (targetPage == lastEmittedPage) continue

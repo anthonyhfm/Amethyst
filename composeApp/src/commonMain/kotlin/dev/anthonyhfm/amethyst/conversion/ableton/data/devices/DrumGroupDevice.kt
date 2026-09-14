@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.conversion.ableton.data.devices
 
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AbletonDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.AutomationTarget
+import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonKeyMidi
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonManual
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonMidiControllerRange
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonOn
@@ -93,6 +94,10 @@ data class DrumGroupDevice(
 
     @Serializable
     data class Macro(
+        @XmlElement
+        val keyMidi: AbletonKeyMidi? = null,
+        @XmlElement
+        val midiControllerRange: AbletonMidiControllerRange? = null,
         @XmlElement
         val manual: AbletonManual<Float> = AbletonManual(0f),
         @XmlElement
