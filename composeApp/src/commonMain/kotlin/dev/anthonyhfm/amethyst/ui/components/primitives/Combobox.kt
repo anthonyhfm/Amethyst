@@ -127,7 +127,7 @@ fun <T> Combobox(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = Theme[colors][mutedForeground],
+                    tint = textColor,
                 )
             }
         }

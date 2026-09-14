@@ -124,7 +124,7 @@ kotlin {
 
             implementation(projects.nativeEngine)
             implementation(libs.kotlinx.coroutines.swing)
-            implementation("io.github.vyfor:kpresence:0.6.5")
+            implementation("io.github.vyfor:kpresence:0.6.6")
             implementation("com.github.junrar:junrar:8.1.1")
 
             // Ktor WebSocket Server + CIO engine (JVM/Desktop only)
@@ -133,12 +133,12 @@ kotlin {
             implementation(libs.ktor.server.cio)
             implementation(libs.ktor.server.websockets)
 
-            implementation("dev.nucleusframework:nucleus.updater-runtime:2.5.12")
-            implementation("dev.nucleusframework:nucleus.nucleus-application:2.5.12")
-            implementation("dev.nucleusframework:nucleus.decorated-window-tao:2.5.12")
-            implementation("dev.nucleusframework:nucleus.menu-macos:2.5.12")
-            implementation("dev.nucleusframework:nucleus.global-hotkey:2.5.12")
-            implementation("dev.nucleusframework:nucleus.system-info:2.5.12")
+            implementation("dev.nucleusframework:nucleus.updater-runtime:2.5.15")
+            implementation("dev.nucleusframework:nucleus.nucleus-application:2.5.15")
+            implementation("dev.nucleusframework:nucleus.decorated-window-tao:2.5.15")
+            implementation("dev.nucleusframework:nucleus.menu-macos:2.5.15")
+            implementation("dev.nucleusframework:nucleus.global-hotkey:2.5.15")
+            implementation("dev.nucleusframework:nucleus.system-info:2.5.15")
         }
     }
 }

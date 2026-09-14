@@ -75,6 +75,7 @@ fun DeviceSettingsDialog(
         ) {
             Field {
                 FieldLabel(stringResource(Res.string.workspace_device_settings_midi_device_label))
+
                 Combobox(
                     items = devices,
                     selectedItem = selectedDevice,
@@ -86,6 +87,7 @@ fun DeviceSettingsDialog(
                     emptyMessage = "No devices found.",
                     enabled = devices.isNotEmpty(),
                 )
+
                 FieldDescription("Launchpad devices are auto-detected and grouped natively.")
             }
         }
