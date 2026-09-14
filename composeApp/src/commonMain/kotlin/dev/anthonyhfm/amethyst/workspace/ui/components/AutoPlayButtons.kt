@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -32,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BookOpenText
 import com.composables.icons.lucide.Lucide
@@ -44,7 +42,6 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
-import dev.anthonyhfm.amethyst.ui.components.primitives.Progress
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -60,14 +57,6 @@ import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
 import dev.anthonyhfm.amethyst.workspace.AutoPlayState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import kotlin.math.roundToInt
-
-private fun formatTime(millis: Double): String {
-    val totalSeconds = (millis / 1000.0).roundToInt().coerceAtLeast(0)
-    val minutes = totalSeconds / 60
-    val secs = totalSeconds % 60
-    return "$minutes:${secs.toString().padStart(2, '0')}"
-}
 
 @Composable
 fun AutoPlayButtons() {
@@ -77,7 +66,7 @@ fun AutoPlayButtons() {
     var showSettingsDialog by remember { mutableStateOf(false) }
 
     val hasAutoPlayData = WorkspaceRepository.workspaceMeta?.autoPlay?.actions?.isNotEmpty() == true
-    val showProgress = hasAutoPlayData && autoPlayState != AutoPlayState.STOPPED
+    val showProgress = hasAutoPlayData
 
     if (showSettingsDialog) {
         AutoPlaySettingsDialog(
@@ -98,29 +87,18 @@ fun AutoPlayButtons() {
             enter = expandVertically(),
             exit = shrinkVertically(),
         ) {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
                     .padding(top = 10.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = formatTime(progress * totalDuration),
-                        style = Theme[typography][small],
-                        color = Theme[colors][mutedForeground],
-                    )
-                    Text(
-                        text = formatTime(totalDuration),
-                        style = Theme[typography][small],
-                        color = Theme[colors][mutedForeground],
-                    )
-                }
-                Progress(value = progress)
+                AutoPlayTimeline(
+                    progress = progress,
+                    totalDuration = totalDuration,
+                    enabled = hasAutoPlayData,
+                    onSeek = AutoPlayRepository::seekTo,
+                )
             }
         }
 
@@ -243,33 +221,13 @@ fun MobileAutoPlayButtons() {
             )
         }
 
-        // Timeline Progress Bar Row
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Progress(
-                value = if (hasAutoPlayData) progress else 0f,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = formatTime(if (hasAutoPlayData) progress * totalDuration else 0.0),
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                )
-                Text(
-                    text = formatTime(if (hasAutoPlayData) totalDuration else 0.0),
-                    style = Theme[typography][small],
-                    color = Theme[colors][mutedForeground],
-                )
-            }
-        }
+        AutoPlayTimeline(
+            progress = if (hasAutoPlayData) progress else 0f,
+            totalDuration = if (hasAutoPlayData) totalDuration else 0.0,
+            enabled = hasAutoPlayData,
+            compact = true,
+            onSeek = AutoPlayRepository::seekTo,
+        )
 
         // Spotify Style Controls Row
         Row(

@@ -40,6 +40,7 @@ import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntime
@@ -460,6 +461,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         val snapshot = renderSnapshot(deviceState)
         n.forEach { signal ->
             if (signal is Signal.Midi) {
+                if (signal.extras[SIGNAL_EXTRA_SILENT_REPLAY] == 1) return@forEach
                 val currentFrame = audioTriggerRuntime?.currentFrame ?: 0L
                 val targetFrame = maxOf(signal.audioTriggerBatch?.requestedTargetFrame ?: currentFrame, currentFrame)
                 val event = signal.toPadTriggerEvent(targetFrame)

@@ -16,6 +16,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.core.midi.data.XY_TO_DRUM_RACK
@@ -73,6 +74,10 @@ class AbletonArpeggiatorChainDevice : GenericChainDevice<AbletonArpeggiatorChain
     }
 
     override fun signalEnter(n: List<Signal>) {
+        if (n.isSilentReplay()) {
+            signalExit?.invoke(n)
+            return
+        }
         n.forEach { signal ->
             when (signal) {
                 is Signal.AudioSignal -> signalExit?.invoke(listOf(signal))

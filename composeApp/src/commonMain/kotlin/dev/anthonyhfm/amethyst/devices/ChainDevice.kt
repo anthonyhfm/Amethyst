@@ -7,6 +7,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.elements.isOn
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.engine.elements.SignalReceiver
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -365,6 +366,10 @@ abstract class AudioChainDevice <State : @Serializable DeviceState> : GenericCha
         TimelineDuration.None
 
     override fun signalEnter(n: List<Signal>) {
+        if (n.isSilentReplay()) {
+            signalExit?.invoke(n)
+            return
+        }
         if (n.any { it.isOn() }) {
             triggerDialAutomationsAtFrame(
                 frame = audioTriggerRuntime?.currentFrame ?: 0L,

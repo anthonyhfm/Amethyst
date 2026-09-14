@@ -23,6 +23,7 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
@@ -234,7 +235,7 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
 
     override fun signalEnter(n: List<Signal>) {
         // Trigger choking on all other choke devices with the same channel
-        chokeChannel(state.value.target, this)
+        if (!n.isSilentReplay()) chokeChannel(state.value.target, this)
 
         // Pass signals through to the chain
         state.value.chain.signalEnter(n)

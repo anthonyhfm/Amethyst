@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -226,6 +227,10 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
     }
 
     override fun signalEnter(n: List<Signal>) {
+        if (n.isSilentReplay()) {
+            signalExit?.invoke(n)
+            return
+        }
         val bpm = WorkspaceRepository.bpm.value
 
         n.forEach { signal ->

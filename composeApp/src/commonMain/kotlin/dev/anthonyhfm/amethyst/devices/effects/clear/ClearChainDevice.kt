@@ -18,6 +18,7 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -109,6 +110,8 @@ class ClearChainDevice : GenericChainDevice<ClearChainDeviceState>() {
 
     override fun signalEnter(n: List<Signal>) {
         signalExit?.invoke(n)
+
+        if (n.isSilentReplay()) return
 
         n.forEach { signal ->
             val released = when (signal) {

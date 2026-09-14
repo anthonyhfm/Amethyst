@@ -23,6 +23,7 @@ import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntime
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntimeAware
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.LiveAutomationSource
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
 import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
@@ -188,6 +189,7 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
     }
 
     override fun signalEnter(n: List<Signal>) {
+        val silentReplay = n.any { it.extras[SIGNAL_EXTRA_SILENT_REPLAY] == 1 }
         val down = n.any {
             when (it) {
                 is Signal.LED -> it.color != Color.Black
@@ -207,22 +209,24 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                 )
             }
 
-            val runtime = audioTriggerRuntime
-            val currentFrame = runtime?.currentFrame ?: 0L
-            val requestedFrame = n.filterIsInstance<Signal.Midi>()
-                .firstNotNullOfOrNull { it.audioTriggerBatch?.requestedTargetFrame }
-                ?: currentFrame
-            val frame = maxOf(requestedFrame, currentFrame)
-            activeSequence.value = runtime?.nextAutomationSequence() ?: activeSequence.value + 1L
-            latchedValue.value = Float.NaN
-            if (getDialAutomation(VALUE_PARAMETER_ID) != null) {
-                triggerDialAutomationsAtFrame(
-                    frame = frame,
-                    sampleRate = runtime?.sampleRate ?: 44_100,
-                    bpm = WorkspaceRepository.bpm.value.toFloat(),
-                )
-            } else {
-                latchedValue.value = targetValue / 127f
+            if (!silentReplay) {
+                val runtime = audioTriggerRuntime
+                val currentFrame = runtime?.currentFrame ?: 0L
+                val requestedFrame = n.filterIsInstance<Signal.Midi>()
+                    .firstNotNullOfOrNull { it.audioTriggerBatch?.requestedTargetFrame }
+                    ?: currentFrame
+                val frame = maxOf(requestedFrame, currentFrame)
+                activeSequence.value = runtime?.nextAutomationSequence() ?: activeSequence.value + 1L
+                latchedValue.value = Float.NaN
+                if (getDialAutomation(VALUE_PARAMETER_ID) != null) {
+                    triggerDialAutomationsAtFrame(
+                        frame = frame,
+                        sampleRate = runtime?.sampleRate ?: 44_100,
+                        bpm = WorkspaceRepository.bpm.value.toFloat(),
+                    )
+                } else {
+                    latchedValue.value = targetValue / 127f
+                }
             }
         }
 

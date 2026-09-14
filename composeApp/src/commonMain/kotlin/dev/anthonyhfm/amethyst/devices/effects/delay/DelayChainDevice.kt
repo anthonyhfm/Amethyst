@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
@@ -209,6 +210,10 @@ class DelayChainDevice : GenericChainDevice<DelayChainDeviceState>(), Chokeable,
     }
 
     override fun signalEnter(n: List<Signal>) {
+        if (n.isSilentReplay()) {
+            signalExit?.invoke(n)
+            return
+        }
         triggerDialAutomations()
         val bpm = WorkspaceRepository.bpm.value
         val snapshot = state.value

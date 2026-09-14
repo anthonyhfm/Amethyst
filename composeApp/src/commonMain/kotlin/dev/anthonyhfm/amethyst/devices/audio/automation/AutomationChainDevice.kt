@@ -34,6 +34,7 @@ import dev.anthonyhfm.amethyst.core.engine.audio.trigger.LiveAutomationSource
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.PadTriggerKey
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.toPadTriggerEvent
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
 import dev.anthonyhfm.amethyst.devices.AudioChainDevice
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
 import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
@@ -103,7 +104,9 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
         ((runtime.valueAtFrame(frame) + 1f) * 0.5f).coerceIn(0f, 1f)
 
     override fun signalEnter(n: List<Signal>) {
-        n.filterIsInstance<Signal.Midi>().firstOrNull { it.velocity > 0 }?.let { signal ->
+        val audibleMidi = n.filterIsInstance<Signal.Midi>()
+            .filterNot { it.extras[SIGNAL_EXTRA_SILENT_REPLAY] == 1 }
+        audibleMidi.firstOrNull { it.velocity > 0 }?.let { signal ->
             val event = signal.toPadTriggerEvent(audioTriggerRuntime?.currentFrame ?: 0L)
             pendingAutomation.value = state.value.automation
             pendingBpm.value = WorkspaceRepository.bpm.value.toFloat()
@@ -112,7 +115,7 @@ class AutomationChainDevice : AudioChainDevice<AutomationChainDeviceState>(),
             activeSequence.value = audioTriggerRuntime?.nextAutomationSequence() ?: 0L
         }
         if (state.value.automation.settings.stopOnPadUp) {
-            n.filterIsInstance<Signal.Midi>().firstOrNull { it.velocity == 0 }?.let { signal ->
+            audibleMidi.firstOrNull { it.velocity == 0 }?.let { signal ->
                 val event = signal.toPadTriggerEvent(audioTriggerRuntime?.currentFrame ?: 0L)
                 if (event.key == activeTriggerKey.value || event.key == pendingTriggerKey.value) {
                     pendingStopFrame.value = event.targetFrame

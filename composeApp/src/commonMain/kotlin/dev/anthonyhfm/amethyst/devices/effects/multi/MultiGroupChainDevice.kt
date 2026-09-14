@@ -36,6 +36,7 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
@@ -315,9 +316,11 @@ class MultiGroupChainDevice : GenericChainDevice<MultiGroupChainDeviceState>(), 
     }
 
     override fun signalEnter(n: List<Signal>) {
-        if (n.isNotEmpty()) {
-            triggerDialAutomations()
+        if (n.isSilentReplay()) {
+            signalExit?.invoke(n)
+            return
         }
+        if (n.isNotEmpty()) triggerDialAutomations()
         n.forEach {
             val down: Boolean = when (it) {
                 is Signal.LED -> it.color != Color.Black

@@ -14,6 +14,7 @@ import com.composables.icons.lucide.Music
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
@@ -210,6 +211,10 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
     }
 
     override fun signalEnter(n: List<Signal>) {
+        if (n.isSilentReplay()) {
+            signalExit?.invoke(n)
+            return
+        }
         super.signalEnter(n)
         
         n.filterIsInstance<Signal.Midi>().forEach { signal ->

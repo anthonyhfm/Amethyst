@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import kotlinx.atomicfu.atomic
 
+internal const val SIGNAL_EXTRA_SILENT_REPLAY = "amethyst.silentReplay"
+
 sealed interface Signal {
     val origin: Any?
     val extras: Map<String, Int>
@@ -119,3 +121,6 @@ fun Signal.isOn(): Boolean = when (this) {
     is Signal.Midi -> velocity > 0
     else -> true
 }
+
+internal fun List<Signal>.isSilentReplay(): Boolean =
+    any { it.extras[SIGNAL_EXTRA_SILENT_REPLAY] == 1 }

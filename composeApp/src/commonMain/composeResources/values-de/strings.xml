@@ -549,6 +549,7 @@
     <string name="workspace_add_device_title">Device hinzufügen</string>
     <string name="workspace_autoplay_learning_mode">Learning-Modus</string>
     <string name="workspace_autoplay_pause">AutoPlay pausieren</string>
+    <string name="workspace_autoplay_position">AutoPlay-Position</string>
     <string name="workspace_autoplay_resume">AutoPlay fortsetzen</string>
     <string name="workspace_autoplay_settings">AutoPlay Settings</string>
     <string name="workspace_autoplay_settings_cancel">Abbrechen</string>

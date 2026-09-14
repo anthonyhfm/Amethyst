@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioStopTicket
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.atomicfu.atomic
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
+import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
 import kotlin.concurrent.Volatile
 import kotlin.math.roundToLong
@@ -120,13 +122,15 @@ object AutoPlayRepository {
     private val _progress = MutableStateFlow(0f)
     val progress: StateFlow<Float> = _progress.asStateFlow()
 
-    var totalDuration: Double = 0.0
-        private set
+    val totalDuration: Double
+        get() = WorkspaceRepository.workspaceMeta?.autoPlay?.actions?.keys?.maxOrNull() ?: 0.0
 
     @Volatile private var playbackStartNanos: Long = 0L
     @Volatile private var playbackOffset: Double = 0.0
     @Volatile private var pendingAudioStopTicket: AudioStopTicket? = null
     private val playbackGeneration = atomic(0L)
+    private var actionsAppliedThroughOffset = false
+    private var initialMacros: List<Macro>? = null
 
     private var learningIndex = 0
     private var sortedActionTimes = listOf<Double>()
@@ -146,15 +150,48 @@ object AutoPlayRepository {
             launchpadId = action.launchpadId,
         ) ?: this
 
-    private fun midiSignals(actions: List<AutoPlayData.Action>): List<Signal.Midi> =
+    private fun midiSignals(
+        actions: List<AutoPlayData.Action>,
+        silentReplay: Boolean = false,
+    ): List<Signal.Midi> =
         actions.map { action ->
             Signal.Midi(
                 origin = originFor(action),
                 x = action.x,
                 y = action.y,
                 velocity = if (action.down) 127 else 0,
+                extras = if (silentReplay) mapOf(SIGNAL_EXTRA_SILENT_REPLAY to 1) else emptyMap(),
             )
         }
+
+    private fun captureInitialState() {
+        if (initialMacros == null) initialMacros = WorkspaceRepository.macros.value
+    }
+
+    /** Restores macro values at a timeline position without replaying audible effects. */
+    private fun reconstructMacrosAt(
+        autoplay: AutoPlayData,
+        targetMs: Double,
+        includeTarget: Boolean = true,
+    ) {
+        captureInitialState()
+        initialMacros?.let {
+            WorkspaceRepository.setMacros(it, undoable = false)
+        }
+
+        autoplay.actions.entries
+            .asSequence()
+            .filter {
+                if (includeTarget) it.key <= targetMs + 0.001 else it.key < targetMs - 0.001
+            }
+            .sortedBy { it.key }
+            .forEach { (_, actions) ->
+                WorkspaceRepository.samplingChain.signalEnter(
+                    midiSignals(actions, silentReplay = true),
+                )
+            }
+        actionsAppliedThroughOffset = true
+    }
 
     private fun currentPlaybackPosition(): Double =
         playbackOffset + (
@@ -181,6 +218,12 @@ object AutoPlayRepository {
         val autoplay = WorkspaceRepository.workspaceMeta?.autoPlay ?: return
         val settings = WorkspaceRepository.workspaceMeta?.settings
 
+        val startingState = _state.value
+        if (startingState == AutoPlayState.STOPPED) {
+            initialMacros = WorkspaceRepository.macros.value
+            actionsAppliedThroughOffset = false
+        }
+
         val samplingChain = WorkspaceRepository.samplingChain
         val audioAvailable = Echo.outputStatus.value.available
         val pendingStop = pendingAudioStopTicket
@@ -203,6 +246,7 @@ object AutoPlayRepository {
         val fromLearning = _state.value == AutoPlayState.LEARNING
         if (fromLearning) {
             playbackOffset = sortedActionTimes.getOrNull(learningIndex) ?: 0.0
+            actionsAppliedThroughOffset = false
             
             // Clear green lights manually
             val clearSignals = previousLearningActions.map {
@@ -215,14 +259,15 @@ object AutoPlayRepository {
         
         if (_state.value != AutoPlayState.PAUSED && !fromLearning) {
             playbackOffset = 0.0
+            actionsAppliedThroughOffset = false
         }
         
-        // Always ensure totalDuration is up to date
-        totalDuration = autoplay.actions.keys.maxOrNull() ?: 0.0
         val scheduledActions = autoplay.actions.entries
             .asSequence()
             .map { entry -> entry.key - playbackOffset to entry.value }
-            .filter { (adjustedDelay, _) -> adjustedDelay >= -0.001 }
+            .filter { (adjustedDelay, _) ->
+                if (actionsAppliedThroughOffset) adjustedDelay > 0.001 else adjustedDelay >= -0.001
+            }
             .sortedBy { (adjustedDelay, _) -> adjustedDelay }
             .toList()
         val runGeneration = playbackGeneration.incrementAndGet()
@@ -236,6 +281,7 @@ object AutoPlayRepository {
             null
         }
         _state.value = AutoPlayState.PLAYING
+        actionsAppliedThroughOffset = true
         playbackStartNanos = audioTimeline?.playbackStartNanos ?: Heaven.timeNanos
         startProgressTracking()
 
@@ -367,6 +413,7 @@ object AutoPlayRepository {
         
         // Calculate how far into the playback we are
         playbackOffset = currentPlaybackPosition()
+        actionsAppliedThroughOffset = true
         playbackGeneration.incrementAndGet()
         Heaven.cancelJobsForOwner(this)
         pendingAudioStopTicket = Echo.stopAll()
@@ -390,9 +437,13 @@ object AutoPlayRepository {
         _state.value = AutoPlayState.STOPPED
         playbackOffset = 0.0
         playbackStartNanos = 0L
+        actionsAppliedThroughOffset = false
         learningIndex = 0
         sortedActionTimes = emptyList()
-        totalDuration = 0.0
+        initialMacros?.let {
+            WorkspaceRepository.setMacros(it, undoable = false)
+        }
+        initialMacros = null
         if (previousLearningActions.isNotEmpty()) {
             val clearSignals = previousLearningActions.map {
                 Signal.LED(origin = originFor(it), x = it.x, y = it.y, color = Color.Black, layer = 101)
@@ -406,6 +457,10 @@ object AutoPlayRepository {
         if (_state.value == AutoPlayState.LEARNING) return
         
         val autoplay = WorkspaceRepository.workspaceMeta?.autoPlay ?: return
+        if (_state.value == AutoPlayState.STOPPED) {
+            initialMacros = WorkspaceRepository.macros.value
+            actionsAppliedThroughOffset = false
+        }
         
         val currentPos = if (_state.value == AutoPlayState.PLAYING) {
             currentPlaybackPosition()
@@ -430,7 +485,6 @@ object AutoPlayRepository {
             if (it == -1) (sortedActionTimes.size - 1).coerceAtLeast(0) else it
         }
 
-        totalDuration = autoplay.actions.keys.maxOrNull() ?: 0.0
         _progress.value = if (sortedActionTimes.isNotEmpty()) {
             (learningIndex.toFloat() / sortedActionTimes.size).coerceIn(0f, 1f)
         } else 0f
@@ -547,24 +601,45 @@ object AutoPlayRepository {
         val autoplay = WorkspaceRepository.workspaceMeta?.autoPlay ?: return
         if (autoplay.actions.isEmpty()) return
 
-        totalDuration = autoplay.actions.keys.maxOrNull() ?: 0.0
         if (totalDuration <= 0) return
 
         val targetMs = (fraction.coerceIn(0f, 1f) * totalDuration)
+        val targetFraction = fraction.coerceIn(0f, 1f)
         playbackOffset = targetMs
-        _progress.value = fraction.coerceIn(0f, 1f)
+        _progress.value = targetFraction
         playbackGeneration.incrementAndGet()
+        Heaven.cancelJobsForOwner(this)
+        progressJob?.cancel()
+        progressJob = null
+        (WorkspaceRepository.lightsChain.devicesDepthFirst() +
+            WorkspaceRepository.samplingChain.devicesDepthFirst())
+            .filterIsInstance<Chokeable>()
+            .forEach(Chokeable::onChoke)
+        Heaven.clear()
         pendingAudioStopTicket = Echo.stopAll()
+        reconstructMacrosAt(
+            autoplay = autoplay,
+            targetMs = targetMs,
+            includeTarget = _state.value != AutoPlayState.LEARNING,
+        )
 
         val currentState = _state.value
         if (currentState == AutoPlayState.PLAYING) {
             _state.value = AutoPlayState.PAUSED
             startAutoPlay()
         } else if (currentState == AutoPlayState.LEARNING) {
+            if (sortedActionTimes.isEmpty()) {
+                sortedActionTimes = autoplay.actions.filterValues { actions ->
+                    actions.any { it.down }
+                }.keys.sorted()
+            }
             learningIndex = sortedActionTimes.indexOfFirst { it >= targetMs }.let {
                 if (it == -1) (sortedActionTimes.size - 1).coerceAtLeast(0) else it
             }
+            _progress.value = (learningIndex.toFloat() / sortedActionTimes.size).coerceIn(0f, 1f)
             showCurrentLearningStep()
+        } else if (currentState == AutoPlayState.STOPPED) {
+            _state.value = AutoPlayState.PAUSED
         }
     }
 }

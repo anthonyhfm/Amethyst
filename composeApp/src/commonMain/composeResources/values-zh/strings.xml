@@ -545,6 +545,7 @@
     <string name="workspace_add_device_title">添加设备</string>
     <string name="workspace_autoplay_learning_mode">跟弹/学习模式</string>
     <string name="workspace_autoplay_pause">暂停自动播放</string>
+    <string name="workspace_autoplay_position">自动播放位置</string>
     <string name="workspace_autoplay_resume">恢复自动播放</string>
     <string name="workspace_autoplay_settings">自动播放设置</string>
     <string name="workspace_autoplay_settings_cancel">取消</string>
