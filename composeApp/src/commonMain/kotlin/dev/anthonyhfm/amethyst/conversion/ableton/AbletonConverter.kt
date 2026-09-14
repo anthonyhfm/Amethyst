@@ -27,9 +27,10 @@ import dev.anthonyhfm.amethyst.conversion.ableton.utils.toFileHash
 import dev.anthonyhfm.amethyst.core.util.FileHelper
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Zip
-import dev.anthonyhfm.amethyst.core.util.ZipEntry
+import dev.anthonyhfm.amethyst.core.util.ProjectArchiveEntry
+import dev.anthonyhfm.amethyst.core.util.ProjectArchiveReader
 import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
-import dev.anthonyhfm.amethyst.core.util.getProjectArchiveEntries
+import dev.anthonyhfm.amethyst.core.util.openProjectArchive
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
@@ -87,7 +88,11 @@ object AbletonConverter : AmethystConverter {
     var isZip: Boolean = false
         private set
 
-    val zipEntries: MutableMap<String, ZipEntry> = mutableMapOf()
+    val zipEntries: MutableMap<String, ProjectArchiveEntry> = mutableMapOf()
+
+    private var zipArchive: ProjectArchiveReader? = null
+
+    internal fun readZipEntry(path: String): ByteArray? = zipArchive?.readEntry(path)
 
     var zipStartPath: String = ""
         private set
@@ -140,68 +145,67 @@ object AbletonConverter : AmethystConverter {
     ): SavableWorkspaceData {
         loadPalette(palettePath)
         isZip = true
-        val unzippingMsg = runCatching { runBlocking { getString(Res.string.home_loading_unzipping_archive) } }.getOrDefault("Extracting project archive...")
-        reporter?.update(0.05f, statusText = unzippingMsg, detailText = file.name)
-
         zipEntries.clear()
-        val entries = getProjectArchiveEntries(file).filter {
-            !it.path.contains("__MACOSX")
-        }
+        try {
+            val unzippingMsg = runCatching { runBlocking { getString(Res.string.home_loading_unzipping_archive) } }.getOrDefault("Extracting project archive...")
+            reporter?.update(0.05f, statusText = unzippingMsg, detailText = file.name)
 
-        FileHelper.clearCache()
+            // Clear old conversion files before opening Android's disk-backed archive reader.
+            FileHelper.clearCache()
+            val archive = checkNotNull(openProjectArchive(file)) {
+                "Could not open project archive: ${file.name}"
+            }
+            zipArchive = archive
 
-        entries.filter {
-            it.path.endsWith(".amxd")
-        }.forEach {
-            println("Hash (${it.data.toFileHash()}) - ${it.path.substringAfterLast("/")}")
-        }
-
-        zipStartPath = entries.map { it.path }
-            .filter { it.endsWith(".als") }
-            .minBy { it.length }
-            .substringBeforeLast("/")
-
-        zipEntries.putAll(
-            entries.associateBy { it.path }
-        )
-
-        val format = determineProjectArchiveFormat(file)
-
-        val alsEntry = entries
-            .filter { it.path.endsWith(".als") }
-            .minBy { it.path.length }
-
-        val projectName = alsEntry.path.substringAfterLast("/").removeSuffix(".als")
-
-        val readingAlsMsg = runCatching { runBlocking { getString(Res.string.home_loading_reading_als) } }.getOrDefault("Reading Ableton Live-Set...")
-        reporter?.update(0.12f, statusText = readingAlsMsg, detailText = "$projectName.als")
-
-        val abletonData = decodeAbletonAls(alsEntry.data)
-
-        zipEntries.remove(alsEntry.path)
-
-        val abletonWorkspace = runLiveConversion(
-            name = projectName,
-            abletonData = abletonData,
-            reporter = reporter
-        )
-
-        if (format == ZippedProjectFormat.ABLETON_APOLLO) {
-            val approjEntries = entries.filter { it.path.endsWith(".approj") }
-
-            println("Possible Apollo Entries: ${approjEntries.size}")
-
-            val approjEntry = approjEntries.firstOrNull {
-                val split = it.path.split("/")
-
-                !split[split.lastIndex - 1].lowercase().endsWith("backups")
+            // Only central-directory metadata is loaded here. Entry payloads stay compressed
+            // on disk until a converter explicitly requests one.
+            val entries = archive.entries.filter {
+                !it.path.contains("__MACOSX")
             }
 
-            if (approjEntry != null) {
+            entries.filter {
+                it.path.endsWith(".amxd")
+            }.forEach {
+                readZipEntry(it.path)?.let { data ->
+                    println("Hash (${data.toFileHash()}) - ${it.path.substringAfterLast("/")}")
+                }
+            }
+
+            val alsEntry = entries
+                .filter { it.path.endsWith(".als") }
+                .minBy { it.path.length }
+            val format = determineProjectArchiveFormat(entries.map(ProjectArchiveEntry::path))
+            val approjCount = entries.count { it.path.endsWith(".approj") }
+            val approjEntry = entries.firstOrNull {
+                if (!it.path.endsWith(".approj")) return@firstOrNull false
+                val split = it.path.split("/")
+                split.size < 2 || !split[split.lastIndex - 1].lowercase().endsWith("backups")
+            }
+
+            zipStartPath = alsEntry.path.substringBeforeLast("/")
+            entries.forEach { zipEntries[it.path] = it }
+
+            val projectName = alsEntry.path.substringAfterLast("/").removeSuffix(".als")
+            val readingAlsMsg = runCatching { runBlocking { getString(Res.string.home_loading_reading_als) } }.getOrDefault("Reading Ableton Live-Set...")
+            reporter?.update(0.12f, statusText = readingAlsMsg, detailText = "$projectName.als")
+
+            val abletonData = decodeAbletonAls(
+                checkNotNull(readZipEntry(alsEntry.path)) { "Could not read ${alsEntry.path}" },
+            )
+            val abletonWorkspace = runLiveConversion(
+                name = projectName,
+                abletonData = abletonData,
+                reporter = reporter
+            )
+
+            if (format == ZippedProjectFormat.ABLETON_APOLLO && approjEntry != null) {
+                println("Possible Apollo Entries: $approjCount")
                 return try {
                     val apolloLightMsg = runCatching { runBlocking { getString(Res.string.home_loading_apollo_light_chains) } }.getOrDefault("Loading Apollo light chains...")
                     reporter?.update(0.92f, statusText = apolloLightMsg, detailText = approjEntry.path.substringAfterLast("/"))
-                    val apolloWorkspace = ApolloConverter.convertBytesToWorkspace(approjEntry.data)
+                    val apolloWorkspace = ApolloConverter.convertBytesToWorkspace(
+                        checkNotNull(readZipEntry(approjEntry.path)) { "Could not read ${approjEntry.path}" },
+                    )
                     val maxMacroIndex = maxOf(
                         apolloWorkspace.lights.findMaxMacroIndex(),
                         abletonWorkspace.sampling.findMaxMacroIndex(),
@@ -221,16 +225,18 @@ object AbletonConverter : AmethystConverter {
                 } catch (e: Exception) {
                     println("Apollo conversion failed, falling back to Ableton lights: ${e.message}")
                     abletonWorkspace
-                } finally {
-                    isZip = false
-                    zipEntries.clear()
                 }
             }
-        }
 
-        return abletonWorkspace.also {
+            return abletonWorkspace
+        } finally {
             isZip = false
             zipEntries.clear()
+            try {
+                zipArchive?.close()
+            } finally {
+                zipArchive = null
+            }
         }
     }
 

@@ -32,7 +32,7 @@ class CycleSamplesAdapter(
     val offset: IntOffset = IntOffset.Zero,
 ) : AbletonAdapter() {
     private companion object {
-        const val MAX_PARALLEL_AUDIO_DECODES = 16
+        const val MAX_PARALLEL_AUDIO_DECODES = 1
         const val MAX_DROPS = 16
     }
 
@@ -98,7 +98,7 @@ class CycleSamplesAdapter(
 
     private suspend fun readAudioFileBytes(filePath: String): ByteArray? {
         return if (AbletonConverter.isZip) {
-            val fileBytes = AbletonConverter.zipEntries[filePath]?.data
+            val fileBytes = AbletonConverter.readZipEntry(filePath)
             if (fileBytes == null) {
                 println("CycleSamplesAdapter: file not found in zip: $filePath")
                 null
@@ -129,10 +129,6 @@ class CycleSamplesAdapter(
             sampleStart = null,
             sampleEnd = null
         ) ?: return null
-
-        if (AbletonConverter.isZip) {
-            AbletonConverter.zipEntries.remove(filePath)
-        }
 
         return SampleChainDeviceState(
             fileName = filePath,

@@ -26,7 +26,7 @@ class MidiLauncherAdapter(
         val skipSilence: MxParameter.MxDIntParameter = device.parameterList.parameterList.parameters[0] as MxParameter.MxDIntParameter
 
         val data = if (AbletonConverter.isZip) {
-            AbletonConverter.zipEntries[filePath]?.data ?: return emptyList()
+            AbletonConverter.readZipEntry(filePath) ?: return emptyList()
         } else {
             try {
                 runBlocking { PlatformFile(filePath).readBytes() }

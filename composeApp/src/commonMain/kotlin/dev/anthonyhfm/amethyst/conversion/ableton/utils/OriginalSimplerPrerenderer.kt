@@ -131,11 +131,6 @@ class OriginalSimplerPrerenderer {
             sampleEnd = null
         )
 
-        if (AbletonConverter.isZip) {
-            // zipEntries kann viel Speicher halten – frühzeitig freigeben
-            AbletonConverter.zipEntries.remove(filePath)
-        }
-
         if (audioSignal == null) {
             println("OriginalSimplerPrerenderer: error while decoding $filePath")
             return@withContext null
@@ -151,7 +146,7 @@ class OriginalSimplerPrerenderer {
 
     private suspend fun readAudioFileBytes(filePath: String): ByteArray? {
         return if (AbletonConverter.isZip) {
-            val fileBytes = AbletonConverter.zipEntries[filePath]?.data
+            val fileBytes = AbletonConverter.readZipEntry(filePath)
             if (fileBytes == null) {
                 println("OriginalSimplerPrerenderer: file not found in zip: $filePath")
                 null

@@ -20,7 +20,7 @@ object Dual2LightLayoutScanner {
                     return@let it
                 } else {
                     val hash = if (AbletonConverter.isZip) {
-                        val maxFile = AbletonConverter.zipEntries[path]!!.data
+                        val maxFile = AbletonConverter.readZipEntry(path) ?: return@forEach
                         maxFile.toFileHash()
                     } else {
                         val maxFile = PlatformFile(path)

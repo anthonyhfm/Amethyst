@@ -131,7 +131,7 @@ class MidiEffectGroupAdapter(
                                             ?: return@mapNotNull null
                                         val hash = MxDeviceMidiEffectAdapter.fileHashMap[path] ?: (
                                             if (AbletonConverter.isZip) {
-                                                AbletonConverter.zipEntries[path]?.data?.toFileHash() ?: ""
+                                                AbletonConverter.readZipEntry(path)?.toFileHash() ?: ""
                                             } else {
                                                 PlatformFile(path).getFileHash()
                                             }

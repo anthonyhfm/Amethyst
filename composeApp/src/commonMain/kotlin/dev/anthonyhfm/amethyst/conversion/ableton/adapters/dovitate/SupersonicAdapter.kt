@@ -28,7 +28,7 @@ class SupersonicAdapter (
     val offset: IntOffset,
 ) : AbletonAdapter() {
     private companion object {
-        const val MAX_PARALLEL_AUDIO_DECODES = 16
+        const val MAX_PARALLEL_AUDIO_DECODES = 1
     }
 
     override fun toDeviceStates(): List<DeviceState> {
@@ -100,7 +100,7 @@ class SupersonicAdapter (
 
     private suspend fun readAudioFileBytes(filePath: String): ByteArray? {
         return if (AbletonConverter.isZip) {
-            val fileBytes = AbletonConverter.zipEntries[filePath]?.data
+            val fileBytes = AbletonConverter.readZipEntry(filePath)
             if (fileBytes == null) {
                 println("SupersonicAdapter: file not found in zip: $filePath")
                 null
@@ -127,10 +127,6 @@ class SupersonicAdapter (
             sampleStart = null,
             sampleEnd = null
         ) ?: return null
-
-        if (AbletonConverter.isZip) {
-            AbletonConverter.zipEntries.remove(filePath)
-        }
 
         return SampleChainDeviceState(
             fileName = filePath,

@@ -126,7 +126,7 @@ class InstrumentGroupAdapter(
                                     val path = patchSlot?.value?.patchRef?.fileRef?.resolvePath() ?: return@let null
 
                                     val hash: String = if (AbletonConverter.isZip) {
-                                        AbletonConverter.zipEntries[path]?.data?.toFileHash() ?: ""
+                                        AbletonConverter.readZipEntry(path)?.toFileHash() ?: ""
                                     } else {
                                         val file = PlatformFile(path)
                                         file.getFileHash()

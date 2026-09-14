@@ -72,7 +72,7 @@ class LightspeedAdapter(
         val filePath: String = fileRef.resolvePath()
 
         val data = if (AbletonConverter.isZip) {
-            AbletonConverter.zipEntries[filePath]?.data ?: return null
+            AbletonConverter.readZipEntry(filePath) ?: return null
         } else {
             try {
                 runBlocking { PlatformFile(filePath).readBytes() }

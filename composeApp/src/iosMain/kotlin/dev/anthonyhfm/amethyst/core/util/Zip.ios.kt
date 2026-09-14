@@ -1,10 +1,17 @@
 package dev.anthonyhfm.amethyst.core.util
 
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.startAccessingSecurityScopedResource
+import io.github.vinceglb.filekit.stopAccessingSecurityScopedResource
 import kotlinx.cinterop.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import platform.posix.FILE
+import platform.posix.SEEK_END
+import platform.posix.fclose
+import platform.posix.fileno
+import platform.posix.fopen
+import platform.posix.fseek
+import platform.posix.ftell
+import platform.posix.pread
 import platform.zlib.*
 
 private class ByteArrayBuilder(initialCapacity: Int = 1024) {
@@ -160,6 +167,7 @@ private fun ByteArray.readUInt32LE(offset: Int): Long {
 }
 
 private fun findEOCD(data: ByteArray): Int {
+    if (data.size < 22) return -1
     val maxCommentLength = 65535
     val minOffset = maxOf(0, data.size - 22 - maxCommentLength)
     for (i in (data.size - 22) downTo minOffset) {
@@ -190,8 +198,16 @@ private fun parseCentralDirectory(data: ByteArray): List<CentralDirectoryEntry> 
     val totalEntries = data.readUInt16LE(eocdOffset + 10)
     val cdOffset = data.readUInt32LE(eocdOffset + 16).toInt()
 
+    return parseCentralDirectoryRecords(data, totalEntries, cdOffset)
+}
+
+private fun parseCentralDirectoryRecords(
+    data: ByteArray,
+    totalEntries: Int,
+    startOffset: Int = 0,
+): List<CentralDirectoryEntry> {
     val entries = mutableListOf<CentralDirectoryEntry>()
-    var offset = cdOffset
+    var offset = startOffset
 
     for (i in 0 until totalEntries) {
         if (offset + 46 > data.size) break
@@ -311,35 +327,49 @@ private fun parseLocalHeaders(data: ByteArray): List<ZipEntry> {
 }
 
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
+@OptIn(ExperimentalForeignApi::class)
 actual object Zip {
-    actual fun getEntries(file: PlatformFile): List<ZipEntry> {
-        val data = runBlocking(Dispatchers.Default) { file.readBytes() }
-        if (data.isEmpty()) return emptyList()
+    actual fun open(file: PlatformFile): ProjectArchiveReader? {
+        file.startAccessingSecurityScopedResource()
+        val path = file.nsUrl.path
+        val handle = path?.let { fopen(it, "rb") }
+        if (handle == null) {
+            file.stopAccessingSecurityScopedResource()
+            return null
+        }
 
-        val cdEntries = parseCentralDirectory(data)
-        if (cdEntries.isNotEmpty()) {
-            return cdEntries.map { entry ->
+        return try {
+            IosProjectArchiveReader(file, handle)
+        } catch (exception: Exception) {
+            fclose(handle)
+            file.stopAccessingSecurityScopedResource()
+            println("Error opening ZIP file: ${exception.message}")
+            null
+        }
+    }
+
+    actual fun getEntries(file: PlatformFile): List<ZipEntry> {
+        val reader = open(file) ?: return emptyList()
+        return try {
+            reader.entries.map { entry ->
                 ZipEntry(
                     path = entry.path,
-                    data = extractEntryData(data, entry),
+                    data = if (entry.isDirectory) ByteArray(0) else reader.readEntry(entry.path) ?: ByteArray(0),
                     isDirectory = entry.isDirectory
                 )
             }
+        } finally {
+            reader.close()
         }
-
-        return parseLocalHeaders(data)
     }
 
     actual fun getPaths(file: PlatformFile): List<String> {
-        val data = runBlocking(Dispatchers.Default) { file.readBytes() }
-        if (data.isEmpty()) return emptyList()
-
-        val cdEntries = parseCentralDirectory(data)
-        if (cdEntries.isNotEmpty()) {
-            return cdEntries.map { it.path }
+        val reader = open(file) ?: return emptyList()
+        return try {
+            reader.entries.map(ProjectArchiveEntry::path)
+        } finally {
+            reader.close()
         }
-
-        return parseLocalHeaders(data).map { it.path }
     }
 
     actual fun decode(data: ByteArray): ByteArray {
@@ -374,5 +404,89 @@ actual object Zip {
 
     actual fun encode(data: ByteArray): ByteArray {
         return gzipCompress(data)
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private class IosProjectArchiveReader(
+    private val file: PlatformFile,
+    private val handle: CPointer<FILE>,
+) : ProjectArchiveReader {
+    private var closed = false
+    private val descriptor = fileno(handle)
+    private val centralEntries: List<CentralDirectoryEntry> = readCentralDirectory()
+    private val entriesByPath = centralEntries.associateBy(CentralDirectoryEntry::path)
+
+    override val entries: List<ProjectArchiveEntry> = centralEntries.map { entry ->
+        ProjectArchiveEntry(
+            path = entry.path,
+            isDirectory = entry.isDirectory,
+            compressedSize = entry.compressedSize.toLong(),
+            uncompressedSize = entry.uncompressedSize.toLong(),
+        )
+    }
+
+    private fun readCentralDirectory(): List<CentralDirectoryEntry> {
+        require(fseek(handle, 0L, SEEK_END) == 0) { "Could not seek ZIP file" }
+        val fileSize = ftell(handle).toLong()
+        val tailSize = minOf(fileSize, 22L + 65535L).toInt()
+        val tail = readAt(fileSize - tailSize, tailSize)
+        val eocdOffset = findEOCD(tail)
+        require(eocdOffset >= 0) { "ZIP end-of-central-directory record not found" }
+
+        val totalEntries = tail.readUInt16LE(eocdOffset + 10)
+        val directorySize = tail.readUInt32LE(eocdOffset + 12).toInt()
+        val directoryOffset = tail.readUInt32LE(eocdOffset + 16)
+        require(directorySize >= 0 && directoryOffset >= 0L) { "Invalid ZIP central directory" }
+
+        val directory = readAt(directoryOffset, directorySize)
+        return parseCentralDirectoryRecords(directory, totalEntries)
+    }
+
+    override fun readEntry(path: String): ByteArray? {
+        if (closed) return null
+        val entry = entriesByPath[path] ?: return null
+        if (entry.isDirectory) return ByteArray(0)
+
+        val localHeader = readAt(entry.localHeaderOffset.toLong(), 30)
+        if (localHeader.size < 30 ||
+            localHeader[0] != 0x50.toByte() ||
+            localHeader[1] != 0x4B.toByte() ||
+            localHeader[2] != 0x03.toByte() ||
+            localHeader[3] != 0x04.toByte()
+        ) return null
+
+        val fileNameLength = localHeader.readUInt16LE(26)
+        val extraFieldLength = localHeader.readUInt16LE(28)
+        val dataOffset = entry.localHeaderOffset.toLong() + 30L + fileNameLength + extraFieldLength
+        val compressedBytes = readAt(dataOffset, entry.compressedSize)
+        if (compressedBytes.size != entry.compressedSize) return null
+
+        return when (entry.compressionMethod) {
+            0 -> compressedBytes
+            8 -> rawDeflateDecompress(compressedBytes)
+            else -> null
+        }
+    }
+
+    private fun readAt(offset: Long, length: Int): ByteArray {
+        if (offset < 0L || length < 0) return ByteArray(0)
+        if (length == 0) return ByteArray(0)
+
+        val bytes = ByteArray(length)
+        val read = bytes.usePinned { pinned ->
+            pread(descriptor, pinned.addressOf(0), length.toULong(), offset)
+        }.toInt()
+        return if (read == length) bytes else bytes.copyOf(read.coerceAtLeast(0))
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        try {
+            fclose(handle)
+        } finally {
+            file.stopAccessingSecurityScopedResource()
+        }
     }
 }

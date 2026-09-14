@@ -1,12 +1,11 @@
 package dev.anthonyhfm.amethyst.core.util
 
 import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.AndroidFile
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.cacheDir
+import io.github.vinceglb.filekit.context
 import io.github.vinceglb.filekit.path
-import io.github.vinceglb.filekit.readBytes
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.GZIPInputStream
@@ -14,55 +13,52 @@ import java.util.zip.GZIPOutputStream
 import java.util.zip.ZipFile
 
 actual object Zip {
+    actual fun open(file: PlatformFile): ProjectArchiveReader? {
+        var ownedTempFile: File? = null
+        return try {
+            val archiveFile = when (val androidFile = file.androidFile) {
+                is AndroidFile.FileWrapper -> androidFile.file
+                is AndroidFile.UriWrapper -> {
+                    File.createTempFile("amethyst-zip-stream-", ".zip", File(FileKit.cacheDir.path)).also { temp ->
+                        ownedTempFile = temp
+                        FileKit.context.contentResolver.openInputStream(androidFile.uri).use { input ->
+                            requireNotNull(input) { "Could not open ZIP content URI" }
+                            temp.outputStream().use { output -> input.copyTo(output, bufferSize = 64 * 1024) }
+                        }
+                    }
+                }
+            }
+            AndroidProjectArchiveReader(ZipFile(archiveFile), ownedTempFile)
+        } catch (exception: Exception) {
+            ownedTempFile?.delete()
+            println("Error opening ZIP file: ${exception.message}")
+            null
+        }
+    }
+
     actual fun getEntries(
         file: PlatformFile,
     ): List<ZipEntry> {
-        val data: ByteArray = runBlocking(Dispatchers.IO) {
-            file.readBytes()
-        }
-
+        val reader = open(file) ?: return emptyList()
         return try {
-            readZipFile(data) { zipFile ->
-                val entries = mutableListOf<ZipEntry>()
-
-                zipFile.entries().asSequence().forEach { entry ->
-                    val entryData = if (entry.isDirectory) {
-                        ByteArray(0)
-                    } else {
-                        zipFile.getInputStream(entry).use { it.readBytes() }
-                    }
-
-                    entries.add(
-                        ZipEntry(
-                            path = entry.name,
-                            data = entryData,
-                            isDirectory = entry.isDirectory,
-                        )
-                    )
-                }
-
-                entries
+            reader.entries.map { entry ->
+                ZipEntry(
+                    path = entry.path,
+                    data = if (entry.isDirectory) ByteArray(0) else reader.readEntry(entry.path) ?: ByteArray(0),
+                    isDirectory = entry.isDirectory,
+                )
             }
-        } catch (e: Exception) {
-            println("Error reading ZIP file: ${e.message}")
-            emptyList()
+        } finally {
+            reader.close()
         }
     }
 
     actual fun getPaths(file: PlatformFile): List<String> {
-        val data: ByteArray = runBlocking(Dispatchers.IO) {
-            file.readBytes()
-        }
-
+        val reader = open(file) ?: return emptyList()
         return try {
-            readZipFile(data) { zipFile ->
-                zipFile.entries().asSequence()
-                    .map { it.name }
-                    .toList()
-            }
-        } catch (e: Exception) {
-            println("Error reading ZIP paths: ${e.message}")
-            emptyList()
+            reader.entries.map(ProjectArchiveEntry::path)
+        } finally {
+            reader.close()
         }
     }
 
@@ -128,6 +124,40 @@ actual object Zip {
             ZipFile(tempFile).use(block)
         } finally {
             tempFile.delete()
+        }
+    }
+}
+
+private class AndroidProjectArchiveReader(
+    private val zipFile: ZipFile,
+    private val ownedTempFile: File?,
+) : ProjectArchiveReader {
+    private var closed = false
+    private val entriesByPath = zipFile.entries().asSequence().associateBy { it.name }
+
+    override val entries: List<ProjectArchiveEntry> = entriesByPath.values.map { entry ->
+        ProjectArchiveEntry(
+            path = entry.name,
+            isDirectory = entry.isDirectory,
+            compressedSize = entry.compressedSize,
+            uncompressedSize = entry.size,
+        )
+    }
+
+    override fun readEntry(path: String): ByteArray? {
+        if (closed) return null
+        val entry = entriesByPath[path] ?: return null
+        if (entry.isDirectory) return ByteArray(0)
+        return zipFile.getInputStream(entry).use { it.readBytes() }
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        try {
+            zipFile.close()
+        } finally {
+            ownedTempFile?.delete()
         }
     }
 }

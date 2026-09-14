@@ -132,7 +132,7 @@ object AbletonTutorialDetector {
                 launchpadId = target.launchpadId,
             )
         }
-        val allTimes = trackActions.flatMap { it.keys }.toSortedSet()
+        val allTimes = trackActions.flatMap { it.keys }.distinct().sorted()
         return buildMap {
             allTimes.forEach { time ->
                 val actions = trackActions.flatMap { it[time].orEmpty() }

@@ -10,63 +10,32 @@ import java.util.zip.ZipInputStream
 
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 actual object Zip {
+    actual fun open(file: PlatformFile): ProjectArchiveReader? {
+        val javaFile = file.file
+        if (!javaFile.exists() || !javaFile.isFile) return null
+
+        return try {
+            DesktopProjectArchiveReader(ZipFile(javaFile))
+        } catch (exception: Exception) {
+            println("Error opening ZIP file: ${exception.message}")
+            null
+        }
+    }
+
     actual fun getEntries(
         file: PlatformFile,
     ): List<ZipEntry> {
-        val javaFile = file.file
-        if (!javaFile.exists() || !javaFile.isFile) {
-            return emptyList()
-        }
-
+        val reader = open(file) ?: return emptyList()
         return try {
-            // Try using ZipFile first (more robust)
-            ZipFile(javaFile).use { zipFile ->
-                val entries = mutableListOf<ZipEntry>()
-
-                zipFile.entries().asSequence().forEach { entry ->
-                    val data = if (!entry.isDirectory) {
-                        zipFile.getInputStream(entry).use { it.readBytes() }
-                    } else {
-                        ByteArray(0)
-                    }
-
-                    entries.add(
-                        ZipEntry(
-                            path = entry.name,
-                            data = data,
-                            isDirectory = entry.isDirectory,
-                        )
-                    )
-                }
-
-                entries
+            reader.entries.map { entry ->
+                ZipEntry(
+                    path = entry.path,
+                    data = if (entry.isDirectory) ByteArray(0) else reader.readEntry(entry.path) ?: ByteArray(0),
+                    isDirectory = entry.isDirectory,
+                )
             }
-        } catch (_: Exception) {
-            // Fallback to ZipInputStream if ZipFile fails
-            try {
-                FileInputStream(javaFile).use { fis ->
-                    ZipInputStream(fis).use { zipStream ->
-                        val entries = mutableListOf<ZipEntry>()
-
-                        var entry = zipStream.nextEntry
-                        while (entry != null) {
-                            entries.add(
-                                ZipEntry(
-                                    path = entry.name,
-                                    data = zipStream.readBytes(),
-                                    isDirectory = entry.isDirectory,
-                                )
-                            )
-                            entry = zipStream.nextEntry
-                        }
-
-                        entries
-                    }
-                }
-            } catch (e2: Exception) {
-                println("Error reading ZIP file: ${e2.message}")
-                emptyList()
-            }
+        } finally {
+            reader.close()
         }
     }
 
@@ -77,12 +46,7 @@ actual object Zip {
         }
 
         return try {
-            // Try using ZipFile first (more robust)
-            ZipFile(javaFile).use { zipFile ->
-                zipFile.entries().asSequence()
-                    .map { it.name }
-                    .toList()
-            }
+            ZipFile(javaFile).use { zipFile -> zipFile.entries().asSequence().map { it.name }.toList() }
         } catch (_: Exception) {
             // Fallback to ZipInputStream if ZipFile fails
             try {
@@ -153,6 +117,36 @@ actual object Zip {
             }
 
             return out.toByteArray()
+        }
+    }
+}
+
+private class DesktopProjectArchiveReader(
+    private val zipFile: ZipFile,
+) : ProjectArchiveReader {
+    private var closed = false
+    private val entriesByPath = zipFile.entries().asSequence().associateBy { it.name }
+
+    override val entries: List<ProjectArchiveEntry> = entriesByPath.values.map { entry ->
+        ProjectArchiveEntry(
+            path = entry.name,
+            isDirectory = entry.isDirectory,
+            compressedSize = entry.compressedSize,
+            uncompressedSize = entry.size,
+        )
+    }
+
+    override fun readEntry(path: String): ByteArray? {
+        if (closed) return null
+        val entry = entriesByPath[path] ?: return null
+        if (entry.isDirectory) return ByteArray(0)
+        return zipFile.getInputStream(entry).use { it.readBytes() }
+    }
+
+    override fun close() {
+        if (!closed) {
+            closed = true
+            zipFile.close()
         }
     }
 }

@@ -33,3 +33,30 @@ fun getProjectArchiveEntries(file: PlatformFile): List<ZipEntry> =
         "rar" -> Rar.getEntries(file)
         else -> Zip.getEntries(file)
     }
+
+/**
+ * Opens project archives through a random-access reader. ZIP files stay compressed on disk;
+ * RAR keeps the legacy eager behavior until the RAR backends support random access everywhere.
+ */
+fun openProjectArchive(file: PlatformFile): ProjectArchiveReader? =
+    when (file.extension.lowercase()) {
+        "rar" -> InMemoryProjectArchiveReader(Rar.getEntries(file))
+        else -> Zip.open(file)
+    }
+
+private class InMemoryProjectArchiveReader(entries: List<ZipEntry>) : ProjectArchiveReader {
+    private val dataByPath = entries.associateBy(ZipEntry::path)
+
+    override val entries: List<ProjectArchiveEntry> = entries.map { entry ->
+        ProjectArchiveEntry(
+            path = entry.path,
+            isDirectory = entry.isDirectory,
+            compressedSize = entry.data.size.toLong(),
+            uncompressedSize = entry.data.size.toLong(),
+        )
+    }
+
+    override fun readEntry(path: String): ByteArray? = dataByPath[path]?.data
+
+    override fun close() = Unit
+}

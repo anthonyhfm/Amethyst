@@ -31,10 +31,7 @@ class MxDeviceInstrumentAdapter(
                 return@let it
             } else {
                 val hash: String = if (AbletonConverter.isZip) {
-                    val entry = AbletonConverter.zipEntries[path]
-                    val computed = entry?.data?.toFileHash() ?: ""
-
-                    AbletonConverter.zipEntries.remove(path)
+                    val computed = AbletonConverter.readZipEntry(path)?.toFileHash() ?: ""
                     computed
                 } else {
                     val maxFile = PlatformFile(path)
