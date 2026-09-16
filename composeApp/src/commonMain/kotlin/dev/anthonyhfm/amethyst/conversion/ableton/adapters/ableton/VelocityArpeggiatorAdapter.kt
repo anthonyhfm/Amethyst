@@ -40,8 +40,7 @@ class VelocityArpeggiatorAdapter(
                     )
                 },
                 timing = Timing.Duration(rateMs),
-                durationMs = rateMs.inWholeMilliseconds.toDouble(),
-                gradientSteps = velocities.size
+                durationMs = rateMs.inWholeMilliseconds.toDouble()
             )
         )
     }
