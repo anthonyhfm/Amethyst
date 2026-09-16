@@ -37,6 +37,7 @@ object GraphProcessor {
         outputOrigin: Any?,
         bounds: Pair<IntOffset, IntSize> = resolveBounds(),
         triggerOrigin: Vec2? = null,
+        durationMs: Double = 1_000.0,
     ): List<Signal.LED> {
         if (!GraphValidator.validate(graph).isValid) return emptyList()
         val output = graph.node(graph.outputNodeId) ?: return emptyList()
@@ -45,6 +46,7 @@ object GraphProcessor {
             outputOrigin = outputOrigin,
             progress = progress.coerceIn(0f, 1f),
             triggerOrigin = triggerOrigin,
+            durationMs = durationMs.coerceAtLeast(1.0),
         )
         return graph.connections
             .filter { it.toNodeId == output.id }

@@ -20,6 +20,7 @@ import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
 import dev.anthonyhfm.amethyst.conversion.unipad.UnipadOwnershipTracker
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.core.util.UUID
@@ -879,18 +880,22 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         state.update { it.copy(renderedAnimation = processed) }
     }
 
-    /** Resolves the entry's coordinates to global and returns a coloured signal, or null if
-     *  the anchored device is not currently in [Heaven.devices]. */
-    private fun KeyframesEntry.resolveGlobal(): Pair<Int, Int>? {
+    /** Resolves the entry's coordinates to global and returns a coloured signal.
+     *  Falls back to entry (x, y) if the anchored device is not currently in [Heaven.devices]. */
+    private fun KeyframesEntry.resolveGlobal(): Pair<Int, Int> {
         if (isDeviceAnchored) {
-            val device = Heaven.devices.firstOrNull { it.launchpadId == launchpadId } ?: return null
-            return Pair(localX!! + device.position.value.x.toInt(), localY!! + device.position.value.y.toInt())
+            val device = Heaven.devices.firstOrNull { it.launchpadId == launchpadId }
+                ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
+            if (device != null) {
+                return Pair(localX!! + device.position.value.x.toInt(), localY!! + device.position.value.y.toInt())
+            }
+            return Pair(x, y)
         }
         return Pair(x, y)
     }
 
-    private fun KeyframesEntry.resolveToSignal(color: Color): Signal.LED? {
-        val (gx, gy) = resolveGlobal() ?: return null
+    private fun KeyframesEntry.resolveToSignal(color: Color): Signal.LED {
+        val (gx, gy) = resolveGlobal()
         val origin = resolveLaunchpadOrigin(
             origin = null,
             x = gx,
@@ -902,27 +907,30 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     /** Returns true when [other] occupies the same physical position as this entry. */
     private fun KeyframesEntry.samePosition(other: KeyframesEntry): Boolean {
-        return if (isDeviceAnchored && other.isDeviceAnchored) {
-            launchpadId == other.launchpadId && localX == other.localX && localY == other.localY
+        return if (isDeviceAnchored && other.isDeviceAnchored && launchpadId == other.launchpadId) {
+            localX == other.localX && localY == other.localY
         } else {
-            x == other.x && y == other.y
+            resolveGlobal() == other.resolveGlobal()
         }
     }
 
-    private fun KeyframesEntry.toSignal(): Signal.LED? = resolveToSignal(Color(r, g, b))
+    private fun KeyframesEntry.toSignal(): Signal.LED = resolveToSignal(Color(r, g, b))
 
-    private fun KeyframesEntry.toOffSignal(): Signal.LED? = resolveToSignal(Color.Black)
+    private fun KeyframesEntry.toOffSignal(): Signal.LED = resolveToSignal(Color.Black)
 
     private val heldSignals = mutableSetOf<Int>() // Signals currently held in Loop mode
     private val continuousLoopIdentifier = Int.MIN_VALUE
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
+        val nonSilent = n.filterNot { it.isSilentReplay() }
+        if (nonSilent.isEmpty()) return
+
         val state = state.value
         if (state.isolate) {
             Heaven.cancelJobsForOwner(this)
         }
         
-        n.forEach { signal ->
+        nonSilent.forEach { signal ->
             if (signal.color != Color.Black) {
                 val identifier = signal.x * 10 + signal.y
                 

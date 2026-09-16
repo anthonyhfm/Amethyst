@@ -84,10 +84,10 @@ class AbletonPitcherChainDevice : GenericChainDevice<AbletonPitcherChainDeviceSt
 
                     val local = (signalX + ((9 - (signalY)) * 10)).toInt()
 
-                    val drIndex: Int = XY_TO_DRUM_RACK[local] + state.value.pitch
-
-                    val newX = DRUM_RACK_TO_XY[drIndex] % 10 + pos.x.toInt()
-                    val newY = 9 - DRUM_RACK_TO_XY[drIndex] / 10 + pos.y.toInt()
+                    val drIndex: Int = (XY_TO_DRUM_RACK.getOrNull(local) ?: return@deviceLoop) + state.value.pitch
+                    val newPad = DRUM_RACK_TO_XY.getOrNull(drIndex) ?: return@deviceLoop
+                    val newX = newPad % 10 + pos.x.toInt()
+                    val newY = 9 - newPad / 10 + pos.y.toInt()
 
                     signalExit?.invoke(
                         listOf(

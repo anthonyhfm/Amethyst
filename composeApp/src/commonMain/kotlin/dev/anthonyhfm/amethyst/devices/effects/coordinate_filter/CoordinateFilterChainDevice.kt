@@ -256,7 +256,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
 
     fun refreshVirtualDevices() {
         val signals = if (state.value.padFilters.isNotEmpty()) {
-            state.value.padFilters.mapNotNull { filter ->
+            val resolved = state.value.padFilters.mapNotNull { filter ->
                 val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
                     ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
                     ?: return@mapNotNull null
@@ -267,6 +267,17 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
                     color = Color.Green,
                     layer = 0
                 )
+            }
+            if (resolved.isNotEmpty()) {
+                resolved
+            } else if (state.value.filters.isNotEmpty()) {
+                state.value.filters.map {
+                    Signal.LED(origin = this, x = it.first, y = it.second, color = Color.Green, layer = 0)
+                }
+            } else {
+                state.value.padFilters.map {
+                    Signal.LED(origin = this, x = it.localX, y = it.localY, color = Color.Green, layer = 0)
+                }
             }
         } else {
             state.value.filters.map {
@@ -288,19 +299,23 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     }
 
     override fun signalEnter(n: List<Signal>) {
-        val globalFilters: Set<Pair<Int, Int>> = if (state.value.padFilters.isNotEmpty()) {
-            state.value.padFilters.mapNotNull { filter ->
-                val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
-                    ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
-                    ?: return@mapNotNull null
-                Pair(
-                    filter.localX + device.position.value.x.toInt(),
-                    filter.localY + device.position.value.y.toInt()
-                )
-            }.toSet()
-        } else {
+        val resolvedPadFilters = state.value.padFilters.mapNotNull { filter ->
+            val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
+                ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
+                ?: return@mapNotNull null
+            Pair(
+                filter.localX + device.position.value.x.toInt(),
+                filter.localY + device.position.value.y.toInt()
+            )
+        }.toSet()
+
+        val globalFilters: Set<Pair<Int, Int>> = if (resolvedPadFilters.isNotEmpty()) {
+            resolvedPadFilters
+        } else if (state.value.filters.isNotEmpty()) {
             // Legacy fallback: global coordinate pairs (from old saves / Ableton imports)
             state.value.filters.toSet()
+        } else {
+            state.value.padFilters.map { Pair(it.localX, it.localY) }.toSet()
         }
 
         val filteredSignals = n.filter { signal ->

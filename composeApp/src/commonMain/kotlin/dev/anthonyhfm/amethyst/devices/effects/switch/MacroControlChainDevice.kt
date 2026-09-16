@@ -197,16 +197,20 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                 else -> false
             }
         }
+        val isAudioPrefetch = n.filterIsInstance<Signal.Midi>()
+            .any { it.audioTriggerBatch?.requestedTargetFrame != null }
         val macroIndex = resolvedMacroIndex()
         val targetValue = state.value.value
 
         if (down && macroIndex != null) {
-            WorkspaceRepository.macros.value.getOrNull(macroIndex)?.let { macro ->
-                WorkspaceRepository.setMacroValue(
-                    index = macroIndex,
-                    macro = macro.copy(value = targetValue),
-                    undoable = false,
-                )
+            if (!isAudioPrefetch && getDialAutomation(VALUE_PARAMETER_ID) == null) {
+                WorkspaceRepository.macros.value.getOrNull(macroIndex)?.let { macro ->
+                    WorkspaceRepository.setMacroValue(
+                        index = macroIndex,
+                        macro = macro.copy(value = targetValue),
+                        undoable = false,
+                    )
+                }
             }
 
             if (!silentReplay) {

@@ -55,11 +55,16 @@ class RandomDeviceMultisamplingAdapter (
             ?: drumContainer?.on?.manual?.value
             ?: true
 
+        val isKeyRangeOrDrum = drumContainer != null || (instrumentContainer?.branches?.branches?.any {
+            it.zoneSettings.keyRange.min.value != 0 || it.zoneSettings.keyRange.max.value != 127
+        } == true)
+
         if (randomChance == 1.0 && altModeEnabled) {
             return listOf(
                 MultiGroupChainDeviceState(
                     type = TYPE.FORWARD,
                     groups = List(multiSteps.toInt()) { step ->
+                        val pitchCompensation = if (isKeyRangeOrDrum) step.toFloat() else 0f
                         when {
                             instrumentContainer != null -> {
                                 Group(
@@ -72,7 +77,7 @@ class RandomDeviceMultisamplingAdapter (
                                                         resolveAdapter(child)
                                                             ?.toDeviceStates()
                                                             ?.firstOrNull()
-                                                    }
+                                                    }.withPitchCompensation(pitchCompensation)
                                                 )
                                             }
                                         }
@@ -108,7 +113,7 @@ class RandomDeviceMultisamplingAdapter (
                                                         resolveAdapter(child)
                                                             ?.toDeviceStates()
                                                             ?.firstOrNull()
-                                                    }
+                                                    }.withPitchCompensation(pitchCompensation)
                                                 )
                                             }
                                         }

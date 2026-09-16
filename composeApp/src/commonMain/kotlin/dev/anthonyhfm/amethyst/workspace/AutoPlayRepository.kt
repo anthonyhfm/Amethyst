@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
+import dev.anthonyhfm.amethyst.core.engine.elements.currentSignalMacroValues
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
@@ -153,6 +154,7 @@ object AutoPlayRepository {
     private fun midiSignals(
         actions: List<AutoPlayData.Action>,
         silentReplay: Boolean = false,
+        macroValues: List<Int> = currentSignalMacroValues(),
     ): List<Signal.Midi> =
         actions.map { action ->
             Signal.Midi(
@@ -161,6 +163,7 @@ object AutoPlayRepository {
                 y = action.y,
                 velocity = if (action.down) 127 else 0,
                 extras = if (silentReplay) mapOf(SIGNAL_EXTRA_SILENT_REPLAY to 1) else emptyMap(),
+                macroValues = macroValues,
             )
         }
 
@@ -316,11 +319,12 @@ object AutoPlayRepository {
 
             // Visual feedback remains on the original AutoPlay wall-clock deadline.
             Heaven.scheduleAt(deadlineNanos, this) {
+                val macroSnapshot = currentSignalMacroValues()
                 if (audioTimeline == null) {
                     // Sampling MIDI also contains page and macro controls required by
                     // a lights-only run. Preserve legacy wall-deadline routing when no
                     // audio callback is available, without prefetching sample commands.
-                    samplingChain.signalEnter(midiSignals(actions))
+                    samplingChain.signalEnter(midiSignals(actions, macroValues = macroSnapshot))
                 }
                 if (settings?.autoPlayShowLights == true) {
                     WorkspaceRepository.lightsChain.signalEnter(
@@ -330,6 +334,7 @@ object AutoPlayRepository {
                                 x = it.x,
                                 y = it.y,
                                 color = if (it.down) Color.White else Color.Black,
+                                macroValues = macroSnapshot,
                             )
                         }
                     )
@@ -343,7 +348,12 @@ object AutoPlayRepository {
                                 x = it.x,
                                 y = it.y,
                                 color = if (it.down) Color.White else Color.Black,
-                                layer = 100
+                                layer = 100,
+                                // Screen blending keeps the compositing loop running so
+                                // any light-effect on layer 0 remains visible beneath
+                                // the button-press flash. Normal (the default) would
+                                // break the loop at layer 100, hiding the animation.
+                                blendingMode = Signal.LED.BlendingMode.Screen,
                             )
                         }
                     )
@@ -500,6 +510,7 @@ object AutoPlayRepository {
         val downActions = actions.filter { it.down }
         if (downActions.isEmpty()) return
 
+        val macroSnapshot = currentSignalMacroValues()
         WorkspaceRepository.samplingChain.signalEnter(
             downActions.map {
                 Signal.Midi(
@@ -507,6 +518,7 @@ object AutoPlayRepository {
                     x = it.x,
                     y = it.y,
                     velocity = 127,
+                    macroValues = macroSnapshot,
                 )
             }
         )
@@ -520,6 +532,7 @@ object AutoPlayRepository {
                         x = it.x,
                         y = it.y,
                         color = Color.White,
+                        macroValues = macroSnapshot,
                     )
                 }
             )

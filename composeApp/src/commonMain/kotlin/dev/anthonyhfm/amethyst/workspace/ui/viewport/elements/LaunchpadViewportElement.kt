@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.core.midi.devices.LaunchpadDevice
 import dev.anthonyhfm.amethyst.core.engine.heaven.Screen
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.currentSignalMacroValues
 import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
@@ -270,25 +271,28 @@ abstract class LaunchpadViewportElement(
             return
         }
 
-        WorkspaceRepository.lightsChain.signalEnter(
+        val macroSnapshot = currentSignalMacroValues()
+        val ledSignals = listOf(
             Signal.LED(
                 origin = this,
                 x = x,
                 y = y,
                 color = Color.White,
-                layer = 0
+                layer = 0,
+                macroValues = macroSnapshot,
             )
         )
-
         val midiSignals = listOf(
             Signal.Midi(
                 origin = this,
                 x = x,
                 y = y,
-                velocity = 127
+                velocity = 127,
+                macroValues = macroSnapshot,
             )
         )
 
+        WorkspaceRepository.lightsChain.signalEnter(ledSignals)
         WorkspaceRepository.samplingChain.signalEnter(midiSignals)
         AutoPlayRepository.onMidiInput(midiSignals)
     }
@@ -303,25 +307,28 @@ abstract class LaunchpadViewportElement(
             return
         }
 
-        WorkspaceRepository.lightsChain.signalEnter(
+        val macroSnapshot = currentSignalMacroValues()
+        val ledSignals = listOf(
             Signal.LED(
                 origin = this,
                 x = x,
                 y = y,
                 color = Color.Black,
-                layer = 0
+                layer = 0,
+                macroValues = macroSnapshot,
             )
         )
-
         val midiSignals = listOf(
             Signal.Midi(
                 origin = this,
                 x = x,
                 y = y,
-                velocity = 0
+                velocity = 0,
+                macroValues = macroSnapshot,
             )
         )
 
+        WorkspaceRepository.lightsChain.signalEnter(ledSignals)
         WorkspaceRepository.samplingChain.signalEnter(midiSignals)
         AutoPlayRepository.onMidiInput(midiSignals)
     }

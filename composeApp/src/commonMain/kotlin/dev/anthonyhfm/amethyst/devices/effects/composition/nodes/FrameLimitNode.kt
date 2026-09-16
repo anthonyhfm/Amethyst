@@ -23,7 +23,13 @@ data class FrameLimitNodeState(
 
 object FrameLimitNode : TransformNode() {
     override val automationParameters = listOf(
-        intAutomationParameter<FrameLimitNodeState>("frames", "Frames per cycle", 1, 120, FrameLimitNodeState::frames) { state, value -> state.copy(frames = value) },
+        intAutomationParameter<FrameLimitNodeState>(
+            id = "frames",
+            label = "FPS",
+            minimum = MIN_FPS,
+            maximum = MAX_FPS,
+            get = FrameLimitNodeState::frames,
+        ) { state, value -> state.copy(frames = value) },
     )
 
     override val type = "frame-limit"
@@ -39,12 +45,17 @@ object FrameLimitNode : TransformNode() {
         node: CompositionNode,
         context: EvaluationContext,
     ): EvaluationContext {
-        val frames = (node.state as? FrameLimitNodeState)?.frames?.coerceIn(1, 120) ?: 12
+        val fps = (node.state as? FrameLimitNodeState)?.frames?.coerceIn(MIN_FPS, MAX_FPS) ?: DEFAULT_FPS
+        val durationMs = context.durationMs.coerceAtLeast(1.0)
+        val elapsedMs = context.progress.coerceIn(0f, 1f) * durationMs
+        val frameIntervalMs = 1_000.0 / fps
         return context.copy(
             progress = if (context.progress >= 1f) {
                 1f
             } else {
-                floor(context.progress * frames) / frames
+                (floor(elapsedMs / frameIntervalMs) * frameIntervalMs / durationMs)
+                    .toFloat()
+                    .coerceIn(0f, 1f)
             }
         )
     }
@@ -62,7 +73,7 @@ object FrameLimitNode : TransformNode() {
         ) {
             AutomatableDial(
                 parameterId = "frames",
-                type = DialType.Steps(values = (1..120).toList()),
+                type = DialType.Steps(values = FPS_VALUES),
                 value = state.frames,
                 defaultValue = 0,
                 title = "FPS",
@@ -79,4 +90,9 @@ object FrameLimitNode : TransformNode() {
             )
         }
     }
+
+    private const val MIN_FPS = 1
+    private const val MAX_FPS = 120
+    private const val DEFAULT_FPS = 12
+    private val FPS_VALUES = (MIN_FPS..MAX_FPS).toList()
 }

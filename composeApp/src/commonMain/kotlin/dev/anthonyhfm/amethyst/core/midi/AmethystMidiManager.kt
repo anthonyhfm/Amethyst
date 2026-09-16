@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.midi
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.currentSignalMacroValues
 import dev.anthonyhfm.amethyst.core.midi.devices.*
 import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
 import dev.anthonyhfm.amethyst.workspace.ViewportRepository
@@ -591,26 +592,30 @@ class AmethystMidiManager(
             return
         }
 
+        val macroSnapshot = currentSignalMacroValues()
         val midiSignals = listOf(
             Signal.Midi(
                 origin = null,
                 x = globalX,
                 y = globalY,
                 velocity = input.velocity,
+                macroValues = macroSnapshot,
             )
         )
-
-        WorkspaceRepository.samplingChain.signalEnter(midiSignals)
-        AutoPlayRepository.onMidiInput(midiSignals)
-        WorkspaceRepository.lightsChain.signalEnter(
+        val ledSignals = listOf(
             Signal.LED(
                 origin = null,
                 x = globalX,
                 y = globalY,
                 color = if (input.velocity == 0) Color.Black else Color.White,
                 layer = 0,
+                macroValues = macroSnapshot,
             )
         )
+
+        WorkspaceRepository.samplingChain.signalEnter(midiSignals)
+        AutoPlayRepository.onMidiInput(midiSignals)
+        WorkspaceRepository.lightsChain.signalEnter(ledSignals)
     }
 
     private fun LaunchpadDeviceType.mapLaunchpadDevice(

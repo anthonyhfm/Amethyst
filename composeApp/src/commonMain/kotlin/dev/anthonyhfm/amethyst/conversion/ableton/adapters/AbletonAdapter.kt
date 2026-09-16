@@ -33,6 +33,11 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiVelocity
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.Limiter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.StereoGain
+import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
+import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import kotlinx.serialization.json.Json
 
@@ -50,6 +55,65 @@ abstract class AbletonAdapter {
     protected fun List<DeviceState>.withMuteState(isOn: Boolean): List<DeviceState> {
         if (!isOn) forEach { it.isMuted = true }
         return this
+    }
+
+    /**
+     * In Ableton Live, Multi / multisampling devices (e.g. Outbreak Multi, Kaskobi Multi,
+     * MidiRandom in Alt mode) cycle through chains by pitch-shifting outgoing MIDI notes
+     * up by (+step) semitones. Because Ableton's Simpler tracks MIDI pitch, the project
+     * author lowered each Simpler's transpose by (-step) semitones to compensate.
+     * In Amethyst, MultiGroupChainDevice routes directly to chains without shifting note pitch.
+     * Therefore, the (-step) downpitch on Simpler must be counteracted by (+step).
+     */
+    protected fun DeviceState.withPitchCompensation(semitones: Float): DeviceState {
+        if (semitones == 0f) return this
+        return when (this) {
+            is SampleChainDeviceState -> preserveDisplayState(
+                copy(transposeSemitones = transposeSemitones + semitones)
+            )
+            is GroupChainDeviceState -> preserveDisplayState(
+                copy(
+                    groups = groups.map { group ->
+                        group.copy(
+                            stateChain = group.stateChain.withPitchCompensation(semitones)
+                        )
+                    }
+                )
+            )
+            is MultiGroupChainDeviceState -> preserveDisplayState(
+                copy(
+                    groups = groups.map { group ->
+                        group.copy(
+                            stateChain = group.stateChain.withPitchCompensation(semitones)
+                        )
+                    },
+                    preprocessChain = preprocessChain.withPitchCompensation(semitones)
+                )
+            )
+            is ChokeChainDeviceState -> preserveDisplayState(
+                copy(
+                    stateChain = stateChain.withPitchCompensation(semitones)
+                )
+            )
+            else -> this
+        }
+    }
+
+    protected fun StateChain.withPitchCompensation(semitones: Float): StateChain {
+        if (semitones == 0f) return this
+        return copy(
+            devices = devices.map { it.withPitchCompensation(semitones) }
+        )
+    }
+
+    protected fun List<DeviceState>.withPitchCompensation(semitones: Float): List<DeviceState> {
+        if (semitones == 0f) return this
+        return map { it.withPitchCompensation(semitones) }
+    }
+
+    private fun <T : DeviceState> DeviceState.preserveDisplayState(copy: T): T = copy.also {
+        it.isMuted = isMuted
+        it.isCollapsed = isCollapsed
     }
 
     companion object {

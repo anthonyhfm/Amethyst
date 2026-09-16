@@ -225,6 +225,7 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
+        if (n.isSilentReplay()) return
         // When an LED signal enters, play the MIDI entry
         n.forEach { signal ->
             if (signal.color != Color.Black) {

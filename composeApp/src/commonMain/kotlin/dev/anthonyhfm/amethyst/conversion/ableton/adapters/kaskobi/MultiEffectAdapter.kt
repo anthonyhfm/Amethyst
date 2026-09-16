@@ -80,6 +80,10 @@ class MultiEffectAdapter(
             }.flatten()
         }
 
+        val isKeyRangeOrDrum = drumContainer != null || (instrumentContainer?.branches?.branches?.any {
+            it.zoneSettings.keyRange.min.value != 0 || it.zoneSettings.keyRange.max.value != 127
+        } == true)
+
         val containerOnState = instrumentContainer?.on?.manual?.value
             ?: midiContainer?.on?.manual?.value
             ?: drumContainer?.on?.manual?.value
@@ -90,6 +94,7 @@ class MultiEffectAdapter(
                 type = TYPE.FORWARD,
                 resetGroupId = resetGroupId,
                 groups = List(steps) { step ->
+                    val pitchCompensation = if (isKeyRangeOrDrum) step.toFloat() else 0f
                     when {
                         instrumentContainer != null -> {
                             Group(
@@ -97,7 +102,10 @@ class MultiEffectAdapter(
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         instrumentBranches.getOrNull(step)?.let { br ->
-                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
+                                            addAll(
+                                                resolveChildren(br.deviceChain.deviceChain.devices.devices)
+                                                    .withPitchCompensation(pitchCompensation)
+                                            )
                                         }
                                     }
                                 )
@@ -121,7 +129,10 @@ class MultiEffectAdapter(
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         drumBranches.getOrNull(step)?.let { br ->
-                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
+                                            addAll(
+                                                resolveChildren(br.deviceChain.deviceChain.devices.devices)
+                                                    .withPitchCompensation(pitchCompensation)
+                                            )
                                         }
                                     }
                                 )

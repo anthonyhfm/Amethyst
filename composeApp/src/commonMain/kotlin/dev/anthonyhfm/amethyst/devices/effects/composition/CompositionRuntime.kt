@@ -9,6 +9,7 @@ data class EvaluationContext(
     val outputOrigin: Any?,
     val progress: Float,
     val triggerOrigin: Vec2? = null,
+    val durationMs: Double = 1_000.0,
 )
 
 data class Vec2(val x: Float, val y: Float)
@@ -178,4 +179,3 @@ fun invertLightness(color: Color): Color {
     val deltaL = (1f - currentL) - currentL
     return shiftHsl(color, hueDegrees = 0f, saturationDelta = 0f, lightnessDelta = deltaL)
 }
-

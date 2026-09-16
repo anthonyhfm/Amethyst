@@ -58,7 +58,7 @@ class DynamicsAudioEffectsTest {
         process(rejectedChain)
         assertEquals(0f, rejected.currentGainReduction)
 
-        val downstream = loadedSample("late-kick")
+        val downstream = loadedSample("late-kick", 1.0f)
         val program = loadedSample("music")
         val allowed = DuckerChainDevice().apply {
             state.value = DuckerChainDeviceState(sidechainSourceId = downstream.selectionUUID, attackMs = 0f, strength = 1f)
@@ -118,11 +118,11 @@ class DynamicsAudioEffectsTest {
         assertEquals(saturator, DeviceRegistry.deepCopyState(saturator))
     }
 
-    private fun loadedSample(name: String): SampleChainDevice = SampleChainDevice().apply {
+    private fun loadedSample(name: String, value: Float = 0.5f): SampleChainDevice = SampleChainDevice().apply {
         selectionUUID = name
         state.value = SampleChainDeviceState(
             fileName = "$name.raw",
-            rawData = pcm16Mono(64, 0.5f),
+            rawData = pcm16Mono(64, value),
             sampleRate = configuration.sampleRate,
             channels = 1,
             bitDepth = 16,

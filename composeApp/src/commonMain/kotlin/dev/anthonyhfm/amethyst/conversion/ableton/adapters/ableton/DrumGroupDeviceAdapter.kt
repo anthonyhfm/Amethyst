@@ -218,7 +218,6 @@ class DrumGroupDeviceAdapter(
 
         if (hasPageSwitching) {
             groups.add(
-                0,
                 Group(
                     name = "Page Switching",
                     stateChain = StateChain(

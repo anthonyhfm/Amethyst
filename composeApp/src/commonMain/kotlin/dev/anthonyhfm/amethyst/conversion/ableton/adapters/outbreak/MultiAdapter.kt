@@ -38,8 +38,13 @@ class MultiAdapter(
 
         if (midiContainer != null) {
             midiBranches = midiContainer.branches.branches.map {
-                val min = it.zoneSettings.keyRange.min.value
-                val max = it.zoneSettings.keyRange.max.value
+                var min = it.zoneSettings.keyRange.min.value
+                var max = it.zoneSettings.keyRange.max.value
+
+                if (min == 0 && max == 127) {
+                    min = it.branchSelectorRange.min.value
+                    max = it.branchSelectorRange.max.value
+                }
 
                 List(max - min + 1) { _ ->
                     it.copy()
@@ -47,8 +52,13 @@ class MultiAdapter(
             }.flatten()
         } else if (instrumentContainer != null) {
             instrumentBranches = instrumentContainer.branches.branches.map {
-                val min = it.zoneSettings.keyRange.min.value
-                val max = it.zoneSettings.keyRange.max.value
+                var min = it.zoneSettings.keyRange.min.value
+                var max = it.zoneSettings.keyRange.max.value
+
+                if (min == 0 && max == 127) {
+                    min = it.branchSelectorRange.min.value
+                    max = it.branchSelectorRange.max.value
+                }
 
                 List(max - min + 1) { _ ->
                     it.copy()
@@ -56,12 +66,16 @@ class MultiAdapter(
             }.flatten()
         } else if (drumContainer != null) {
             drumBranches = drumContainer.branches.branches.map {
-                // Drum hat pro Pad eine Note; wir replizieren nicht nach Note-Range
                 listOf(it.copy())
             }.flatten()
         }
 
         val steps = dataObj.steps.first().toInt()
+
+        val isKeyRangeOrDrum = drumContainer != null || (instrumentContainer?.branches?.branches?.any {
+            it.zoneSettings.keyRange.min.value != 0 || it.zoneSettings.keyRange.max.value != 127
+        } == true)
+        val isNoteMode = dataObj.mode.firstOrNull() != 1.0 && isKeyRangeOrDrum
 
         val containerOnState = instrumentContainer?.on?.manual?.value
             ?: midiContainer?.on?.manual?.value
@@ -72,6 +86,7 @@ class MultiAdapter(
             MultiGroupChainDeviceState(
                 type = TYPE.FORWARD,
                 groups = List(steps) { step ->
+                    val pitchCompensation = if (isNoteMode) step.toFloat() else 0f
                     when {
                         instrumentContainer != null -> {
                             Group(
@@ -79,7 +94,10 @@ class MultiAdapter(
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         instrumentBranches.getOrNull(step)?.let { br ->
-                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
+                                            addAll(
+                                                resolveChildren(br.deviceChain.deviceChain.devices.devices)
+                                                    .withPitchCompensation(pitchCompensation)
+                                            )
                                         }
                                     }
                                 )
@@ -103,7 +121,10 @@ class MultiAdapter(
                                 stateChain = StateChain(
                                     devices = mutableListOf<DeviceState>().apply {
                                         drumBranches.getOrNull(step)?.let { br ->
-                                            addAll(resolveChildren(br.deviceChain.deviceChain.devices.devices))
+                                            addAll(
+                                                resolveChildren(br.deviceChain.deviceChain.devices.devices)
+                                                    .withPitchCompensation(pitchCompensation)
+                                            )
                                         }
                                     }
                                 )
@@ -127,5 +148,7 @@ class MultiAdapter(
     data class MultiData(
         @SerialName("live.numbox")
         val steps: List<Double>,
+        @SerialName("live.text")
+        val mode: List<Double> = emptyList(),
     )
 }

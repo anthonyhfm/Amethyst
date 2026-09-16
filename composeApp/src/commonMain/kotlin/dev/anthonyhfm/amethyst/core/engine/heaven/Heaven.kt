@@ -2,6 +2,7 @@ package dev.anthonyhfm.amethyst.core.engine.heaven
 
 import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
 import dev.anthonyhfm.amethyst.core.util.mainDispatcherOrDefault
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -72,7 +73,7 @@ object Heaven {
     }
 
     @Volatile var devices: List<LaunchpadViewportElement> = emptyList()
-        private set
+        internal set
 
     private val signalQueue = Channel<List<Signal.LED>>(UNLIMITED)
     private val schedulerCommands = Channel<SchedulerCommand>(UNLIMITED)
@@ -160,7 +161,9 @@ object Heaven {
     }
 
     fun midiEnter(signals: List<Signal.LED>) {
-        signalQueue.trySend(signals)
+        val nonSilent = signals.filterNot { it.extras[SIGNAL_EXTRA_SILENT_REPLAY] == 1 }
+        if (nonSilent.isEmpty()) return
+        signalQueue.trySend(nonSilent)
         wakeRenderer()
     }
 

@@ -63,7 +63,7 @@ import nl.adaptivity.xmlutil.serialization.structure.XmlDescriptor
 
 object AbletonConverter : AmethystConverter {
     var file: PlatformFile? = null
-        private set
+        internal set
 
     var bpm: Double = 120.0
         internal set
@@ -717,6 +717,7 @@ object AbletonConverter : AmethystConverter {
         localCoordinates: List<Pair<Int, Int>>,
     ): CoordinateFilterChainDeviceState =
         CoordinateFilterChainDeviceState(
+            filters = localCoordinates.map { (x, y) -> Pair(x + launchpad.offset.x, y + launchpad.offset.y) },
             padFilters = localCoordinates.map { (x, y) -> launchpad.padFilter(x, y) },
         )
 
@@ -747,7 +748,7 @@ object AbletonConverter : AmethystConverter {
         }
     }
 
-    private fun decodeAbletonAls(compressedBytes: ByteArray): Ableton {
+    internal fun decodeAbletonAls(compressedBytes: ByteArray): Ableton {
         val decoded = Zip.decode(compressedBytes)
         val sanitized = sanitizeAlsXml(decoded.decodeToString())
         return xml.decodeFromString(sanitized)

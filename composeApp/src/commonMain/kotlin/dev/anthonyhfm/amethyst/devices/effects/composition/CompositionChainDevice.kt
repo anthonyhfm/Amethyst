@@ -17,6 +17,7 @@ import com.composeunstyled.Icon
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -29,6 +30,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGrap
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphProcessor
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.defaultCompositionGraph
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.hasOriginBinding
+import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
@@ -87,6 +89,13 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
                 renderAnimation()
             }
         }
+
+        // The pre-rendered cache must use the same frame rate as Heaven.
+        stateObserverScope.launch {
+            GeneralSettings.performanceFPS.flow.drop(1).collect {
+                renderAnimation()
+            }
+        }
     }
 
     override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
@@ -124,7 +133,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     override fun ledSignalEnter(n: List<Signal.LED>) {
         if (workspacePreviewActive) return
 
-        val activeSignals = n.filter { it.color != Color.Black }
+        val activeSignals = n.filter { it.color != Color.Black && !it.isSilentReplay() }
         if (activeSignals.isEmpty()) return
 
         activeSignals.forEach { trigger ->
@@ -273,7 +282,8 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
         Heaven.schedule(delayInMs = delayMs, owner = this, identifier = PLAYBACK_IDENTIFIER) {
             val run = playbackRun ?: return@schedule
             val options = state.value.playbackOptions
-            val durationMs = options.durationMs().coerceAtLeast(FRAME_INTERVAL_MS)
+            val frameIntervalMs = compositionFrameIntervalMs()
+            val durationMs = options.durationMs().coerceAtLeast(frameIntervalMs)
             val frame = run.frames.getOrElse(frameIndex) { run.frames.last() }
             val progress = frame.progress
             playbackProgress.value = progress
@@ -293,7 +303,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
                 }
                 run.repeat -> {
                     Heaven.schedule(
-                        delayInMs = FRAME_INTERVAL_MS,
+                        delayInMs = frameIntervalMs,
                         owner = this,
                         identifier = PLAYBACK_IDENTIFIER,
                     ) {
@@ -307,7 +317,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
                 }
                 else -> {
                     Heaven.schedule(
-                        delayInMs = FRAME_INTERVAL_MS,
+                        delayInMs = frameIntervalMs,
                         owner = this,
                         identifier = PLAYBACK_IDENTIFIER,
                     ) {
@@ -335,12 +345,14 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     }
 
     private fun renderLivePlaybackFrame(progress: Float, origin: Any?, triggerOrigin: Vec2? = null) {
+        val durationMs = state.value.playbackOptions.durationMs().coerceAtLeast(1.0)
         emitFrame(
             GraphProcessor.renderFrame(
                 graph = state.value.graph,
                 progress = progress,
                 outputOrigin = origin,
                 triggerOrigin = triggerOrigin,
+                durationMs = durationMs,
             )
         )
     }
@@ -411,7 +423,8 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
         Heaven.schedule(delayInMs = delayMs, owner = this, identifier = voiceId) {
             val voice = synchronized(chainVoicesLock) { activeChainVoices[voiceId] } ?: return@schedule
             val options = state.value.playbackOptions
-            val durationMs = options.durationMs().coerceAtLeast(FRAME_INTERVAL_MS)
+            val frameIntervalMs = compositionFrameIntervalMs()
+            val durationMs = options.durationMs().coerceAtLeast(frameIntervalMs)
             val frame = voice.frames.getOrElse(frameIndex) { voice.frames.last() }
             val progress = frame.progress
 
@@ -421,6 +434,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
                     progress = progress,
                     outputOrigin = voice.origin,
                     triggerOrigin = voice.triggerOrigin,
+                    durationMs = durationMs,
                 )
             } else {
                 frame.signals.map { it.copy(origin = voice.origin) }
@@ -437,7 +451,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
                 )
             } else {
                 Heaven.schedule(
-                    delayInMs = FRAME_INTERVAL_MS,
+                    delayInMs = frameIntervalMs,
                     owner = this,
                     identifier = voiceId,
                 ) {
@@ -518,16 +532,18 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
 
     private fun buildLivePreviewFrames(): List<RenderedCompositionFrame> {
         val durationMs = playbackDurationMs().coerceAtLeast(1L)
-        val frameCount = kotlin.math.ceil(durationMs / (1_000.0 / RENDER_FPS)).toInt().coerceAtLeast(1)
+        val frameCount = kotlin.math.ceil(durationMs / compositionFrameIntervalMs())
+            .toInt()
+            .coerceAtLeast(1)
         return (0..frameCount).map { index ->
             RenderedCompositionFrame(progress = index.toFloat() / frameCount, signals = emptyList())
         }
     }
 
-    /** Renders the graph once into a transient, chain-playback cache at a fixed 120 FPS. */
+    /** Renders the graph into a transient cache at the configured performance frame rate. */
     fun renderAnimation() {
         val durationMs = playbackDurationMs().coerceAtLeast(1L)
-        val intervalMs = 1_000.0 / RENDER_FPS
+        val intervalMs = compositionFrameIntervalMs()
         val frameCount = kotlin.math.ceil(durationMs / intervalMs).toInt().coerceAtLeast(1)
         val graph = state.value.graph
         val bounds = GraphProcessor.resolveBounds()
@@ -540,6 +556,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
                     progress = progress,
                     outputOrigin = this,
                     bounds = bounds,
+                    durationMs = durationMs.toDouble(),
                 ),
             )
         }
@@ -619,8 +636,6 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
 
     companion object : ChainDeviceFactory<CompositionChainDeviceState> {
         private const val PLAYBACK_IDENTIFIER = "composition-playback"
-        private const val FRAME_INTERVAL_MS = 16.0
-        private const val RENDER_FPS = 120
         const val MIN_SPLIT_RATIO = 0.25f
         const val MAX_SPLIT_RATIO = 0.75f
 
@@ -635,6 +650,9 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
             }
     }
 }
+
+private fun compositionFrameIntervalMs(): Double =
+    1_000.0 / GeneralSettings.performanceFPS.value.coerceAtLeast(1)
 
 @Serializable
 data class CompositionChainDeviceState(

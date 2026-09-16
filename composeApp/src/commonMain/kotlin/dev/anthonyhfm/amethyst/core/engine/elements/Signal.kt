@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import kotlinx.atomicfu.atomic
 
-internal const val SIGNAL_EXTRA_SILENT_REPLAY = "amethyst.silentReplay"
+const val SIGNAL_EXTRA_SILENT_REPLAY = "amethyst.silentReplay"
 
 sealed interface Signal {
     val origin: Any?
@@ -105,7 +105,7 @@ internal fun updateSignalMacroValues(values: List<Int>) {
     signalMacroValues.value = values.toList()
 }
 
-private fun currentSignalMacroValues(): List<Int> = signalMacroValues.value
+internal fun currentSignalMacroValues(): List<Int> = signalMacroValues.value
 
 internal fun Signal.refreshMacroValues(): Signal {
     val values = currentSignalMacroValues()
@@ -122,5 +122,7 @@ fun Signal.isOn(): Boolean = when (this) {
     else -> true
 }
 
-internal fun List<Signal>.isSilentReplay(): Boolean =
-    any { it.extras[SIGNAL_EXTRA_SILENT_REPLAY] == 1 }
+fun Signal.isSilentReplay(): Boolean = extras[SIGNAL_EXTRA_SILENT_REPLAY] == 1
+
+fun List<Signal>.isSilentReplay(): Boolean =
+    any { it.isSilentReplay() }
