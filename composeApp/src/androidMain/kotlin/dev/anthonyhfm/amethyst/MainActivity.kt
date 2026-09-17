@@ -7,6 +7,7 @@ import android.os.Build
 import android.content.pm.PackageManager
 import android.view.Window
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -60,7 +61,10 @@ class MainActivity : ComponentActivity() {
             exitAnimatorSet.start()
         }
 
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
 
         initializeSentry()
