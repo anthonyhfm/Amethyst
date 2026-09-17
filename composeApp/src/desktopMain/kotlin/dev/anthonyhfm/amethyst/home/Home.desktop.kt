@@ -25,6 +25,7 @@ import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
 import dev.anthonyhfm.amethyst.home.ui.views.AbletonImportWizard
 import dev.anthonyhfm.amethyst.home.ui.views.AboutView
+import dev.anthonyhfm.amethyst.home.ui.views.ArcadeView
 import dev.anthonyhfm.amethyst.home.ui.views.BrowserView
 import dev.anthonyhfm.amethyst.home.ui.views.TutorialsView
 import dev.anthonyhfm.amethyst.home.ui.views.LoadingScreenView
@@ -108,6 +109,12 @@ actual fun Home(
                     composable<HomeNavRoute.Browser> {
                         AppLocaleRefreshBoundary {
                             BrowserView()
+                        }
+                    }
+
+                    composable<HomeNavRoute.Arcade> {
+                        AppLocaleRefreshBoundary {
+                            ArcadeView()
                         }
                     }
 

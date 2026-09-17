@@ -181,6 +181,9 @@
     <string name="home_about_signature_desc">Signature</string>
     <string name="home_about_title">Amethyst Studio</string>
     <string name="home_about_version">Version %1$s</string>
+    <string name="home_arcade_empty">Nothing to see here..</string>
+    <string name="home_arcade_title">Arcade</string>
+    <string name="home_arcade_wip">Work in Progress</string>
     <string name="home_browser_empty">Nothing to see here..</string>
     <string name="home_browser_title">Browser</string>
     <string name="home_browser_wip">Work in Progress</string>
@@ -238,6 +241,7 @@
     <string name="home_loading_decoding_unipad_audio">Decoding UniPack audio clips...</string>
     <string name="home_loading_ableton_title">CONVERTING ABLETON LIVE-SET</string>
     <string name="home_nav_drawer_title">Studio Home</string>
+    <string name="home_nav_tab_arcade">Arcade</string>
     <string name="home_nav_tab_browser">Browser</string>
     <string name="home_nav_tab_projects">Projects</string>
     <string name="home_nav_tab_settings">Settings</string>
@@ -341,6 +345,7 @@
     <string name="home_update_version_label">Version %1$s</string>
     <string name="home_widescreen_navbar_about">About</string>
     <string name="home_widescreen_navbar_about_amethyst">About Amethyst</string>
+    <string name="home_widescreen_navbar_arcade">Arcade</string>
     <string name="home_widescreen_navbar_browser">Browser</string>
     <string name="home_widescreen_navbar_group_home">Home</string>
     <string name="home_widescreen_navbar_group_support">Support</string>
@@ -370,6 +375,7 @@
     <string name="settings_discord_show_workspace_state_title">Show Current Workspace State</string>
     <string name="settings_experimental_group_title">Experimental Features</string>
     <string name="settings_experimental_live_collab_title">Live Collaboration (LAN-only)</string>
+    <string name="settings_experimental_performance_overlay_title">Performance Overlay</string>
     <string name="settings_general_always_show_grid_title">Always show grid</string>
     <string name="settings_general_author_name_title">Author Name</string>
     <string name="settings_general_gradient_smoothness_label">%1$d%%</string>

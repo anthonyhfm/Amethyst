@@ -32,6 +32,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.composables.icons.lucide.BadgeInfo
 import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.FolderOpen
+import com.composables.icons.lucide.Gamepad2
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Settings2
@@ -85,6 +86,7 @@ fun WidescreenNavBar(
         currentNavigation = when (current?.destination?.route) {
             HomeNavRoute.Recent::class.qualifiedName -> HomeNavRoute.Recent
             HomeNavRoute.Browser::class.qualifiedName -> HomeNavRoute.Browser
+            HomeNavRoute.Arcade::class.qualifiedName -> HomeNavRoute.Arcade
             HomeNavRoute.Settings::class.qualifiedName -> HomeNavRoute.Settings
             HomeNavRoute.Tutorials::class.qualifiedName -> HomeNavRoute.Tutorials
             HomeNavRoute.About::class.qualifiedName -> HomeNavRoute.About
@@ -95,9 +97,8 @@ fun WidescreenNavBar(
 
     val primaryItems = mutableListOf(NavRailItem.RECENT)
 
-    if (ExecutableRuntime.isDev()) {
-        primaryItems.add(NavRailItem.BROWSER)
-    }
+    primaryItems.add(NavRailItem.BROWSER)
+    primaryItems.add(NavRailItem.ARCADE)
 
     val secondaryItems = listOf(
         NavRailItem.TUTORIALS,
@@ -280,6 +281,13 @@ private data class NavRailItem(
             expandedLabelRes = Res.string.home_widescreen_navbar_project_browser,
             icon = Lucide.FolderOpen,
             route = HomeNavRoute.Browser
+        )
+
+        val ARCADE = NavRailItem(
+            labelRes = Res.string.home_widescreen_navbar_arcade,
+            expandedLabelRes = Res.string.home_widescreen_navbar_arcade,
+            icon = Lucide.Gamepad2,
+            route = HomeNavRoute.Arcade
         )
 
         val SETTINGS = NavRailItem(

@@ -18,6 +18,7 @@ import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
 import dev.anthonyhfm.amethyst.home.nav.HomeNavigationTab
 import dev.anthonyhfm.amethyst.home.ui.layout.AdaptiveHomeNavLayout
 import dev.anthonyhfm.amethyst.home.ui.views.AbletonImportWizardSheet
+import dev.anthonyhfm.amethyst.home.ui.views.ArcadeView
 import dev.anthonyhfm.amethyst.home.ui.views.BrowserView
 import dev.anthonyhfm.amethyst.home.ui.views.LoadingScreenView
 import dev.anthonyhfm.amethyst.home.ui.views.ProjectsView
@@ -53,6 +54,10 @@ actual fun Home(
 
             composable<HomeNavRoute.Browser> {
                 BrowserView()
+            }
+
+            composable<HomeNavRoute.Arcade> {
+                ArcadeView()
             }
 
             composable<HomeNavRoute.Settings> {

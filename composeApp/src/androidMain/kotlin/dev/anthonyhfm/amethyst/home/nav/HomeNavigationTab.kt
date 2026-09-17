@@ -6,6 +6,7 @@ import org.jetbrains.compose.resources.stringResource
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.FolderOpen
+import com.composables.icons.lucide.Gamepad2
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Settings2
@@ -27,6 +28,11 @@ enum class HomeNavigationTab(
         labelRes = Res.string.home_nav_tab_browser,
         icon = Lucide.FolderOpen,
         route = HomeNavRoute.Browser,
+    ),
+    Arcade(
+        labelRes = Res.string.home_nav_tab_arcade,
+        icon = Lucide.Gamepad2,
+        route = HomeNavRoute.Arcade,
     ),
     Settings(
         labelRes = Res.string.home_nav_tab_settings,

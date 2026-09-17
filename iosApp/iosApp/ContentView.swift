@@ -88,6 +88,7 @@ struct ContentView: View {
     private enum HomeTab: Hashable {
         case projects
         case browser
+        case arcade
         case settings
     }
 
@@ -233,6 +234,30 @@ struct ContentView: View {
             .tag(HomeTab.browser)
             .tabItem {
                 Label("Browser", systemImage: "globe")
+            }
+
+            NavigationStack {
+                ZStack {
+                    theme.background.ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image(systemName: "gamecontroller")
+                            .font(.largeTitle)
+                            .foregroundStyle(theme.mutedForeground)
+                        Text("Work in Progress")
+                            .font(.headline)
+                            .foregroundStyle(theme.foreground)
+                        Text("Nothing to see here yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(theme.mutedForeground)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("Arcade")
+                }
+            }
+            .tint(theme.glassForeground)
+            .tag(HomeTab.arcade)
+            .tabItem {
+                Label("Arcade", systemImage: "gamecontroller")
             }
 
             SettingsTabView(viewModel: settingsViewModel)

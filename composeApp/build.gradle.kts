@@ -10,7 +10,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     kotlin("plugin.serialization") version "2.4.20-Beta2"
-    id("org.jetbrains.kotlinx.atomicfu") version "0.29.0"
+    kotlin("plugin.atomicfu") version "2.4.20-Beta2"
     alias(libs.plugins.sentryKmp)
     id("dev.nucleusframework") version "2.5.12"
 }
@@ -109,6 +109,8 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.websockets)
 
+            implementation("org.jetbrains.kotlinx:atomicfu:0.29.0")
+
             kotlin("stdlib")
         }
         commonTest.dependencies {
@@ -133,12 +135,12 @@ kotlin {
             implementation(libs.ktor.server.cio)
             implementation(libs.ktor.server.websockets)
 
-            implementation("dev.nucleusframework:nucleus.updater-runtime:2.5.15")
-            implementation("dev.nucleusframework:nucleus.nucleus-application:2.5.15")
-            implementation("dev.nucleusframework:nucleus.decorated-window-tao:2.5.15")
-            implementation("dev.nucleusframework:nucleus.menu-macos:2.5.15")
-            implementation("dev.nucleusframework:nucleus.global-hotkey:2.5.15")
-            implementation("dev.nucleusframework:nucleus.system-info:2.5.15")
+            implementation(libs.nucleus.updater.runtime)
+            implementation(libs.nucleus.nucleus.application)
+            implementation(libs.nucleus.decorated.window.tao)
+            implementation(libs.nucleus.menu.macos)
+            implementation(libs.nucleus.global.hotkey)
+            implementation(libs.nucleus.system.info)
         }
     }
 }

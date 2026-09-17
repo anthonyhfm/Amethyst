@@ -178,6 +178,9 @@
     <string name="home_about_signature_desc">签名描述</string>
     <string name="home_about_title">Amethyst集成站</string>
     <string name="home_about_version">版本 %1$s</string>
+    <string name="home_arcade_empty">很遗憾这里什么也没有...</string>
+    <string name="home_arcade_title">Arcade</string>
+    <string name="home_arcade_wip">正在开发中</string>
     <string name="home_browser_empty">很遗憾这里什么也没有...</string>
     <string name="home_browser_title">工作区工坊</string>
     <string name="home_browser_wip">正在开发中</string>
@@ -234,6 +237,7 @@
     <string name="home_loading_decoding_unipad_audio">正在解码 UniPack 音频剪辑...</string>
     <string name="home_loading_ableton_title">转换ABLETON LIVE-SET</string>
     <string name="home_nav_drawer_title">集成站主页</string>
+    <string name="home_nav_tab_arcade">Arcade</string>
     <string name="home_nav_tab_browser">工坊</string>
     <string name="home_nav_tab_projects">工程</string>
     <string name="home_nav_tab_settings">设置</string>
@@ -337,6 +341,7 @@
     <string name="home_update_version_label">版本 %1$s</string>
     <string name="home_widescreen_navbar_about">关于</string>
     <string name="home_widescreen_navbar_about_amethyst">关于 Amethyst</string>
+    <string name="home_widescreen_navbar_arcade">Arcade</string>
     <string name="home_widescreen_navbar_browser">工坊</string>
     <string name="home_widescreen_navbar_group_home">主页</string>
     <string name="home_widescreen_navbar_group_support">支持</string>
@@ -366,6 +371,7 @@
     <string name="settings_discord_show_workspace_state_title">显示当前工作区状态</string>
     <string name="settings_experimental_group_title">实验性功能</string>
     <string name="settings_experimental_live_collab_title">实时联网合作（仅限局域网）</string>
+    <string name="settings_experimental_performance_overlay_title">性能概览浮层</string>
     <string name="settings_general_always_show_grid_title">始终显示网格</string>
     <string name="settings_general_author_name_title">作者姓名</string>
     <string name="settings_general_gradient_smoothness_label">%1$d%%</string>
