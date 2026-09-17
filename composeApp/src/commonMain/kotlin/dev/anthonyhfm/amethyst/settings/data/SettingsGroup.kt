@@ -15,7 +15,7 @@ abstract class SettingsGroup(
 
     private val _settings = mutableListOf<Setting<*>>()
     val settings: List<Setting<*>>
-        get() = _settings.filter { it.platformQuery(platform) }
+        get() = _settings.filter { it.platformQuery(platform) && it.visibleQuery() }
 
     val allSettings: List<Setting<*>>
         get() = _settings
@@ -26,8 +26,9 @@ abstract class SettingsGroup(
         titleRes: StringResource? = null,
         default: Boolean,
         platformQuery: (Platform) -> Boolean = { true },
+        visibleQuery: () -> Boolean = { true },
         onUpdate: (Boolean) -> Unit = {},
-    ): Setting.Toggle = Setting.Toggle(key, title, titleRes, default, platformQuery, onUpdate).also { _settings += it }
+    ): Setting.Toggle = Setting.Toggle(key, title, titleRes, default, platformQuery, visibleQuery, onUpdate).also { _settings += it }
 
     protected fun <T> select(
         key: String,
@@ -38,8 +39,9 @@ abstract class SettingsGroup(
         codec: SettingCodec<T>,
         label: (T) -> String = { it.toString() },
         platformQuery: (Platform) -> Boolean = { true },
+        visibleQuery: () -> Boolean = { true },
         onUpdate: (T) -> Unit = {},
-    ): Setting.Select<T> = Setting.Select(key, title, titleRes, default, options, codec, label, platformQuery, onUpdate).also { _settings += it }
+    ): Setting.Select<T> = Setting.Select(key, title, titleRes, default, options, codec, label, platformQuery, visibleQuery, onUpdate).also { _settings += it }
 
     protected fun slider(
         key: String,
@@ -48,8 +50,9 @@ abstract class SettingsGroup(
         default: Float,
         range: ClosedFloatingPointRange<Float> = 0f..1f,
         platformQuery: (Platform) -> Boolean = { true },
+        visibleQuery: () -> Boolean = { true },
         onUpdate: (Float) -> Unit = {},
-    ): Setting.Slider = Setting.Slider(key, title, titleRes, default, range, platformQuery, onUpdate).also { _settings += it }
+    ): Setting.Slider = Setting.Slider(key, title, titleRes, default, range, platformQuery, visibleQuery, onUpdate).also { _settings += it }
 
     protected fun text(
         key: String,
@@ -57,6 +60,7 @@ abstract class SettingsGroup(
         titleRes: StringResource? = null,
         default: String = "",
         platformQuery: (Platform) -> Boolean = { true },
+        visibleQuery: () -> Boolean = { true },
         onUpdate: (String) -> Unit = {},
-    ): Setting.TextField = Setting.TextField(key, title, titleRes, default, platformQuery, onUpdate).also { _settings += it }
+    ): Setting.TextField = Setting.TextField(key, title, titleRes, default, platformQuery, visibleQuery, onUpdate).also { _settings += it }
 }

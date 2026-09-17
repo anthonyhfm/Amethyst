@@ -1,6 +1,7 @@
 package dev.anthonyhfm.amethyst.core.util
 
 expect val platform: Platform
+expect val isDevMode: Boolean
 
 /**
  * Represents the platform on which the application is running.

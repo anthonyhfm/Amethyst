@@ -37,7 +37,7 @@ import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadSurfaceDetection
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlin.math.floor
-import kotlin.math.pow
+import dev.anthonyhfm.amethyst.ui.launchpad.applyLaunchpadGamma
 
 import dev.anthonyhfm.amethyst.ui.launchpad.LaunchpadGraphicsRepository
 
@@ -100,13 +100,7 @@ class ViewportLaunchpadProMk3(
                             for (y in 0..9) {
                                 if (previewGrid[x + (y * 10)].color != Color.Black) {
                                     drawRect(
-                                        color = previewGrid[x + (y * 10)].color.let {
-                                            it.copy(
-                                                red = it.red.pow(0.3f),
-                                                green = it.green.pow(0.3f),
-                                                blue = it.blue.pow(0.3f),
-                                            )
-                                        },
+                                        color = previewGrid[x + (y * 10)].color.applyLaunchpadGamma(),
                                         topLeft = Offset(
                                             x = padding + (x * ((size.width - (padding * 2)) / 10)),
                                             y = padding + ((9 - y) * ((size.height - (padding * 2)) / 10))

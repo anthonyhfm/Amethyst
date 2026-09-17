@@ -35,12 +35,14 @@ import dev.anthonyhfm.amethyst.core.util.isMobile
 import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
 import dev.anthonyhfm.amethyst.workspace.ui.components.ActivityToastOverlay
 import dev.anthonyhfm.amethyst.workspace.ui.components.AudioLibraryDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.AudioLibraryPanel
 import dev.anthonyhfm.amethyst.workspace.ui.components.DeviceSettingsDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.ExitWorkspaceDialog
 import dev.anthonyhfm.amethyst.workspace.ui.components.InsertLaunchpadDialog
+import dev.anthonyhfm.amethyst.workspace.ui.components.PerformanceOverlay
 import dev.anthonyhfm.amethyst.workspace.ui.components.WorkspaceTopAppBar
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
@@ -173,6 +175,15 @@ fun Workspace(onBack: () -> Unit = {}) {
                     .align(Alignment.BottomEnd)
                     .padding(24.dp),
             )
+
+            val showPerformanceOverlay by ExperimentalSettings.showPerformanceOverlay.flow.collectAsState()
+            if (showPerformanceOverlay) {
+                PerformanceOverlay(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp),
+                )
+            }
         }
     }
 }

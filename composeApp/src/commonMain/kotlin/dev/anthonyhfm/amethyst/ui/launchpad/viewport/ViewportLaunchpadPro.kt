@@ -48,7 +48,7 @@ import kotlin.math.floor
 import org.jetbrains.compose.resources.InternalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.readResourceBytes
-import kotlin.math.pow
+import dev.anthonyhfm.amethyst.ui.launchpad.applyLaunchpadGamma
 
 import dev.anthonyhfm.amethyst.ui.launchpad.LaunchpadGraphicsRepository
 
@@ -112,13 +112,7 @@ class ViewportLaunchpadPro(
                             for (y in 0..9) {
                                 if (previewGrid[x + (y * 10)].color != Color.Black) {
                                     drawRect(
-                                        color = previewGrid[x + (y * 10)].color.let {
-                                            it.copy(
-                                                red = it.red.pow(0.3f),
-                                                green = it.green.pow(0.3f),
-                                                blue = it.blue.pow(0.3f),
-                                            )
-                                        },
+                                        color = previewGrid[x + (y * 10)].color.applyLaunchpadGamma(),
                                         topLeft = Offset(
                                             x = padding + (x * ((size.width - (padding * 2)) / 10)),
                                             y = padding + ((9 - y) * ((size.height - (padding * 2)) / 10))
@@ -134,13 +128,7 @@ class ViewportLaunchpadPro(
 
                         if (previewGrid[99].color != Color.Black) {
                             drawRect(
-                                color = previewGrid[99].color.let {
-                                    it.copy(
-                                        red = it.red.pow(0.3f),
-                                        green = it.green.pow(0.3f),
-                                        blue = it.blue.pow(0.3f),
-                                    )
-                                },
+                                color = previewGrid[99].color.applyLaunchpadGamma(),
                                 topLeft = Offset(
                                     x = size.width / 2 - padding,
                                     y = size.height - padding - (2f * density.density)

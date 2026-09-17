@@ -36,7 +36,7 @@ import dev.anthonyhfm.amethyst.ui.launchpad.components.GenericLaunchpadLayout
 import dev.anthonyhfm.amethyst.ui.launchpad.components.LaunchpadLayout
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlin.math.floor
-import kotlin.math.pow
+import dev.anthonyhfm.amethyst.ui.launchpad.applyLaunchpadGamma
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -195,13 +195,7 @@ class ViewportMidiFighter64(
                             for (y in 1..8) {
                                 if (previewGrid[x + (y * 10)].color != Color.Black) {
                                     drawRect(
-                                        color = previewGrid[x + (y * 10)].color.let {
-                                            it.copy(
-                                                red = it.red.pow(0.3f),
-                                                green = it.green.pow(0.3f),
-                                                blue = it.blue.pow(0.3f),
-                                            )
-                                        },
+                                        color = previewGrid[x + (y * 10)].color.applyLaunchpadGamma(),
                                         topLeft = Offset(
                                             x = padding + ((x - 1) * ((size.width - (padding * 2)) / 8)),
                                             y = padding + ((8 - y) * ((size.height - (padding * 2)) / 8))

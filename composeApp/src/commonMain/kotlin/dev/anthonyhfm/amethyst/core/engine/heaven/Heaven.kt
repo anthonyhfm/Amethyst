@@ -1,9 +1,9 @@
 package dev.anthonyhfm.amethyst.core.engine.heaven
 
 import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
+import dev.anthonyhfm.amethyst.core.diagnostics.PerformanceDiagnostics
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
-import dev.anthonyhfm.amethyst.core.util.mainDispatcherOrDefault
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.workspace.ViewportRepository
@@ -94,7 +94,7 @@ object Heaven {
 
     private val stopWatch = StopWatch()
     private val renderScope = CoroutineScope(
-        mainDispatcherOrDefault(owner = "Heaven", parallelism = 1) + SupervisorJob()
+        Dispatchers.Default.limitedParallelism(1) + SupervisorJob()
     )
     private val schedulerScope = CoroutineScope(
         Dispatchers.Default.limitedParallelism(1) + SupervisorJob()
@@ -257,6 +257,7 @@ object Heaven {
 
                         if (renderAtNanos >= 0 && nowNanos >= renderAtNanos) {
                             Screen.draw()
+                            PerformanceDiagnostics.recordHeavenFrame()
                             lastRenderNanos = nowNanos
                             renderAtNanos = -1L
                         }

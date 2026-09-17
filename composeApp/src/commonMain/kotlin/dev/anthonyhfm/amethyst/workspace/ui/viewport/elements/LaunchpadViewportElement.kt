@@ -64,6 +64,7 @@ abstract class LaunchpadViewportElement(
         launchpadDevice?.close()
         launchpadDevice = null
         screen.close()
+        previewState.close()
     }
 
     init {
@@ -71,8 +72,8 @@ abstract class LaunchpadViewportElement(
             val rotatedUpdates = rotateMidiUpdates(u, layout, rotationDegrees.floatValue)
             launchpadDevice?.sendUpdate(rotatedUpdates, c)
 
-            // Screen.draw() runs on Heaven's UI dispatcher. Keep Compose state
-            // on that dispatcher so TAO applies the invalidation in this pump.
+            // Screen.draw() runs on Heaven's background render dispatcher.
+            // previewState safely buffers updates and conflates dispatches to Dispatchers.Main.
             previewState.sendToPreview(u)
         }
     }
