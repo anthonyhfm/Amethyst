@@ -207,6 +207,10 @@ internal object IosAudioDecoder {
         durationMs = frameCount * 1_000L / sampleRate,
     )
 
+    /**
+     * The shared decoder already returns the same interleaved 24-bit PCM layout,
+     * so only the requested frame range has to be sliced out.
+     */
     private fun EchoAudioBuffer.toSignal(
         sampleStart: Long?,
         sampleEnd: Long?,
@@ -215,18 +219,16 @@ internal object IosAudioDecoder {
         val rate = sampleRate.toInt()
         if (rate <= 0 || channelCount !in 1..2) return null
 
-        val totalFrames = samples.size / channelCount
+        val frameSize = channelCount * PCM24_BYTES
+        val totalFrames = pcm24.size / frameSize
         val start = (sampleStart ?: 0L).coerceIn(0L, totalFrames.toLong()).toInt()
         val end = (sampleEnd ?: totalFrames.toLong())
             .coerceIn(start.toLong(), totalFrames.toLong())
             .toInt()
-        val output = allocatePcm24((end - start).toLong(), channelCount) ?: return null
-        var outputIndex = 0
-        var sampleIndex = start * channelCount
-        val sampleEndIndex = end * channelCount
-        while (sampleIndex < sampleEndIndex) {
-            outputIndex = writePcm24(output, outputIndex, samples[sampleIndex])
-            sampleIndex++
+        val output = if (start == 0 && end == totalFrames) {
+            pcm24
+        } else {
+            pcm24.copyOfRange(start * frameSize, end * frameSize)
         }
         return signal(output, rate, channelCount, (end - start).toLong())
     }

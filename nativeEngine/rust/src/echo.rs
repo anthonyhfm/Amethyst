@@ -6,9 +6,17 @@ use symphonia::core::{
     formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
 };
 
+/**
+ * Decoded audio as interleaved signed 24-bit little-endian PCM.
+ *
+ * The conversion happens here rather than in Kotlin on purpose: UniFFI lowers a
+ * `Vec<f32>` into a boxed `List<Float>`, which costs one heap object per sample
+ * and OOMs Android on multi-minute samples. `Vec<u8>` crosses as a `ByteArray`,
+ * which is also the representation `Signal.AudioSignal.rawData` wants anyway.
+ */
 #[derive(uniffi::Record, Clone)]
 pub struct EchoAudioBuffer {
-    pub samples: Vec<f32>,
+    pub pcm24: Vec<u8>,
     pub sample_rate: u32,
     pub channels: u32,
 }
@@ -119,9 +127,21 @@ fn decode(bytes: Vec<u8>, name: &str) -> Result<EchoAudioBuffer, String> {
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|error| error.to_string())?;
-    let mut samples = Vec::new();
+    let estimated_frames = track
+        .codec_params
+        .n_frames
+        .unwrap_or(0)
+        .min(MAXIMUM_RESERVED_FRAMES);
+    let estimated_channels = track
+        .codec_params
+        .channels
+        .map(|channels| channels.count())
+        .unwrap_or(2) as u64;
+    let mut pcm24 =
+        Vec::with_capacity((estimated_frames * estimated_channels * PCM24_BYTES as u64) as usize);
     let mut sample_rate = None;
     let mut channels = None;
+    let mut sample_buffer: Option<SampleBuffer<f32>> = None;
 
     loop {
         let packet = match format.next_packet() {
@@ -157,17 +177,51 @@ fn decode(bytes: Vec<u8>, name: &str) -> Result<EchoAudioBuffer, String> {
             }
             _ => {}
         }
-        let mut buffer = SampleBuffer::<f32>::new(decoded.capacity() as u64, *decoded.spec());
+        // Reuse the scratch buffer across packets; only a format/size change
+        // forces a reallocation.
+        let required_samples = decoded.frames() * decoded_channels as usize;
+        if sample_buffer
+            .as_ref()
+            .is_none_or(|buffer| buffer.capacity() < required_samples)
+        {
+            sample_buffer = Some(SampleBuffer::<f32>::new(
+                decoded.capacity() as u64,
+                *decoded.spec(),
+            ));
+        }
+        let buffer = sample_buffer
+            .as_mut()
+            .expect("sample buffer is allocated above");
         buffer.copy_interleaved_ref(decoded);
-        samples.extend_from_slice(buffer.samples());
+        append_pcm24(&mut pcm24, buffer.samples());
     }
 
     Ok(EchoAudioBuffer {
-        samples,
+        pcm24,
         sample_rate: sample_rate.ok_or_else(|| "No audio frames decoded".to_owned())?,
         channels: channels.ok_or_else(|| "No audio frames decoded".to_owned())?,
     })
 }
+
+/** Appends interleaved f32 samples as signed 24-bit little-endian PCM. */
+fn append_pcm24(output: &mut Vec<u8>, samples: &[f32]) {
+    output.reserve(samples.len() * PCM24_BYTES);
+    for sample in samples {
+        let normalized = sample.clamp(-1.0, 1.0);
+        let value = if normalized <= -1.0 {
+            -8_388_608i32
+        } else {
+            (normalized * 8_388_607.0) as i32
+        };
+        output.push(value as u8);
+        output.push((value >> 8) as u8);
+        output.push((value >> 16) as u8);
+    }
+}
+
+const PCM24_BYTES: usize = 3;
+/** Caps the pre-allocation so a corrupt frame count cannot request gigabytes. */
+const MAXIMUM_RESERVED_FRAMES: u64 = 60 * 60 * 192_000;
 
 fn probe_wav_header(path: &str) -> Option<EchoAudioMetadata> {
     use std::io::{Read, Seek, SeekFrom};
@@ -298,8 +352,16 @@ mod tests {
 
         assert_eq!(decoded.sample_rate, 48_000);
         assert_eq!(decoded.channels, 1);
-        assert_eq!(decoded.samples.len(), source.len());
-        for (actual, expected) in decoded.samples.iter().zip(source) {
+        assert_eq!(decoded.pcm24.len(), source.len() * super::PCM24_BYTES);
+        for (index, expected) in source.into_iter().enumerate() {
+            let offset = index * super::PCM24_BYTES;
+            let actual = i32::from_le_bytes([
+                0,
+                decoded.pcm24[offset],
+                decoded.pcm24[offset + 1],
+                decoded.pcm24[offset + 2],
+            ]) >> 8;
+            let actual = actual as f32 / 8_388_608.0;
             let expected = expected as f32 / 32_768.0;
             assert!(
                 (actual - expected).abs() <= 1.0 / 32_768.0,

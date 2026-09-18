@@ -547,27 +547,20 @@ actual object Echo {
         }
     }
 
+    /**
+     * The native decoder already emits interleaved signed 24-bit little-endian
+     * PCM, so the buffer is adopted as-is instead of being re-encoded here.
+     */
     private fun EchoAudioBuffer.toSignal(origin: String): Signal.AudioSignal {
-        val pcm = ByteArray(samples.size * 3)
-        samples.forEachIndexed { index, sample ->
-            val normalized = sample.coerceIn(-1f, 1f)
-            val value = if (normalized <= -1f) {
-                -8_388_608
-            } else {
-                (normalized * 8_388_607f).toInt()
-            }
-            pcm[index * 3] = (value and 0xFF).toByte()
-            pcm[index * 3 + 1] = ((value ushr 8) and 0xFF).toByte()
-            pcm[index * 3 + 2] = ((value ushr 16) and 0xFF).toByte()
-        }
+        val channelCount = channels.toInt().coerceAtLeast(1)
+        val frames = pcm24.size / (channelCount * PCM24_BYTES)
         return Signal.AudioSignal(
             origin = origin,
-            rawData = pcm,
+            rawData = pcm24,
             sampleRate = sampleRate.toInt(),
-            channels = channels.toInt(),
+            channels = channelCount,
             bitDepth = 24,
-            durationMs = (samples.size / channels.toInt().coerceAtLeast(1) * 1_000L) /
-                sampleRate.toLong().coerceAtLeast(1),
+            durationMs = frames * 1_000L / sampleRate.toLong().coerceAtLeast(1),
         )
     }
 
@@ -577,12 +570,16 @@ actual object Echo {
         val frames = bytes.size / frameSize
         val from = (start ?: 0).coerceIn(0, frames.toLong()).toInt()
         val until = (end ?: frames.toLong()).coerceIn(from.toLong(), frames.toLong()).toInt()
+        // Copying a full-length range would double the peak footprint of a
+        // multi-minute sample for no gain.
+        if (from == 0 && until == frames) return this
         return copy(
             rawData = bytes.copyOfRange(from * frameSize, until * frameSize),
             durationMs = (until - from) * 1_000L / sampleRate,
         )
     }
 
+    private const val PCM24_BYTES = 3
     private const val OUTPUT_CHANNELS = 2
     private const val MAXIMUM_RENDER_BLOCK_FRAMES = 256
     private const val RENDER_THREAD_JOIN_MILLIS = 1_000L
