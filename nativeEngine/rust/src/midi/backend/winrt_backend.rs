@@ -2,13 +2,15 @@ use crate::midi::backend::{BackendPortHandle, MidiBackend, monotonic_micros};
 use crate::midi::error::MidiError;
 use crate::midi::grouping::sort_ports;
 use crate::midi::types::*;
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use windows::Devices::Enumeration::{DeviceInformation, DeviceInformationUpdate, DeviceWatcher};
 use windows::Devices::Midi::{MidiInPort, MidiMessageReceivedEventArgs, MidiOutPort};
+use windows::Foundation::Collections::IMapView;
 use windows::Foundation::{
     AsyncStatus, EventRegistrationToken, IAsyncOperation, IPropertyValue, TypedEventHandler,
 };
@@ -17,7 +19,7 @@ use windows::Win32::Devices::Properties::{
     DEVPKEY_Device_ContainerId, DEVPKEY_Device_InstanceId, DEVPROP_TYPE_GUID, DEVPROP_TYPE_STRING,
     DEVPROPKEY, DEVPROPTYPE,
 };
-use windows::Win32::Foundation::RO_E_CLOSED;
+use windows::Win32::Foundation::{RO_E_CLOSED, RPC_E_CHANGED_MODE};
 use windows::Win32::System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize};
 use windows::core::{GUID, HSTRING, IInspectable, Interface, PCWSTR, RuntimeType};
 
@@ -52,7 +54,7 @@ unsafe extern "system" {
     ) -> u32;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct WinRtPort {
     id: String,
     name: String,
@@ -81,9 +83,20 @@ impl PortKey {
     }
 }
 
+enum InputSendOutcome {
+    Sent,
+    Dropped,
+    Disconnected,
+}
+
 struct ConnectionState {
     open: AtomicBool,
     input_sender: Mutex<Option<mpsc::SyncSender<MidiMessage>>>,
+    /// Count of input messages dropped because the receiver's queue was full.
+    /// A full queue means the consumer is falling behind, not that the
+    /// connection is dead, so we drop and keep going rather than tearing
+    /// down the connection (see `send_input`).
+    dropped_messages: AtomicU64,
 }
 
 impl ConnectionState {
@@ -91,6 +104,7 @@ impl ConnectionState {
         Self {
             open: AtomicBool::new(true),
             input_sender: Mutex::new(Some(sender)),
+            dropped_messages: AtomicU64::new(0),
         }
     }
 
@@ -98,6 +112,7 @@ impl ConnectionState {
         Self {
             open: AtomicBool::new(true),
             input_sender: Mutex::new(None),
+            dropped_messages: AtomicU64::new(0),
         }
     }
 
@@ -117,19 +132,36 @@ impl ConnectionState {
             return Err(());
         }
 
-        let result = {
+        let outcome = {
             let sender = self.input_sender.lock().unwrap();
-            match sender.as_ref().ok_or(())?.try_send(message) {
-                Ok(()) => Ok(()),
-                Err(mpsc::TrySendError::Full(_)) | Err(mpsc::TrySendError::Disconnected(_)) => {
-                    Err(())
-                }
+            match sender.as_ref() {
+                Some(sender) => match sender.try_send(message) {
+                    Ok(()) => InputSendOutcome::Sent,
+                    Err(mpsc::TrySendError::Full(_)) => InputSendOutcome::Dropped,
+                    Err(mpsc::TrySendError::Disconnected(_)) => InputSendOutcome::Disconnected,
+                },
+                None => InputSendOutcome::Disconnected,
             }
         };
-        if result.is_err() {
-            self.invalidate();
+
+        match outcome {
+            InputSendOutcome::Sent => Ok(()),
+            InputSendOutcome::Dropped => {
+                // The consumer (Kotlin's `receive_timeout` loop) is falling
+                // behind. Drop the message but keep the connection open --
+                // a full queue is not evidence the device disconnected, and
+                // invalidating here would kill a healthy connection under
+                // load (e.g. a burst of Launchpad input).
+                self.dropped_messages.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }
+            InputSendOutcome::Disconnected => {
+                // The receiver was dropped; nothing can ever consume
+                // messages again, so the connection really is dead.
+                self.invalidate();
+                Err(())
+            }
         }
-        result
     }
 }
 
@@ -171,6 +203,63 @@ impl ConnectionRegistry {
     }
 }
 
+/// A cache of the currently known WinRT MIDI ports, kept up to date by the
+/// `Added`/`Removed`/`Updated` events of the two `DeviceWatcher`s (one per
+/// direction). `discover_devices()` is called by the manager roughly every
+/// 2 seconds, and immediately after every `wait_for_device_change`; serving
+/// it from this cache instead of re-running `DeviceInformation::FindAllAsync`
+/// keeps discovery from ever blocking the worker thread for long, which
+/// matters because output sends used to share that same thread/queue.
+///
+/// Until each direction's watcher has completed at least one enumeration
+/// pass, the cache is not authoritative and callers should fall back to a
+/// real `FindAllAsync`-based discovery.
+#[derive(Default)]
+struct PortCache {
+    ports: Mutex<HashMap<String, WinRtPort>>,
+    input_ready: AtomicBool,
+    output_ready: AtomicBool,
+}
+
+impl PortCache {
+    /// Seeds (or refreshes) the cache with a full discovery result, without
+    /// affecting readiness. Used for the initial synchronous discovery at
+    /// startup and as a fallback while the watchers are still bootstrapping.
+    fn seed(&self, ports: &[WinRtPort]) {
+        let mut cache = self.ports.lock().unwrap();
+        for port in ports {
+            cache.insert(port.id.clone(), port.clone());
+        }
+    }
+
+    fn upsert(&self, port: WinRtPort) {
+        self.ports.lock().unwrap().insert(port.id.clone(), port);
+    }
+
+    fn remove(&self, port_id: &str) {
+        self.ports.lock().unwrap().remove(port_id);
+    }
+
+    fn get(&self, port_id: &str) -> Option<WinRtPort> {
+        self.ports.lock().unwrap().get(port_id).cloned()
+    }
+
+    fn mark_ready(&self, direction: MidiPortDirection) {
+        match direction {
+            MidiPortDirection::Input => self.input_ready.store(true, Ordering::Release),
+            MidiPortDirection::Output => self.output_ready.store(true, Ordering::Release),
+        }
+    }
+
+    fn is_ready(&self) -> bool {
+        self.input_ready.load(Ordering::Acquire) && self.output_ready.load(Ordering::Acquire)
+    }
+
+    fn snapshot(&self) -> Vec<WinRtPort> {
+        self.ports.lock().unwrap().values().cloned().collect()
+    }
+}
+
 enum WorkerCommand {
     Discover {
         reply: mpsc::Sender<Result<Vec<WinRtPort>, MidiError>>,
@@ -185,12 +274,7 @@ enum WorkerCommand {
         port_id: String,
         device_id: String,
         state: Arc<ConnectionState>,
-        reply: mpsc::Sender<Result<u64, MidiError>>,
-    },
-    SendOutput {
-        handle_id: u64,
-        data: Vec<u8>,
-        reply: mpsc::Sender<Result<(), MidiError>>,
+        reply: mpsc::Sender<Result<(u64, MidiOutPort), MidiError>>,
     },
     Close {
         handle_id: u64,
@@ -282,22 +366,12 @@ impl WinRtWorker {
         port_id: &str,
         device_id: &str,
         state: Arc<ConnectionState>,
-    ) -> Result<u64, MidiError> {
+    ) -> Result<(u64, MidiOutPort), MidiError> {
         let (reply, receiver) = mpsc::channel();
         self.send(WorkerCommand::OpenOutput {
             port_id: port_id.to_string(),
             device_id: device_id.to_string(),
             state,
-            reply,
-        })?;
-        receive_worker_reply(receiver)
-    }
-
-    fn send_output(&self, handle_id: u64, data: &[u8]) -> Result<(), MidiError> {
-        let (reply, receiver) = mpsc::channel();
-        self.send(WorkerCommand::SendOutput {
-            handle_id,
-            data: data.to_vec(),
             reply,
         })?;
         receive_worker_reply(receiver)
@@ -348,7 +422,7 @@ enum WorkerOpenPort {
     },
     Output {
         key: PortKey,
-        port: windows::Devices::Midi::IMidiOutPort,
+        port: MidiOutPort,
         state: Arc<ConnectionState>,
     },
 }
@@ -384,6 +458,7 @@ struct WorkerRuntime {
     watchers: Vec<WinRtDeviceWatcher>,
     open_ports: HashMap<u64, WorkerOpenPort>,
     next_handle_id: u64,
+    cache: Arc<PortCache>,
 }
 
 impl WorkerRuntime {
@@ -393,6 +468,8 @@ impl WorkerRuntime {
         worker_commands: mpsc::Sender<WorkerCommand>,
     ) -> Result<(Self, Vec<WinRtPort>), MidiError> {
         let initial_ports = discover_all_ports()?;
+        let cache = Arc::new(PortCache::default());
+        cache.seed(&initial_ports);
         let mut watchers = Vec::new();
 
         for direction in [MidiPortDirection::Input, MidiPortDirection::Output] {
@@ -408,6 +485,7 @@ impl WorkerRuntime {
                 device_change_sender.clone(),
                 connections.clone(),
                 worker_commands.clone(),
+                cache.clone(),
             )?);
         }
 
@@ -416,6 +494,7 @@ impl WorkerRuntime {
                 watchers,
                 open_ports: HashMap::new(),
                 next_handle_id: 1,
+                cache,
             },
             initial_ports,
         ))
@@ -425,7 +504,19 @@ impl WorkerRuntime {
         while let Ok(command) = commands.recv() {
             match command {
                 WorkerCommand::Discover { reply } => {
-                    let _ = reply.send(discover_all_ports());
+                    // Serve from the watcher-maintained cache once it has
+                    // completed at least one enumeration pass in each
+                    // direction; this makes Discover effectively instant so
+                    // it never meaningfully delays the commands queued
+                    // behind or after it (open/close/invalidate). Before
+                    // that point fall back to a real, blocking FindAllAsync
+                    // and seed the cache with its result.
+                    let result = if self.cache.is_ready() {
+                        Ok(self.cache.snapshot())
+                    } else {
+                        discover_all_ports().inspect(|ports| self.cache.seed(ports))
+                    };
+                    let _ = reply.send(result);
                 }
                 WorkerCommand::OpenInput {
                     port_id,
@@ -443,14 +534,7 @@ impl WorkerRuntime {
                     reply,
                 } => {
                     let result = self.open_output(&port_id, &device_id, state);
-                    self.reply_with_open_handle(reply, result);
-                }
-                WorkerCommand::SendOutput {
-                    handle_id,
-                    data,
-                    reply,
-                } => {
-                    let _ = reply.send(self.send_output(handle_id, &data));
+                    self.reply_with_open_output(reply, result);
                 }
                 WorkerCommand::Close { handle_id, reply } => {
                     let _ = reply.send(self.close_port(handle_id));
@@ -478,6 +562,23 @@ impl WorkerRuntime {
         }
     }
 
+    fn reply_with_open_output(
+        &mut self,
+        reply: mpsc::Sender<Result<(u64, MidiOutPort), MidiError>>,
+        result: Result<(u64, MidiOutPort), MidiError>,
+    ) {
+        match result {
+            Ok((handle_id, port)) => {
+                if reply.send(Ok((handle_id, port))).is_err() {
+                    let _ = self.close_port(handle_id);
+                }
+            }
+            Err(error) => {
+                let _ = reply.send(Err(error));
+            }
+        }
+    }
+
     fn open_input(
         &mut self,
         port_id: &str,
@@ -493,6 +594,18 @@ impl WorkerRuntime {
             "opening MIDI input",
             to_connection_error,
         )?;
+        if Interface::as_raw(&input_port).is_null() {
+            // FromIdAsync can complete successfully with a null result
+            // instead of an error HRESULT, typically when the port is
+            // exclusively in use by another application. Bail out before
+            // touching the object further -- any vtable call through a
+            // null COM pointer would crash.
+            return Err(MidiError::ConnectionFailed {
+                reason: format!(
+                    "MIDI input '{port_id}' is unavailable (it may be in use by another application)"
+                ),
+            });
+        }
 
         let port_id_clone = port_id.to_string();
         let callback_state = state.clone();
@@ -570,7 +683,7 @@ impl WorkerRuntime {
         port_id: &str,
         device_id: &str,
         state: Arc<ConnectionState>,
-    ) -> Result<u64, MidiError> {
+    ) -> Result<(u64, MidiOutPort), MidiError> {
         let device_id_hstring = HSTRING::from(device_id);
         let operation =
             MidiOutPort::FromIdAsync(&device_id_hstring).map_err(to_connection_error)?;
@@ -580,6 +693,21 @@ impl WorkerRuntime {
             "opening MIDI output",
             to_connection_error,
         )?;
+        if Interface::as_raw(&output_port).is_null() {
+            // Same null-on-success quirk as MidiInPort::FromIdAsync.
+            return Err(MidiError::ConnectionFailed {
+                reason: format!(
+                    "MIDI output '{port_id}' is unavailable (it may be in use by another application)"
+                ),
+            });
+        }
+        // FromIdAsync's declared result type is the IMidiOutPort interface,
+        // but the underlying object is always a MidiOutPort, whose runtime
+        // class is agile (Send + Sync) -- unlike the bare interface type.
+        // Casting to the concrete class lets the caller hold a clone and
+        // call SendBuffer directly from any thread, bypassing the worker
+        // for the hot send path (see WinRtOutputPortHandle::send).
+        let output_port: MidiOutPort = output_port.cast().map_err(to_connection_error)?;
         if !state.is_open() {
             let _ = output_port.Close();
             return Err(MidiError::ConnectionFailed {
@@ -592,42 +720,11 @@ impl WorkerRuntime {
             handle_id,
             WorkerOpenPort::Output {
                 key: PortKey::new(MidiPortDirection::Output, device_id),
-                port: output_port,
+                port: output_port.clone(),
                 state,
             },
         );
-        Ok(handle_id)
-    }
-
-    fn send_output(&mut self, handle_id: u64, data: &[u8]) -> Result<(), MidiError> {
-        let result = match self.open_ports.get(&handle_id) {
-            Some(WorkerOpenPort::Output { port, state, .. }) if state.is_open() => {
-                let writer = DataWriter::new().map_err(to_send_error)?;
-                writer.WriteBytes(data).map_err(to_send_error)?;
-                let buffer = writer.DetachBuffer().map_err(to_send_error)?;
-                port.SendBuffer(&buffer)
-            }
-            Some(WorkerOpenPort::Output { .. }) | None => {
-                return Err(MidiError::PortNotOpen {
-                    port_id: format!("WinRT handle {handle_id}"),
-                });
-            }
-            Some(WorkerOpenPort::Input { .. }) => {
-                return Err(MidiError::SendFailed {
-                    reason: "Port is not opened for output".into(),
-                });
-            }
-        };
-
-        if let Err(error) = result {
-            // Other HRESULTs may be transient and leave the port usable.
-            if error.code() == RO_E_CLOSED {
-                let _ = self.close_port(handle_id);
-            }
-            return Err(to_send_error(error));
-        }
-
-        Ok(())
+        Ok((handle_id, output_port))
     }
 
     fn close_port(&mut self, handle_id: u64) -> Result<(), MidiError> {
@@ -716,13 +813,7 @@ impl MidiBackend for WinRtBackend {
         let ports = self.worker.discover()?;
         self.reconcile_snapshot(port_snapshot(&ports));
 
-        let mut grouped: BTreeMap<String, Vec<WinRtPort>> = BTreeMap::new();
-        for port in ports {
-            grouped
-                .entry(port.container_id.clone())
-                .or_default()
-                .push(port);
-        }
+        let grouped = group_ports_by_device(ports);
 
         let mut devices = Vec::new();
         for (container_id, mut grouped_ports) in grouped {
@@ -832,12 +923,12 @@ impl MidiBackend for WinRtBackend {
         let key = PortKey::new(decoded.direction, &decoded.device_id);
         let connection_state = Arc::new(ConnectionState::output());
         self.connections.register(key, &connection_state);
-        let handle_id =
+        let (handle_id, port) =
             match self
                 .worker
                 .open_output(port_id, &decoded.device_id, connection_state.clone())
             {
-                Ok(handle_id) => handle_id,
+                Ok(opened) => opened,
                 Err(error) => {
                     connection_state.invalidate();
                     return Err(error);
@@ -848,6 +939,7 @@ impl MidiBackend for WinRtBackend {
             port_id: port_id.to_string(),
             handle_id,
             worker: self.worker.clone(),
+            port,
             connection_state,
             closed: AtomicBool::new(false),
         }))
@@ -894,6 +986,14 @@ struct WinRtOutputPortHandle {
     port_id: String,
     handle_id: u64,
     worker: Arc<WinRtWorker>,
+    /// A clone of the WinRT output port, held directly so sends can call
+    /// `SendBuffer` from the caller's thread instead of round-tripping
+    /// through the worker's command channel for every message. `MidiOutPort`
+    /// is an agile (thread-safe) WinRT runtime class, so this is sound as
+    /// long as the calling thread has the WinRT runtime initialized --
+    /// see `ensure_apartment_initialized`. The worker keeps its own clone
+    /// for open/close bookkeeping (see `WorkerOpenPort::Output`).
+    port: MidiOutPort,
     connection_state: Arc<ConnectionState>,
     closed: AtomicBool,
 }
@@ -905,8 +1005,23 @@ impl BackendPortHandle for WinRtOutputPortHandle {
                 port_id: self.port_id.clone(),
             });
         }
+        ensure_apartment_initialized()?;
 
-        self.worker.send_output(self.handle_id, data)
+        let writer = DataWriter::new().map_err(to_send_error)?;
+        writer.WriteBytes(data).map_err(to_send_error)?;
+        let buffer = writer.DetachBuffer().map_err(to_send_error)?;
+
+        match self.port.SendBuffer(&buffer) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                // Other HRESULTs may be transient and leave the port
+                // usable; only a closed port is a hard failure.
+                if error.code() == RO_E_CLOSED {
+                    self.connection_state.invalidate();
+                }
+                Err(to_send_error(error))
+            }
+        }
     }
 
     fn close(&self) -> Result<(), MidiError> {
@@ -950,6 +1065,7 @@ impl WinRtDeviceWatcher {
         sender: mpsc::Sender<()>,
         connections: Arc<ConnectionRegistry>,
         worker_commands: mpsc::Sender<WorkerCommand>,
+        cache: Arc<PortCache>,
     ) -> Result<Self, MidiError> {
         let watcher =
             DeviceInformation::CreateWatcherAqsFilter(&selector).map_err(to_backend_error)?;
@@ -964,15 +1080,25 @@ impl WinRtDeviceWatcher {
         let added_sender = sender.clone();
         let added_connections = connections.clone();
         let added_worker_commands = worker_commands.clone();
+        let added_cache = cache.clone();
         let added_handler = TypedEventHandler::<DeviceWatcher, DeviceInformation>::new(
             move |_watcher, info: &Option<DeviceInformation>| {
-                let Some(device_id) = info
-                    .as_ref()
-                    .and_then(|info| info.Id().ok())
-                    .map(|id| id.to_string_lossy())
-                else {
+                let Some(info) = info.as_ref() else {
                     return Ok(());
                 };
+                let Some(device_id) = info.Id().ok().map(|id| id.to_string_lossy()) else {
+                    return Ok(());
+                };
+
+                // Keep the cache fresh unconditionally, including during the
+                // watcher's initial enumeration replay (before
+                // EnumerationCompleted): that replay is what lets
+                // discover_devices() serve from the cache from the very
+                // first call instead of always falling back to a blocking
+                // FindAllAsync.
+                if let Ok(port) = port_from_device_info(info.clone(), direction) {
+                    added_cache.upsert(port);
+                }
 
                 let notify = {
                     let mut state = added_state.lock().unwrap();
@@ -993,8 +1119,24 @@ impl WinRtDeviceWatcher {
 
         let updated_state = state.clone();
         let updated_sender = sender.clone();
+        let updated_cache = cache.clone();
         let updated_handler = TypedEventHandler::<DeviceWatcher, DeviceInformationUpdate>::new(
-            move |_watcher, _info| {
+            move |_watcher, info: &Option<DeviceInformationUpdate>| {
+                // Refresh whatever fields changed on an already-cached
+                // entry. This never invalidates connections or the
+                // ConnectionRegistry -- an Updated event is metadata churn,
+                // not a disconnect, so doing so would tear down healthy
+                // connections needlessly.
+                if let Some(update) = info.as_ref() {
+                    if let Some(device_id) = update.Id().ok().map(|id| id.to_string_lossy()) {
+                        let port_id = encode_port_id(direction, &device_id);
+                        if let Some(mut port) = updated_cache.get(&port_id) {
+                            merge_port_update(&mut port, update);
+                            updated_cache.upsert(port);
+                        }
+                    }
+                }
+
                 let notify = {
                     let mut state = updated_state.lock().unwrap();
                     if !state.enumeration_complete {
@@ -1016,6 +1158,7 @@ impl WinRtDeviceWatcher {
         let removed_sender = sender.clone();
         let removed_connections = connections;
         let removed_worker_commands = worker_commands;
+        let removed_cache = cache.clone();
         let removed_handler = TypedEventHandler::<DeviceWatcher, DeviceInformationUpdate>::new(
             move |_watcher, info: &Option<DeviceInformationUpdate>| {
                 let Some(device_id) = info
@@ -1025,6 +1168,8 @@ impl WinRtDeviceWatcher {
                 else {
                     return Ok(());
                 };
+
+                removed_cache.remove(&encode_port_id(direction, &device_id));
 
                 let key = PortKey::new(direction, &device_id);
                 removed_connections.invalidate(&key);
@@ -1049,8 +1194,10 @@ impl WinRtDeviceWatcher {
 
         let completed_state = state;
         let completed_sender = sender.clone();
+        let completed_cache = cache;
         let enumeration_completed_handler =
             TypedEventHandler::<DeviceWatcher, IInspectable>::new(move |_watcher, _args| {
+                completed_cache.mark_ready(direction);
                 let notify = {
                     let mut state = completed_state.lock().unwrap();
                     if state.enumeration_complete {
@@ -1108,25 +1255,66 @@ impl Drop for WinRtDeviceWatcher {
     }
 }
 
-struct WinRtApartment;
+/// Per-thread WinRT apartment membership. `owns_initialization` is false when
+/// the thread was already initialized by someone else (e.g. the JVM or another
+/// library put it into an STA): WinRT MIDI objects are agile, so calls still
+/// work, and we must not `RoUninitialize` what we did not initialize.
+struct WinRtApartment {
+    owns_initialization: bool,
+}
 
 impl WinRtApartment {
     fn initialize_mta() -> Result<Self, MidiError> {
-        unsafe { RoInitialize(RO_INIT_MULTITHREADED) }
-            .map(|()| Self)
-            .map_err(|error| MidiError::BackendError {
+        match unsafe { RoInitialize(RO_INIT_MULTITHREADED) } {
+            Ok(()) => Ok(Self {
+                owns_initialization: true,
+            }),
+            // Already initialized on this thread with a different apartment model.
+            Err(error) if error.code() == RPC_E_CHANGED_MODE => Ok(Self {
+                owns_initialization: false,
+            }),
+            Err(error) => Err(MidiError::BackendError {
                 reason: format!(
                     "Could not initialize the WinRT MIDI MTA: {}",
                     error.message()
                 ),
-            })
+            }),
+        }
     }
 }
 
 impl Drop for WinRtApartment {
     fn drop(&mut self) {
-        unsafe { RoUninitialize() };
+        if self.owns_initialization {
+            unsafe { RoUninitialize() };
+        }
     }
+}
+
+thread_local! {
+    // Keeps this thread's WinRT MTA membership alive for as long as the
+    // thread lives; RoUninitialize runs when the thread exits and the
+    // thread-local is dropped.
+    static CALLER_APARTMENT: RefCell<Option<WinRtApartment>> = const { RefCell::new(None) };
+}
+
+/// Ensures the *calling* thread has the WinRT runtime initialized before it
+/// makes a direct WinRT call (currently only `WinRtOutputPortHandle::send`,
+/// which calls `IMidiOutPort::SendBuffer` from whatever thread the caller
+/// (e.g. the Kotlin/UniFFI side) happens to be on, bypassing the worker
+/// thread for latency). The worker thread initializes its own apartment at
+/// startup (see `WinRtWorker::start`); this does the same for any other
+/// thread that ends up calling into WinRT directly. Idempotent per thread.
+fn ensure_apartment_initialized() -> Result<(), MidiError> {
+    CALLER_APARTMENT.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        if slot.is_some() {
+            return Ok(());
+        }
+        let apartment = WinRtApartment::initialize_mta()?;
+        *slot = Some(apartment);
+        Ok(())
+    })
 }
 
 fn wait_for_async<T>(
@@ -1205,11 +1393,10 @@ fn port_from_device_info(
         .or_else(|| info.Name().ok().map(|value| value.to_string_lossy()))
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "Windows MIDI Device".to_string());
-    let container_id = property_guid(&info, CONTAINER_ID_PROPERTY)
+    let container_candidate = property_guid(&info, CONTAINER_ID_PROPERTY)
         .or_else(|| property_string(&info, CONTAINER_ID_PROPERTY))
-        .or_else(|| device_interface_container_id(&device_id))
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| fallback_container_id(&device_id, &name));
+        .or_else(|| device_interface_container_id(&device_id));
+    let container_id = resolve_container_id(container_candidate, &device_id, &name);
     let manufacturer = property_string(&info, MANUFACTURER_PROPERTY);
     let model = property_string(&info, MODEL_PROPERTY);
 
@@ -1224,6 +1411,31 @@ fn port_from_device_info(
     })
 }
 
+/// Merges a `DeviceInformationUpdate`'s changed properties into a cached
+/// port entry in place. `DeviceInformationUpdate` only carries the
+/// properties that actually changed (plus the endpoint id), so any field
+/// whose property is absent from this update is left untouched.
+fn merge_port_update(existing: &mut WinRtPort, update: &DeviceInformationUpdate) {
+    if let Some(name) = property_string(update, FRIENDLY_NAME_PROPERTY) {
+        if !name.is_empty() {
+            existing.name = name;
+        }
+    }
+    let container_candidate = property_guid(update, CONTAINER_ID_PROPERTY)
+        .or_else(|| property_string(update, CONTAINER_ID_PROPERTY));
+    if let Some(candidate) = container_candidate {
+        if !candidate.is_empty() && !is_null_guid(&candidate) {
+            existing.container_id = candidate;
+        }
+    }
+    if let Some(manufacturer) = property_string(update, MANUFACTURER_PROPERTY) {
+        existing.manufacturer = Some(manufacturer);
+    }
+    if let Some(model) = property_string(update, MODEL_PROPERTY) {
+        existing.model = Some(model);
+    }
+}
+
 fn read_midi_message(args: &MidiMessageReceivedEventArgs) -> Result<(Vec<u8>, u64), MidiError> {
     let message = args.Message().map_err(to_connection_error)?;
     let timestamp_us = message.Timestamp().map_err(to_connection_error)?.Duration as u64 / 10;
@@ -1235,8 +1447,30 @@ fn read_midi_message(args: &MidiMessageReceivedEventArgs) -> Result<(Vec<u8>, u6
     Ok((bytes, timestamp_us))
 }
 
-fn property_string(info: &DeviceInformation, key: &str) -> Option<String> {
-    let properties = info.Properties().ok()?;
+/// Implemented by the two WinRT types that expose a `Properties` bag we read
+/// device metadata from: full enumeration results (`DeviceInformation`) and
+/// incremental watcher updates (`DeviceInformationUpdate`). Lets
+/// `property_string`/`property_guid` serve both `port_from_device_info`
+/// (full discovery and watcher `Added` events) and `merge_port_update`
+/// (watcher `Updated` events) without duplicating the lookup logic.
+trait HasWinRtProperties {
+    fn properties(&self) -> windows::core::Result<IMapView<HSTRING, IInspectable>>;
+}
+
+impl HasWinRtProperties for DeviceInformation {
+    fn properties(&self) -> windows::core::Result<IMapView<HSTRING, IInspectable>> {
+        self.Properties()
+    }
+}
+
+impl HasWinRtProperties for DeviceInformationUpdate {
+    fn properties(&self) -> windows::core::Result<IMapView<HSTRING, IInspectable>> {
+        self.Properties()
+    }
+}
+
+fn property_string<T: HasWinRtProperties>(info: &T, key: &str) -> Option<String> {
+    let properties = info.properties().ok()?;
     let key = HSTRING::from(key);
     if !properties.HasKey(&key).ok()? {
         return None;
@@ -1250,8 +1484,8 @@ fn property_string(info: &DeviceInformation, key: &str) -> Option<String> {
         .map(|value| value.to_string_lossy())
 }
 
-fn property_guid(info: &DeviceInformation, key: &str) -> Option<String> {
-    let properties = info.Properties().ok()?;
+fn property_guid<T: HasWinRtProperties>(info: &T, key: &str) -> Option<String> {
+    let properties = info.properties().ok()?;
     let key = HSTRING::from(key);
     if !properties.HasKey(&key).ok()? {
         return None;
@@ -1384,6 +1618,41 @@ fn fallback_container_id(device_id: &str, _name: &str) -> String {
     format!("device:{}", device_id)
 }
 
+/// The all-zero GUID (`00000000-0000-0000-0000-000000000000`), as produced
+/// by `format_guid`. Some drivers report a present-but-unset ContainerId
+/// property using this value rather than omitting the property entirely; if
+/// we treated it as a real id, every such port would collapse into a single
+/// device.
+fn is_null_guid(value: &str) -> bool {
+    value == "00000000-0000-0000-0000-000000000000"
+}
+
+/// Resolves the container id to group a port by, given whatever candidate
+/// the caller found (from `System.Devices.ContainerId`, `CM_Get_*_Property`,
+/// etc). A missing, empty or null-GUID candidate means we have no proof two
+/// ports belong to the same physical device, so each such port falls back to
+/// its own unique id (see `fallback_container_id`) rather than being
+/// collapsed together with every other port that also lacks a container id.
+fn resolve_container_id(candidate: Option<String>, device_id: &str, name: &str) -> String {
+    candidate
+        .filter(|value| !value.is_empty() && !is_null_guid(value))
+        .unwrap_or_else(|| fallback_container_id(device_id, name))
+}
+
+/// Groups discovered ports by their (already-resolved) container id. Pure
+/// grouping logic split out from `discover_devices` so it can be unit
+/// tested without any WinRT calls.
+fn group_ports_by_device(ports: Vec<WinRtPort>) -> BTreeMap<String, Vec<WinRtPort>> {
+    let mut grouped: BTreeMap<String, Vec<WinRtPort>> = BTreeMap::new();
+    for port in ports {
+        grouped
+            .entry(port.container_id.clone())
+            .or_default()
+            .push(port);
+    }
+    grouped
+}
+
 fn infer_transport(ports: &[WinRtPort]) -> MidiTransportType {
     let haystack = ports
         .iter()
@@ -1509,5 +1778,262 @@ fn to_connection_error(error: windows::core::Error) -> MidiError {
 fn to_send_error(error: windows::core::Error) -> MidiError {
     MidiError::SendFailed {
         reason: error.message().to_string(),
+    }
+}
+
+// These tests exercise only the pure Rust logic (port-id encoding, the
+// container-id/grouping fallback, and the port cache) -- nothing here makes
+// a WinRT call, so it does not need a Windows machine to run. The module
+// itself is `cfg(target_os = "windows")`, so `cargo test` only actually
+// *runs* these on Windows, but they still need to compile under
+// `cargo check --target x86_64-pc-windows-msvc` on any host.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_port(direction: MidiPortDirection, device_id: &str, container_id: &str) -> WinRtPort {
+        WinRtPort {
+            id: encode_port_id(direction, device_id),
+            name: format!("Test Port {device_id}"),
+            direction,
+            device_id: device_id.to_string(),
+            container_id: container_id.to_string(),
+            manufacturer: None,
+            model: None,
+        }
+    }
+
+    #[test]
+    fn port_id_roundtrips_through_encode_and_decode() {
+        for direction in [MidiPortDirection::Input, MidiPortDirection::Output] {
+            for device_id in [
+                r"\\?\SWD#MMDEVAPI#{0.0.0.00000000}.{guid}#{class-guid}",
+                "simple-id",
+                "id with spaces / slashes \\ and unicode: 🎹",
+                "",
+            ] {
+                let encoded = encode_port_id(direction, device_id);
+                let decoded = decode_port_id(&encoded).expect("round trip should decode");
+                assert_eq!(decoded.direction, direction);
+                assert_eq!(decoded.device_id, device_id);
+            }
+        }
+    }
+
+    #[test]
+    fn decode_port_id_rejects_foreign_prefix() {
+        let result = decode_port_id("some-other-backend:in:6465766963653a31");
+        assert!(matches!(result, Err(MidiError::PortNotFound { .. })));
+    }
+
+    #[test]
+    fn decode_port_id_rejects_unknown_direction() {
+        let result = decode_port_id("winrt1:sideways:6465766963653a31");
+        assert!(matches!(result, Err(MidiError::PortNotFound { .. })));
+    }
+
+    #[test]
+    fn decode_port_id_rejects_malformed_hex() {
+        // Odd-length hex cannot represent whole bytes.
+        assert!(decode_port_id("winrt1:in:abc").is_err());
+        // Non-hex characters.
+        assert!(decode_port_id("winrt1:in:zz").is_err());
+    }
+
+    #[test]
+    fn encode_component_matches_decode_component_for_utf8() {
+        let original = "Launchpad X: MIDI 2 \u{1F3B9}";
+        let encoded = encode_component(original);
+        assert_eq!(decode_component(&encoded).as_deref(), Some(original));
+    }
+
+    #[test]
+    fn is_null_guid_matches_only_all_zero_guid() {
+        assert!(is_null_guid("00000000-0000-0000-0000-000000000000"));
+        assert!(!is_null_guid(""));
+        assert!(!is_null_guid("12345678-1234-1234-1234-123456789abc"));
+        // Case matters: format_guid always produces lowercase, so an
+        // uppercase zero GUID should not be treated as "not null" by
+        // accident, but should also not slip past the check unexpectedly.
+        assert!(!is_null_guid("00000000-0000-0000-0000-00000000000"));
+    }
+
+    #[test]
+    fn resolve_container_id_falls_back_when_candidate_missing() {
+        let resolved = resolve_container_id(None, "device-1", "Some Device");
+        assert_eq!(resolved, fallback_container_id("device-1", "Some Device"));
+    }
+
+    #[test]
+    fn resolve_container_id_falls_back_when_candidate_is_null_guid() {
+        let resolved = resolve_container_id(
+            Some("00000000-0000-0000-0000-000000000000".to_string()),
+            "device-1",
+            "Some Device",
+        );
+        assert_eq!(resolved, fallback_container_id("device-1", "Some Device"));
+    }
+
+    #[test]
+    fn resolve_container_id_falls_back_when_candidate_is_empty() {
+        let resolved = resolve_container_id(Some(String::new()), "device-1", "Some Device");
+        assert_eq!(resolved, fallback_container_id("device-1", "Some Device"));
+    }
+
+    #[test]
+    fn resolve_container_id_keeps_a_real_container_id() {
+        let real_guid = "12345678-1234-1234-1234-123456789abc";
+        let resolved = resolve_container_id(Some(real_guid.to_string()), "device-1", "Some Device");
+        assert_eq!(resolved, real_guid);
+    }
+
+    #[test]
+    fn group_ports_by_device_keeps_missing_container_id_ports_separate() {
+        // Two physically distinct endpoints that both failed to report a
+        // ContainerId must NOT be collapsed into a single device -- each
+        // gets `fallback_container_id`'s per-endpoint id, which is unique.
+        let ports = vec![
+            test_port(
+                MidiPortDirection::Input,
+                "device-a",
+                &fallback_container_id("device-a", "Device A"),
+            ),
+            test_port(
+                MidiPortDirection::Input,
+                "device-b",
+                &fallback_container_id("device-b", "Device B"),
+            ),
+        ];
+
+        let grouped = group_ports_by_device(ports);
+        assert_eq!(
+            grouped.len(),
+            2,
+            "each fallback id should form its own group"
+        );
+    }
+
+    #[test]
+    fn group_ports_by_device_merges_ports_sharing_a_real_container_id() {
+        let container_id = "12345678-1234-1234-1234-123456789abc";
+        let ports = vec![
+            test_port(MidiPortDirection::Input, "device-in", container_id),
+            test_port(MidiPortDirection::Output, "device-out", container_id),
+        ];
+
+        let grouped = group_ports_by_device(ports);
+        assert_eq!(
+            grouped.len(),
+            1,
+            "shared real container id should group together"
+        );
+        assert_eq!(grouped.get(container_id).map(Vec::len), Some(2));
+    }
+
+    #[test]
+    fn group_ports_by_device_does_not_merge_two_null_guid_devices() {
+        // Simulates two identical Launchpads whose driver reports the null
+        // GUID for ContainerId: after `resolve_container_id` they must land
+        // in different groups, not be merged into one "device".
+        let resolved_a =
+            resolve_container_id(Some(is_null_guid_string()), "device-a", "Launchpad X");
+        let resolved_b =
+            resolve_container_id(Some(is_null_guid_string()), "device-b", "Launchpad X");
+        assert_ne!(resolved_a, resolved_b);
+
+        let ports = vec![
+            test_port(MidiPortDirection::Output, "device-a", &resolved_a),
+            test_port(MidiPortDirection::Output, "device-b", &resolved_b),
+        ];
+        let grouped = group_ports_by_device(ports);
+        assert_eq!(grouped.len(), 2);
+    }
+
+    fn is_null_guid_string() -> String {
+        "00000000-0000-0000-0000-000000000000".to_string()
+    }
+
+    #[test]
+    fn port_cache_upsert_get_remove_and_snapshot() {
+        let cache = PortCache::default();
+        assert!(!cache.is_ready());
+
+        let port = test_port(MidiPortDirection::Output, "device-1", "container-1");
+        cache.upsert(port.clone());
+
+        let fetched = cache.get(&port.id).expect("port should be cached");
+        assert_eq!(fetched.device_id, port.device_id);
+        assert_eq!(cache.snapshot().len(), 1);
+
+        cache.remove(&port.id);
+        assert!(cache.get(&port.id).is_none());
+        assert_eq!(cache.snapshot().len(), 0);
+    }
+
+    #[test]
+    fn port_cache_is_ready_only_once_both_directions_completed() {
+        let cache = PortCache::default();
+        assert!(!cache.is_ready());
+
+        cache.mark_ready(MidiPortDirection::Input);
+        assert!(!cache.is_ready(), "only one direction is ready so far");
+
+        cache.mark_ready(MidiPortDirection::Output);
+        assert!(cache.is_ready());
+    }
+
+    #[test]
+    fn port_cache_seed_does_not_affect_readiness() {
+        let cache = PortCache::default();
+        let ports = vec![test_port(
+            MidiPortDirection::Input,
+            "device-1",
+            "container-1",
+        )];
+        cache.seed(&ports);
+
+        assert_eq!(cache.snapshot().len(), 1);
+        assert!(!cache.is_ready());
+    }
+
+    #[test]
+    fn connection_state_drops_input_on_full_queue_without_invalidating() {
+        let (sender, _receiver) = mpsc::sync_channel::<MidiMessage>(1);
+        let state = ConnectionState::input(sender);
+
+        let message = |n: u8| MidiMessage {
+            data: vec![0x90, n, 0x7f],
+            timestamp_us: 0,
+            port_id: "winrt1:in:00".to_string(),
+        };
+
+        // First message fills the bounded (capacity-1) channel.
+        assert!(state.send_input(message(1)).is_ok());
+        // Second message finds the channel full and must be dropped, not
+        // treated as a disconnect.
+        assert!(state.send_input(message(2)).is_ok());
+        assert!(
+            state.is_open(),
+            "a full queue must not invalidate the connection"
+        );
+    }
+
+    #[test]
+    fn connection_state_invalidates_when_receiver_is_dropped() {
+        let (sender, receiver) = mpsc::sync_channel::<MidiMessage>(4);
+        let state = ConnectionState::input(sender);
+        drop(receiver);
+
+        let message = MidiMessage {
+            data: vec![0x90, 0x40, 0x7f],
+            timestamp_us: 0,
+            port_id: "winrt1:in:00".to_string(),
+        };
+
+        assert!(state.send_input(message).is_err());
+        assert!(
+            !state.is_open(),
+            "a dropped receiver must invalidate the connection"
+        );
     }
 }

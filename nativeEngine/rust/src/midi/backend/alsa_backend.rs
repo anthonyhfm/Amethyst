@@ -10,14 +10,31 @@ use alsa::seq::{
     Addr, ClientIter, EventType, MidiEvent, PortCap, PortIter, PortSubscribe, PortSubscribeIter,
     PortType, QuerySubsType, Seq,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 const BACKEND_PREFIX: &str = "alsa-seq1";
 const MIDI_BUFFER_SIZE: u32 = 65_536;
 const MAX_EVENTS_PER_POLL: usize = 1_024;
+// How often a long-lived connection re-checks that its subscription is still
+// alive. Checking is a sequencer query, so it is throttled away from the
+// hot path (LED output streams / MIDI input polling) while still catching a
+// vanished port quickly enough that `is_open()`/thread exit stay responsive.
+const SUBSCRIPTION_CHECK_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Sequencer client ids created by this backend itself (discovery, hotplug
+/// monitor, and any currently-open input/output connections). Closing one of
+/// our clients generates `ClientStart`/`PortStart`/`PortExit`/`ClientExit`
+/// announcements just like a real hotplug event; without this set the
+/// monitor would treat our own connect/disconnect churn as a device change,
+/// triggering a rescan, which (for still-unrecognized devices) triggers a
+/// probe open/close, which generates more announcements — an endless loop.
+/// Client ids are reused by the kernel, so entries are removed when we
+/// observe our own `ClientExit`, not when we close a handle.
+type OwnClientIds = Arc<Mutex<HashSet<i32>>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PortDirection {
@@ -86,10 +103,11 @@ impl PortAddress {
 struct HotplugMonitor {
     seq: Seq,
     _port: i32,
+    own_clients: OwnClientIds,
 }
 
 impl HotplugMonitor {
-    fn new() -> Result<Self, MidiError> {
+    fn new(own_clients: OwnClientIds) -> Result<Self, MidiError> {
         let seq = open_seq(None, true)?;
         seq.set_client_name(c"Amethyst MIDI Monitor")
             .map_err(alsa_error)?;
@@ -100,15 +118,21 @@ impl HotplugMonitor {
                 PortType::APPLICATION,
             )
             .map_err(alsa_error)?;
+        let client_id = seq.client_id().map_err(alsa_error)?;
         subscribe(
             &seq,
             Addr::system_announce(),
             Addr {
-                client: seq.client_id().map_err(alsa_error)?,
+                client: client_id,
                 port,
             },
         )?;
-        Ok(Self { seq, _port: port })
+        own_clients.lock().unwrap().insert(client_id);
+        Ok(Self {
+            seq,
+            _port: port,
+            own_clients,
+        })
     }
 
     fn wait(&mut self, timeout_ms: u64) -> bool {
@@ -118,18 +142,29 @@ impl HotplugMonitor {
             Ok(events) if !events.is_empty() => {
                 let mut input = self.seq.input();
                 let mut changed = false;
+                let mut own_clients = self.own_clients.lock().unwrap();
                 while input.event_input_pending(true).unwrap_or(0) > 0 {
                     let Ok(event) = input.event_input() else {
                         break;
                     };
-                    changed |= matches!(
-                        event.get_type(),
+                    let event_type = event.get_type();
+                    if !matches!(
+                        event_type,
                         EventType::ClientStart
                             | EventType::ClientExit
                             | EventType::PortStart
                             | EventType::PortExit
                             | EventType::PortChange
-                    );
+                    ) {
+                        continue;
+                    }
+                    let Some(addr) = event.get_data::<Addr>() else {
+                        continue;
+                    };
+                    if should_ignore_announcement(event_type, addr, &mut own_clients) {
+                        continue;
+                    }
+                    changed = true;
                 }
                 changed
             }
@@ -138,20 +173,42 @@ impl HotplugMonitor {
     }
 }
 
+/// Decides whether a sequencer announcement should be treated as self-noise
+/// rather than a real device change. `ClientExit` also releases the id from
+/// `own_clients` (kernel client ids are reused, so a stale entry could later
+/// suppress a real device's announcements).
+fn should_ignore_announcement(
+    event_type: EventType,
+    addr: Addr,
+    own_clients: &mut HashSet<i32>,
+) -> bool {
+    if event_type == EventType::ClientExit {
+        own_clients.remove(&addr.client)
+    } else {
+        own_clients.contains(&addr.client)
+    }
+}
+
 pub struct AlsaBackend {
     monitor: Mutex<HotplugMonitor>,
     discovery: Mutex<Seq>,
+    own_clients: OwnClientIds,
 }
 
 impl AlsaBackend {
     pub fn new() -> Result<Self, MidiError> {
+        let own_clients: OwnClientIds = Arc::new(Mutex::new(HashSet::new()));
         let discovery = open_seq(None, false)?;
         discovery
             .set_client_name(c"Amethyst MIDI Discovery")
             .map_err(alsa_error)?;
+        let discovery_client_id = discovery.client_id().map_err(alsa_error)?;
+        own_clients.lock().unwrap().insert(discovery_client_id);
+        let monitor = HotplugMonitor::new(Arc::clone(&own_clients))?;
         Ok(Self {
-            monitor: Mutex::new(HotplugMonitor::new()?),
+            monitor: Mutex::new(monitor),
             discovery: Mutex::new(discovery),
+            own_clients,
         })
     }
 }
@@ -161,11 +218,18 @@ impl MidiBackend for AlsaBackend {
         // A persistent client prevents discovery from generating hotplug events.
         let seq = self.discovery.lock().unwrap();
         let own_client = seq.client_id().map_err(alsa_error)?;
+        // Filter by tracked client id first (covers discovery/monitor plus any
+        // input/output connections currently open); the name prefix is kept as
+        // a defense-in-depth fallback.
+        let own_clients = self.own_clients.lock().unwrap().clone();
         let mut devices = BTreeMap::<String, MidiDeviceInfo>::new();
 
         for client in ClientIter::new(&seq) {
             let client_id = client.get_client();
-            if client_id == own_client || client_id == Addr::system_announce().client {
+            if client_id == own_client
+                || client_id == Addr::system_announce().client
+                || own_clients.contains(&client_id)
+            {
                 continue;
             }
             let name = client
@@ -307,13 +371,20 @@ impl MidiBackend for AlsaBackend {
         let open = Arc::new(AtomicBool::new(true));
         let thread_open = Arc::clone(&open);
         let thread_port_id = port_id.to_string();
+        let thread_own_clients = Arc::clone(&self.own_clients);
         let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<(), String>>(1);
         let failure_tx = ready_tx.clone();
         let thread = std::thread::Builder::new()
             .name("amethyst-alsa-midi-in".into())
             .spawn(move || {
-                let result =
-                    run_input_connection(address, thread_port_id, sender, &thread_open, ready_tx);
+                let result = run_input_connection(
+                    address,
+                    thread_port_id,
+                    sender,
+                    &thread_open,
+                    ready_tx,
+                    thread_own_clients,
+                );
                 if let Err(error) = result {
                     let _ = failure_tx.send(Err(error.to_string()));
                     eprintln!("ALSA MIDI input stopped: {error}");
@@ -364,6 +435,7 @@ impl MidiBackend for AlsaBackend {
         };
         let destination = address.alsa();
         subscribe(&seq, source, destination)?;
+        self.own_clients.lock().unwrap().insert(source.client);
 
         Ok(Box::new(AlsaOutputHandle {
             port_id: port_id.to_string(),
@@ -375,6 +447,7 @@ impl MidiBackend for AlsaBackend {
                 MidiEvent::new(MIDI_BUFFER_SIZE).map_err(alsa_error)?,
             )),
             open: AtomicBool::new(true),
+            last_subscription_check: Mutex::new(None),
         }))
     }
 
@@ -421,6 +494,10 @@ struct AlsaOutputHandle {
     destination: Addr,
     encoder: Mutex<SendMidiEncoder>,
     open: AtomicBool,
+    // Throttles the `has_subscription` sequencer query performed in `send`,
+    // which would otherwise run on every LED-output message. `None` forces a
+    // check on the first send.
+    last_subscription_check: Mutex<Option<Instant>>,
 }
 
 struct SendMidiEncoder(MidiEvent);
@@ -440,7 +517,17 @@ impl BackendPortHandle for AlsaOutputHandle {
         let seq = seq_guard.as_mut().ok_or_else(|| MidiError::PortNotOpen {
             port_id: self.port_id.clone(),
         })?;
-        if !has_subscription(seq, self.source, self.destination) {
+        let should_check_subscription = {
+            let mut last_check = self.last_subscription_check.lock().unwrap();
+            let now = Instant::now();
+            let due = last_check
+                .is_none_or(|previous| now.duration_since(previous) >= SUBSCRIPTION_CHECK_INTERVAL);
+            if due {
+                *last_check = Some(now);
+            }
+            due
+        };
+        if should_check_subscription && !has_subscription(seq, self.source, self.destination) {
             self.open.store(false, Ordering::Release);
             return Err(MidiError::PortNotOpen {
                 port_id: self.port_id.clone(),
@@ -505,6 +592,7 @@ fn run_input_connection(
     sender: mpsc::SyncSender<MidiMessage>,
     open: &AtomicBool,
     ready: mpsc::SyncSender<Result<(), String>>,
+    own_clients: OwnClientIds,
 ) -> Result<(), MidiError> {
     let seq = open_seq(Some(Direction::Capture), true)?;
     seq.set_client_name(c"Amethyst MIDI Input")
@@ -521,6 +609,7 @@ fn run_input_connection(
         client: seq.client_id().map_err(alsa_error)?,
         port: destination_port,
     };
+    own_clients.lock().unwrap().insert(destination.client);
     subscribe(&seq, source, destination)?;
     let _ = ready.send(Ok(()));
 
@@ -531,10 +620,21 @@ fn run_input_connection(
     decoder.enable_running_status(false);
     let mut parser = MidiStreamParser::new();
     let mut decode_buffer = vec![0u8; MIDI_BUFFER_SIZE as usize];
+    // Dropped input messages (receiver too slow to keep up); logged, not fatal.
+    let mut dropped_messages: u64 = 0;
+    // Throttle the liveness (`has_subscription`) query the same way output
+    // throttles it; each poll iteration below already waits up to 50ms, so
+    // checking every 5th iteration still ends the thread within ~300ms of a
+    // real PortExit.
+    let mut last_subscription_check = Instant::now() - SUBSCRIPTION_CHECK_INTERVAL;
     while open.load(Ordering::Acquire) {
-        // ALSA may reuse client and port numbers after a replug.
-        if !has_subscription(&seq, source, destination) {
-            return Ok(());
+        let now = Instant::now();
+        if now.duration_since(last_subscription_check) >= SUBSCRIPTION_CHECK_INTERVAL {
+            last_subscription_check = now;
+            // ALSA may reuse client and port numbers after a replug.
+            if !has_subscription(&seq, source, destination) {
+                return Ok(());
+            }
         }
         match poll::poll_all(&descriptors, 50) {
             Ok(events) if events.is_empty() => continue,
@@ -592,7 +692,20 @@ fn run_input_connection(
                     port_id: port_id.clone(),
                 }) {
                     Ok(()) => {}
-                    Err(mpsc::TrySendError::Full(_) | mpsc::TrySendError::Disconnected(_)) => {
+                    Err(mpsc::TrySendError::Full(_)) => {
+                        // Receiver is temporarily behind; drop this message
+                        // rather than ending the connection (Kotlin polls
+                        // via `receive_timeout` and treats `is_open() ==
+                        // false` as a dead connection, so tearing the thread
+                        // down here would look like a device disconnect).
+                        dropped_messages += 1;
+                        if dropped_messages.is_power_of_two() {
+                            eprintln!(
+                                "ALSA MIDI input {port_id}: dropped {dropped_messages} message(s) so far (receiver full)"
+                            );
+                        }
+                    }
+                    Err(mpsc::TrySendError::Disconnected(_)) => {
                         return Ok(());
                     }
                 }
@@ -698,5 +811,81 @@ mod tests {
     #[test]
     fn malformed_port_address_is_rejected() {
         assert!(PortAddress::decode("alsa-seq1:24:3:sideways").is_err());
+    }
+
+    fn addr(client: i32, port: i32) -> Addr {
+        Addr { client, port }
+    }
+
+    #[test]
+    fn ignores_start_and_exit_events_from_own_clients() {
+        let mut own = HashSet::from([42]);
+        assert!(should_ignore_announcement(
+            EventType::ClientStart,
+            addr(42, 0),
+            &mut own
+        ));
+        assert!(should_ignore_announcement(
+            EventType::PortStart,
+            addr(42, 1),
+            &mut own
+        ));
+        assert!(should_ignore_announcement(
+            EventType::PortExit,
+            addr(42, 1),
+            &mut own
+        ));
+        assert!(should_ignore_announcement(
+            EventType::PortChange,
+            addr(42, 1),
+            &mut own
+        ));
+        // Not consumed by non-exit checks.
+        assert!(own.contains(&42));
+    }
+
+    #[test]
+    fn does_not_ignore_events_from_foreign_clients() {
+        let mut own = HashSet::from([42]);
+        assert!(!should_ignore_announcement(
+            EventType::ClientStart,
+            addr(99, 0),
+            &mut own
+        ));
+        assert!(!should_ignore_announcement(
+            EventType::PortStart,
+            addr(99, 1),
+            &mut own
+        ));
+    }
+
+    #[test]
+    fn client_exit_releases_the_id_so_a_reused_id_is_not_misclassified() {
+        let mut own = HashSet::from([42]);
+        // Our own client exits: the announcement is still ours to ignore...
+        assert!(should_ignore_announcement(
+            EventType::ClientExit,
+            addr(42, 0),
+            &mut own
+        ));
+        // ...but the id is released, since the kernel may hand it to a real
+        // device next.
+        assert!(!own.contains(&42));
+        assert!(!should_ignore_announcement(
+            EventType::ClientStart,
+            addr(42, 0),
+            &mut own
+        ));
+    }
+
+    #[test]
+    fn foreign_client_exit_is_not_treated_as_own() {
+        let mut own = HashSet::from([42]);
+        assert!(!should_ignore_announcement(
+            EventType::ClientExit,
+            addr(7, 0),
+            &mut own
+        ));
+        assert!(own.contains(&42));
     }
 }
