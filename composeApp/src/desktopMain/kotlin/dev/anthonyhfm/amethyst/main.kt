@@ -28,6 +28,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 fun main(args: Array<String>) {
+    // The Tao backend turns macOS trackpad gestures into Compose Pan events
+    // (PanStart/PanMove/PanEnd). The timeline, piano roll and waveform editor
+    // handle wheel input through PointerEventType.Scroll, so keep the AWT-style
+    // Scroll stream until those handlers understand Pan. Must be set before the
+    // Tao scene host classes load — they read the flag once.
+    System.setProperty("nucleus.tao.trackpadPanEvents", "false")
+
     initializeSentry()
 
     val platform = DesktopPlatform.get()

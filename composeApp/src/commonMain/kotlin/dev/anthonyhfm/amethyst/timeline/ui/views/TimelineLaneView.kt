@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.zIndex
+import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
@@ -136,6 +138,28 @@ fun TimelineLaneView(
         TimelineClipMoveEngine.Preview(false)
     }
     var lastPointerX by remember { mutableStateOf<Float?>(null) }
+    val currentPlayheadMs = rememberUpdatedState(playheadPositionMs)
+    // Keyboard zoom (Cmd/Ctrl + Plus / Minus): anchor at the playhead if it is on
+    // screen, otherwise at the viewport centre, so the visible context stays put.
+    DisposableEffect(viewModel) {
+        TimelineKeyHandler.zoomTimeline = { scaleDelta ->
+            val viewportWidth = currentViewportWidthPx.value
+            if (viewportWidth <= 0f) {
+                false
+            } else {
+                viewModel.updateViewport { currentViewport ->
+                    val liveViewport = viewportWithTimelineMetrics(currentViewport)
+                    val playheadX = liveViewport.timeMsToScreenX(currentPlayheadMs.value.toDouble())
+                    val anchorX = if (playheadX in 0f..viewportWidth) playheadX else viewportWidth * 0.5f
+                    viewportWithTimelineMetrics(liveViewport.zoomAtX(scaleDelta, anchorX))
+                }
+                true
+            }
+        }
+        onDispose {
+            TimelineKeyHandler.zoomTimeline = null
+        }
+    }
     val coroutineScope = rememberCoroutineScope()
     val gesturePanUnlockJobHolder = remember { arrayOfNulls<Job>(1) }
     val suppressTransformPanHolder = remember { booleanArrayOf(false) }

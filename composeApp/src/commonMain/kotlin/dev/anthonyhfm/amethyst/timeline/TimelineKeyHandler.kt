@@ -16,6 +16,8 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.narrower
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.wider
 import dev.anthonyhfm.amethyst.timeline.utils.TimelineClipUtils
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -25,6 +27,11 @@ object TimelineKeyHandler {
     internal var deleteChainEffectClip: ((Int, String) -> Unit)? = null
     internal var duplicateChainEffectClip: ((Int, String) -> Unit)? = null
     internal var nudgeTimelineTime: ((Int) -> Boolean)? = null
+    /** Multiplies the horizontal zoom by the given factor; wired by the lane view. */
+    internal var zoomTimeline: ((Float) -> Boolean)? = null
+
+    /** Per-keystroke zoom step for Cmd/Ctrl + Plus / Minus. */
+    private const val KEYBOARD_ZOOM_STEP = 1.25f
     fun canCopySelection(
         selections: List<Selectable> = SelectionManager.selections.value
     ): Boolean {
@@ -103,6 +110,16 @@ object TimelineKeyHandler {
             keyEvent.key == Key.Delete || keyEvent.key == Key.Backspace -> deleteSelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.D -> duplicateSelection()
 
+            // Grid resolution (Ableton): Cmd/Ctrl+1 narrows, Cmd/Ctrl+2 widens.
+            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.One -> handleGridStep(narrower = true)
+            keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.Two -> handleGridStep(narrower = false)
+
+            // Horizontal zoom: Cmd/Ctrl (or Alt) + Plus / Minus, keypad included.
+            keyEvent.hasZoomModifier() && keyEvent.isZoomInKey() ->
+                zoomTimeline?.invoke(KEYBOARD_ZOOM_STEP) == true
+            keyEvent.hasZoomModifier() && keyEvent.isZoomOutKey() ->
+                zoomTimeline?.invoke(1f / KEYBOARD_ZOOM_STEP) == true
+
             // Time-cursor navigation: move to the previous/next musical grid line.
             keyEvent.hasNoShortcutModifier() && keyEvent.key == Key.DirectionLeft ->
                 nudgeTimelineTime?.invoke(-1) == true
@@ -118,6 +135,23 @@ object TimelineKeyHandler {
             else -> false
         }
     }
+
+    private fun handleGridStep(narrower: Boolean): Boolean {
+        val current = WorkspaceRepository.gridType.value
+        val next = if (narrower) current.narrower() else current.wider()
+        if (next == current) return false
+        WorkspaceRepository.setGridType(next)
+        return true
+    }
+
+    private fun KeyEvent.hasZoomModifier(): Boolean =
+        hasPrimaryShortcutModifier() || isAltPressed
+
+    private fun KeyEvent.isZoomInKey(): Boolean =
+        key == Key.Plus || key == Key.Equals || key == Key.NumPadAdd
+
+    private fun KeyEvent.isZoomOutKey(): Boolean =
+        key == Key.Minus || key == Key.NumPadSubtract
 
     internal fun handleTogglePlayPause(): Boolean {
         if (TimelineRepository.isPlaying.value) {

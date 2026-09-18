@@ -140,6 +140,52 @@ object GridUtils {
     private fun Double.roundToLongSafe(): Long = round(this).toLong().coerceAtLeast(1L)
     private fun Double.ceilInt(): Int = ceil(this).toInt().coerceAtLeast(1)
 
+    /** Fixed grid sizes from widest to narrowest. */
+    private val fixedLadder: List<GridType.Fixed> = listOf(
+        GridType.Fixed.Bar_8,
+        GridType.Fixed.Bar_4,
+        GridType.Fixed.Bar_2,
+        GridType.Fixed.Bar_1,
+        GridType.Fixed._1_2,
+        GridType.Fixed._1_4,
+        GridType.Fixed._1_8,
+        GridType.Fixed._1_16,
+        GridType.Fixed._1_32,
+    )
+
+    /** Adaptive grid sizes from widest to narrowest. */
+    private val flexibleLadder: List<GridType.Flexible> = listOf(
+        GridType.Flexible.Largest,
+        GridType.Flexible.Large,
+        GridType.Flexible.Medium,
+        GridType.Flexible.Small,
+        GridType.Flexible.Smallest,
+    )
+
+    /**
+     * Steps the grid one notch along its ladder, like Ableton's Cmd+1 (narrow)
+     * and Cmd+2 (widen). Fixed grids halve/double the division, adaptive grids
+     * move between the Flexible sizes. "Auto" starts from Flexible.Medium and
+     * "No Grid" stays unchanged. Returns the same instance at the end of a ladder.
+     */
+    fun GridType.stepped(narrower: Boolean): GridType {
+        fun <T : GridType> List<T>.step(current: T): T {
+            val index = indexOf(current)
+            if (index < 0) return current
+            val target = if (narrower) index + 1 else index - 1
+            return getOrNull(target) ?: current
+        }
+        return when (this) {
+            is GridType.NoGrid -> this
+            is GridType.None -> flexibleLadder.step(GridType.Flexible.Medium)
+            is GridType.Flexible -> flexibleLadder.step(this)
+            is GridType.Fixed -> fixedLadder.step(this)
+        }
+    }
+
+    fun GridType.narrower(): GridType = stepped(narrower = true)
+    fun GridType.wider(): GridType = stepped(narrower = false)
+
     sealed interface GridType {
         data object None : GridType
         data object NoGrid : GridType
