@@ -45,13 +45,15 @@ fun PlaybackModePicker(
             color = Theme[colors][foreground],
         )
 
+        val visibleModes = PlaybackMode.entries.filter { it != PlaybackMode.Continuous }
+
         Tabs(
             selectedTab = selectedMode.name,
-            tabs = PlaybackMode.entries.map { it.name },
+            tabs = visibleModes.map { it.name },
             modifier = Modifier.fillMaxWidth(),
         ) {
             TabsList(modifier = Modifier.fillMaxWidth()) {
-                PlaybackMode.entries.forEach { mode ->
+                visibleModes.forEach { mode ->
                     TabsTrigger(
                         key = mode.name,
                         selected = selectedMode == mode,
