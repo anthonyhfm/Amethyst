@@ -127,7 +127,8 @@ class MxDeviceMidiEffectAdapter(
                     return InfinityAdapter().toDeviceStates()
                 }
 
-                "b587108a297a3eb744172735c5d3f064" -> {
+                "b587108a297a3eb744172735c5d3f064",
+                "9f50358372279f946cae0fdac0cfbf56" -> {
                     return WormholeLiteAdapter(device).toDeviceStates()
                 }
 
@@ -215,7 +216,6 @@ class MxDeviceMidiEffectAdapter(
                     return MultiResetAdapter(device).toDeviceStates()
                 }
 
-                "9f50358372279f946cae0fdac0cfbf56", // Wormhole Lite, unsure if this actually works!
                 "3d3de9b05506f279ad6cfe14d26e0084" -> {
                     return WormholeAdapter(blob).toDeviceStates()
                 }
