@@ -120,6 +120,7 @@ fun WorkspaceToolbarIconButton(
     modifier: Modifier = Modifier,
     variant: ButtonVariant = ButtonVariant.Ghost,
     enabled: Boolean = true,
+    showTooltip: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -170,7 +171,7 @@ fun WorkspaceToolbarIconButton(
 
     Tooltip(
         text = contentDescription.orEmpty(),
-        enabled = !contentDescription.isNullOrBlank(),
+        enabled = showTooltip && !contentDescription.isNullOrBlank(),
         anchor = {
             UnstyledButton(
                 onClick = onClick,

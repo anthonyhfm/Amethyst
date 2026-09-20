@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,7 +19,6 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
-import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -28,7 +26,6 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Event
-import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract.Frame
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.InfinityCheckbox
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPinchControl
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.KeyframesPreviewControls
@@ -36,12 +33,10 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.PlaybackM
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.components.RepeatsControl
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameDrawingPanel
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.ui.views.FrameListPanel
-import dev.anthonyhfm.amethyst.ui.theme.cardForeground
-import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportPanBoundsPolicy
@@ -53,6 +48,7 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
     override val claimMidiInputs: Boolean = true
 
     lateinit var state: StateFlow<KeyframesChainDeviceContract.KeyframesChainDeviceState>
+    lateinit var isPreviewPlaying: StateFlow<Boolean>
 
     var onVirtualDeviceDragStart: ((device: LaunchpadViewportElement, localX: Int, localY: Int) -> Unit)? = null
     var onVirtualDeviceDrag: ((device: LaunchpadViewportElement, localX: Int, localY: Int) -> Unit)? = null
@@ -71,6 +67,7 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
     @Composable
     fun ModeContent(modifier: Modifier) {
         val state by state.collectAsState()
+        val isPreviewPlaying by isPreviewPlaying.collectAsState()
 
         Row(
             modifier = modifier
@@ -161,7 +158,20 @@ class KeyframesWorkspaceMode : WorkspaceMode() {
                     ),
                 )
 
-                KeyframesPreviewControls()
+                KeyframesPreviewControls(
+                    currentFrameIndex = state.currentFrameIndex,
+                    frameCount = state.frames.size,
+                    isPlaying = isPreviewPlaying,
+                    onPreviousFrame = {
+                        onEvent?.invoke(Event.OnSelectFrame(state.currentFrameIndex - 1))
+                    },
+                    onTogglePlayback = {
+                        parentDevice?.togglePreview()
+                    },
+                    onNextFrame = {
+                        onEvent?.invoke(Event.OnSelectFrame(state.currentFrameIndex + 1))
+                    },
+                )
             }
 
             FrameDrawingPanel(

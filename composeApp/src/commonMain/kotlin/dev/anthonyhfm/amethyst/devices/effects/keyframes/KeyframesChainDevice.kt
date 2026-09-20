@@ -45,6 +45,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -74,6 +76,8 @@ private fun keyframeLoopTargetTimeNanos(
 ): Long = epochNanos + ((iteration * totalDurationMs + eventTimeMs) * 1_000_000.0).roundToLong()
 
 class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokeable, dev.anthonyhfm.amethyst.devices.TimelineTriggerable {
+    private data class VirtualDevicePixel(val x: Int, val y: Int)
+
     private fun timelineTrigger(color: Color): Signal.LED {
         val root = state.value.rootKey
         return Signal.LED(
@@ -111,6 +115,12 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     override val state = MutableStateFlow(KeyframesChainDeviceState())
     override val helpRef = "Keyframes"
 
+    private val _isPreviewPlaying = MutableStateFlow(false)
+    val isPreviewPlaying = _isPreviewPlaying.asStateFlow()
+    private val previewPlaybackOwner = Any()
+    private val virtualDeviceColorsLock = SynchronizedObject()
+    private val virtualDeviceColors = mutableMapOf<VirtualDevicePixel, Color>()
+
     private val customMode: KeyframesWorkspaceMode = KeyframesWorkspaceMode()
     private var lastSelectedFrameIndex: Int? = null
     private val dragVisitedPads: MutableSet<Triple<String, Int, Int>> = mutableSetOf()
@@ -123,15 +133,21 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         renderAnimation()
 
         customMode.state = state.asStateFlow()
+        customMode.isPreviewPlaying = isPreviewPlaying
         customMode.parentDevice = this
 
         customMode.onEvent = { onEvent(it) }
 
         customMode.modeWakeup = {
-            refreshVirtualDevices()
+            clearVirtualDeviceColors()
+            Heaven.clear {
+                refreshVirtualDevices()
+            }
         }
 
         customMode.modeClose = {
+            stopPreview(refreshCurrentFrame = false)
+            clearVirtualDeviceColors()
             Heaven.devices.forEach { device ->
                 device.previewState.clear()
             }
@@ -148,22 +164,13 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         customMode.onVirtualDeviceDragEnd = {
             endVirtualDrag()
         }
-        
-        // Observe state changes to refresh virtual devices when state is restored (e.g., undo/redo).
-        // Only refresh when the keyframes editor mode is active — refreshVirtualDevices() is a
-        // direct-preview feature of that mode, and calling it outside the mode (e.g. during project
-        // load) causes the current keyframe to flash briefly on virtual devices before playback starts.
+
         stateObserverScope.launch {
             state.collect { newState ->
-                // Check if frame entries changed (but only when not actively dragging)
                 if (!isDragging.value) {
                     val currentFrameEntries = newState.frames.getOrNull(newState.currentFrameIndex)?.entries
                     if (currentFrameEntries != lastObservedFrameEntries) {
                         lastObservedFrameEntries = currentFrameEntries
-                        // Only refresh virtual devices when the keyframes editor mode is active.
-                        // refreshVirtualDevices() is a direct-preview feature of that mode; calling
-                        // it outside (e.g. during project load) causes the current keyframe to flash
-                        // briefly on virtual devices before playback starts.
                         if (WorkspaceRepository.mode.value === customMode) {
                             refreshVirtualDevices()
                         }
@@ -172,8 +179,6 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             }
         }
 
-        // Re-render the pre-computed animation whenever any device is repositioned, so that
-        // device-anchored entries continue to resolve to the correct global coordinates.
         stateObserverScope.launch {
             snapshotFlow {
                 Heaven.devices.map { it.position.value }
@@ -224,6 +229,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun beginVirtualDrag(device: LaunchpadViewportElement, localX: Int, localY: Int) {
+        if (_isPreviewPlaying.value) return
+
         isDragging.value = true
         dragVisitedPads.clear()
         dragEraseMode = padMatchesSelectedColor(device.launchpadId, localX, localY)
@@ -235,6 +242,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun continueVirtualDrag(device: LaunchpadViewportElement, localX: Int, localY: Int) {
+        if (_isPreviewPlaying.value) return
+
         if (!isDragging.value) {
             beginVirtualDrag(device, localX, localY)
             return
@@ -244,6 +253,13 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     private fun endVirtualDrag() {
+        if (_isPreviewPlaying.value) {
+            isDragging.value = false
+            stateBeforeDrag = null
+            dragVisitedPads.clear()
+            return
+        }
+
         isDragging.value = false
         
         // Push state change for undo/redo
@@ -294,6 +310,13 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         val launchpadId = device.launchpadId
         val globalX = localX + device.position.value.x.toInt()
         val globalY = localY + device.position.value.y.toInt()
+        val signalColor = Color(
+            red = color.first,
+            green = color.second,
+            blue = color.third,
+        )
+
+        setVirtualDeviceColor(globalX, globalY, signalColor)
 
         state.update { currentState ->
             currentState.copy(
@@ -329,11 +352,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     origin = this,
                     x = globalX,
                     y = globalY,
-                    color = Color(
-                        red = color.first,
-                        green = color.second,
-                        blue = color.third
-                    ),
+                    color = signalColor,
                     layer = 0
                 )
             )
@@ -343,6 +362,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     fun onEvent(event: Event) {
         when (event) {
             is Event.OnPaintButton -> {
+                if (_isPreviewPlaying.value) return
+
                 val globalX = event.x
                 val globalY = event.y
 
@@ -382,6 +403,10 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             }
 
             is Event.OnSelectFrame -> {
+                if (_isPreviewPlaying.value) {
+                    stopPreview(refreshCurrentFrame = false)
+                }
+
                 if (event.frameIndex == state.value.frames.lastIndex + 1) {
                     onEvent(Event.OnAddFrame())
                     return
@@ -813,15 +838,120 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     }
 
     fun refreshVirtualDevices() {
-        Heaven.clear {
-            if (WorkspaceRepository.mode.value === customMode) {
-                val currentFrame = state.value.frames.getOrNull(state.value.currentFrameIndex)
-                    ?: return@clear
-                Heaven.midiEnter(
-                    currentFrame.entries.mapNotNull {
-                        it.resolveToSignal(Color(it.r, it.g, it.b))
-                    }
+        if (WorkspaceRepository.mode.value !== customMode) return
+
+        val currentFrame = state.value.frames.getOrNull(state.value.currentFrameIndex)
+            ?: return
+        val desiredColors = currentFrame.entries.associate {
+            VirtualDevicePixel(it.resolveGlobal().first, it.resolveGlobal().second) to Color(it.r, it.g, it.b)
+        }
+
+        val changedSignals = synchronized(virtualDeviceColorsLock) {
+            val previousColors = virtualDeviceColors.toMap()
+            val positions = previousColors.keys + desiredColors.keys
+
+            virtualDeviceColors.clear()
+            virtualDeviceColors.putAll(desiredColors.filterValues { it.isLit() })
+
+            positions.mapNotNull { position ->
+                val previous = previousColors[position] ?: Color.Black
+                val desired = desiredColors[position] ?: Color.Black
+                if (previous == desired) {
+                    null
+                } else {
+                    Signal.LED(
+                        origin = this,
+                        x = position.x,
+                        y = position.y,
+                        color = desired,
+                        layer = 0,
+                    )
+                }
+            }
+        }
+
+        if (changedSignals.isNotEmpty()) {
+            Heaven.midiEnter(changedSignals)
+        }
+    }
+
+    fun togglePreview() {
+        if (_isPreviewPlaying.value) {
+            stopPreview()
+        } else {
+            startPreview()
+        }
+    }
+
+    fun startPreview() {
+        stopPreview(refreshCurrentFrame = false)
+        renderAnimation()
+
+        val animation = state.value.renderedAnimation
+        if (animation.isEmpty()) return
+
+        _isPreviewPlaying.value = true
+        val framePixels = state.value.frames
+            .flatMap { it.entries }
+            .map { it.resolveGlobal() }
+        val cachedPixels = synchronized(virtualDeviceColorsLock) {
+            virtualDeviceColors.keys.map { it.x to it.y }
+        }
+        val resetSignals = (framePixels + cachedPixels)
+            .distinct()
+            .map { (x, y) ->
+                Signal.LED(
+                    origin = this,
+                    x = x,
+                    y = y,
+                    color = Color.Black,
+                    layer = 0,
                 )
+            }
+        clearVirtualDeviceColors()
+        if (resetSignals.isNotEmpty()) {
+            Heaven.midiEnter(resetSignals)
+        }
+
+        animation.forEach { (time, signals) ->
+            Heaven.schedule(
+                delayInMs = time.toDouble(),
+                owner = previewPlaybackOwner,
+            ) {
+                Heaven.midiEnter(signals.filterIsInstance<Signal.LED>())
+            }
+        }
+
+        Heaven.schedule(
+            delayInMs = animation.last().first.toDouble(),
+            owner = previewPlaybackOwner,
+        ) {
+            _isPreviewPlaying.value = false
+            refreshVirtualDevices()
+        }
+    }
+
+    fun stopPreview(refreshCurrentFrame: Boolean = true) {
+        Heaven.cancelJobsForOwner(previewPlaybackOwner)
+        _isPreviewPlaying.value = false
+        if (refreshCurrentFrame) {
+            refreshVirtualDevices()
+        }
+    }
+
+    private fun clearVirtualDeviceColors() {
+        synchronized(virtualDeviceColorsLock) {
+            virtualDeviceColors.clear()
+        }
+    }
+
+    private fun setVirtualDeviceColor(x: Int, y: Int, color: Color) {
+        synchronized(virtualDeviceColorsLock) {
+            val pixel = VirtualDevicePixel(x, y)
+            if (color.isLit()) {
+                virtualDeviceColors[pixel] = color
+            } else {
+                virtualDeviceColors.remove(pixel)
             }
         }
     }
@@ -1227,6 +1357,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         // Cancel all scheduled Heaven tasks owned by this device
         Heaven.cancelJobsForOwner(this)
         heldSignals.clear()
+        stopPreview(refreshCurrentFrame = false)
     }
 
     override fun onStateRestored() {
@@ -1240,9 +1371,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         super.onRemovedFromChain()
     }
 
-    companion object : ChainDeviceFactory<KeyframesChainDeviceContract.KeyframesChainDeviceState> {
-        override val stateClass = KeyframesChainDeviceContract.KeyframesChainDeviceState::class
-        override val serializer = KeyframesChainDeviceContract.KeyframesChainDeviceState.serializer()
+    companion object : ChainDeviceFactory<KeyframesChainDeviceState> {
+        override val stateClass = KeyframesChainDeviceState::class
+        override val serializer = KeyframesChainDeviceState.serializer()
         override fun create() = KeyframesChainDevice()
     }
 }
