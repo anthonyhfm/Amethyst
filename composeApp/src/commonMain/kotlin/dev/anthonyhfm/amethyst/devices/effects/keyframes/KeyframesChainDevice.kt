@@ -50,6 +50,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
@@ -1050,6 +1051,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private val heldSignals = mutableSetOf<Int>() // Signals currently held in Loop mode
     private val continuousLoopIdentifier = Int.MIN_VALUE
+    private var continuousTriggerSignal: Signal.LED? = null
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
         val nonSilent = n.filterNot { it.isSilentReplay() }
@@ -1082,6 +1084,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     }
                     PlaybackMode.Continuous -> {
                         if (heldSignals.add(continuousLoopIdentifier)) {
+                            continuousTriggerSignal = signal
                             Heaven.cancelJobsForOwner(this, continuousLoopIdentifier)
                             startLoopPlayback(signal, continuousLoopIdentifier)
                         }
@@ -1095,6 +1098,35 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 }
             }
         }
+    }
+
+    fun restartContinuousPlayback() {
+        if (state.value.playbackMode != PlaybackMode.Continuous) return
+        if (!heldSignals.contains(continuousLoopIdentifier)) return
+
+        val triggerSignal = continuousTriggerSignal ?: return
+        Heaven.cancelJobsForOwner(this, continuousLoopIdentifier)
+        startLoopPlayback(triggerSignal, continuousLoopIdentifier)
+    }
+
+    fun prepareForCleanup(preserveContinuousPlayback: Boolean) {
+        val triggerSignal = continuousTriggerSignal
+        val wasContinuous = preserveContinuousPlayback &&
+            state.value.playbackMode == PlaybackMode.Continuous &&
+            heldSignals.contains(continuousLoopIdentifier) &&
+            triggerSignal != null
+
+        onChoke()
+
+        if (wasContinuous) {
+            continuousTriggerSignal = triggerSignal
+            heldSignals.add(continuousLoopIdentifier)
+        }
+    }
+
+    fun disposeForWorkspaceExit() {
+        onChoke()
+        stateObserverScope.cancel()
     }
 
     private fun startPlayback(triggerSignal: Signal.LED) {
@@ -1357,6 +1389,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         // Cancel all scheduled Heaven tasks owned by this device
         Heaven.cancelJobsForOwner(this)
         heldSignals.clear()
+        continuousTriggerSignal = null
         stopPreview(refreshCurrentFrame = false)
     }
 

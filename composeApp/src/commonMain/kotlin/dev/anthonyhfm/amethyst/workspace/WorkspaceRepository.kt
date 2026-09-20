@@ -17,6 +17,7 @@ import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.transmit.TransmitChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
+import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.devicesDepthFirst
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
@@ -628,11 +629,58 @@ object WorkspaceRepository {
         recursiveResetMulti(samplingChain)
     }
 
+    fun clearEverything(
+        clearLights: Boolean = true,
+        clearAudio: Boolean = true,
+        clearMulti: Boolean = true,
+        restartContinuousLights: Boolean = true,
+    ) {
+        val lightDevices = if (clearLights) lightsChain.devicesDepthFirst() else emptyList()
+        val continuousLights = lightDevices.filterIsInstance<KeyframesChainDevice>()
+
+        if (clearLights) {
+            lightDevices.forEach { device ->
+                when (device) {
+                    is KeyframesChainDevice -> {
+                        if (restartContinuousLights) {
+                            device.prepareForCleanup(preserveContinuousPlayback = true)
+                        } else {
+                            device.disposeForWorkspaceExit()
+                        }
+                    }
+
+                    is Chokeable -> device.onChoke()
+                }
+            }
+        }
+
+        if (clearAudio) {
+            samplingChain.devicesDepthFirst()
+                .filterIsInstance<Chokeable>()
+                .forEach(Chokeable::onChoke)
+            Echo.stopAll()
+        }
+
+        if (clearMulti) {
+            resetMulti()
+        }
+
+        if (clearLights) {
+            if (restartContinuousLights) {
+                Heaven.clear {
+                    continuousLights.forEach { it.restartContinuousPlayback() }
+                }
+            } else {
+                Heaven.clear()
+            }
+        }
+    }
+
     fun loadWorkspace(workspaceData: SavableWorkspaceData, fromRemote: Boolean = false) {
         AutoPlayRepository.stopAutoPlay()
         TimelineRepository.stop()
+        clearEverything(restartContinuousLights = false)
         Echo.reset()
-        Heaven.clear()
 
         if (fromRemote) {
             isApplyingRemoteBpmUpdate = true
@@ -1045,8 +1093,8 @@ object WorkspaceRepository {
         TimelineRepository.loadTracks(emptyList())
         UndoManager.clear()
         SelectionManager.clear()
+        clearEverything(restartContinuousLights = false)
         Echo.reset()
-        Heaven.clear()
         AudioLibraryRepository.clear()
         StemExtractionRepository.reset()
         TransmitChainDevice.clearReceivers()

@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.elements.isSilentReplay
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
@@ -123,9 +122,11 @@ class ClearChainDevice : GenericChainDevice<ClearChainDeviceState>() {
             if (released) {
                 Heaven.schedule(1.0, owner = this) {
                     val s = state.value
-                    if (s.clearLights) Heaven.clear()
-                    if (s.clearAudio) Echo.stopAll()
-                    if (s.clearMulti)  WorkspaceRepository.resetMulti()
+                    WorkspaceRepository.clearEverything(
+                        clearLights = s.clearLights,
+                        clearAudio = s.clearAudio,
+                        clearMulti = s.clearMulti,
+                    )
                 }
             }
         }

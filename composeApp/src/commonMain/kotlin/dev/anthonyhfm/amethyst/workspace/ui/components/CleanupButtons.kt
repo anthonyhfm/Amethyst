@@ -11,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BrushCleaning
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCcw
-import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SeparatorOrientation
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -31,7 +30,7 @@ fun CleanupButtons() {
         )
 
         WorkspaceToolbarIconButton(
-            onClick = { Heaven.clear() },
+            onClick = { WorkspaceRepository.clearEverything() },
             imageVector = Lucide.BrushCleaning,
             contentDescription = stringResource(Res.string.workspace_cleanup_lights),
         )
