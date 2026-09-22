@@ -1,16 +1,34 @@
 package dev.anthonyhfm.amethyst.devices.audio.effects
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.device_eq_three_high_kill
+import amethyst.composeapp.generated.resources.device_eq_three_low_kill
+import amethyst.composeapp.generated.resources.device_eq_three_mid_kill
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import org.jetbrains.compose.resources.stringResource
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -30,6 +48,15 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.theme.background
+import dev.anthonyhfm.amethyst.ui.theme.border
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.destructive
+import dev.anthonyhfm.amethyst.ui.theme.destructiveForeground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -65,8 +92,6 @@ class EqThreeChainDevice : AudioChainDevice<EqThreeChainDeviceState>(), Paramete
                 .coerceAtLeast(lowCrossover + 10f)
             lowSplit.configure(lowCrossover, configuration.sampleRate)
             midSplit.configure(highCrossover, configuration.sampleRate)
-            // The band switches are no longer exposed by the compact UI, but old
-            // projects that saved a muted band must continue to sound the same.
             lowGain.setTarget(if (snapshot.lowKilled) 0f else dbGain(resolveRealtimeParameter(PARAMETERS[0], snapshot.lowGainDb, absoluteFrame)))
             midGain.setTarget(if (snapshot.midKilled) 0f else dbGain(resolveRealtimeParameter(PARAMETERS[1], snapshot.midGainDb, absoluteFrame)))
             highGain.setTarget(if (snapshot.highKilled) 0f else dbGain(resolveRealtimeParameter(PARAMETERS[2], snapshot.highGainDb, absoluteFrame)))
@@ -105,6 +130,9 @@ class EqThreeChainDevice : AudioChainDevice<EqThreeChainDeviceState>(), Paramete
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        var gestureStart by remember { mutableStateOf(deviceState) }
+        val startGesture = { gestureStart = state.value }
+        val finishGesture = { pushStateChange(gestureStart, state.value) }
         ChainDeviceShell(
             title = "EQ Three",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
@@ -113,18 +141,39 @@ class EqThreeChainDevice : AudioChainDevice<EqThreeChainDeviceState>(), Paramete
             titleBarModifier = LocalTitleBarModifier.current,
         ) {
             Column(
-                Modifier.fillMaxWidth().padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    GainDial("lowGain", "Gain Low", deviceState.lowGainDb) { state.update { s -> s.copy(lowGainDb = it) } }
-                    GainDial("midGain", "Gain Mid", deviceState.midGainDb) { state.update { s -> s.copy(midGainDb = it) } }
-                    GainDial("highGain", "Gain High", deviceState.highGainDb) { state.update { s -> s.copy(highGainDb = it) } }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        GainDial("lowGain", "Gain Low", deviceState.lowGainDb, startGesture, finishGesture) { state.update { s -> s.copy(lowGainDb = it) } }
+                        BandKillControl(stringResource(Res.string.device_eq_three_low_kill), deviceState.lowKilled) { killed ->
+                            val before = state.value
+                            state.update { it.copy(lowKilled = killed) }
+                            pushStateChange(before, state.value)
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        GainDial("midGain", "Gain Mid", deviceState.midGainDb, startGesture, finishGesture) { state.update { s -> s.copy(midGainDb = it) } }
+                        BandKillControl(stringResource(Res.string.device_eq_three_mid_kill), deviceState.midKilled) { killed ->
+                            val before = state.value
+                            state.update { it.copy(midKilled = killed) }
+                            pushStateChange(before, state.value)
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        GainDial("highGain", "Gain High", deviceState.highGainDb, startGesture, finishGesture) { state.update { s -> s.copy(highGainDb = it) } }
+                        BandKillControl(stringResource(Res.string.device_eq_three_high_kill), deviceState.highKilled) { killed ->
+                            val before = state.value
+                            state.update { it.copy(highKilled = killed) }
+                            pushStateChange(before, state.value)
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    FrequencyDial("lowCrossover", "Low / Mid", deviceState.lowCrossoverHz, 60f, 2_000f) { state.update { s -> s.copy(lowCrossoverHz = it) } }
-                    GainDial("output", "Output", deviceState.outputGainDb) { state.update { s -> s.copy(outputGainDb = it) } }
-                    FrequencyDial("highCrossover", "Mid / High", deviceState.highCrossoverHz, 500f, 16_000f) { state.update { s -> s.copy(highCrossoverHz = it) } }
+                    FrequencyDial("lowCrossover", "Low / Mid", deviceState.lowCrossoverHz, 60f, 2_000f, startGesture, finishGesture) { state.update { s -> s.copy(lowCrossoverHz = it) } }
+                    GainDial("output", "Output", deviceState.outputGainDb, startGesture, finishGesture) { state.update { s -> s.copy(outputGainDb = it) } }
+                    FrequencyDial("highCrossover", "Mid / High", deviceState.highCrossoverHz, 500f, 16_000f, startGesture, finishGesture) { state.update { s -> s.copy(highCrossoverHz = it) } }
                 }
             }
         }
@@ -156,7 +205,6 @@ data class EqThreeChainDeviceState(
     val lowCrossoverHz: Float = 250f,
     val highCrossoverHz: Float = 2_500f,
     val outputGainDb: Float = 0f,
-    /** Legacy serialized fields; band-kill controls are no longer part of EQ Three. */
     val lowKilled: Boolean = false,
     val midKilled: Boolean = false,
     val highKilled: Boolean = false,
@@ -166,7 +214,14 @@ data class EqThreeChainDeviceState(
 }
 
 @Composable
-private fun GainDial(id: String, label: String, value: Float, onValue: (Float) -> Unit) {
+private fun GainDial(
+    id: String,
+    label: String,
+    value: Float,
+    onStart: () -> Unit,
+    onFinish: () -> Unit,
+    onValue: (Float) -> Unit,
+) {
     AutomatableDial(
         parameterId = id,
         type = DialType.Continuous,
@@ -174,13 +229,24 @@ private fun GainDial(id: String, label: String, value: Float, onValue: (Float) -
         defaultValue = 0.5f,
         title = label,
         text = "${value.roundToInt()} dB",
+        onStartValueChange = { onStart() },
         onValueChange = { onValue(it * 48f - 24f) },
+        onFinishValueChange = { onFinish() },
         isFlat = false,
     )
 }
 
 @Composable
-private fun FrequencyDial(id: String, label: String, value: Float, min: Float, max: Float, onValue: (Float) -> Unit) {
+private fun FrequencyDial(
+    id: String,
+    label: String,
+    value: Float,
+    min: Float,
+    max: Float,
+    onStart: () -> Unit,
+    onFinish: () -> Unit,
+    onValue: (Float) -> Unit,
+) {
     AutomatableDial(
         parameterId = id,
         type = DialType.Continuous,
@@ -188,7 +254,28 @@ private fun FrequencyDial(id: String, label: String, value: Float, min: Float, m
         defaultValue = 0.5f,
         title = label,
         text = "${value.roundToInt()} Hz",
+        onStartValueChange = { onStart() },
         onValueChange = { onValue(min + it * (max - min)) },
+        onFinishValueChange = { onFinish() },
         isFlat = false,
     )
+}
+
+@Composable
+private fun BandKillControl(label: String, killed: Boolean, onKilledChange: (Boolean) -> Unit) {
+    val backgroundColor = if (killed) Theme[colors][destructive] else Theme[colors][background]
+    val contentColor = if (killed) Theme[colors][destructiveForeground] else Theme[colors][mutedForeground]
+    val borderColor = if (killed) Theme[colors][destructive] else Theme[colors][border]
+    Box(
+        modifier = Modifier
+            .width(72.dp)
+            .height(18.dp)
+            .clip(SmallShape)
+            .background(backgroundColor)
+            .border(1.dp, borderColor, SmallShape)
+            .toggleable(value = killed, role = Role.Checkbox, onValueChange = onKilledChange),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = label, style = Theme[typography][small], color = contentColor, maxLines = 1)
+    }
 }

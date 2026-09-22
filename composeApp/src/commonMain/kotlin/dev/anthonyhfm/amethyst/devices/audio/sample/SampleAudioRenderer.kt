@@ -33,8 +33,6 @@ internal class SampleRenderSnapshot private constructor(
     val panLeftGain: Float,
     val panRightGain: Float,
     val volumeAutomationLane: TimelineAutomationLane?,
-    val warpMode: SampleWarpMode,
-    val tempoRatio: Double,
     val pitchRatio: Double,
 ) {
     val activeFrames: Long get() = endFrame - startFrame
@@ -125,7 +123,6 @@ internal class SampleRenderSnapshot private constructor(
         fun from(
             state: SampleChainDeviceState,
             source: ByteArrayPcmAudioSource,
-            workspaceBpm: Double = state.sourceBpm?.toDouble() ?: 120.0,
         ): SampleRenderSnapshot? {
             val sourceAssetFrames = state.resolvedRawData()
                 ?.size
@@ -172,8 +169,6 @@ internal class SampleRenderSnapshot private constructor(
                 volumeAutomationLane = state.volumeAutomationLane?.normalized()?.takeIf {
                     it.enabled && it.target == TimelineTrackAutomationTarget.VOLUME
                 },
-                warpMode = state.warpMode,
-                tempoRatio = sampleTempoRatio(state.warpMode, state.sourceBpm, workspaceBpm),
                 pitchRatio = 2.0.pow(
                     (state.transposeSemitones.takeIf(Float::isFinite) ?: 0f)
                         .coerceIn(-48f, 48f) / 12.0,
@@ -297,15 +292,6 @@ internal class SampleVoiceRenderer {
     private var releaseFramesTotal = 0
     private var lastLeft = 0f
     private var lastRight = 0f
-    private var tempoRatio = 1.0
-    private var targetTempoRatio = 1.0
-    private var warpLatencyRemaining = 0
-    private var warpOutputFrames = 0L
-    private var warpConsumedSourceFrames = 0.0
-    private var warpGrainPhase = 0
-    private var warpCurrentGrainStart = 0.0
-    private var warpPreviousGrainStart = 0.0
-    private var warpPreviousGrainValid = false
 
     var startSequence: Long = -1L
         private set
@@ -342,19 +328,6 @@ internal class SampleVoiceRenderer {
         this.key = key
         startSequence = sequence
         sourcePosition = snapshot.startFrame.toDouble()
-        tempoRatio = snapshot.tempoRatio
-        targetTempoRatio = snapshot.tempoRatio
-        warpLatencyRemaining = if (snapshot.warpMode == SampleWarpMode.Warp) WARP_LATENCY_FRAMES else 0
-        warpOutputFrames = 0L
-        warpConsumedSourceFrames = 0.0
-        warpGrainPhase = 0
-        warpCurrentGrainStart = snapshot.startFrame.toDouble()
-        warpPreviousGrainStart = warpCurrentGrainStart
-        warpPreviousGrainValid = false
-    }
-
-    fun updateTempoRatio(ratio: Double) {
-        targetTempoRatio = ratio.coerceIn(MINIMUM_TEMPO_RATIO, MAXIMUM_TEMPO_RATIO)
     }
 
     fun requestRelease(key: PadTriggerKey, fadeFrames: Int) {
@@ -383,8 +356,7 @@ internal class SampleVoiceRenderer {
         var rendered = 0
         while (rendered < frameCount) {
             val active = snapshot ?: break
-            rampTempoRatio()
-            if (active.warpMode != SampleWarpMode.Warp && sourcePosition >= playbackBoundary(active)) {
+            if (sourcePosition >= playbackBoundary(active)) {
                 if (active.playbackMode == SamplePlaybackMode.GateLoop && releaseFramesRemaining == 0) {
                     val overshoot = sourcePosition - active.loopEndFrame
                     sourcePosition = active.loopStartFrame + overshoot
@@ -394,21 +366,8 @@ internal class SampleVoiceRenderer {
                 }
             }
 
-            if (active.warpMode == SampleWarpMode.Warp && warpFinished(active)) {
-                if (active.playbackMode == SamplePlaybackMode.GateLoop && releaseFramesRemaining == 0) {
-                    resetWarpLoop(active)
-                } else {
-                    stopImmediately()
-                    break
-                }
-            }
-
-            val relativeFrame = if (active.warpMode == SampleWarpMode.Warp) {
-                (warpOutputFrames * tempoRatio).toLong().coerceAtLeast(0L)
-            } else {
-                (sourcePosition - active.startFrame).toLong().coerceAtLeast(0L)
-            }
-            if (active.warpMode == SampleWarpMode.Warp) readWarpFrame(active) else readSourceFrame(active)
+            val relativeFrame = (sourcePosition - active.startFrame).toLong().coerceAtLeast(0L)
+            readSourceFrame(active)
             val modulationFrame = destinationFrameOffset + rendered
             var gain = gainAt(
                 active,
@@ -420,11 +379,10 @@ internal class SampleVoiceRenderer {
             if (releaseFramesRemaining > 0) {
                 gain *= releaseFramesRemaining.toFloat() / releaseFramesTotal.toFloat()
             }
-            val latencyGain = if (warpLatencyRemaining > 0) 0f else 1f
             val leftPan = modulation?.panLeftGain?.get(modulationFrame) ?: active.panLeftGain
             val rightPan = modulation?.panRightGain?.get(modulationFrame) ?: active.panRightGain
-            val left = sourceFrameBuffer[0] * gain * leftPan * latencyGain
-            val right = sourceFrameBuffer[1] * gain * rightPan * latencyGain
+            val left = sourceFrameBuffer[0] * gain * leftPan
+            val right = sourceFrameBuffer[1] * gain * rightPan
             val transitionProgress = if (transitionFramesRemaining > 0) {
                 1f - transitionFramesRemaining.toFloat() / transitionFramesTotal.toFloat()
             } else 1f
@@ -444,24 +402,9 @@ internal class SampleVoiceRenderer {
                     break
                 }
             }
-            when (active.warpMode) {
-                SampleWarpMode.Off -> sourcePosition += active.pitchRatio
-                SampleWarpMode.Repitch -> sourcePosition += tempoRatio * active.pitchRatio
-                SampleWarpMode.Warp -> {
-                    if (warpLatencyRemaining > 0) {
-                        warpLatencyRemaining--
-                    } else {
-                        advanceWarp(active)
-                    }
-                }
-            }
-            if (active.playbackMode == SamplePlaybackMode.OneShot) {
-                val finished = if (active.warpMode == SampleWarpMode.Warp) {
-                    warpFinished(active)
-                } else {
-                    sourcePosition >= active.endFrame
-                }
-                if (finished) stopImmediately()
+            sourcePosition += active.pitchRatio
+            if (active.playbackMode == SamplePlaybackMode.OneShot && sourcePosition >= active.endFrame) {
+                stopImmediately()
             }
             rendered++
         }
@@ -479,15 +422,6 @@ internal class SampleVoiceRenderer {
         releaseFramesTotal = 0
         lastLeft = 0f
         lastRight = 0f
-        tempoRatio = 1.0
-        targetTempoRatio = 1.0
-        warpLatencyRemaining = 0
-        warpOutputFrames = 0L
-        warpConsumedSourceFrames = 0.0
-        warpGrainPhase = 0
-        warpCurrentGrainStart = 0.0
-        warpPreviousGrainStart = 0.0
-        warpPreviousGrainValid = false
         startSequence = -1L
     }
 
@@ -507,86 +441,6 @@ internal class SampleVoiceRenderer {
         }
     }
 
-    /**
-     * Dependency-free synchronous granular OLA. Each grain reads at 1x (pitch lock), while
-     * grain anchors follow the tempo ratio. The implementation is allocation-free and lives
-     * in commonMain, so every supported desktop target uses identical DSP and project state.
-     */
-    private fun readWarpFrame(snapshot: SampleRenderSnapshot) {
-        if (warpLatencyRemaining > 0) {
-            sourceFrameBuffer[0] = 0f
-            sourceFrameBuffer[1] = 0f
-            return
-        }
-        val blend = warpGrainPhase.toFloat() / WARP_GRAIN_HOP.toFloat()
-        val currentPosition = wrapWarpPosition(
-            snapshot,
-            warpCurrentGrainStart + warpGrainPhase * snapshot.pitchRatio,
-        )
-        val previousPosition = wrapWarpPosition(
-            snapshot,
-            warpPreviousGrainStart + (warpGrainPhase + WARP_GRAIN_HOP) * snapshot.pitchRatio,
-        )
-        var channel = 0
-        while (channel < 2) {
-            val sourceChannel = if (snapshot.source.channels == 1) 0 else channel
-            val current = interpolatedSample(snapshot, currentPosition, sourceChannel)
-            val previous = if (warpPreviousGrainValid) {
-                interpolatedSample(snapshot, previousPosition, sourceChannel)
-            } else current
-            sourceFrameBuffer[channel] = previous + (current - previous) * blend
-            channel++
-        }
-        sourcePosition = currentPosition
-    }
-
-    private fun advanceWarp(snapshot: SampleRenderSnapshot) {
-        warpOutputFrames++
-        warpConsumedSourceFrames += tempoRatio
-        warpGrainPhase++
-        if (warpGrainPhase >= WARP_GRAIN_HOP) {
-            warpGrainPhase = 0
-            warpPreviousGrainStart = warpCurrentGrainStart
-            warpPreviousGrainValid = true
-            warpCurrentGrainStart += WARP_GRAIN_HOP * tempoRatio
-            if (snapshot.playbackMode == SamplePlaybackMode.GateLoop) {
-                warpCurrentGrainStart = wrapWarpPosition(snapshot, warpCurrentGrainStart)
-            }
-        }
-    }
-
-    private fun warpFinished(snapshot: SampleRenderSnapshot): Boolean =
-        warpLatencyRemaining == 0 &&
-            warpConsumedSourceFrames >= if (
-                snapshot.playbackMode == SamplePlaybackMode.GateLoop && releaseFramesRemaining == 0
-            ) {
-                snapshot.loopEndFrame - snapshot.loopStartFrame
-            } else {
-                snapshot.activeFrames
-            }
-
-    private fun resetWarpLoop(snapshot: SampleRenderSnapshot) {
-        warpOutputFrames = 0L
-        warpConsumedSourceFrames = 0.0
-        warpGrainPhase = 0
-        warpCurrentGrainStart = snapshot.loopStartFrame.toDouble()
-        warpPreviousGrainStart = warpCurrentGrainStart
-        warpPreviousGrainValid = false
-        sourcePosition = warpCurrentGrainStart
-    }
-
-    private fun wrapWarpPosition(snapshot: SampleRenderSnapshot, position: Double): Double {
-        val looping = snapshot.playbackMode == SamplePlaybackMode.GateLoop && releaseFramesRemaining == 0
-        val lower = if (looping) snapshot.loopStartFrame else snapshot.startFrame
-        val upper = if (looping) snapshot.loopEndFrame else snapshot.endFrame
-        val length = (upper - lower).toDouble().coerceAtLeast(1.0)
-        return if (looping) {
-            lower + ((position - lower) % length + length) % length
-        } else {
-            position.coerceIn(lower.toDouble(), (upper - 1).toDouble())
-        }
-    }
-
     private fun interpolatedSample(snapshot: SampleRenderSnapshot, position: Double, channel: Int): Float {
         val lowerFrame = floor(position).toLong()
         val fraction = (position - lowerFrame).toFloat()
@@ -594,11 +448,6 @@ internal class SampleVoiceRenderer {
         val lower = snapshot.source.sample(lowerFrame.coerceIn(snapshot.startFrame, snapshot.endFrame - 1L), channel)
         val upper = snapshot.source.sample(upperFrame, channel)
         return lower + (upper - lower) * fraction
-    }
-
-    private fun rampTempoRatio() {
-        val frames = (configuration.sampleRate * TEMPO_RAMP_SECONDS).coerceAtLeast(1f)
-        tempoRatio += (targetTempoRatio - tempoRatio) / frames
     }
 
     private fun gainAt(
@@ -625,11 +474,6 @@ internal class SampleVoiceRenderer {
 
     private companion object {
         const val RETRIGGER_TRANSITION_SECONDS = 0.00133f
-        const val TEMPO_RAMP_SECONDS = 0.02f
-        const val WARP_GRAIN_HOP = 128
-        const val WARP_LATENCY_FRAMES = WARP_GRAIN_HOP
-        const val MINIMUM_TEMPO_RATIO = 0.25
-        const val MAXIMUM_TEMPO_RATIO = 4.0
     }
 }
 
@@ -666,10 +510,6 @@ internal class SampleVoicePool(
             }
             is SampleVoiceCommand.Choke -> voices.forEach { it.requestStop(command.fadeFrames) }
         }
-    }
-
-    fun updateTempoRatio(ratio: Double) {
-        voices.forEach { voice -> if (voice.isActive) voice.updateTempoRatio(ratio) }
     }
 
     private fun start(command: SampleVoiceCommand.Start) {
@@ -746,11 +586,4 @@ internal class SampleVoicePool(
     private companion object {
         const val DEFAULT_MAXIMUM_VOICES = 16
     }
-}
-
-internal fun sampleTempoRatio(mode: SampleWarpMode, sourceBpm: Float?, workspaceBpm: Double): Double {
-    if (mode == SampleWarpMode.Off) return 1.0
-    val source = sourceBpm?.toDouble()?.takeIf { it.isFinite() && it > 0.0 } ?: return 1.0
-    val workspace = workspaceBpm.takeIf { it.isFinite() && it > 0.0 } ?: return 1.0
-    return (workspace / source).coerceIn(0.25, 4.0)
 }

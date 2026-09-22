@@ -6,18 +6,12 @@ import dev.anthonyhfm.amethyst.core.parameter.ParameterAddress
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
 import dev.anthonyhfm.amethyst.core.parameter.ParameterValueResolver
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
-import dev.anthonyhfm.amethyst.devices.AudioProcessingBlock
-import dev.anthonyhfm.amethyst.devices.AudioRenderContext
-import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
-import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
-import dev.anthonyhfm.amethyst.devices.DeviceRegistry
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMappingMode
-import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -145,67 +139,6 @@ class LiveAutomationTest {
     }
 
     @Test
-    fun padStartsMacroAutomationOnAudioFrameClock() {
-        val target = LiveAutomationTarget.Macro("macro-a")
-        val device = AutomationChainDevice().apply {
-            state.value = AutomationChainDeviceState(
-                target = target,
-                automation = LiveAutomation(settings = LiveAutomationSettings(
-                    durationValue = 100f,
-                    timingUnit = LiveAutomationTimingUnit.Milliseconds,
-                )),
-            )
-        }
-        val chain = AudioChain().apply {
-            add(device, fromUser = false)
-            prepareAudio(AudioConfiguration(1_000, 2, 64))
-        }
-        val block = AudioProcessingBlock(FloatArray(128), 2, 64).apply { configure(25, 0) }
-
-        device.signalEnter(listOf(Signal.Midi("pad", 1, 1, 127)))
-        chain.processAudio(block, AudioRenderContext(1_000, 0))
-
-        val value = checkNotNull(device.audioTriggerRuntime?.automationValue(target, 25))
-        assertTrue(abs(value - 0.25f) < 0.001f)
-        assertTrue(device.isAutomationRunning)
-        assertFalse(block.samples.any { !it.isFinite() })
-    }
-
-    @Test
-    fun padUpStopsOnlyTheAutomationStartedByTheSamePad() {
-        val device = AutomationChainDevice().apply {
-            state.value = AutomationChainDeviceState(
-                target = LiveAutomationTarget.Macro("macro-a"),
-                automation = LiveAutomation(settings = LiveAutomationSettings(
-                    durationValue = 1_000f,
-                    timingUnit = LiveAutomationTimingUnit.Milliseconds,
-                    stopOnPadUp = true,
-                )),
-            )
-        }
-        val chain = AudioChain().apply {
-            add(device, fromUser = false)
-            prepareAudio(AudioConfiguration(1_000, 2, 64))
-        }
-        val block = AudioProcessingBlock(FloatArray(128), 2, 64)
-
-        device.signalEnter(listOf(Signal.Midi("pad", 1, 1, 127)))
-        block.configure(1, 0)
-        chain.processAudio(block, AudioRenderContext(1_000, 0))
-        assertTrue(device.isAutomationRunning)
-
-        device.signalEnter(listOf(Signal.Midi("pad", 2, 1, 0)))
-        block.configure(1, 1)
-        chain.processAudio(block, AudioRenderContext(1_000, 1))
-        assertTrue(device.isAutomationRunning)
-
-        device.signalEnter(listOf(Signal.Midi("pad", 1, 1, 0)))
-        block.configure(1, 2)
-        chain.processAudio(block, AudioRenderContext(1_000, 2))
-        assertFalse(device.isAutomationRunning)
-    }
-
-    @Test
     fun macroControlAutomationUsesAudioFramesAndLatchesItsEndValue() {
         val previousMacros = WorkspaceRepository.macros.value
         val macro = Macro(value = 23, id = "macro-live", name = "Live")
@@ -268,22 +201,4 @@ class LiveAutomationTest {
         }
     }
 
-    @Test
-    fun automationDeviceStateRoundTripsItsPersistentTarget() {
-        val original = AutomationChainDeviceState(
-            target = LiveAutomationTarget.Parameter(ParameterAddress("device-a", "cutoff")),
-            automation = LiveAutomation(
-                parameterId = "cutoff",
-                settings = LiveAutomationSettings(
-                    curve = LiveAutomationCurve.SCurve,
-                    retriggerMode = LiveAutomationRetriggerMode.Blend,
-                    blendDurationMs = 42f,
-                ),
-            ),
-        )
-
-        val restored = DeviceRegistry.deepCopyState(original) as AutomationChainDeviceState
-
-        assertEquals(original, restored)
-    }
 }

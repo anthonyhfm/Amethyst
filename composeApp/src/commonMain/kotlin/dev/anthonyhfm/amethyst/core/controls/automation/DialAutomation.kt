@@ -37,7 +37,7 @@ data class LiveAutomationSettings(
     val stopOnPadUp: Boolean = false,
 )
 
-/** Parameter-independent automation shared by direct controls and automation devices. */
+/** Parameter-independent automation shared by automatable controls and macro control. */
 @Serializable
 data class LiveAutomation(
     val parameterId: String = "",

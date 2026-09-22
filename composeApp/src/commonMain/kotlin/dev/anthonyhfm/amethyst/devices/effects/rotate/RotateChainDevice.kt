@@ -384,7 +384,7 @@ data class RotateChainDeviceState(
     @ProtoNumber(3)
     val mode: RotateMode = RotateMode.DEGREES_90,
     @ProtoNumber(4)
-    val antiAlias: Boolean = true,
+    val antiAlias: Boolean = false,
     @Automatable(RotateChainDevice.Params.Angle::class)
     @ProtoNumber(5)
     val angleDegrees: Float = 90f,

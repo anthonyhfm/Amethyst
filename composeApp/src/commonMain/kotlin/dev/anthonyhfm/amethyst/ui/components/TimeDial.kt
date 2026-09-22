@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import dev.anthonyhfm.amethyst.core.util.Timing
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
@@ -30,6 +31,10 @@ fun TimeDial(
     enabled: Boolean = true,
     text: String? = null,
     flat: Boolean = false,
+    automationParameter: AutomationParameter? = null,
+    maximumDurationMillis: Long = 1_000L,
+    defaultDurationMillis: Long = maximumDurationMillis / 2L,
+    rightClickTogglesMode: Boolean = true,
 ) {
     val millisecondMode = timing is Timing.Duration
     val bpm by WorkspaceRepository.bpm.collectAsState()
@@ -44,15 +49,20 @@ fun TimeDial(
         lastRythmTiming = currentRythmTiming
     }
 
-    val toggleTimingModeModifier = if (enabled) {
+    val toggleTimingModeModifier = if (enabled && rightClickTogglesMode) {
         Modifier.rightClickable {
             if (timing is Timing.Rythm) {
                 val msVal = timing.toMsValue(bpm)
                 val durationTiming = Timing.Duration(msVal.milliseconds)
+                onStartValueChange(timing, msVal)
                 onSelectTiming(durationTiming, msVal)
+                onFinishValueChange(durationTiming, msVal)
             } else {
                 val rythmTiming = Timing.Rythm(lastRythmTiming)
-                onSelectTiming(rythmTiming, rythmTiming.toMsValue(bpm))
+                val msVal = rythmTiming.toMsValue(bpm)
+                onStartValueChange(timing, timing.toMsValue(bpm))
+                onSelectTiming(rythmTiming, msVal)
+                onFinishValueChange(rythmTiming, msVal)
             }
         }
     } else {
@@ -64,18 +74,18 @@ fun TimeDial(
             if (flat) {
                 FlatDial(
                     type = DialType.Continuous,
-                    value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / 1000,
+                    value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / maximumDurationMillis,
                     onStartValueChange = {
-                        onStartValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                        onStartValueChange(timing, (it * maximumDurationMillis.toFloat()).roundToInt().milliseconds.inWholeMilliseconds)
                     },
                     onValueChange = {
                         onSelectTiming(
-                            Timing.Duration((it * 1000).roundToInt().milliseconds),
-                            (it * 1000).roundToInt().milliseconds.inWholeMilliseconds
+                            Timing.Duration((it * maximumDurationMillis.toFloat()).roundToInt().milliseconds),
+                            (it * maximumDurationMillis.toFloat()).roundToInt().milliseconds.inWholeMilliseconds
                         )
                     },
                     onFinishValueChange = {
-                        onFinishValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                        onFinishValueChange(timing, (it * maximumDurationMillis.toFloat()).roundToInt().milliseconds.inWholeMilliseconds)
                     },
                     title = title,
                     text = text ?: "${timing.duration.inWholeMilliseconds.toInt()} ms",
@@ -83,7 +93,7 @@ fun TimeDial(
                         val timing = it.asTiming()
 
                         timing?.let { t ->
-                            if (t.toMsValue(bpm) <= 1000) {
+                            if (t.toMsValue(bpm) <= maximumDurationMillis) {
                                 onSelectTiming(
                                     t,
                                     t.toMsValue(bpm)
@@ -92,24 +102,25 @@ fun TimeDial(
                         }
                     },
                     enabled = enabled,
-                    defaultValue = 0.5f,
-                    isAutomatable = false,
+                    defaultValue = defaultDurationMillis.toFloat() / maximumDurationMillis,
+                    automationParameter = automationParameter,
+                    isAutomatable = automationParameter != null,
                 )
             } else {
                 Dial(
                     type = DialType.Continuous,
-                    value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / 1000,
+                    value = (timing as Timing.Duration).duration.inWholeMilliseconds.toFloat() / maximumDurationMillis,
                     onStartValueChange = {
-                        onStartValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                        onStartValueChange(timing, (it * maximumDurationMillis.toFloat()).roundToInt().milliseconds.inWholeMilliseconds)
                     },
                     onValueChange = {
                         onSelectTiming(
-                            Timing.Duration((it * 1000).roundToInt().milliseconds),
-                            (it * 1000).roundToInt().milliseconds.inWholeMilliseconds
+                            Timing.Duration((it * maximumDurationMillis.toFloat()).roundToInt().milliseconds),
+                            (it * maximumDurationMillis.toFloat()).roundToInt().milliseconds.inWholeMilliseconds
                         )
                     },
                     onFinishValueChange = {
-                        onFinishValueChange(timing, (it * 1000).roundToInt().milliseconds.inWholeMilliseconds)
+                        onFinishValueChange(timing, (it * maximumDurationMillis.toFloat()).roundToInt().milliseconds.inWholeMilliseconds)
                     },
                     title = title,
                     text = text ?: "${timing.duration.inWholeMilliseconds.toInt()} ms",
@@ -117,7 +128,7 @@ fun TimeDial(
                         val timing = it.asTiming()
 
                         timing?.let { t ->
-                            if (t.toMsValue(bpm) <= 1000) {
+                            if (t.toMsValue(bpm) <= maximumDurationMillis) {
                                 onSelectTiming(
                                     t,
                                     t.toMsValue(bpm)
@@ -126,8 +137,9 @@ fun TimeDial(
                         }
                     },
                     enabled = enabled,
-                    defaultValue = 0.5f,
-                    isAutomatable = false,
+                    defaultValue = defaultDurationMillis.toFloat() / maximumDurationMillis,
+                    automationParameter = automationParameter,
+                    isAutomatable = automationParameter != null,
                 )
             }
         } else {

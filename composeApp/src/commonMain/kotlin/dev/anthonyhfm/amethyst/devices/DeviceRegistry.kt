@@ -3,7 +3,6 @@ package dev.anthonyhfm.amethyst.devices
 import dev.anthonyhfm.amethyst.devices.ableton.AbletonArpeggiatorChainDevice
 import dev.anthonyhfm.amethyst.devices.ableton.AbletonPitcherChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
-import dev.anthonyhfm.amethyst.devices.audio.automation.AutomationChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.EqThreeChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.EqEightChainDevice
 import dev.anthonyhfm.amethyst.devices.audio.effects.FilterChainDevice
@@ -84,7 +83,6 @@ object DeviceRegistry {
         register(PreviewChainDevice)
         register(RotateChainDevice)
         register(SampleChainDevice)
-        register(AutomationChainDevice)
         register(EqThreeChainDevice)
         register(EqEightChainDevice)
         register(FilterChainDevice)

@@ -1,15 +1,22 @@
 package dev.anthonyhfm.amethyst.devices.effects.switch
 
+import amethyst.composeapp.generated.resources.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
+import org.jetbrains.compose.resources.stringResource
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
 import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntime
@@ -32,6 +40,8 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
 import dev.anthonyhfm.amethyst.ui.components.primitives.Dial
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -40,11 +50,13 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.atomicfu.atomic
+import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.TimelineDuration
 import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
@@ -77,14 +89,25 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
     override fun Content() {
         val deviceState by state.collectAsState()
         val macros by WorkspaceRepository.macros.collectAsState()
+        val mappings by WorkspaceRepository.parameterMappings.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        val macroLabel = stringResource(Res.string.device_macro_control_macro_headline)
+        val defaultMacroName = stringResource(Res.string.device_macro_control_macro_1)
+        val effectiveValue by produceState(initialValue = deviceState.value) {
+            while (true) {
+                withFrameNanos {
+                    value = (currentNormalizedValue?.times(127f)?.roundToInt() ?: state.value.value)
+                        .coerceIn(0, 127)
+                }
+            }
+        }
 
         ChainDeviceShell(
-            title = "Macro Control",
+            title = stringResource(Res.string.device_macro_control_title),
             isSelected = selections.any { it.selectionUUID == this.selectionUUID },
             isDragging = isDragging.value,
             modifier = Modifier
-                .width(120.dp),
+                .width(156.dp),
             titleBarModifier = LocalTitleBarModifier.current
         ) {
             Column(
@@ -98,33 +121,33 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                     val selectedIndex = macros.indexOfFirst { it.id == deviceState.macroId }
                         .takeIf { it >= 0 } ?: deviceState.macro.coerceIn(0, macros.lastIndex)
                     val selectedMacro = macros[selectedIndex]
+                    val mappingCount = mappings.count { it.macroId == selectedMacro.id }
                     if (macros.size > 1) {
-                        var beforeMacro = deviceState.copy().macro
+                        var beforeMacro by remember { mutableStateOf(deviceState) }
                         Dial(
-                            title = "Macro",
+                            title = macroLabel,
                             value = selectedIndex,
                             type = DialType.Steps(IntArray(macros.size) { it }.toList()),
-                            text = selectedMacro.name.ifBlank { "Macro ${selectedIndex + 1}" },
+                            text = selectedMacro.name.ifBlank { "$macroLabel ${selectedIndex + 1}" },
                             onResolveTextValue = {
                                 val macroText = it.trim().toIntOrNull()
 
                                 macroText?.let { macro ->
                                     if (macro in 1..macros.size) {
+                                        val before = state.value
                                         clearAutomationOverride()
                                         state.update {
                                             it.copy(macro = macro - 1, macroId = macros[macro - 1].id)
                                         }
+                                        pushStateChange(before, state.value)
                                     }
                                 }
                             },
                             onStartValueChange = {
-                                beforeMacro = it
+                                beforeMacro = state.value
                             },
                             onFinishValueChange = {
-                                pushStateChange(
-                                    before = state.value.copy(macro = beforeMacro),
-                                    after = state.value
-                                )
+                                pushStateChange(before = beforeMacro, after = state.value)
                             },
                             onValueChange = { value ->
                                 clearAutomationOverride()
@@ -140,7 +163,7 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = selectedMacro.name.ifBlank { "Macro 1" },
+                                text = selectedMacro.name.ifBlank { "$macroLabel 1" },
                                 textAlign = TextAlign.Center,
                                 style = Theme[typography][small],
                                 color = Theme[colors][foreground]
@@ -148,41 +171,71 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                         }
                     }
 
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = stringResource(
+                                if (mappingCount == 1) Res.string.device_macro_control_mapping_count
+                                else Res.string.device_macro_control_mappings_count,
+                                mappingCount,
+                            ),
+                            style = Theme[typography][small],
+                            color = Theme[colors][mutedForeground],
+                        )
+                        if (getDialAutomation(VALUE_PARAMETER_ID) != null) {
+                            Text(
+                                text = stringResource(Res.string.device_macro_control_auto),
+                                style = Theme[typography][small],
+                                color = Theme[colors][foreground],
+                            )
+                        }
+                    }
+
+                    var beforeValue by remember { mutableStateOf(deviceState) }
                     AutomatableDial(
                         parameterId = "value",
-                        title = "Value",
+                        title = stringResource(Res.string.device_macro_control_value_headline),
                         value = deviceState.value,
                         defaultValue = 0,
                         type = DialType.Steps(IntArray(128) { it }.toList()),
-                        text = deviceState.value.toString(),
+                        text = effectiveValue.toString(),
                         onResolveTextValue = {
                             val valueText = it.trim().toIntOrNull()
 
                             valueText?.let { value ->
                                 if (value in 0..127) {
+                                    val before = state.value
                                     clearAutomationOverride()
                                     state.update {
                                         it.copy(value = value)
                                     }
+                                    pushStateChange(before, state.value)
                                 }
                             }
                         },
+                        onStartValueChange = { beforeValue = state.value },
                         onValueChange = { value ->
                             clearAutomationOverride()
                             state.update {
                                 it.copy(value = value)
                             }
                         },
+                        onFinishValueChange = { pushStateChange(beforeValue, state.value) },
                     )
                 } else {
                     Text(
-                        text = "No macros available",
+                        text = stringResource(Res.string.device_macro_control_no_macros),
                         modifier = Modifier
                             .padding(horizontal = 12.dp),
                         textAlign = TextAlign.Center,
                         style = Theme[typography][small],
                         color = Theme[colors][mutedForeground]
                     )
+                    Button(
+                        onClick = { WorkspaceRepository.addMacro(Macro(value = 0, name = defaultMacroName)) },
+                        size = ButtonSize.Small,
+                    ) {
+                        Text(stringResource(Res.string.device_macro_control_create))
+                    }
                 }
             }
         }

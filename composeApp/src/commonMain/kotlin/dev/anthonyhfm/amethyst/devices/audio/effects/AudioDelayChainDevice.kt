@@ -10,11 +10,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.parameter.ParameterDescriptor
 import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
@@ -33,6 +37,7 @@ import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.components.AutomatableDial
 import dev.anthonyhfm.amethyst.ui.components.DialType
 import dev.anthonyhfm.amethyst.ui.components.TimeDial
+import dev.anthonyhfm.amethyst.ui.components.toMsValue
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
 import dev.anthonyhfm.amethyst.ui.components.primitives.Separator
@@ -168,6 +173,9 @@ class AudioDelayChainDevice : AudioChainDevice<AudioDelayChainDeviceState>(), Pa
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        var gestureStart by remember { mutableStateOf(deviceState) }
+        val startGesture = { gestureStart = state.value }
+        val finishGesture = { pushStateChange(gestureStart, state.value) }
         ChainDeviceShell(
             title = "Delay",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
@@ -179,9 +187,23 @@ class AudioDelayChainDevice : AudioChainDevice<AudioDelayChainDeviceState>(), Pa
                 Modifier.fillMaxWidth().padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(Modifier.width(104.dp)) {
+                Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     DelaySelect("Mode", deviceState.stereoMode.label, AudioDelayStereoMode.entries.map { it.label }) { label ->
                         changeState { copy(stereoMode = AudioDelayStereoMode.entries.first { it.label == label }) }
+                    }
+                    DelaySelect("Time", deviceState.timeMode.label, AudioDelayTimeMode.entries.map { it.label }) { label ->
+                        val mode = AudioDelayTimeMode.entries.first { it.label == label }
+                        changeState {
+                            val newTiming = if (mode == AudioDelayTimeMode.Milliseconds) {
+                                Timing.Duration(timeMs.roundToInt().milliseconds)
+                            } else {
+                                val rhythm = Timing.Rythm.RythmTiming.entries.firstOrNull {
+                                    it.text == noteValue.label
+                                } ?: Timing.Rythm.RythmTiming._1_4
+                                Timing.Rythm(rhythm)
+                            }
+                            withTiming(newTiming, newTiming.toMsValue(WorkspaceRepository.bpm.value))
+                        }
                     }
                 }
                 Separator(Modifier.height(168.dp), orientation = SeparatorOrientation.Vertical)
@@ -193,16 +215,24 @@ class AudioDelayChainDevice : AudioChainDevice<AudioDelayChainDeviceState>(), Pa
                             onSelectTiming = { timing, milliseconds ->
                                 state.update { current -> current.withTiming(timing, milliseconds) }
                             },
+                            onStartValueChange = { _, _ -> startGesture() },
+                            onFinishValueChange = { _, _ -> finishGesture() },
+                            automationParameter = if (deviceState.resolvedTiming() is Timing.Duration) {
+                                TIME_AUTOMATION_PARAMETER
+                            } else null,
+                            maximumDurationMillis = PARAMETERS[0].maximum.toLong(),
+                            defaultDurationMillis = PARAMETERS[0].defaultValue.toLong(),
+                            rightClickTogglesMode = false,
                         )
-                        EffectDial("feedback", "Feedback", deviceState.feedback, "${(deviceState.feedback * 100).roundToInt()}%") {
+                        EffectDial("feedback", "Feedback", deviceState.feedback, "${(deviceState.feedback * 100).roundToInt()}%", startGesture, finishGesture) {
                             state.update { s -> s.copy(feedback = it) }
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        EffectDial("filter", "Filter", PARAMETERS[3].normalize(deviceState.filterHz), "${deviceState.filterHz.roundToInt()} Hz") {
+                        EffectDial("filter", "Filter", PARAMETERS[3].normalize(deviceState.filterHz), "${deviceState.filterHz.roundToInt()} Hz", startGesture, finishGesture) {
                             state.update { s -> s.copy(filterHz = PARAMETERS[3].denormalize(it)) }
                         }
-                        EffectDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%") {
+                        EffectDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%", startGesture, finishGesture) {
                             state.update { s -> s.copy(dryWet = it) }
                         }
                     }
@@ -231,6 +261,10 @@ class AudioDelayChainDevice : AudioChainDevice<AudioDelayChainDeviceState>(), Pa
         private const val MAX_DELAY_SECONDS = 8
         private val TIME_SMOOTHING = ParameterSmoothing(20f)
         private val MIX_SMOOTHING = ParameterSmoothing(8f)
+        private val TIME_AUTOMATION_PARAMETER = object : AutomationParameter {
+            override val id = "timeMs"
+            override val label = "Time"
+        }
     }
 }
 
@@ -281,7 +315,15 @@ data class AudioDelayChainDeviceState(
 }
 
 @Composable
-internal fun EffectDial(id: String, title: String, value: Float, text: String, onValue: (Float) -> Unit) {
+internal fun EffectDial(
+    id: String,
+    title: String,
+    value: Float,
+    text: String,
+    onStart: () -> Unit = {},
+    onFinish: () -> Unit = {},
+    onValue: (Float) -> Unit,
+) {
     AutomatableDial(
         parameterId = id,
         type = DialType.Continuous,
@@ -289,7 +331,9 @@ internal fun EffectDial(id: String, title: String, value: Float, text: String, o
         defaultValue = 0.5f,
         title = title,
         text = text,
+        onStartValueChange = { onStart() },
         onValueChange = onValue,
+        onFinishValueChange = { onFinish() },
         isFlat = false,
     )
 }

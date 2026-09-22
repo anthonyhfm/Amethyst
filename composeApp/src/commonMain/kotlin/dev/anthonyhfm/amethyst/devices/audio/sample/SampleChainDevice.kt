@@ -129,7 +129,6 @@ private const val SampleEnvelopeCurvePathSteps = 16
 private data class SampleRenderCache(
     val state: SampleChainDeviceState,
     val outputSampleRate: Int,
-    val workspaceBpm: Double,
     val rawData: ByteArray?,
     val preparedSource: ByteArrayPcmAudioSource?,
     val snapshot: SampleRenderSnapshot?,
@@ -142,8 +141,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     override val title: String
         get() = state.value.let { if (it.isLoaded) it.fileName.ifEmpty { "Sample" } else "Sample" }
     override val audioRole = AudioChainDeviceRole.Generator
-    override val latencyFrames: Int
-        get() = if (state.value.warpMode == SampleWarpMode.Warp) WARP_LATENCY_FRAMES else 0
+    override val latencyFrames: Int = 0
 
     private val triggerQueue = SampleTriggerQueue()
     private val voicePool = SampleVoicePool(maximumVoices = 1, monophonic = true)
@@ -158,7 +156,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     override val chokeScopeId: String? get() = state.value.chokeScopeId
     override val chokeOwnerId: String? get() = state.value.chokeOwnerId
     override val parameterDescriptors: List<ParameterDescriptor>
-        get() = PARAMETERS
+        get() = parameterDescriptorsFor(state.value)
 
     /**
      * Source-frame position consumed by the audio renderer, or `-1` while idle.
@@ -197,14 +195,13 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         private const val VOLUME_RANGE_DB = VOLUME_MAX_DB - VOLUME_MIN_DB
         private const val PLAYHEAD_REFRESH_MILLIS = 16L
         private const val RELEASE_RAMP_MILLIS = 3
-        internal const val WARP_LATENCY_FRAMES = 128
         private val SAMPLE_MODULATION_PARAMETER_IDS = arrayOf("gain", "pan", "fadeIn", "fadeOut")
 
-        val PARAMETERS = listOf(
+        private val BASE_PARAMETERS = listOf(
             ParameterDescriptor("gain", "Gain", "dB", -24f, 24f, 0f),
             ParameterDescriptor("pan", "Pan", "%", -100f, 100f, 0f),
-            ParameterDescriptor("fadeIn", "Fade In", "ms", 0f, 60_000f, 0f),
-            ParameterDescriptor("fadeOut", "Fade Out", "ms", 0f, 60_000f, 0f),
+            ParameterDescriptor("fadeIn", "Fade In", "ms", 0f, 1f, 0f),
+            ParameterDescriptor("fadeOut", "Fade Out", "ms", 0f, 1f, 0f),
             ParameterDescriptor("start", "Start", minimum = 0f, maximum = 1f, defaultValue = 0f),
             ParameterDescriptor("end", "End", minimum = 0f, maximum = 1f, defaultValue = 1f),
             ParameterDescriptor("loopStart", "Loop Start", minimum = 0f, maximum = 1f, defaultValue = 0f),
@@ -214,8 +211,18 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                 scale = ParameterScale.Discrete, snapPoints = listOf(0f, 1f),
                 smoothing = ParameterSmoothing.None,
             ),
-            ParameterDescriptor("sourceBpm", "Source BPM", "BPM", 20f, 300f, 120f),
         )
+
+        fun parameterDescriptorsFor(state: SampleChainDeviceState): List<ParameterDescriptor> {
+            val activeDurationMs = (
+                state.totalDurationMs * (state.endPosition - state.startPosition)
+            ).coerceAtLeast(1f)
+            return BASE_PARAMETERS.map { descriptor ->
+                if (descriptor.id == "fadeIn" || descriptor.id == "fadeOut") {
+                    descriptor.copy(maximum = activeDurationMs)
+                } else descriptor
+            }
+        }
     }
 
     private fun formatCleanTitle(fileName: String): String {
@@ -529,9 +536,6 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         }
 
         val currentState = state.value
-        voicePool.updateTempoRatio(
-            sampleTempoRatio(currentState.warpMode, currentState.sourceBpm, WorkspaceRepository.bpm.value),
-        )
         fillModulation(currentState, context.absoluteFrame, block.frameCount)
         var renderedFrames = 0
         while (renderedFrames < block.frameCount) {
@@ -562,19 +566,20 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     }
 
     private fun fillModulation(base: SampleChainDeviceState, absoluteFrame: Long, frameCount: Int) {
+        val descriptors = parameterDescriptorsFor(base)
         if (!hasSampleRateModulation()) {
-            val volumeDb = resolveRealtimeParameter(PARAMETERS[0], base.volumeDb, absoluteFrame)
-            val pan = (resolveRealtimeParameter(PARAMETERS[1], base.pan, absoluteFrame) / 100f)
+            val volumeDb = resolveRealtimeParameter(descriptors[0], base.volumeDb, absoluteFrame)
+            val pan = (resolveRealtimeParameter(descriptors[1], base.pan, absoluteFrame) / 100f)
                 .coerceIn(-1f, 1f)
             val angle = (pan + 1f) * (PI.toFloat() / 4f)
             val centerCompensation = sqrt(2f)
             val sampleRate = audioConfiguration.value?.sampleRate ?: 44_100
             val fadeInFrames = (
-                resolveRealtimeParameter(PARAMETERS[2], base.fadeInMs, absoluteFrame) *
+                resolveRealtimeParameter(descriptors[2], base.fadeInMs, absoluteFrame) *
                     sampleRate / 1_000f
                 ).toInt().coerceAtLeast(0)
             val fadeOutFrames = (
-                resolveRealtimeParameter(PARAMETERS[3], base.fadeOutMs, absoluteFrame) *
+                resolveRealtimeParameter(descriptors[3], base.fadeOutMs, absoluteFrame) *
                     sampleRate / 1_000f
                 ).toInt().coerceAtLeast(0)
             modulation.volumeGain.fill(10.0.pow(volumeDb / 20.0).toFloat(), 0, frameCount)
@@ -588,8 +593,8 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         var frame = 0
         while (frame < frameCount) {
             val timelineFrame = absoluteFrame + frame
-            val volumeDb = resolveRealtimeParameter(PARAMETERS[0], base.volumeDb, timelineFrame)
-            val pan = (resolveRealtimeParameter(PARAMETERS[1], base.pan, timelineFrame) / 100f)
+            val volumeDb = resolveRealtimeParameter(descriptors[0], base.volumeDb, timelineFrame)
+            val pan = (resolveRealtimeParameter(descriptors[1], base.pan, timelineFrame) / 100f)
                 .coerceIn(-1f, 1f)
             val angle = (pan + 1f) * (PI.toFloat() / 4f)
             val centerCompensation = sqrt(2f)
@@ -597,11 +602,11 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
             modulation.panLeftGain[frame] = cos(angle) * centerCompensation
             modulation.panRightGain[frame] = sin(angle) * centerCompensation
             modulation.fadeInFrames[frame] = (
-                resolveRealtimeParameter(PARAMETERS[2], base.fadeInMs, timelineFrame) *
+                resolveRealtimeParameter(descriptors[2], base.fadeInMs, timelineFrame) *
                     (audioConfiguration.value?.sampleRate ?: 44_100) / 1_000f
                 ).toInt().coerceAtLeast(0)
             modulation.fadeOutFrames[frame] = (
-                resolveRealtimeParameter(PARAMETERS[3], base.fadeOutMs, timelineFrame) *
+                resolveRealtimeParameter(descriptors[3], base.fadeOutMs, timelineFrame) *
                     (audioConfiguration.value?.sampleRate ?: 44_100) / 1_000f
                 ).toInt().coerceAtLeast(0)
             frame++
@@ -683,12 +688,10 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     ): SampleRenderSnapshot? {
         val outputSampleRate = audioConfiguration.value?.sampleRate
             ?: deviceState.sampleRate
-        val workspaceBpm = WorkspaceRepository.bpm.value
         val resolvedRawData = deviceState.resolvedRawData()
         val cached = renderCache.value
         if (cached?.state == deviceState &&
             cached.outputSampleRate == outputSampleRate &&
-            cached.workspaceBpm == workspaceBpm &&
             cached.rawData === resolvedRawData
         ) {
             return cached.snapshot
@@ -710,17 +713,12 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
             )
         }
         val snapshot = preparedSource?.let {
-            SampleRenderSnapshot.from(
-                state = deviceState,
-                source = it,
-                workspaceBpm = workspaceBpm,
-            )
+            SampleRenderSnapshot.from(state = deviceState, source = it)
         }
         return snapshot.also {
             renderCache.value = SampleRenderCache(
                 state = deviceState,
                 outputSampleRate = outputSampleRate,
-                workspaceBpm = workspaceBpm,
                 rawData = resolvedRawData,
                 preparedSource = preparedSource,
                 snapshot = it,
@@ -1078,10 +1076,7 @@ data class SampleChainDeviceState(
     val loopEndPosition: Float? = null,
     @ProtoNumber(19)
     val chokeGroup: Int = 0,
-    @ProtoNumber(20)
-    val warpMode: SampleWarpMode = SampleWarpMode.Off,
-    @ProtoNumber(21)
-    val sourceBpm: Float? = null,
+    // Proto fields 20 and 21 were used by an unreleased warp experiment. Keep them reserved.
     @ProtoNumber(22)
     val sourceStartFrame: Long? = null,
     @ProtoNumber(23)
@@ -1102,13 +1097,6 @@ data class SampleChainDeviceState(
 enum class SamplePlaybackMode {
     OneShot,
     GateLoop,
-}
-
-@Serializable
-enum class SampleWarpMode {
-    Off,
-    Repitch,
-    Warp,
 }
 
 fun SampleChainDeviceState.resolvedRawData(): ByteArray? =

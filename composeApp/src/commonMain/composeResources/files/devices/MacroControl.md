@@ -1,13 +1,20 @@
 # Macro Control
 
-The Macro Control device updates a workspace macro to a specific value whenever it receives an active incoming signal. It's most commonly used to automatically change macro states triggered by specific MIDI inputs or preceding devices in a chain.
+The Macro Control device drives a workspace macro whenever its pad is triggered. It is also the canonical way to build pad-triggered live automation.
 
 ![Macro Control device](res://macro_control.jpg)
 
 *Macro Control device*
 
-The device features two main controls:
-* **Macro Dial**: Allows the user to select which macro to control (if multiple macros are available). If only one macro exists, it simply displays "Macro 1". If no macros exist, it will display a "No macros available" message.
-* **Value Dial**: A dial that sets the target value (ranging from 0 to 127) to apply to the chosen macro.
+* **Macro** selects the macro to control. If the workspace has no macro yet, use **Create macro**.
+* **Value** sets the target from 0 to 127.
+* The status line shows how many parameters the selected macro controls. **AUTO** appears when Value has a dial automation.
 
-When an active incoming signal is received (a non-black LED signal or a MIDI signal with a velocity greater than 0), the device passes the signal through to the next device and sets the chosen macro to the target value. Inactive signals (like a black LED color or a MIDI velocity of 0) are simply passed through without triggering a macro change.
+To create live automation:
+
+1. Right-click **Value** and choose **Automate Value**.
+2. Set the automation length, curve, start, end, and retrigger behavior.
+3. Right-click a parameter dial on the Sample or audio effect and map it to the same macro.
+4. Trigger the pad containing Macro Control.
+
+The automation runs on the audio frame clock and holds its final value. Without Value automation, a trigger immediately applies the selected value. Signals continue through the chain normally.

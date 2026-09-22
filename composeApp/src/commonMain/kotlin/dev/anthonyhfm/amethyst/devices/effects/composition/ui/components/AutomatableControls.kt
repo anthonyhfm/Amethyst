@@ -90,7 +90,9 @@ fun <T> AutomatableDial(
     defaultValue: T,
     title: String,
     text: String,
+    onStartValueChange: (T) -> Unit = {},
     onValueChange: (T) -> Unit,
+    onFinishValueChange: (T) -> Unit = {},
     onResolveTextValue: ((String) -> Unit)? = null,
     containerColor: Color = Color.Unspecified,
     dialColor: Color = Color.Unspecified,
@@ -160,9 +162,15 @@ fun <T> AutomatableDial(
                 defaultValue = defaultValue,
                 title = title,
                 text = text,
-                onStartValueChange = { nodeChangeCallbacks.onStart() },
+                onStartValueChange = {
+                    nodeChangeCallbacks.onStart()
+                    onStartValueChange(it)
+                },
                 onValueChange = onValueChange,
-                onFinishValueChange = { nodeChangeCallbacks.onFinish() },
+                onFinishValueChange = {
+                    nodeChangeCallbacks.onFinish()
+                    onFinishValueChange(it)
+                },
                 onResolveTextValue = onResolveTextValue,
                 containerColor = containerColor,
                 dialColor = dialColor,
@@ -177,9 +185,15 @@ fun <T> AutomatableDial(
                 defaultValue = defaultValue,
                 title = title,
                 text = text,
-                onStartValueChange = { nodeChangeCallbacks.onStart() },
+                onStartValueChange = {
+                    nodeChangeCallbacks.onStart()
+                    onStartValueChange(it)
+                },
                 onValueChange = onValueChange,
-                onFinishValueChange = { nodeChangeCallbacks.onFinish() },
+                onFinishValueChange = {
+                    nodeChangeCallbacks.onFinish()
+                    onFinishValueChange(it)
+                },
                 onResolveTextValue = onResolveTextValue,
                 containerColor = containerColor,
                 dialColor = dialColor,

@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
@@ -131,6 +134,9 @@ class ReverbChainDevice : AudioChainDevice<ReverbChainDeviceState>(), ParameterO
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        var gestureStart by remember { mutableStateOf(deviceState) }
+        val startGesture = { gestureStart = state.value }
+        val finishGesture = { pushStateChange(gestureStart, state.value) }
         ChainDeviceShell(
             title = "Reverb",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
@@ -140,21 +146,21 @@ class ReverbChainDevice : AudioChainDevice<ReverbChainDeviceState>(), ParameterO
         ) {
             Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    EffectDial("preDelay", "Pre-delay", deviceState.preDelayMs / MAX_PRE_DELAY_MS, "${deviceState.preDelayMs.roundToInt()} ms") {
+                    EffectDial("preDelay", "Pre-delay", deviceState.preDelayMs / MAX_PRE_DELAY_MS, "${deviceState.preDelayMs.roundToInt()} ms", startGesture, finishGesture) {
                         state.update { s -> s.copy(preDelayMs = it * MAX_PRE_DELAY_MS) }
                     }
-                    EffectDial("size", "Size", deviceState.size, "${(deviceState.size * 100).roundToInt()}%") {
+                    EffectDial("size", "Size", deviceState.size, "${(deviceState.size * 100).roundToInt()}%", startGesture, finishGesture) {
                         state.update { s -> s.copy(size = it) }
                     }
-                    EffectDial("decay", "Decay", deviceState.decay, "${formatDecay(deviceState.decay)} s") {
+                    EffectDial("decay", "Decay", deviceState.decay, "${formatDecay(deviceState.decay)} s", startGesture, finishGesture) {
                         state.update { s -> s.copy(decay = it) }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    EffectDial("damping", "Damping", deviceState.damping, "${(deviceState.damping * 100).roundToInt()}%") {
+                    EffectDial("damping", "Damping", deviceState.damping, "${(deviceState.damping * 100).roundToInt()}%", startGesture, finishGesture) {
                         state.update { s -> s.copy(damping = it) }
                     }
-                    EffectDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%") {
+                    EffectDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%", startGesture, finishGesture) {
                         state.update { s -> s.copy(dryWet = it) }
                     }
                 }

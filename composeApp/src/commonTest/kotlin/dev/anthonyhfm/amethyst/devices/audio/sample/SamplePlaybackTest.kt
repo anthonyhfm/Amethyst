@@ -19,7 +19,6 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.math.abs
-import kotlin.math.sin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -212,8 +211,6 @@ class SamplePlaybackTest {
         assertEquals(0f, restored.pan)
         assertEquals(SamplePlaybackMode.OneShot, restored.playbackMode)
         assertEquals(0, restored.chokeGroup)
-        assertEquals(SampleWarpMode.Off, restored.warpMode)
-        assertEquals(null, restored.sourceBpm)
         assertEquals(null, restored.sourceStartFrame)
         assertEquals(null, restored.sourceEndFrameExclusive)
     }
@@ -240,68 +237,23 @@ class SamplePlaybackTest {
         assertEquals(descriptors.size, ids.size)
         assertTrue(
             ids.containsAll(
-                setOf("gain", "pan", "fadeIn", "fadeOut", "start", "end", "loopStart", "loopEnd", "mode", "sourceBpm"),
+                setOf("gain", "pan", "fadeIn", "fadeOut", "start", "end", "loopStart", "loopEnd", "mode"),
             ),
         )
     }
 
     @Test
-    fun tempoRatioIsDeterministicAndMissingSourceBpmFallsBackSafely() {
-        assertEquals(0.75, sampleTempoRatio(SampleWarpMode.Repitch, 120f, 90.0))
-        assertEquals(2.0, sampleTempoRatio(SampleWarpMode.Warp, 60f, 120.0))
-        assertEquals(1.0, sampleTempoRatio(SampleWarpMode.Off, 60f, 240.0))
-        assertEquals(1.0, sampleTempoRatio(SampleWarpMode.Warp, null, 120.0))
-    }
+    fun fadeMappingRangeTracksTheActiveSampleRegion() {
+        val sample = SampleChainDevice().apply {
+            state.value = state(frames = 1_000).copy(
+                totalDurationMs = 1_000,
+                startPosition = 0.25f,
+                endPosition = 0.75f,
+            )
+        }
 
-    @Test
-    fun repitchFollowsBeatLengthAndChangesPitch() {
-        val sampleState = state(
-            warpMode = SampleWarpMode.Repitch,
-            sourceBpm = 100f,
-            frames = 200,
-            sample = { frame -> sin(2.0 * kotlin.math.PI * 25.0 * frame / configuration.sampleRate).toFloat() },
-        )
-        val pool = SampleVoicePool(1).apply { prepare(configuration) }
-        pool.apply(SampleVoiceCommand.Start(0, keyA, snapshot(sampleState, workspaceBpm = 200.0)))
-        val output = render(pool, 100)
-
-        assertEquals(0, pool.activeVoiceCount)
-        assertTrue(positiveZeroCrossings(output, fromFrame = 10) in 4..6)
-    }
-
-    @Test
-    fun warpPreservesPitchAndReportsItsLatency() {
-        val sampleState = state(
-            warpMode = SampleWarpMode.Warp,
-            sourceBpm = 200f,
-            frames = 512,
-            sample = { frame -> sin(2.0 * kotlin.math.PI * 31.25 * frame / configuration.sampleRate).toFloat() },
-        )
-        val pool = SampleVoicePool(1).apply { prepare(configuration) }
-        pool.apply(SampleVoiceCommand.Start(0, keyA, snapshot(sampleState, workspaceBpm = 100.0)))
-        val output = render(pool, 1_152)
-
-        assertEquals(0, pool.activeVoiceCount)
-        assertTrue(output.take(SampleChainDevice.WARP_LATENCY_FRAMES * 2).all { it == 0f })
-        assertTrue(positiveZeroCrossings(output, fromFrame = 256) in 25..38)
-        assertEquals(SampleChainDevice.WARP_LATENCY_FRAMES, SampleChainDevice().apply {
-            state.value = sampleState
-        }.latencyFrames)
-    }
-
-    @Test
-    fun liveTempoChangeRampsWithoutResettingVoice() {
-        val sampleState = state(warpMode = SampleWarpMode.Repitch, sourceBpm = 100f, frames = 512)
-        val pool = SampleVoicePool(1).apply { prepare(configuration) }
-        pool.apply(SampleVoiceCommand.Start(0, keyA, snapshot(sampleState, workspaceBpm = 100.0)))
-        render(pool, 16)
-        val before = pool.sourceFrame
-        pool.updateTempoRatio(2.0)
-        render(pool, 16)
-
-        assertTrue(pool.sourceFrame > before)
-        assertTrue(pool.sourceFrame - before < 32L)
-        assertEquals(1, pool.activeVoiceCount)
+        val fades = sample.parameterDescriptors.filter { it.id == "fadeIn" || it.id == "fadeOut" }
+        assertTrue(fades.all { it.minimum == 0f && it.maximum == 500f })
     }
 
     @Test
@@ -383,8 +335,6 @@ class SamplePlaybackTest {
         loopStartPosition: Float? = null,
         loopEndPosition: Float? = null,
         chokeGroup: Int = 0,
-        warpMode: SampleWarpMode = SampleWarpMode.Off,
-        sourceBpm: Float? = null,
         frames: Int = 128,
         sample: (Int) -> Float = { 0.5f },
     ): SampleChainDeviceState = SampleChainDeviceState(
@@ -400,13 +350,11 @@ class SamplePlaybackTest {
         loopStartPosition = loopStartPosition,
         loopEndPosition = loopEndPosition,
         chokeGroup = chokeGroup,
-        warpMode = warpMode,
-        sourceBpm = sourceBpm,
     )
 
-    private fun snapshot(state: SampleChainDeviceState, workspaceBpm: Double = state.sourceBpm?.toDouble() ?: 120.0): SampleRenderSnapshot {
+    private fun snapshot(state: SampleChainDeviceState): SampleRenderSnapshot {
         val source = checkNotNull(SampleRenderSnapshot.prepareSource(state, configuration.sampleRate))
-        return checkNotNull(SampleRenderSnapshot.from(state, source, workspaceBpm))
+        return checkNotNull(SampleRenderSnapshot.from(state, source))
     }
 
     private fun renderSnapshot(snapshot: SampleRenderSnapshot, frames: Int): FloatArray {
@@ -447,17 +395,6 @@ class SamplePlaybackTest {
         }
     }
 
-    private fun positiveZeroCrossings(samples: FloatArray, fromFrame: Int): Int {
-        var crossings = 0
-        var frame = fromFrame.coerceAtLeast(1)
-        while (frame < samples.size / 2) {
-            val previous = samples[(frame - 1) * 2]
-            val current = samples[frame * 2]
-            if (previous <= 0f && current > 0f) crossings++
-            frame++
-        }
-        return crossings
-    }
 }
 
 private fun pcm16Mono(frameCount: Int, sample: (Int) -> Float): ByteArray {

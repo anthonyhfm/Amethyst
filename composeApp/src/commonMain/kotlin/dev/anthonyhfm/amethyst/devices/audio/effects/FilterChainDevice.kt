@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
@@ -108,6 +111,9 @@ class FilterChainDevice : AudioChainDevice<FilterChainDeviceState>(), ParameterO
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        var gestureStart by remember { mutableStateOf(deviceState) }
+        val startGesture = { gestureStart = state.value }
+        val finishGesture = { pushStateChange(gestureStart, state.value) }
         ChainDeviceShell(
             title = "Filter",
             isSelected = selections.any { it.selectionUUID == selectionUUID },
@@ -134,18 +140,18 @@ class FilterChainDevice : AudioChainDevice<FilterChainDeviceState>(), ParameterO
                 Separator(Modifier.height(168.dp), orientation = SeparatorOrientation.Vertical)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        FilterDial("cutoff", "Cutoff", PARAMETERS[0].normalize(deviceState.cutoffHz), "${deviceState.cutoffHz.roundToInt()} Hz") {
+                        FilterDial("cutoff", "Cutoff", PARAMETERS[0].normalize(deviceState.cutoffHz), "${deviceState.cutoffHz.roundToInt()} Hz", startGesture, finishGesture) {
                             state.update { s -> s.copy(cutoffHz = PARAMETERS[0].denormalize(it)) }
                         }
-                        FilterDial("resonance", "Resonance", PARAMETERS[1].normalize(deviceState.resonance), "${(deviceState.resonance * 100).roundToInt() / 100f}") {
+                        FilterDial("resonance", "Resonance", PARAMETERS[1].normalize(deviceState.resonance), "${(deviceState.resonance * 100).roundToInt() / 100f}", startGesture, finishGesture) {
                             state.update { s -> s.copy(resonance = PARAMETERS[1].denormalize(it)) }
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        FilterDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%") {
+                        FilterDial("dryWet", "Dry / Wet", deviceState.dryWet, "${(deviceState.dryWet * 100).roundToInt()}%", startGesture, finishGesture) {
                             state.update { s -> s.copy(dryWet = it) }
                         }
-                        FilterDial("drive", "Drive", deviceState.driveDb / 24f, "${deviceState.driveDb.roundToInt()} dB") {
+                        FilterDial("drive", "Drive", deviceState.driveDb / 24f, "${deviceState.driveDb.roundToInt()} dB", startGesture, finishGesture) {
                             state.update { s -> s.copy(driveDb = it * 24f) }
                         }
                     }
@@ -211,7 +217,15 @@ private fun LabeledFilterSelect(
 }
 
 @Composable
-private fun FilterDial(id: String, label: String, value: Float, text: String, onValue: (Float) -> Unit) {
+private fun FilterDial(
+    id: String,
+    label: String,
+    value: Float,
+    text: String,
+    onStart: () -> Unit,
+    onFinish: () -> Unit,
+    onValue: (Float) -> Unit,
+) {
     AutomatableDial(
         parameterId = id,
         type = DialType.Continuous,
@@ -219,7 +233,9 @@ private fun FilterDial(id: String, label: String, value: Float, text: String, on
         defaultValue = 0.5f,
         title = label,
         text = text,
+        onStartValueChange = { onStart() },
         onValueChange = onValue,
+        onFinishValueChange = { onFinish() },
         isFlat = false,
     )
 }

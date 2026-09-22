@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
@@ -47,9 +50,6 @@ import kotlin.math.exp
 import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
-
-@Serializable
-enum class DuckerDetectorMode { Trigger, AudioEnvelope }
 
 class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterOwner, SidechainAudioConsumer {
     override val state = MutableStateFlow(DuckerChainDeviceState())
@@ -237,6 +237,9 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
     override fun Content() {
         val deviceState by state.collectAsState()
         val selections by SelectionManager.selections.collectAsState()
+        var gestureStart by remember { mutableStateOf(deviceState) }
+        val startGesture = { gestureStart = state.value }
+        val finishGesture = { pushStateChange(gestureStart, state.value) }
         val options = WorkspaceRepository.samplingChain.sampleOptions(eligibleSourceIds.value)
         val selectedLabel = options.firstOrNull { it.first == deviceState.sidechainSourceId }?.second
             ?: if (deviceState.sidechainSourceId == null) "None" else "Missing source"
@@ -268,13 +271,13 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
                     )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    EffectDial("attack", "Attack", PARAMETERS[0].normalize(deviceState.attackMs), "${deviceState.attackMs.roundToInt()} ms") {
+                    EffectDial("attack", "Attack", PARAMETERS[0].normalize(deviceState.attackMs), "${deviceState.attackMs.roundToInt()} ms", startGesture, finishGesture) {
                         state.update { s -> s.copy(attackMs = PARAMETERS[0].denormalize(it)) }
                     }
-                    EffectDial("release", "Release", PARAMETERS[1].normalize(deviceState.releaseMs), "${deviceState.releaseMs.roundToInt()} ms") {
+                    EffectDial("release", "Release", PARAMETERS[1].normalize(deviceState.releaseMs), "${deviceState.releaseMs.roundToInt()} ms", startGesture, finishGesture) {
                         state.update { s -> s.copy(releaseMs = PARAMETERS[1].denormalize(it)) }
                     }
-                    EffectDial("strength", "Strength", deviceState.strength, "${(deviceState.strength * 100).roundToInt()}%") {
+                    EffectDial("strength", "Strength", deviceState.strength, "${(deviceState.strength * 100).roundToInt()}%", startGesture, finishGesture) {
                         state.update { s -> s.copy(strength = it) }
                     }
                 }
@@ -311,7 +314,6 @@ data class DuckerChainDeviceState(
     val attackMs: Float = 5f,
     val releaseMs: Float = 180f,
     val strength: Float = 0.8f,
-    val detectorMode: DuckerDetectorMode = DuckerDetectorMode.AudioEnvelope,
     override val automations: Map<String, DialAutomationLane> = emptyMap(),
     val sidechainBusId: String? = null,
     val sidechainSourceIds: List<String> = emptyList(),
