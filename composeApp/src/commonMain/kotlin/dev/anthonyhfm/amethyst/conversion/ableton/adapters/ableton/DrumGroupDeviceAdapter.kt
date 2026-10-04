@@ -86,18 +86,20 @@ class DrumGroupDeviceAdapter(
                 },
                 stateChain = StateChain(
                     devices = mutableListOf<DeviceState>().apply {
-                        val note = branch.branchInfo.receivingNote.value
+                        if (!isTransparentWrapperBranch(branch)) {
+                            val note = branch.branchInfo.receivingNote.value
 
-                        val xy = DRUM_RACK_TO_XY[128 - note] // WHYYYYYY
-                        val x: Int = xy % 10
-                        val y: Int = 9 - xy / 10
+                            val xy = DRUM_RACK_TO_XY[128 - note] // WHYYYYYY
+                            val x: Int = xy % 10
+                            val y: Int = 9 - xy / 10
 
-                        add(
-                            AbletonConverter.coordinateFilter(
-                                launchpad = AbletonConverter.launchpadTarget(offset),
-                                localCoordinates = listOf(Pair(x, y)),
+                            add(
+                                AbletonConverter.coordinateFilter(
+                                    launchpad = AbletonConverter.launchpadTarget(offset),
+                                    localCoordinates = listOf(Pair(x, y)),
+                                )
                             )
-                        )
+                        }
 
                         // Multisampling logic
                         val branchElements = branch.deviceChain.deviceChain.devices.devices
@@ -404,4 +406,13 @@ private fun StateChain.withAbletonDrumChoke(
 private fun <T : DeviceState> DeviceState.preserveDisplayState(copy: T): T = copy.also {
     it.isMuted = isMuted
     it.isCollapsed = isCollapsed
+}
+
+/**
+ * If we only have one nested drum group and coords are (0, 0), we most likely have a "catchall" wrapper
+ * and should skip any coordinate filters
+ */
+internal fun isTransparentWrapperBranch(branch: DrumGroupDevice.Branches.DrumBranch): Boolean {
+    return branch.deviceChain.deviceChain.devices.devices.singleOrNull() is DrumGroupDevice
+            && DRUM_RACK_TO_XY.getOrNull(128 - branch.branchInfo.receivingNote.value) == 0
 }
