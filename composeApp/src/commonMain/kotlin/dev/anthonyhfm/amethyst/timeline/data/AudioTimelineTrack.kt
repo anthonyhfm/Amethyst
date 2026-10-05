@@ -48,8 +48,7 @@ class AudioTimelineTrack : TimelineTrack<AudioEntry>() {
 
         println("AudioTimelineTrack: Successfully decoded audio - duration: ${source.totalDurationMs}ms, sample rate: ${source.sampleRate}")
 
-        val bytesPerSample = (source.bitDepth / 8) * source.channels
-        val totalSamples = source.rawData.size.toLong() / bytesPerSample
+        val totalSamples = source.totalSamples
 
         entries[at] = AudioEntry(
             startTimeMs = at,

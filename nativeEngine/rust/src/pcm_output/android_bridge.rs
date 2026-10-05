@@ -49,3 +49,22 @@ pub extern "system" fn Java_dev_anthonyhfm_amethyst_nativeengine_audio_PcmOutput
 ) -> jlong {
     unsafe { amethyst_pcm_output_queued_frames(handle as u64) as jlong }
 }
+
+unsafe extern "C" {
+    fn madvise(address: *mut core::ffi::c_void, length: usize, advice: core::ffi::c_int) -> core::ffi::c_int;
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_anthonyhfm_amethyst_nativeengine_audio_PcmOutputDirectBridge_releaseMappedPages(
+    env: JNIEnv,
+    _class: JClass,
+    samples: JByteBuffer,
+) -> jint {
+    let Ok(capacity) = env.get_direct_buffer_capacity(&samples) else {
+        return -1;
+    };
+    let Ok(address) = env.get_direct_buffer_address(&samples) else {
+        return -1;
+    };
+    unsafe { madvise(address.cast(), capacity, 4) }
+}

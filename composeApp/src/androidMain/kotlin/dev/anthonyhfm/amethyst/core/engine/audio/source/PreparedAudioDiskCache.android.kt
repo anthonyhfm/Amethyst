@@ -11,6 +11,18 @@ internal actual object PreparedAudioDiskCache {
         return file.readBytes()
     }
 
+    actual fun copyFile(root: String, key: String, sourcePath: String) {
+        val directory = File(root).apply { mkdirs() }
+        val target = File(directory, "$key.pcm")
+        val staging = File.createTempFile("prepared-", ".part", directory)
+        try {
+            Files.copy(File(sourcePath).toPath(), staging.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            Files.move(staging.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            staging.delete()
+        }
+    }
+
     actual fun write(root: String, key: String, bytes: ByteArray) {
         val directory = File(root).apply { mkdirs() }
         val target = File(directory, "$key.pcm")

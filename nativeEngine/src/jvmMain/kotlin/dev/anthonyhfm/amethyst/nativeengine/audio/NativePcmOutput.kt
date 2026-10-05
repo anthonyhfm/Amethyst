@@ -138,3 +138,11 @@ private object PcmOutputDirectBridge : Library {
     @JvmStatic
     external fun amethyst_pcm_output_queued_frames(handle: Long): Long
 }
+
+fun releaseMappedPcmPages(buffer: ByteBuffer) {
+    if (!com.sun.jna.Platform.isWindows()) {
+        val pointer = Native.getDirectBufferPointer(buffer)
+        com.sun.jna.NativeLibrary.getInstance("c").getFunction("madvise")
+            .invokeInt(arrayOf(pointer, com.sun.jna.NativeLong(buffer.capacity().toLong()), 4))
+    }
+}

@@ -850,6 +850,9 @@ object WorkspaceRepository {
         // complete library before either consumer is restored.
         dev.anthonyhfm.amethyst.core.loading.ProjectLoadMetrics.measure("workspace.audioLibrary") {
             AudioLibraryRepository.load(workspaceData.audioSources)
+            dev.anthonyhfm.amethyst.core.engine.audio.source.ProjectPcmFiles.retain(
+                paths = workspaceData.audioSources.mapNotNull { it.pcmBytes.filePath }.toSet(),
+            )
         }
         fun reportDeviceProgress(value: Float, detail: String) {
             val current = dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.loadingProgress.value ?: return
@@ -1038,8 +1041,8 @@ object WorkspaceRepository {
             sampleRate = sampleRate,
             channels = channels,
             bitDepth = bitDepth,
-            byteCount = rawData.size,
-            contentHash = rawData.contentHashCode(),
+            byteCount = pcmByteCount,
+            contentHash = pcmContentHash,
         )
 
         var sourceIndex: MutableMap<SourceFingerprint, MutableList<AudioSource>>? = null
@@ -1283,9 +1286,9 @@ object WorkspaceRepository {
 
     private fun logAudioMemory(stage: String) {
         val sources = AudioLibraryRepository.sources.value.values
-        val sourcePcmBytes = sources.map { it.rawData }.toSet().sumOf { it.size.toLong() }
+        val sourcePcmBytes = sources.mapNotNull { it.residentPcmData }.toSet().sumOf { it.size.toLong() }
         val preparedPcmBytes = dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache.retainedPcmBytes()
-        println("ProjectAudioMemory stage=$stage sourceCount=${sources.size} sourcePcmBytes=$sourcePcmBytes cachedPreparedPcmBytes=$preparedPcmBytes")
+        println("ProjectAudioMemory stage=$stage sourceCount=${sources.size} sourcePcmBytes=$sourcePcmBytes cachedPreparedPcmBytes=$preparedPcmBytes mappedSourcePcmBytes=${sources.filter { it.residentPcmData == null }.sumOf { it.pcmByteCount.toLong() }} mappedPreparedPcmBytes=${dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache.mappedPcmBytes()}")
     }
 
     fun clean() {
@@ -1300,6 +1303,7 @@ object WorkspaceRepository {
         AudioLibraryRepository.clear()
         dev.anthonyhfm.amethyst.core.util.FileHelper.clearCache()
         dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache.configurePersistentRoot(root = null)
+        dev.anthonyhfm.amethyst.core.engine.audio.source.ProjectPcmFiles.clear()
         StemExtractionRepository.reset()
         TransmitChainDevice.clearReceivers()
         AutomappingManager.reset()

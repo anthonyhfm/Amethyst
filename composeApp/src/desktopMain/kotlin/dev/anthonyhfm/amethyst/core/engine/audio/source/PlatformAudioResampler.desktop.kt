@@ -1,8 +1,8 @@
 package dev.anthonyhfm.amethyst.core.engine.audio.source
 
 internal actual fun platformResampleToPcm24(
-    source: ByteArrayPcmAudioSource,
+    source: PcmAudioSource,
     outputRate: Int,
-): ByteArrayPcmAudioSource? = null
+): PcmAudioSource? = null
 
 internal actual fun useNativeRateForLongSample(sourceFrames: Long, sourceRate: Int): Boolean = false

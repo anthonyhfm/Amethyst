@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import dev.anthonyhfm.amethyst.core.engine.audio.source.AudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
@@ -67,7 +69,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.theme.Theme
 import com.composeunstyled.Text
-import dev.anthonyhfm.amethyst.ui.components.primitives.Spinner
 import dev.anthonyhfm.amethyst.ui.modifier.scaleGestureZoom
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -80,8 +81,6 @@ import dev.anthonyhfm.amethyst.ui.theme.chart2
 import dev.anthonyhfm.amethyst.ui.theme.chart4
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -112,7 +111,8 @@ private enum class DragTarget {
  */
 @Composable
 fun SimplerWaveformEditor(
-    rawData: ByteArray?,
+    rawData: ByteArray? = null,
+    pcmSource: AudioSource? = null,
     sampleRate: Int,
     channels: Int,
     bitDepth: Int,
@@ -145,58 +145,24 @@ fun SimplerWaveformEditor(
     val resolvedChannels = if (channels > 0) channels else 2
     val resolvedBitDepth = if (bitDepth in listOf(8, 16, 24, 32)) bitDepth else 16
 
-    val decodedSamples = remember(rawData, resolvedBitDepth, resolvedChannels) {
-        mutableStateOf<FloatArray?>(null)
-    }
-
-    LaunchedEffect(rawData, resolvedBitDepth, resolvedChannels) {
-        decodedSamples.value = withContext(context = Dispatchers.Default) {
-            val bytes = rawData ?: return@withContext FloatArray(size = 0)
-            pcmToMonoFloats(
-                raw = bytes,
+    val source = remember(rawData, pcmSource, resolvedBitDepth, resolvedChannels, sampleRate) {
+        pcmSource ?: rawData?.takeIf { it.isNotEmpty() }?.let {
+            ByteArrayPcmAudioSource(
+                id = "sample-waveform",
+                sampleRate = sampleRate,
+                channels = resolvedChannels,
                 bitDepth = resolvedBitDepth,
-                channels = resolvedChannels
+                rawData = it,
             )
         }
     }
-
-    val samples = decodedSamples.value
-
-    if (samples == null) {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .semantics {
-                    liveRegion = LiveRegionMode.Polite
-                },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(
-                space = 8.dp,
-                alignment = Alignment.CenterVertically
-            )
-        ) {
-            Spinner(
-                modifier = Modifier
-                    .semantics {
-                        progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
-                    }
-            )
-
-            Text(
-                text = stringResource(resource = Res.string.device_sample_preparing_waveform),
-                style = Theme[typography][small],
-                color = Theme[colors][mutedForeground]
-            )
-        }
-
-        return
-    }
+    val sampleCount = source?.frameCount ?: 0L
 
     val focusRequester = remember { FocusRequester() }
     val navigationPaddingPx = with(LocalDensity.current) { 16.dp.toPx() }
-    val minimumViewSpan = (2.0 / samples.size.coerceAtLeast(2)).coerceAtLeast(0.0000001)
-    var viewport by remember(rawData) { mutableStateOf(WaveformViewport()) }
-    var fitSelection by remember(rawData) { mutableStateOf(true) }
+    val minimumViewSpan = (2.0 / sampleCount.coerceAtLeast(2L)).coerceAtLeast(0.0000001)
+    var viewport by remember(source) { mutableStateOf(WaveformViewport()) }
+    var fitSelection by remember(source) { mutableStateOf(true) }
     var pointerX by remember { mutableStateOf<Float?>(null) }
 
     val viewStart = viewport.start
@@ -358,7 +324,7 @@ fun SimplerWaveformEditor(
         }
     }
 
-    LaunchedEffect(rawData, canvasWidthPx, startPosition, endPosition, navigationPaddingPx, activeDragTarget) {
+    LaunchedEffect(source, canvasWidthPx, startPosition, endPosition, navigationPaddingPx, activeDragTarget) {
         if (fitSelection && canvasWidthPx > 0f && activeDragTarget == DragTarget.None) {
             viewport = fittedViewport()
         }
@@ -413,27 +379,16 @@ fun SimplerWaveformEditor(
     val playheadColor = palette[chart4]
 
     // Compute high-res envelope for visible zoomed viewport
-    val visibleStartSample = (samples.size * viewStart).toLong().coerceIn(0L, samples.size.toLong())
-    val visibleEndSample = (samples.size * viewEnd).toLong().coerceIn(visibleStartSample, samples.size.toLong())
-    val visibleAmps: FloatArray = remember(
-        samples,
-        visibleStartSample,
-        visibleEndSample,
-        canvasWidthPx
-    ) {
-        if (samples.isEmpty() || visibleEndSample <= visibleStartSample) {
-            FloatArray(0)
-        } else {
-            computeWaveformEnvelope(
-                samples = samples,
-                startSample = visibleStartSample,
-                endSample = visibleEndSample,
-                zoomLevel = 1f,
-                sampleRate = sampleRate,
-                widthPx = canvasWidthPx.roundToInt().coerceAtLeast(100)
-            )
-        }
-    }
+    val visibleStartSample = (sampleCount * viewStart).toLong().coerceIn(0L, sampleCount)
+    val visibleEndSample = (sampleCount * viewEnd).toLong().coerceIn(visibleStartSample, sampleCount)
+    val visibleAmps = rememberWaveformEnvelope(
+        source = source,
+        startSample = visibleStartSample,
+        endSample = visibleEndSample,
+        zoomLevel = 1f,
+        sampleRate = sampleRate,
+        widthPx = canvasWidthPx.roundToInt().coerceAtLeast(100),
+    )
 
     val textMeasurer = rememberTextMeasurer()
 
@@ -1046,36 +1001,4 @@ private fun formatRulerTime(timeMs: Float): String {
         val tenths = ((timeMs % 1000f) / 100f).toInt()
         "${totalSec.toInt()}.$tenths s"
     }
-}
-
-private fun pcmToMonoFloats(raw: ByteArray, bitDepth: Int, channels: Int): FloatArray {
-    val ch = if (channels > 0) channels else 2
-    val bd = if (bitDepth in listOf(8, 16, 24, 32)) bitDepth else 16
-    val bps = bd / 8
-    val frameSize = bps * ch
-    if (raw.size < frameSize) return FloatArray(0)
-    val frames = raw.size / frameSize
-    val out = FloatArray(frames)
-    var frameIdx = 0
-    var byteIndex = 0
-    while (frameIdx < frames) {
-        var sum = 0f
-        var c = 0
-        while (c < ch) {
-            val off = byteIndex + c * bps
-            val sample = when (bd) {
-                8 -> { val u = raw[off].toInt() and 0xFF; ((u - 128) / 128f).coerceIn(-1f, 1f) }
-                16 -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f).coerceIn(-1f, 1f) }
-                24 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt(); var v = b0 or (b1 shl 8) or (b2 shl 16); if ((v and 0x800000) != 0) v = v or -0x1000000; (v / 8388608f).coerceIn(-1f, 1f) }
-                32 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt() and 0xFF; val b3 = raw[off + 3].toInt(); val v = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24); if (v == Int.MIN_VALUE) -1f else (v / 2147483648f).coerceIn(-1f, 1f) }
-                else -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f).coerceIn(-1f, 1f) }
-            }
-            sum += sample
-            c++
-        }
-        out[frameIdx] = sum / ch
-        frameIdx++
-        byteIndex += frameSize
-    }
-    return out
 }

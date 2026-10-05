@@ -46,6 +46,7 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.elements.SIGNAL_EXTRA_SILENT_REPLAY
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.PcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntime
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerRuntimeAware
@@ -147,8 +148,8 @@ private const val SampleEnvelopeCurvePathSteps = 16
 private data class SampleRenderCache(
     val state: SampleChainDeviceState,
     val outputSampleRate: Int,
-    val rawData: ByteArray?,
-    val preparedSource: ByteArrayPcmAudioSource?,
+    val pcmIdentity: Any?,
+    val preparedSource: PcmAudioSource?,
     val snapshot: SampleRenderSnapshot?,
 )
 
@@ -427,19 +428,16 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     @Composable
     private fun AudioView() {
         val deviceState by state.collectAsState()
-        val resolvedRawData = deviceState.resolvedRawData()
+        val waveformSource = remember(deviceState.sourceId, deviceState.rawData, deviceState.sampleRate) {
+            SampleRenderSnapshot.prepareSource(state = deviceState, outputSampleRate = deviceState.sampleRate)
+        }
         val livePlayheadFrame by produceState(initialValue = playheadFrame) {
             while (true) {
                 value = playheadFrame
                 delay(PLAYHEAD_REFRESH_MILLIS)
             }
         }
-        val bytesPerFrame = (deviceState.bitDepth / 8) * deviceState.channels
-        val totalFrames = if (bytesPerFrame > 0) {
-            (resolvedRawData?.size ?: 0) / bytesPerFrame
-        } else {
-            0
-        }
+        val totalFrames = waveformSource?.frameCount ?: 0L
         val playheadPosition = samplePlayheadProgress(
             renderedFrame = livePlayheadFrame,
             renderedSampleRate = renderCache.value?.snapshot?.source?.sampleRate
@@ -468,7 +466,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                     .border(1.dp, Theme[colors][border], RoundedCornerShape(6.dp))
             ) {
                 SimplerWaveformEditor(
-                    rawData = resolvedRawData,
+                    pcmSource = waveformSource,
                     onInteractionStart = { beforeState = state.value },
                     onInteractionCancel = { updateStateFromUser { beforeState } },
                     sampleRate = deviceState.sampleRate,
@@ -821,7 +819,9 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
         )
     }
 
-    internal fun preparedPcmData(): ByteArray? = renderCache.value?.preparedSource?.rawData
+    internal fun preparedAudioSource(): PcmAudioSource? = renderCache.value?.preparedSource
+
+    internal fun preparedPcmData(): ByteArray? = (renderCache.value?.preparedSource as? ByteArrayPcmAudioSource)?.rawData
 
     override fun releaseAudio() {
         resetAudio()
@@ -852,18 +852,20 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
     ): SampleRenderSnapshot? {
         val outputSampleRate = audioConfiguration.value?.sampleRate
             ?: deviceState.sampleRate
-        val resolvedRawData = deviceState.resolvedRawData()
+        val librarySource = deviceState.sourceId?.let(AudioLibraryRepository::get)
+        val resolvedRawData = librarySource?.residentPcmData ?: deviceState.rawData
+        val pcmIdentity = librarySource?.pcmCacheIdentity ?: resolvedRawData
         val cached = renderCache.value
         if (cached?.state == deviceState &&
             cached.outputSampleRate == outputSampleRate &&
-            cached.rawData === resolvedRawData
+            cached.pcmIdentity === pcmIdentity
         ) {
             return cached.snapshot
         }
         val preparedSource = if (
             cached != null &&
             cached.outputSampleRate == outputSampleRate &&
-            cached.rawData === resolvedRawData &&
+            cached.pcmIdentity === pcmIdentity &&
             cached.state.sampleRate == deviceState.sampleRate &&
             cached.state.channels == deviceState.channels &&
             cached.state.bitDepth == deviceState.bitDepth
@@ -883,7 +885,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
             renderCache.value = SampleRenderCache(
                 state = deviceState,
                 outputSampleRate = outputSampleRate,
-                rawData = resolvedRawData,
+                pcmIdentity = pcmIdentity,
                 preparedSource = preparedSource,
                 snapshot = it,
             )

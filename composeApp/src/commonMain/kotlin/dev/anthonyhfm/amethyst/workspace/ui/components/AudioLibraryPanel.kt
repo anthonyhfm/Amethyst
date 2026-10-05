@@ -1018,7 +1018,7 @@ private fun AudioLibraryWaveform(source: AudioSource, progress: Float, modifier:
     val activeColor = Theme[colors][primary]
     Box(modifier) {
         WaveformView(
-            rawData = source.rawData,
+            pcmSource = source.pcmSource(),
             sampleRate = source.sampleRate,
             channels = source.channels,
             bitDepth = source.bitDepth,

@@ -51,14 +51,21 @@ class Float32AudioSource(
  * preserves finite values without clamping so headroom remains available to
  * the processing chain.
  */
-class ByteArrayPcmAudioSource(
+open class PcmAudioSource internal constructor(
     override val id: String,
     override val sampleRate: Int,
     override val channels: Int,
     val bitDepth: Int,
-    val rawData: ByteArray,
+    internal val pcmBytes: PcmByteStorage,
     val floatingPoint: Boolean = false,
 ) : AudioSource {
+    val pcmByteCount: Int get() = pcmBytes.size
+    internal val pcmCacheIdentity: Any get() = (pcmBytes as? InMemoryPcmBytes)?.bytes ?: pcmBytes
+    internal val residentPcmBytes: Int get() = if (pcmBytes is InMemoryPcmBytes) {
+        pcmBytes.size
+    } else {
+        0
+    }
     val bytesPerSample: Int = bitDepth / 8
     val bytesPerFrame: Int = bytesPerSample * channels
 
@@ -70,12 +77,12 @@ class ByteArrayPcmAudioSource(
             "Supported PCM bit depths are 8, 16, 24, and 32"
         }
         require(!floatingPoint || bitDepth == 32) { "Only Float32 PCM is supported" }
-        require(rawData.size % bytesPerFrame == 0) {
+        require(pcmBytes.size % bytesPerFrame == 0) {
             "PCM byte count must contain complete interleaved frames"
         }
     }
 
-    override val frameCount: Long = rawData.size.toLong() / bytesPerFrame
+    override val frameCount: Long = pcmBytes.size.toLong() / bytesPerFrame
 
     override fun sample(frameIndex: Long, channel: Int): Float {
         if (frameIndex !in 0 until frameCount || channel !in 0 until channels) {
@@ -88,18 +95,20 @@ class ByteArrayPcmAudioSource(
                 if (value.isFinite()) value else 0f
             }
 
-            bitDepth == 8 -> ((rawData[offset].toInt() and 0xff) - 128) / 128f
+            bitDepth == 8 -> ((pcmBytes[offset].toInt() and 0xff) - 128) / 128f
             bitDepth == 16 -> {
-                val value = (rawData[offset].toInt() and 0xff) or
-                    (rawData[offset + 1].toInt() shl 8)
+                val value = (pcmBytes[offset].toInt() and 0xff) or
+                    (pcmBytes[offset + 1].toInt() shl 8)
                 value.toShort() / 32768f
             }
 
             bitDepth == 24 -> {
-                var value = (rawData[offset].toInt() and 0xff) or
-                    ((rawData[offset + 1].toInt() and 0xff) shl 8) or
-                    ((rawData[offset + 2].toInt() and 0xff) shl 16)
-                if (value and 0x800000 != 0) value = value or -0x1000000
+                var value = (pcmBytes[offset].toInt() and 0xff) or
+                    ((pcmBytes[offset + 1].toInt() and 0xff) shl 8) or
+                    ((pcmBytes[offset + 2].toInt() and 0xff) shl 16)
+                if (value and 0x800000 != 0) {
+                    value = value or -0x1000000
+                }
                 value / 8388608f
             }
 
@@ -108,12 +117,56 @@ class ByteArrayPcmAudioSource(
     }
 
     private fun readInt32LittleEndian(offset: Int): Int =
-        (rawData[offset].toInt() and 0xff) or
-            ((rawData[offset + 1].toInt() and 0xff) shl 8) or
-            ((rawData[offset + 2].toInt() and 0xff) shl 16) or
-            (rawData[offset + 3].toInt() shl 24)
+        (pcmBytes[offset].toInt() and 0xff) or
+            ((pcmBytes[offset + 1].toInt() and 0xff) shl 8) or
+            ((pcmBytes[offset + 2].toInt() and 0xff) shl 16) or
+            (pcmBytes[offset + 3].toInt() shl 24)
 
     companion object {
         val SUPPORTED_BIT_DEPTHS = setOf(8, 16, 24, 32)
     }
+}
+
+class ByteArrayPcmAudioSource(
+    id: String,
+    sampleRate: Int,
+    channels: Int,
+    bitDepth: Int,
+    val rawData: ByteArray,
+    floatingPoint: Boolean = false,
+) : PcmAudioSource(
+    id = id,
+    sampleRate = sampleRate,
+    channels = channels,
+    bitDepth = bitDepth,
+    pcmBytes = InMemoryPcmBytes(bytes = rawData),
+    floatingPoint = floatingPoint,
+) {
+    companion object {
+        val SUPPORTED_BIT_DEPTHS = PcmAudioSource.SUPPORTED_BIT_DEPTHS
+    }
+}
+
+internal fun pcmSourceFromStorage(
+    id: String,
+    sampleRate: Int,
+    channels: Int,
+    bitDepth: Int,
+    storage: PcmByteStorage,
+): PcmAudioSource = if (storage is InMemoryPcmBytes) {
+    ByteArrayPcmAudioSource(
+        id = id,
+        sampleRate = sampleRate,
+        channels = channels,
+        bitDepth = bitDepth,
+        rawData = storage.bytes,
+    )
+} else {
+    PcmAudioSource(
+        id = id,
+        sampleRate = sampleRate,
+        channels = channels,
+        bitDepth = bitDepth,
+        pcmBytes = storage,
+    )
 }

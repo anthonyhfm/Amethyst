@@ -90,7 +90,7 @@ object AudioLibraryRepository {
         val fingerprint = source.fingerprint()
         val duplicate = current.values.firstOrNull { candidate ->
             candidate.isLibraryAsset && candidate.fingerprint() == fingerprint &&
-                candidate.rawData.contentEquals(source.rawData)
+                candidate.hasSamePcm(other = source)
         }
         if (duplicate != null) return duplicate
 
@@ -404,12 +404,12 @@ object AudioLibraryRepository {
         sampleRate = sampleRate,
         channels = channels,
         bitDepth = bitDepth,
-        byteCount = rawData.size,
-        contentHash = rawData.contentHashCode(),
+        byteCount = pcmByteCount,
+        contentHash = pcmContentHash,
     )
 
     private fun AudioSource.hasSameAudioAs(other: AudioSource): Boolean =
-        fingerprint() == other.fingerprint() && rawData.contentEquals(other.rawData)
+        fingerprint() == other.fingerprint() && hasSamePcm(other = other)
 
     private const val PREVIEW_REFRESH_MILLIS = 16L
     private const val NANOS_PER_SECOND = 1_000_000_000L

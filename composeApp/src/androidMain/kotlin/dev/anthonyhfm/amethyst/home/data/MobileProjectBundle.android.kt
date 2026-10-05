@@ -12,7 +12,7 @@ actual object MobileProjectBundle {
         check(audio.mkdirs())
         try {
             workspace.audioSources.forEachIndexed { index, source ->
-                File(audio, "$index.pcm").writeBytes(source.rawData)
+                source.writePcm(path = File(audio, "$index.pcm").absolutePath)
             }
             File(staging, "workspace.pb.gz").writeBytes(MobileProjectBundleCodec.encodeHeader(workspace))
             val target = File(root, "Converted")
@@ -33,7 +33,8 @@ actual object MobileProjectBundle {
         val root = File(bundlePath)
         val workspace = MobileProjectBundleCodec.decodeHeader(File(root, "workspace.pb.gz").readBytes())
         workspace.copy(audioSources = workspace.audioSources.mapIndexed { index, source ->
-            source.copy(rawData = File(root, "audio/$index.pcm").readBytes())
+            val file = File(root, "audio/$index.pcm")
+            source.copyFromPcmFile(path = file.absolutePath) ?: source.copy(rawData = file.readBytes())
         })
     }.getOrNull()
 }

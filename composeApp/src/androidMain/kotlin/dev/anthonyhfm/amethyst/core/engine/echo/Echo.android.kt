@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioStopTicket
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.PcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.elements.AudioChain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
@@ -302,16 +303,10 @@ actual object Echo {
         }
     }
 
-    private fun libraryPcmSource(sourceId: String): ByteArrayPcmAudioSource? {
+    private fun libraryPcmSource(sourceId: String): PcmAudioSource? {
         val source = AudioLibraryRepository.get(sourceId) ?: return null
         return runCatching {
-            ByteArrayPcmAudioSource(
-                id = source.id,
-                sampleRate = source.sampleRate,
-                channels = source.channels,
-                bitDepth = source.bitDepth,
-                rawData = source.rawData,
-            )
+            source.pcmSource()
         }.getOrNull()
     }
 

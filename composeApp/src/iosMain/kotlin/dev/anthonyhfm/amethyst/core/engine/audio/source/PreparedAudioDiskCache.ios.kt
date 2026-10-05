@@ -38,6 +38,17 @@ internal actual object PreparedAudioDiskCache {
         }
     }
 
+    actual fun copyFile(root: String, key: String, sourcePath: String) {
+        check(NSFileManager.defaultManager.createDirectoryAtPath(root, true, null, null))
+        val staging = "$root/.${NSUUID().UUIDString}.part"
+        try {
+            check(NSFileManager.defaultManager.copyItemAtPath(sourcePath, staging, null))
+            check(rename(staging, "$root/$key.pcm") == 0)
+        } finally {
+            NSFileManager.defaultManager.removeItemAtPath(staging, null)
+        }
+    }
+
     actual fun write(root: String, key: String, bytes: ByteArray) {
         check(NSFileManager.defaultManager.createDirectoryAtPath(root, true, null, null))
         val target = "$root/$key.pcm"

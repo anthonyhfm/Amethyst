@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioRenderCommand
 import dev.anthonyhfm.amethyst.core.engine.audio.command.AudioStopTicket
 import dev.anthonyhfm.amethyst.core.engine.audio.source.AudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.PcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.PcmAudioVoice
 import dev.anthonyhfm.amethyst.core.engine.audio.voice.VoiceId
@@ -66,7 +67,7 @@ class AudioPlaybackEngine(
     }
 
     private fun isProjectSource(source: AudioSource): Boolean =
-        source is ByteArrayPcmAudioSource && AudioLibraryRepository.get(id = source.id)?.rawData === source.rawData
+        source is PcmAudioSource && AudioLibraryRepository.get(id = source.id)?.pcmCacheIdentity === source.pcmCacheIdentity
 
     fun play(
         signal: Signal.AudioSignal,

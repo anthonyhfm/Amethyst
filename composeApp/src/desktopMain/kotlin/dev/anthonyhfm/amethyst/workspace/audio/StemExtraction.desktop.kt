@@ -400,7 +400,7 @@ private fun writePcmWave(path: Path, source: AudioSource) {
     val blockAlign = source.channels * source.bitDepth / 8
     val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {
         put("RIFF".encodeToByteArray())
-        putInt(36 + source.rawData.size)
+        putInt(36 + source.pcmByteCount)
         put("WAVEfmt ".encodeToByteArray())
         putInt(16)
         putShort(1.toShort())
@@ -410,7 +410,7 @@ private fun writePcmWave(path: Path, source: AudioSource) {
         putShort(blockAlign.toShort())
         putShort(source.bitDepth.toShort())
         put("data".encodeToByteArray())
-        putInt(source.rawData.size)
+        putInt(source.pcmByteCount)
     }.array()
     BufferedOutputStream(path.outputStream()).use { output ->
         output.write(header)

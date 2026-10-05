@@ -1,9 +1,9 @@
 package dev.anthonyhfm.amethyst.devices.audio.sample
 
 import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.PcmAudioSource
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache
 import dev.anthonyhfm.amethyst.core.engine.audio.source.PolyphaseSincResampler
-import dev.anthonyhfm.amethyst.core.engine.audio.source.useNativeRateForLongSample
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.AudioTriggerBatch
 import dev.anthonyhfm.amethyst.core.engine.audio.trigger.PadTriggerKey
 import dev.anthonyhfm.amethyst.devices.AudioConfiguration
@@ -22,7 +22,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 internal class SampleRenderSnapshot private constructor(
-    val source: ByteArrayPcmAudioSource,
+    val source: PcmAudioSource,
     val startFrame: Long,
     val endFrame: Long,
     val loopStartFrame: Long,
@@ -42,51 +42,43 @@ internal class SampleRenderSnapshot private constructor(
         fun prepareSource(
             state: SampleChainDeviceState,
             outputSampleRate: Int,
-            rawData: ByteArray? = state.resolvedRawData(),
-        ): ByteArrayPcmAudioSource? {
-            rawData ?: return null
-            val bytesPerSample = state.bitDepth / 8
-            val bytesPerFrame = bytesPerSample * state.channels
-            if (
-                rawData.isEmpty() || state.sampleRate <= 0 || state.channels !in 1..2 ||
-                state.bitDepth !in ByteArrayPcmAudioSource.SUPPORTED_BIT_DEPTHS ||
-                bytesPerFrame <= 0 || rawData.size % bytesPerFrame != 0
-            ) return null
-
-            val original = ByteArrayPcmAudioSource(
-                id = state.sourceId?.takeIf(String::isNotBlank)
-                    ?: state.fileName.ifBlank { "sample" },
-                sampleRate = state.sampleRate,
-                channels = state.channels,
-                bitDepth = state.bitDepth,
-                rawData = rawData,
-            )
-            if (state.sampleRate == outputSampleRate) return original
-
-            // Library-backed Sample devices all reference the same immutable PCM
-            // payload. Preparing that complete payload independently per device
-            // defeats the library sharing and can allocate gigabytes for a rack
-            // containing many regions of the same file.
+            rawData: ByteArray? = state.rawData,
+        ): PcmAudioSource? {
             val librarySource = state.sourceId
                 ?.takeIf(String::isNotBlank)
                 ?.let(AudioLibraryRepository::get)
                 ?.takeIf {
-                    it.rawData === rawData &&
+                    (rawData == null || it.residentPcmData === rawData) &&
                         it.sampleRate == state.sampleRate &&
                         it.channels == state.channels &&
                         it.bitDepth == state.bitDepth
                 }
             if (librarySource != null) {
-                if (useNativeRateForLongSample(original.frameCount, original.sampleRate)) {
-                    return original
-                }
                 return PreparedAudioSourceCache.getOrPrepare(
-                    source = original,
+                    source = librarySource.pcmSource(),
                     outputRate = outputSampleRate,
                     retainForProject = true,
-                ) as ByteArrayPcmAudioSource
+                ) as PcmAudioSource
             }
-
+            rawData ?: return null
+            val bytesPerFrame = (state.bitDepth / 8) * state.channels
+            if (
+                rawData.isEmpty() || state.sampleRate <= 0 || state.channels !in 1..2 ||
+                state.bitDepth !in ByteArrayPcmAudioSource.SUPPORTED_BIT_DEPTHS ||
+                bytesPerFrame <= 0 || rawData.size % bytesPerFrame != 0
+            ) {
+                return null
+            }
+            val original = ByteArrayPcmAudioSource(
+                id = state.sourceId?.takeIf(String::isNotBlank) ?: state.fileName.ifBlank { "sample" },
+                sampleRate = state.sampleRate,
+                channels = state.channels,
+                bitDepth = state.bitDepth,
+                rawData = rawData,
+            )
+            if (state.sampleRate == outputSampleRate) {
+                return original
+            }
             val outputFrames = (
                 original.frameCount.toDouble() * outputSampleRate / original.sampleRate
             ).toLong().coerceAtLeast(1L)
@@ -127,10 +119,10 @@ internal class SampleRenderSnapshot private constructor(
 
         fun from(
             state: SampleChainDeviceState,
-            source: ByteArrayPcmAudioSource,
+            source: PcmAudioSource,
         ): SampleRenderSnapshot? {
-            val sourceAssetFrames = state.resolvedRawData()
-                ?.size
+            val sourceAssetFrames = state.sourceId?.let(AudioLibraryRepository::get)?.totalSamples
+                ?: state.rawData?.size
                 ?.let { byteCount ->
                     val bytesPerFrame = (state.bitDepth / 8) * state.channels
                     if (bytesPerFrame > 0) byteCount.toLong() / bytesPerFrame else 0L

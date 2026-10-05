@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use symphonia::core::{
     audio::SampleBuffer, codecs::DecoderOptions, errors::Error as SymphoniaError,
-    formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
+    formats::FormatOptions, io::{MediaSource, MediaSourceStream}, meta::MetadataOptions, probe::Hint,
 };
 
 /**
@@ -72,11 +72,17 @@ impl EchoEngine {
     }
 
     pub fn decode_file(&self, path: String) -> EchoDecodeResult {
-        match std::fs::read(&path) {
-            Ok(bytes) => self.decode_bytes(bytes, path),
+        let result = std::fs::File::open(&path)
+            .map_err(|error| format!("Cannot read audio file: {error}"))
+            .and_then(|file| decode_media(Box::new(file), &path));
+        match result {
+            Ok(buffer) => EchoDecodeResult {
+                buffer: Some(buffer),
+                error: None,
+            },
             Err(error) => EchoDecodeResult {
                 buffer: None,
-                error: Some(format!("Cannot read audio file: {error}")),
+                error: Some(error),
             },
         }
     }
@@ -99,6 +105,10 @@ impl EchoEngine {
 }
 
 fn decode(bytes: Vec<u8>, name: &str) -> Result<EchoAudioBuffer, String> {
+    decode_media(Box::new(Cursor::new(bytes)), name)
+}
+
+fn decode_media(source: Box<dyn MediaSource>, name: &str) -> Result<EchoAudioBuffer, String> {
     let mut hint = Hint::new();
     if let Some(extension) = std::path::Path::new(name)
         .extension()
@@ -106,7 +116,7 @@ fn decode(bytes: Vec<u8>, name: &str) -> Result<EchoAudioBuffer, String> {
     {
         hint.with_extension(extension);
     }
-    let media = MediaSourceStream::new(Box::new(Cursor::new(bytes)), Default::default());
+    let media = MediaSourceStream::new(source, Default::default());
     let probed = symphonia::default::get_probe()
         .format(
             &hint,
@@ -335,6 +345,27 @@ fn probe_file_internal(path: &str) -> Result<EchoAudioMetadata, String> {
 #[cfg(test)]
 mod tests {
     use super::decode;
+
+    #[test]
+    fn file_decode_matches_bytes_without_reading_the_entire_input() {
+        let bytes = pcm16_mono_wav(44_100, &[0, 16_384, -16_384, 32_767, -32_768]);
+        let path = std::env::temp_dir().join(format!(
+            "amethyst-stream-decode-{}-{}.wav",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::write(&path, &bytes).unwrap();
+        let result = super::EchoEngine.decode_file(path.to_string_lossy().into_owned());
+        std::fs::remove_file(path).unwrap();
+        let file = result.buffer.expect("file should decode");
+        let memory = decode(bytes, "stream.wav").unwrap();
+        assert_eq!(file.sample_rate, memory.sample_rate);
+        assert_eq!(file.channels, memory.channels);
+        assert_eq!(file.pcm24, memory.pcm24);
+    }
 
     #[test]
     fn pcm16_wav_decode_preserves_samples_and_format() {

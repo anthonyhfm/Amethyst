@@ -6,6 +6,14 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
+import dev.anthonyhfm.amethyst.core.engine.audio.source.PcmAudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.AudioSource
+import dev.anthonyhfm.amethyst.core.engine.audio.source.ByteArrayPcmAudioSource
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,13 +41,73 @@ internal fun computeWaveformEnvelope(
     widthPx: Int? = null,
     maxBuckets: Int = 20_000
 ): FloatArray {
-    if (samples.isEmpty()) return FloatArray(0)
-    val sStart = startSample.toInt().coerceIn(0, samples.size)
-    val sEnd = endSample.toInt().coerceIn(sStart, samples.size)
+    return computeWaveformEnvelope(
+        sampleCount = samples.size,
+        sampleAt = { samples[it] },
+        startSample = startSample,
+        endSample = endSample,
+        zoomLevel = zoomLevel,
+        sampleRate = sampleRate,
+        timelineStartUs = timelineStartUs,
+        widthPx = widthPx,
+        maxBuckets = maxBuckets,
+    )
+}
+
+internal fun computeWaveformEnvelope(
+    source: AudioSource,
+    startSample: Long,
+    endSample: Long,
+    zoomLevel: Float,
+    sampleRate: Int,
+    timelineStartUs: Long = 0L,
+    widthPx: Int? = null,
+    maxBuckets: Int = 20_000,
+    checkActive: () -> Unit = {},
+): FloatArray = computeWaveformEnvelope(
+    sampleCount = source.frameCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+    sampleAt = { frame ->
+        var sum = 0f
+        var channel = 0
+        while (channel < source.channels) {
+            sum += source.sample(frameIndex = frame.toLong(), channel = channel).coerceIn(-1f, 1f)
+            channel++
+        }
+        sum / source.channels
+    },
+    startSample = startSample,
+    endSample = endSample,
+    zoomLevel = zoomLevel,
+    sampleRate = sampleRate,
+    timelineStartUs = timelineStartUs,
+    widthPx = widthPx,
+    maxBuckets = maxBuckets,
+    checkActive = checkActive,
+)
+
+private fun computeWaveformEnvelope(
+    sampleCount: Int,
+    sampleAt: (Int) -> Float,
+    startSample: Long,
+    endSample: Long,
+    zoomLevel: Float,
+    sampleRate: Int,
+    timelineStartUs: Long,
+    widthPx: Int?,
+    maxBuckets: Int,
+    checkActive: () -> Unit = {},
+): FloatArray {
+    if (sampleCount <= 0) {
+        return FloatArray(0)
+    }
+    val sStart = startSample.toInt().coerceIn(0, sampleCount)
+    val sEnd = endSample.toInt().coerceIn(sStart, sampleCount)
     val subsetLen = sEnd - sStart
-    if (subsetLen <= 0) return FloatArray(0)
+    if (subsetLen <= 0) {
+        return FloatArray(0)
+    }
     if (subsetLen == 1) {
-        val amp = kotlin.math.abs(samples[sStart]).coerceIn(0f, 1f)
+        val amp = kotlin.math.abs(sampleAt(sStart)).coerceIn(0f, 1f)
         return floatArrayOf(amp, amp)
     }
 
@@ -50,6 +118,7 @@ internal fun computeWaveformEnvelope(
     widthPx?.takeIf { it > 0 }?.let { width ->
         val bucketCount = width.coerceIn(2, maxBuckets)
         return FloatArray(bucketCount) { bucketIndex ->
+            checkActive()
             val localStart = ((bucketIndex.toLong() * subsetLen) / bucketCount)
                 .toInt()
                 .coerceIn(0, subsetLen - 1)
@@ -58,8 +127,10 @@ internal fun computeWaveformEnvelope(
                 .coerceIn(localStart + 1, subsetLen)
             var maxAmp = 0f
             for (sampleIndex in (sStart + localStart) until (sStart + localEnd)) {
-                val value = kotlin.math.abs(samples[sampleIndex])
-                if (value > maxAmp) maxAmp = value
+                val value = kotlin.math.abs(sampleAt(sampleIndex))
+                if (value > maxAmp) {
+                    maxAmp = value
+                }
             }
             maxAmp.coerceIn(0f, 1f)
         }
@@ -82,6 +153,7 @@ internal fun computeWaveformEnvelope(
     val bucketDurationUs = 1000.0 / safeZoom.toDouble()
 
     return FloatArray(bucketCount) { bucketIndex ->
+        checkActive()
         val absoluteBucketStartUs = (firstBucketIndex + bucketIndex).toDouble() * bucketDurationUs
         val absoluteBucketEndUs = absoluteBucketStartUs + bucketDurationUs
         val clippedBucketStartUs = maxOf(absoluteBucketStartUs, timelineStartUs.toDouble())
@@ -100,11 +172,51 @@ internal fun computeWaveformEnvelope(
             .coerceIn(localStart + 1, subsetLen)
         var maxAmp = 0f
         for (sampleIndex in (sStart + localStart) until (sStart + localEnd)) {
-            val value = kotlin.math.abs(samples[sampleIndex])
-            if (value > maxAmp) maxAmp = value
+            val value = kotlin.math.abs(sampleAt(sampleIndex))
+            if (value > maxAmp) {
+                maxAmp = value
+            }
         }
         maxAmp.coerceIn(0f, 1f)
     }
+}
+
+@Composable
+internal fun rememberWaveformEnvelope(
+    source: AudioSource?,
+    startSample: Long,
+    endSample: Long,
+    zoomLevel: Float,
+    sampleRate: Int,
+    timelineStartUs: Long = 0L,
+    widthPx: Int? = null,
+): FloatArray {
+    val range = listOf(startSample, endSample, zoomLevel, sampleRate, timelineStartUs, widthPx)
+    var envelope by remember(source, range) { mutableStateOf(value = FloatArray(size = 0)) }
+    LaunchedEffect(source, range) {
+        envelope = withContext(context = Dispatchers.Default) {
+            if (source == null) {
+                FloatArray(size = 0)
+            } else {
+                val context = coroutineContext
+                try {
+                    computeWaveformEnvelope(
+                        source = source,
+                        startSample = startSample,
+                        endSample = endSample,
+                        zoomLevel = zoomLevel,
+                        sampleRate = sampleRate,
+                        timelineStartUs = timelineStartUs,
+                        widthPx = widthPx,
+                        checkActive = { context.ensureActive() },
+                    )
+                } finally {
+                    (source as? PcmAudioSource)?.pcmBytes?.releaseCachedPages()
+                }
+            }
+        }
+    }
+    return envelope
 }
 
 /**
@@ -119,7 +231,8 @@ internal fun computeWaveformEnvelope(
  */
 @Composable
 fun WaveformView(
-    rawData: ByteArray?,
+    rawData: ByteArray? = null,
+    pcmSource: AudioSource? = null,
     sampleRate: Int,
     channels: Int,
     bitDepth: Int,
@@ -145,17 +258,23 @@ fun WaveformView(
 ) {
     val wave = waveColor
     val baseline = waveColor.copy(alpha = 0.6f)
-    val MAX_BUCKETS = 20_000
 
     val resolvedChannels = if (channels > 0) channels else 2
     val resolvedBitDepth = if (bitDepth in listOf(8, 16, 24, 32)) bitDepth else 16
     val resolvedSampleRate = if (sampleRate > 0) sampleRate else 44100
 
-    // Decode PCM → mono floats once per rawData identity change.
-    val samples: FloatArray = remember(rawData, resolvedBitDepth, resolvedChannels) {
-        val bytes = rawData ?: return@remember FloatArray(0)
-        pcmToMonoFloats(bytes, resolvedBitDepth, resolvedChannels)
+    val source = remember(rawData, pcmSource, resolvedBitDepth, resolvedChannels, resolvedSampleRate) {
+        pcmSource ?: rawData?.takeIf { it.isNotEmpty() }?.let {
+            ByteArrayPcmAudioSource(
+                id = "waveform",
+                sampleRate = resolvedSampleRate,
+                channels = resolvedChannels,
+                bitDepth = resolvedBitDepth,
+                rawData = it,
+            )
+        }
     }
+    val sampleCount = source?.frameCount ?: 0L
 
     val currentStartPosition by rememberUpdatedState(startPosition)
     val currentEndPosition by rememberUpdatedState(endPosition)
@@ -171,21 +290,15 @@ fun WaveformView(
     var measuredWidthPx by remember { mutableStateOf(0) }
     val effectiveWidthPx = renderWidthPx?.takeIf { it > 0 } ?: measuredWidthPx
 
-    // Compute envelope once per (samples, startSample, endSample, zoomLevel, sampleRate) — NOT
-    // inside the Canvas block which redraws every frame. Moving here cuts CPU from O(N) every
-    // frame to O(N) only when parameters change.
-    val amps: FloatArray = remember(samples, startSample, endSample, timelineStartUs, zoomLevel, sampleRate, effectiveWidthPx) {
-        computeWaveformEnvelope(
-            samples = samples,
-            startSample = startSample,
-            endSample = endSample,
-            zoomLevel = zoomLevel,
-            sampleRate = sampleRate,
-            timelineStartUs = timelineStartUs,
-            widthPx = effectiveWidthPx.takeIf { it > 0 },
-            maxBuckets = MAX_BUCKETS
-        )
-    }
+    val amps = rememberWaveformEnvelope(
+        source = source,
+        startSample = startSample,
+        endSample = endSample,
+        zoomLevel = zoomLevel,
+        sampleRate = resolvedSampleRate,
+        timelineStartUs = timelineStartUs,
+        widthPx = effectiveWidthPx.takeIf { it > 0 },
+    )
 
     Box(modifier = modifier) {
         Canvas(
@@ -215,7 +328,7 @@ fun WaveformView(
                                     // larger hit target than fades so boundaries stay draggable.
                                     val edgeHandleSize = 32f
 
-                                    val durationMs = if (sampleRate > 0) (samples.size.toFloat() / sampleRate) * 1000f else 0f
+                                    val durationMs = if (sampleRate > 0) (sampleCount.toFloat() / sampleRate) * 1000f else 0f
                                     val activeDurationMs = durationMs * (currentEndPosition - currentStartPosition)
                                     val fadeInRatio = if (activeDurationMs > 0f) (currentFadeInMs / activeDurationMs).coerceIn(0f, 1f) else 0f
                                     val fadeOutRatio = if (activeDurationMs > 0f) (currentFadeOutMs / activeDurationMs).coerceIn(0f, 1f) else 0f
@@ -233,7 +346,7 @@ fun WaveformView(
                                 onDrag = { _, dragAmount ->
                                     val w = size.width.toFloat()
                                     val delta = dragAmount.x / w
-                                    val durationMs = if (sampleRate > 0) (samples.size.toFloat() / sampleRate) * 1000f else 0f
+                                    val durationMs = if (sampleRate > 0) (sampleCount.toFloat() / sampleRate) * 1000f else 0f
                                     val activeDurationMs = durationMs * (currentEndPosition - currentStartPosition)
 
                                     when {
@@ -319,7 +432,7 @@ fun WaveformView(
                     size = androidx.compose.ui.geometry.Size(w - endX, h))
             }
 
-            val signalDurationMs = if (sampleRate > 0) (samples.size.toFloat() / sampleRate) * 1000f else 0f
+            val signalDurationMs = if (sampleRate > 0) (sampleCount.toFloat() / sampleRate) * 1000f else 0f
             val activeDurationMs = signalDurationMs * (endPosition - startPosition)
 
             if (fadeInMs > 0f && activeWidth > 0f && activeDurationMs > 0f) {
@@ -373,37 +486,4 @@ fun WaveformView(
             }
         }
     }
-}
-
-
-private fun pcmToMonoFloats(raw: ByteArray, bitDepth: Int, channels: Int): FloatArray {
-    val ch = if (channels > 0) channels else 2
-    val bd = if (bitDepth in listOf(8, 16, 24, 32)) bitDepth else 16
-    val bps = bd / 8
-    val frameSize = bps * ch
-    if (raw.size < frameSize) return FloatArray(0)
-    val frames = raw.size / frameSize
-    val out = FloatArray(frames)
-    var frameIdx = 0
-    var byteIndex = 0
-    while (frameIdx < frames) {
-        var sum = 0f
-        var c = 0
-        while (c < ch) {
-            val off = byteIndex + c * bps
-            val sample = when (bd) {
-                8  -> { val u = raw[off].toInt() and 0xFF; ((u - 128) / 128f).coerceIn(-1f, 1f) }
-                16 -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f).coerceIn(-1f, 1f) }
-                24 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt(); var v = b0 or (b1 shl 8) or (b2 shl 16); if ((v and 0x800000) != 0) v = v or -0x1000000; (v / 8388608f).coerceIn(-1f, 1f) }
-                32 -> { val b0 = raw[off].toInt() and 0xFF; val b1 = raw[off + 1].toInt() and 0xFF; val b2 = raw[off + 2].toInt() and 0xFF; val b3 = raw[off + 3].toInt(); val v = b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24); if (v == Int.MIN_VALUE) -1f else (v / 2147483648f).coerceIn(-1f, 1f) }
-                else -> { val lo = raw[off].toInt() and 0xFF; val hi = raw[off + 1].toInt() shl 8; val s = (lo or hi).toShort().toInt(); (s / 32768f).coerceIn(-1f, 1f) }
-            }
-            sum += sample
-            c++
-        }
-        out[frameIdx] = sum / ch
-        frameIdx++
-        byteIndex += frameSize
-    }
-    return out
 }

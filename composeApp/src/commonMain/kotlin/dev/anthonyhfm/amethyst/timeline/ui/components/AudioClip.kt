@@ -630,7 +630,7 @@ fun AudioClip(
                     )
                 }
 
-                if (audioEntry.source()?.rawData != null) {
+                if (audioEntry.source() != null) {
                     val revealProgress = if (isDecoding) decodingProgress.coerceIn(0.01f, 1f) else 1f
                     Box(
                         modifier = Modifier
@@ -643,7 +643,7 @@ fun AudioClip(
                                 .fillMaxSize()
                                 .padding(vertical = 4.dp),
                             waveColor = waveformColor,
-                            rawData = audioEntry.source()?.rawData,
+                            pcmSource = audioEntry.source()?.pcmSource(),
                             sampleRate = audioEntry.sampleRate,
                             channels = audioEntry.channels,
                             bitDepth = audioEntry.bitDepth,

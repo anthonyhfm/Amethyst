@@ -176,7 +176,7 @@ internal class AudioInstanceUnlink(
         return regions.getOrPut(key = region) {
             source.copy(
                 id = UUID.randomUUID(),
-                rawData = source.rawData.copyOfRange(
+                rawData = source.pcmRegionBytes(
                     fromIndex = (startFrame * source.bytesPerSample).toInt(),
                     toIndex = (endFrame * source.bytesPerSample).toInt(),
                 ),

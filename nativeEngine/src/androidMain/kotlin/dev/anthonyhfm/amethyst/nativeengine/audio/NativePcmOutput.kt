@@ -136,5 +136,12 @@ private object PcmOutputDirectBridge {
     ): Int
 
     @JvmStatic
+    external fun releaseMappedPages(samples: ByteBuffer): Int
+
+    @JvmStatic
     external fun queuedFrames(handle: Long): Long
+}
+
+fun releaseMappedPcmPages(buffer: ByteBuffer) {
+    PcmOutputDirectBridge.releaseMappedPages(samples = buffer)
 }

@@ -18,7 +18,7 @@ object PreparedAudioSourceCache {
     )
 
     private data class Entry(
-        val sourceBytes: ByteArray?,
+        val sourceIdentity: Any?,
         val prepared: AudioSource,
         val retainForProject: Boolean,
     )
@@ -50,36 +50,56 @@ object PreparedAudioSourceCache {
             channels = source.channels,
             frameCount = source.frameCount,
         )
-        val sourceBytes = (source as? ByteArrayPcmAudioSource)?.rawData
-        cachedSource(key = key, sourceBytes = sourceBytes, retainForProject = retainForProject)?.let {
+        val sourceIdentity = (source as? PcmAudioSource)?.pcmCacheIdentity ?: source
+        cachedSource(key = key, sourceIdentity = sourceIdentity, retainForProject = retainForProject)?.let {
             return it
         }
 
-        val diskKey = (source as? ByteArrayPcmAudioSource)?.let {
-            "${source.id.hashCode().toUInt().toString(16)}-${it.rawData.contentHashCode().toUInt().toString(16)}-" +
+        val root = persistentRoot.value
+        val diskKey = if (root != null && source is PcmAudioSource) {
+            "${source.id.hashCode().toUInt().toString(16)}-${source.pcmBytes.contentHash().toUInt().toString(16)}-" +
                 "${source.sampleRate}-$outputRate-${source.channels}-${source.frameCount}"
+        } else {
+            null
         }
         val outputFrames = (source.frameCount.toDouble() * outputRate / source.sampleRate)
             .toLong().coerceAtLeast(1L)
         val expectedBytes = outputFrames * source.channels * BYTES_PER_PCM24_SAMPLE
-        val root = persistentRoot.value
-        val diskBytes = if (root != null && diskKey != null && expectedBytes <= Int.MAX_VALUE) {
-            runCatching { PreparedAudioDiskCache.read(root, diskKey, expectedBytes.toInt()) }.getOrNull()
-        } else null
-        val prepared = if (diskBytes != null) {
-            ByteArrayPcmAudioSource(source.id, outputRate, source.channels, 24, diskBytes)
+        val cachedStorage = if (root != null && diskKey != null && expectedBytes <= Int.MAX_VALUE) {
+            runCatching {
+                if (expectedBytes >= MAPPED_PCM_THRESHOLD_BYTES) {
+                    mapPcmFile(path = "$root/$diskKey.pcm", expectedBytes = expectedBytes.toInt())
+                } else {
+                    PreparedAudioDiskCache.read(root = root, key = diskKey, expectedBytes = expectedBytes.toInt())
+                        ?.let { InMemoryPcmBytes(bytes = it) }
+                }
+            }.getOrNull()
         } else {
-            (if (source is ByteArrayPcmAudioSource) {
-                platformResampleToPcm24(source, outputRate)
-            } else null).let { it ?: resampleToPcm24(source, outputRate) }.also { result ->
-                if (root != null && diskKey != null && result is ByteArrayPcmAudioSource) {
-                    runCatching { PreparedAudioDiskCache.write(root, diskKey, result.rawData) }
+            null
+        }
+        val prepared = cachedStorage?.let {
+            pcmSourceFromStorage(id = source.id, sampleRate = outputRate, channels = source.channels, bitDepth = 24, storage = it)
+        } ?: (if (source is PcmAudioSource) {
+            platformResampleToPcm24(source = source, outputRate = outputRate)
+        } else {
+            null
+        } ?: resampleToPcm24(source = source, outputRate = outputRate)).also { result ->
+            if (root != null && diskKey != null && result is PcmAudioSource) {
+                runCatching {
+                    val path = result.pcmBytes.filePath
+                    if (path != null) {
+                        PreparedAudioDiskCache.copyFile(root = root, key = diskKey, sourcePath = path)
+                    } else {
+                        PreparedAudioDiskCache.write(root = root, key = diskKey, bytes = result.pcmBytes.readAll())
+                    }
                 }
             }
         }
+        (source as? PcmAudioSource)?.pcmBytes?.releaseCachedPages()
+        (prepared as? PcmAudioSource)?.pcmBytes?.releaseCachedPages()
         while (true) {
             val current = entries.value
-            val existing = current[key]?.takeIf { it.sourceBytes === sourceBytes }
+            val existing = current[key]?.takeIf { it.sourceIdentity === sourceIdentity }
             if (existing != null) {
                 if (!retainForProject || existing.retainForProject) {
                     return existing.prepared
@@ -95,7 +115,7 @@ object PreparedAudioSourceCache {
                 continue
             }
             val updated = current + (key to Entry(
-                sourceBytes = sourceBytes,
+                sourceIdentity = sourceIdentity,
                 prepared = prepared,
                 retainForProject = retainForProject,
             ))
@@ -111,12 +131,12 @@ object PreparedAudioSourceCache {
 
     private fun cachedSource(
         key: Key,
-        sourceBytes: ByteArray?,
+        sourceIdentity: Any?,
         retainForProject: Boolean,
     ): AudioSource? {
         while (true) {
             val current = entries.value
-            val existing = current[key]?.takeIf { it.sourceBytes === sourceBytes } ?: return null
+            val existing = current[key]?.takeIf { it.sourceIdentity === sourceIdentity } ?: return null
             if (!retainForProject || existing.retainForProject) {
                 return existing.prepared
             }
@@ -132,9 +152,15 @@ object PreparedAudioSourceCache {
     }
 
     internal fun retainedPcmBytes(): Long = entries.value.values
-        .mapNotNull { (it.prepared as? ByteArrayPcmAudioSource)?.rawData }
-        .toSet()
-        .sumOf { it.size.toLong() }
+        .mapNotNull { it.prepared as? PcmAudioSource }
+        .distinctBy { it.pcmBytes }
+        .sumOf { it.residentPcmBytes.toLong() }
+
+    internal fun mappedPcmBytes(): Long = entries.value.values
+        .mapNotNull { it.prepared as? PcmAudioSource }
+        .filter { it.residentPcmBytes == 0 }
+        .distinctBy { it.pcmBytes }
+        .sumOf { it.pcmByteCount.toLong() }
 
     internal fun removeSources(sourceIds: Set<String>) {
         while (true) {
@@ -157,36 +183,45 @@ object PreparedAudioSourceCache {
         require(outputFrames <= Int.MAX_VALUE / (source.channels * BYTES_PER_PCM24_SAMPLE)) {
             "Prepared audio source is too large"
         }
-        val output = ByteArray(
-            outputFrames.toInt() * source.channels * BYTES_PER_PCM24_SAMPLE,
-        )
-        val frame = FloatArray(source.channels)
-        val resampler = PolyphaseSincResampler(
-            sourceRate = source.sampleRate,
-            outputRate = outputRate,
-            channels = source.channels,
-        )
-        var outputFrame = 0
-        while (outputFrame < outputFrames.toInt()) {
-            resampler.readFrame(source, frame)
-            var channel = 0
-            while (channel < source.channels) {
-                writePcm24(
-                    destination = output,
-                    sampleIndex = outputFrame * source.channels + channel,
-                    sample = frame[channel],
-                )
-                channel++
+        val storage = ProjectPcmFiles.prepare(
+            expectedBytes = outputFrames.toInt() * source.channels * BYTES_PER_PCM24_SAMPLE,
+        ) { writer ->
+            val blockFrames = 8192
+            val output = ByteArray(size = blockFrames * source.channels * BYTES_PER_PCM24_SAMPLE)
+            val frame = FloatArray(size = source.channels)
+            val resampler = PolyphaseSincResampler(
+                sourceRate = source.sampleRate,
+                outputRate = outputRate,
+                channels = source.channels,
+            )
+            var outputFrame = 0
+            while (outputFrame < outputFrames.toInt()) {
+                val count = minOf(blockFrames, outputFrames.toInt() - outputFrame)
+                var localFrame = 0
+                while (localFrame < count) {
+                    resampler.readFrame(source = source, destination = frame)
+                    var channel = 0
+                    while (channel < source.channels) {
+                        writePcm24(
+                            destination = output,
+                            sampleIndex = localFrame * source.channels + channel,
+                            sample = frame[channel],
+                        )
+                        channel++
+                    }
+                    resampler.advance()
+                    localFrame++
+                }
+                writer.write(bytes = output, offset = 0, length = count * source.channels * BYTES_PER_PCM24_SAMPLE)
+                outputFrame += count
             }
-            resampler.advance()
-            outputFrame++
         }
-        return ByteArrayPcmAudioSource(
+        return pcmSourceFromStorage(
             id = source.id,
             sampleRate = outputRate,
             channels = source.channels,
             bitDepth = 24,
-            rawData = output,
+            storage = storage,
         )
     }
 
