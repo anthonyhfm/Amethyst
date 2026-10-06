@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.core.network.user.LocalUserRepository
 import dev.anthonyhfm.amethyst.core.util.BaseViewModel
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
 import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
+import dev.anthonyhfm.amethyst.core.util.fileDialogSettings
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.home.nav.HomeNavRoute
 import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
@@ -81,7 +82,9 @@ class RecentViewModel(
                         type = FileKitType.File(
                             extensions = listOf("ame", "als", "zip", "rar", "approj")
                         ),
-                        title = getString(Res.string.home_recent_dialog_file_picker_title)
+                        dialogSettings = fileDialogSettings(
+                            title = getString(Res.string.home_recent_dialog_file_picker_title),
+                        ),
                     )
 
                     if (file == null) return@launch

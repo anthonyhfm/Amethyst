@@ -61,6 +61,7 @@ import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.reorder.ReorderContainer
 import com.mohamedrejeb.compose.dnd.reorder.ReorderableItem
 import com.mohamedrejeb.compose.dnd.reorder.rememberReorderState
+import dev.anthonyhfm.amethyst.core.util.fileDialogSettings
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.timeline.data.StemKind
@@ -325,7 +326,7 @@ fun AudioLibraryPanel(
                     scope.launch {
                         val file = FileKit.openFilePicker(
                             mode = FileKitMode.Single,
-                            title = importLabel,
+                            dialogSettings = fileDialogSettings(title = importLabel),
                             type = FileKitType.File(extensions = Echo.getSupportedFormats()),
                         )
                         file?.let { importFiles(listOf(it)) }

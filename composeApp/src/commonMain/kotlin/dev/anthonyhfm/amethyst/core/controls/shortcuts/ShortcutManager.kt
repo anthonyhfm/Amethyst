@@ -211,7 +211,7 @@ object ShortcutManager {
                 GlobalScope.launch {
                     var path = FileKit.openFileSaver(
                         suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
-                        extension = "ame"
+                        defaultExtension = "ame"
                     )?.path ?: return@launch
                     persistWorkspace(path)
                 }
@@ -221,7 +221,7 @@ object ShortcutManager {
                     var path = WorkspaceRepository.workspaceMeta?.path
                         ?: FileKit.openFileSaver(
                             suggestedName = WorkspaceRepository.workspaceMeta?.title ?: "Untitled",
-                            extension = "ame"
+                            defaultExtension = "ame"
                         )?.path ?: return@launch
                     persistWorkspace(path)
                 }

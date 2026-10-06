@@ -11,6 +11,7 @@ import dev.anthonyhfm.amethyst.core.util.BaseViewModel
 import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.core.util.ZippedProjectFormat
 import dev.anthonyhfm.amethyst.core.util.determineProjectArchiveFormat
+import dev.anthonyhfm.amethyst.core.util.fileDialogSettings
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.home.data.AndroidLocalProjectDeletion
 import dev.anthonyhfm.amethyst.home.data.AndroidProjectImporter
@@ -43,7 +44,9 @@ class ProjectsViewModel(
                         // makes the system picker filter for ZIP files only and
                         // greys out valid Amethyst projects.
                         type = FileKitType.File(),
-                        title = getString(Res.string.home_projects_dialog_file_picker_title),
+                        dialogSettings = fileDialogSettings(
+                            title = getString(Res.string.home_projects_dialog_file_picker_title),
+                        ),
                     )
 
                     if (file == null) return@launch

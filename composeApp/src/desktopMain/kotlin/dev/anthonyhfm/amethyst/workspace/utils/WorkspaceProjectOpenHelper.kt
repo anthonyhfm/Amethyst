@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.workspace.utils
 
+import dev.anthonyhfm.amethyst.core.util.fileDialogSettings
 import org.jetbrains.compose.resources.getString
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
@@ -31,7 +32,9 @@ object WorkspaceProjectOpenHelper {
 
         val file = FileKit.openFilePicker(
             type = FileKitType.File(extensions = extensions),
-            title = getString(Res.string.workspace_open_dialog_title)
+            dialogSettings = fileDialogSettings(
+                title = getString(Res.string.workspace_open_dialog_title),
+            ),
         ) ?: return WorkspaceProjectOpenResult.Cancelled
 
         return openProject(file)

@@ -58,7 +58,7 @@ object WorkspaceSaveHelper {
                 path = FileKit.openFileSaver(
                     suggestedName = WorkspaceRepository.workspaceMeta?.title
                         ?: getString(Res.string.workspace_save_untitled),
-                    extension = "ame"
+                    defaultExtension = "ame"
                 )?.path ?: return false
             }
 
@@ -79,7 +79,7 @@ object WorkspaceSaveHelper {
             val path = FileKit.openFileSaver(
                 suggestedName = WorkspaceRepository.workspaceMeta?.title
                     ?: getString(Res.string.workspace_save_untitled),
-                extension = "ame"
+                defaultExtension = "ame"
             )?.path ?: return false
 
             return writeToPath(path)

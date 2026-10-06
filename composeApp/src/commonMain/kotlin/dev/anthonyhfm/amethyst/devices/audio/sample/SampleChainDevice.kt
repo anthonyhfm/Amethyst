@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import com.composeunstyled.Text
 import com.mohamedrejeb.compose.dnd.drop.dropTarget
+import dev.anthonyhfm.amethyst.core.util.fileDialogSettings
 import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -317,7 +318,7 @@ class SampleChainDevice : AudioChainDevice<SampleChainDeviceState>(), Chokeable,
                 try {
                     val file = FileKit.openFilePicker(
                         mode = FileKitMode.Single,
-                        title = selectFileTitle,
+                        dialogSettings = fileDialogSettings(title = selectFileTitle),
                         type = FileKitType.File(
                             extensions = Echo.getSupportedFormats()
                         )
