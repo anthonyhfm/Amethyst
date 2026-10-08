@@ -66,6 +66,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.AutomationParameter
@@ -127,6 +128,7 @@ fun <T> Dial(
     hasAutomation: Boolean = false,
     statusIndicatorColor: Color = Color.Unspecified,
     isAutomatable: Boolean = true,
+    readoutWidth: Dp = DialReadoutWidth,
 ) {
     val chainDevice = LocalChainDevice.current
     val node = LocalCompositionNode.current
@@ -191,6 +193,7 @@ fun <T> Dial(
             enabled = enabled,
             isAutomated = hasAutomation,
             statusIndicatorColor = statusIndicatorColor,
+            readoutWidth = readoutWidth,
         )
 
         DialType.Knob -> ContinuousDial(
@@ -209,6 +212,7 @@ fun <T> Dial(
             enabled = enabled,
             isAutomated = hasAutomation,
             statusIndicatorColor = statusIndicatorColor,
+            readoutWidth = readoutWidth,
         )
 
         is DialType.Steps<*> -> SteppedDial(
@@ -227,6 +231,7 @@ fun <T> Dial(
             enabled = enabled,
             isAutomated = hasAutomation,
             statusIndicatorColor = statusIndicatorColor,
+            readoutWidth = readoutWidth,
         )
     }
 }
@@ -248,13 +253,21 @@ private fun ContinuousDial(
     enabled: Boolean,
     isAutomated: Boolean = false,
     statusIndicatorColor: Color = Color.Unspecified,
+    readoutWidth: Dp = DialReadoutWidth,
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf(value.coerceIn(0f, 1f)) }
 
     val currentProgress = if (isDragging) dragValue else value.coerceIn(0f, 1f)
 
-    DialContent(title, text, enabled, modifier, onResolveTextValue) { dialModifier ->
+    DialContent(
+        title = title,
+        text = text,
+        enabled = enabled,
+        modifier = modifier,
+        onResolveTextValue = onResolveTextValue,
+        readoutWidth = readoutWidth,
+    ) { dialModifier ->
         DialSurface(
             progress = currentProgress,
             onDragStart = {
@@ -314,6 +327,7 @@ private fun <T> SteppedDial(
     onResolveTextValue: ((String) -> Unit)?, containerColor: Color, dialColor: Color,
     modifier: Modifier, enabled: Boolean, isAutomated: Boolean = false,
     statusIndicatorColor: Color = Color.Unspecified,
+    readoutWidth: Dp = DialReadoutWidth,
 ) {
     var isDragging by remember { mutableStateOf(false) }
     val currentIndex = values.indexOf(value).coerceAtLeast(0)
@@ -323,7 +337,14 @@ private fun <T> SteppedDial(
     val effectiveIndex = if (isDragging) dragIndex else currentIndex
     val surfaceProgress = if (isDragging) dragProgress else displayProgressForSelection(currentIndex, values.size)
 
-    DialContent(title, text, enabled, modifier, onResolveTextValue) { dialModifier ->
+    DialContent(
+        title = title,
+        text = text,
+        enabled = enabled,
+        modifier = modifier,
+        onResolveTextValue = onResolveTextValue,
+        readoutWidth = readoutWidth,
+    ) { dialModifier ->
         DialSurface(
             progress = surfaceProgress,
             onDragStart = {
@@ -617,6 +638,7 @@ internal fun DialContent(
     enabled: Boolean,
     modifier: Modifier = Modifier,
     onResolveTextValue: ((String) -> Unit)?,
+    readoutWidth: Dp = DialReadoutWidth,
     dial: @Composable (Modifier) -> Unit,
 ) {
     if (text == null) {
@@ -669,13 +691,15 @@ internal fun DialContent(
                     onValueChange = { textValue = it },
                     onSubmit = submitTextValue,
                     onCancel = { editing = false },
-                    enabled = enabled
+                    enabled = enabled,
+                    width = readoutWidth,
                 )
             } else {
                 DialReadoutLabel(
                     text = text,
                     enabled = enabled,
-                    modifier = editModifier
+                    modifier = editModifier,
+                    width = readoutWidth,
                 )
             }
         }
@@ -711,11 +735,12 @@ internal fun DialReadoutLabel(
     text: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    width: Dp = DialReadoutWidth,
 ) {
     Box(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.6f)
-            .width(DialReadoutWidth)
+            .width(width = width)
             .height(DialReadoutHeight)
             .clip(SmallShape)
             .background(Theme[colors][background])
@@ -742,6 +767,7 @@ internal fun DialReadoutEditor(
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
     enabled: Boolean,
+    width: Dp = DialReadoutWidth,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
@@ -760,7 +786,7 @@ internal fun DialReadoutEditor(
         modifier = Modifier
             .alpha(if (enabled) 1f else 0.6f)
             .focusRequester(focusRequester)
-            .width(DialReadoutWidth)
+            .width(width = width)
             .height(DialReadoutHeight)
             .clip(SmallShape)
             .background(Theme[colors][background])

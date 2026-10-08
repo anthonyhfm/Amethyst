@@ -1053,6 +1053,8 @@
     <string name="workspace_swap_launchpad_description">Wähle ein neues Layout. Alle Bindungen bleiben bei diesem Device.</string>
     <string name="composition_length_follows_clip">Länge folgt Timeline-Clip</string>
     <string name="home_import_wizard_open_failed">Das Projekt wurde konvertiert, konnte aber nicht geöffnet werden. Bitte versuche es erneut.</string>
+    <string name="issue_071_track_volume">Lautstärke</string>
+    <string name="issue_071_track_volume_reset">Tracklautstärke auf 0 dB zurücksetzen</string>
     <string name="locators_menu">Locatoren</string>
     <string name="locators_default_name">Locator</string>
     <string name="locators_add">Locator am Abspielkopf hinzufügen</string>

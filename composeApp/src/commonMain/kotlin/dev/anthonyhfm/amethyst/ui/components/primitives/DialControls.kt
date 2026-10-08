@@ -7,6 +7,8 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import dev.anthonyhfm.amethyst.ui.components.DialReadoutWidth
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.ui.components.DialType
 
@@ -29,6 +31,7 @@ fun <T> Dial(
     isAutomated: Boolean = false,
     hasAutomation: Boolean = false,
     statusIndicatorColor: Color = Color.Unspecified,
+    readoutWidth: Dp = DialReadoutWidth,
 ) = dev.anthonyhfm.amethyst.ui.components.Dial(
     type = type,
     value = value,
@@ -47,6 +50,7 @@ fun <T> Dial(
     isAutomated = isAutomated,
     hasAutomation = hasAutomation,
     statusIndicatorColor = statusIndicatorColor,
+    readoutWidth = readoutWidth,
 )
 
 @Composable

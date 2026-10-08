@@ -127,7 +127,8 @@ class MacroControlChainDevice : GenericChainDevice<MacroControlChainDeviceState>
                             title = macroLabel,
                             value = selectedIndex,
                             type = DialType.Steps(IntArray(macros.size) { it }.toList()),
-                            text = selectedMacro.name.ifBlank { "$macroLabel ${selectedIndex + 1}" },
+                            text = "${selectedIndex + 1} · ${selectedMacro.name.ifBlank { macroLabel }}",
+                            readoutWidth = 124.dp,
                             onResolveTextValue = {
                                 val macroText = it.trim().toIntOrNull()
 

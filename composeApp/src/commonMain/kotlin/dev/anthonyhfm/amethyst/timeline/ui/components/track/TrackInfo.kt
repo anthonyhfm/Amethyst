@@ -332,12 +332,22 @@ fun TrackInfo(
                                         color = trackHeaderColors.content.copy(alpha = 0.66f),
                                         fontWeight = FontWeight.Medium
                                     ),
-                                    maxLines = 2,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
 
                             Spacer(modifier = Modifier.weight(1f))
+
+                            if (track is AudioTimelineTrack) {
+                                TrackVolumeControl(
+                                    volume = track.volume,
+                                    contentColor = trackHeaderColors.content,
+                                    onVolumeChange = { value ->
+                                        onTrackVolumeChange(trackIndex, value)
+                                    },
+                                )
+                            }
 
                             Row(
                                 modifier = Modifier

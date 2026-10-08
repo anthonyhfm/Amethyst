@@ -16,7 +16,9 @@ import dev.nucleusframework.window.DialogTitleBar
 
 @Composable
 actual fun SettingsDialog(visible: Boolean, onDismiss: () -> Unit) {
-    if (!visible) return
+    if (!visible) {
+        return
+    }
 
     DecoratedDialog(
         onCloseRequest = {
@@ -30,16 +32,19 @@ actual fun SettingsDialog(visible: Boolean, onDismiss: () -> Unit) {
         ),
         resizable = false
     ) {
-        DialogTitleBar {
-            Text(
-                text = "Settings",
-                color = Theme[colors][foreground].copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
-        }
-
         AppLocaleProvider {
-            DesktopUtilityWindowScaffold {
+            DesktopUtilityWindowScaffold(
+                titleBar = {
+                    DialogTitleBar {
+                        Text(
+                            text = "Settings",
+                            color = Theme[colors][foreground].copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .align(alignment = Alignment.CenterHorizontally),
+                        )
+                    }
+                }
+            ) {
                 AppLocaleRefreshBoundary {
                     Settings()
                 }
