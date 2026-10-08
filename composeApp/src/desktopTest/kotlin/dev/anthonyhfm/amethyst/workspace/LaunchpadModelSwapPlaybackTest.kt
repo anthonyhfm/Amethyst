@@ -38,6 +38,7 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadPro
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -308,7 +309,7 @@ class LaunchpadModelSwapPlaybackTest {
 
     @Test
     fun attachedAndVirtualMidiInputFollowTheReplacementLayoutAndRecordCanonicalPadAddresses(): Unit = runBlocking {
-        WorkspaceRepository.clean()
+        WorkspaceRepository.loadWorkspace(workspaceData = SavableWorkspaceData())
         val access = FakeMidiAccess()
         val manager = AmethystMidiManager(midiAccess = access, closeMidiAccessOnClose = false)
         try {

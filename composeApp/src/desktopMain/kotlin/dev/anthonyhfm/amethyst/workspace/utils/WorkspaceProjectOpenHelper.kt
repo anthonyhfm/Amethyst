@@ -5,6 +5,7 @@ import org.jetbrains.compose.resources.getString
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
+import kotlinx.coroutines.CancellationException
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -55,6 +56,8 @@ object WorkspaceProjectOpenHelper {
                 projectTitle = workspace.title,
                 projectPath = file.path
             )
+        } catch (cause: CancellationException) {
+            throw cause
         } catch (cause: Exception) {
             WorkspaceProjectOpenResult.Failure(
                 message = buildString {

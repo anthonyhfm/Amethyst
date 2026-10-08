@@ -55,7 +55,12 @@ import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.card
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 
 @Composable
 fun AbletonImportWizard(
@@ -69,6 +74,7 @@ fun AbletonImportWizard(
     val apolloProjPath: String by viewModel.apolloProjPath.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     var conversionError by remember(path) { mutableStateOf(false) }
+    var openingError by remember(path) { mutableStateOf(false) }
     val paletteName = customPalettePath.substringAfterLast("/").ifBlank { customPalettePath }
     val apolloProjName = apolloProjPath.substringAfterLast("/").ifBlank { apolloProjPath }
 
@@ -125,6 +131,9 @@ fun AbletonImportWizard(
                 if (conversionError) {
                     FieldDescription(stringResource(Res.string.home_import_wizard_conversion_failed))
                 }
+                if (openingError) {
+                    FieldDescription(stringResource(Res.string.home_import_wizard_open_failed))
+                }
 
                 Spacer(Modifier.weight(1f))
 
@@ -137,6 +146,7 @@ fun AbletonImportWizard(
                     },
                     onStartConversion = {
                         conversionError = false
+                        openingError = false
                         dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.startLoading(
                             initialTitle = "ABLETON LIVE-SET KONVERTIEREN",
                             initialStatus = loadingMsg
@@ -144,15 +154,31 @@ fun AbletonImportWizard(
                         navigator.navigate(HomeNavRoute.LoadingScreen(loadingMsg))
 
                         coroutineScope.launch {
+                            var importedChain: Chain? = null
+                            var imported = false
                             try {
-                                viewModel.startAbletonImport(path)
-                                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
+                                viewModel.startAbletonImport(path = path)
+                                imported = true
+                                importedChain = WorkspaceRepository.lightsChain
+                                currentCoroutineContext().ensureActive()
                                 onOpenWorkspace()
-                            } catch (e: Exception) {
-                                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
-                                e.printStackTrace()
+                            } catch (failure: CancellationException) {
+                                importedChain?.let { chain ->
+                                    runCatching { WorkspaceRepository.cleanIfCurrent(chain = chain) }
+                                        .onFailure { cleanupFailure -> failure.addSuppressed(exception = cleanupFailure) }
+                                }
+                                throw failure
+                            } catch (failure: Exception) {
+                                importedChain?.let { chain ->
+                                    runCatching { WorkspaceRepository.cleanIfCurrent(chain = chain) }
+                                        .onFailure { cleanupFailure -> failure.addSuppressed(exception = cleanupFailure) }
+                                }
+                                failure.printStackTrace()
                                 navigator.popBackStack()
-                                conversionError = true
+                                conversionError = !imported
+                                openingError = imported
+                            } finally {
+                                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.finishLoading()
                             }
                         }
                     },

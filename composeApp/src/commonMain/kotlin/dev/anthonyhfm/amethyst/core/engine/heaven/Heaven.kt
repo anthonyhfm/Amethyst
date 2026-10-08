@@ -101,10 +101,18 @@ object Heaven {
     private val schedulerScope = CoroutineScope(
         Dispatchers.Default.limitedParallelism(1) + SupervisorJob()
     )
+    private val schedulerJob: Job
 
     init {
-        schedulerScope.launch {
+        schedulerJob = schedulerScope.launch {
             runScheduler()
+        }
+        schedulerJob.invokeOnCompletion { cause ->
+            schedulerCommands.close(cause = cause)
+            if (cause != null && cause !is CancellationException) {
+                println("Heaven scheduler stopped: ${cause.message}")
+                cause.printStackTrace()
+            }
         }
 
         renderScope.launch {
@@ -190,6 +198,7 @@ object Heaven {
         val sequence = jobIdCounter.incrementAndGet()
         val jobId = "job_$sequence"
         synchronized(schedulerMutationLock) {
+            check(schedulerJob.isActive) { "Heaven scheduler is unavailable" }
             val (ownerGeneration, identifierGeneration) = snapshotJobGenerations(owner, identifier)
             val scheduledJob = ScheduledJob(
                 id = jobId,
@@ -277,7 +286,7 @@ object Heaven {
                         }
 
                         val remainingNanos = renderAtNanos - timeNanos
-                        if (remainingNanos > StopWatch.NANOS_PER_MILLISECOND) {
+                        if (remainingNanos > StopWatch.NANOS_PER_MILLISECOND && signalQueue.isEmpty) {
                             delay((remainingNanos / StopWatch.NANOS_PER_MILLISECOND).coerceAtLeast(1L))
                         } else {
                             yield()
@@ -339,23 +348,41 @@ object Heaven {
         }
     }
 
-    private suspend fun drainSchedulerCommands(jobs: ScheduledJobQueue) {
-        while (true) {
-            val command = schedulerCommands.tryReceive().getOrNull() ?: return
-            handleSchedulerCommand(command, jobs)
+    private fun handleSchedulerCommandSafely(
+        command: SchedulerCommand,
+        jobs: ScheduledJobQueue,
+    ) {
+        try {
+            handleSchedulerCommand(command = command, jobs = jobs)
+        } catch (exception: Exception) {
+            println("Heaven scheduler command failed: ${exception.message}")
+            exception.printStackTrace()
         }
+    }
+
+    private fun drainSchedulerCommands(jobs: ScheduledJobQueue): Boolean {
+        repeat(SCHEDULER_BATCH_SIZE) {
+            val command = schedulerCommands.tryReceive().getOrNull() ?: return false
+            handleSchedulerCommandSafely(command = command, jobs = jobs)
+        }
+        return true
     }
 
     private suspend fun runScheduler() {
         val jobs = ScheduledJobQueue()
 
         while (currentCoroutineContext().isActive) {
-            drainSchedulerCommands(jobs)
+            if (drainSchedulerCommands(jobs = jobs)) {
+                yield()
+            }
 
             val nowNanos = timeNanos
-            while (jobs.peek()?.targetTimeNanos?.let { it <= nowNanos } == true) {
+            var executedJobs = 0
+            while (executedJobs < SCHEDULER_BATCH_SIZE &&
+                jobs.peek()?.targetTimeNanos?.let { it <= nowNanos } == true) {
                 val scheduledJob = jobs.removeFirst()
                 pendingJobsCount.decrementAndGet()
+                executedJobs++
 
                 if (!isJobCurrent(scheduledJob)) {
                     continue
@@ -369,8 +396,13 @@ object Heaven {
                 }
             }
 
+            if (executedJobs == SCHEDULER_BATCH_SIZE) {
+                yield()
+                continue
+            }
+
             if (jobs.isEmpty()) {
-                handleSchedulerCommand(schedulerCommands.receive(), jobs)
+                handleSchedulerCommandSafely(command = schedulerCommands.receive(), jobs = jobs)
                 continue
             }
 
@@ -384,7 +416,7 @@ object Heaven {
                     schedulerCommands.receive()
                 }
                 if (command != null) {
-                    handleSchedulerCommand(command, jobs)
+                    handleSchedulerCommandSafely(command = command, jobs = jobs)
                 }
             } else if (remainingNanos > 0L) {
                 while (timeNanos < jobs.peek()!!.targetTimeNanos) {
@@ -397,9 +429,12 @@ object Heaven {
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun processSignals(): Boolean {
         var changed = false
+        val deadlineNanos = timeNanos + SIGNAL_DRAIN_BUDGET_NANOS
+        var processedBatches = 0
 
-        while (!signalQueue.isEmpty) {
+        while (processedBatches < SIGNAL_BATCH_SIZE && !signalQueue.isEmpty) {
             val signals = signalQueue.tryReceive().getOrNull() ?: break
+            processedBatches++
 
             data class MidiCall(val device: LaunchpadViewportElement, val signal: Signal.LED)
             val midiCalls = mutableListOf<MidiCall>()
@@ -426,6 +461,9 @@ object Heaven {
 
             midiCalls.forEach { (device, signal) ->
                 device.screen.midiEnter(signal)
+            }
+            if (timeNanos >= deadlineNanos) {
+                break
             }
         }
 
@@ -470,6 +508,9 @@ object Heaven {
     internal fun pendingJobCountForTesting(): Int = pendingJobsCount.value
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    internal fun hasPendingSignalsForTesting(): Boolean = !signalQueue.isEmpty
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     internal suspend fun waitUntilIdleForTesting(timeoutMs: Long = 2_000L) {
         withTimeout(timeoutMs) {
             while (true) {
@@ -491,4 +532,7 @@ object Heaven {
     }
 
     private const val FINAL_DEADLINE_WINDOW_NANOS = 1_000_000L
+    private const val SIGNAL_DRAIN_BUDGET_NANOS = 2_000_000L
+    private const val SIGNAL_BATCH_SIZE = 64
+    private const val SCHEDULER_BATCH_SIZE = 256
 }

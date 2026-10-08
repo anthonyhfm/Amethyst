@@ -16,6 +16,7 @@ import dev.anthonyhfm.amethyst.core.util.platform
 import dev.anthonyhfm.amethyst.core.util.isMobile
 import dev.anthonyhfm.amethyst.core.loading.ProjectLoadMetrics
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.workspace.chain.data.findMaxMacroIndex
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.data.RecentWorkspace
@@ -29,6 +30,8 @@ import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.write
 import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -241,26 +244,47 @@ object HomeRepository {
         workspace: SavableWorkspaceData,
         rememberRecent: Boolean = false,
     ) {
-        withContext(Dispatchers.Default) {
-            ProjectLoadMetrics.measure("workspace.load") {
-                WorkspaceRepository.loadWorkspace(workspace, preparedCacheRoot = preparedCacheRoot(workspace.path))
-            }
-
-            val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
-            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
-                1.0f,
-                statusText = loadedMsg,
-                detailText = workspace.title,
-            )
-
-            if (rememberRecent) {
-                workspace.path?.let { path ->
-                    rememberRecentWorkspace(
-                        title = workspace.title,
-                        path = path,
+        var installedChain: Chain? = null
+        try {
+            withContext(Dispatchers.Default) {
+                ProjectLoadMetrics.measure("workspace.load") {
+                    val loadContext = currentCoroutineContext()
+                    loadContext.ensureActive()
+                    WorkspaceRepository.loadWorkspace(
+                        workspaceData = workspace,
+                        preparedCacheRoot = preparedCacheRoot(workspace.path),
+                        onPrepared = {
+                            installedChain = WorkspaceRepository.lightsChain
+                            loadContext.ensureActive()
+                        },
                     )
                 }
+
+                val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
+                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                    1.0f,
+                    statusText = loadedMsg,
+                    detailText = workspace.title,
+                )
+
+                if (rememberRecent) {
+                    workspace.path?.let { path ->
+                        rememberRecentWorkspace(
+                            title = workspace.title,
+                            path = path,
+                        )
+                    }
+                }
             }
+        } catch (failure: Throwable) {
+            installedChain?.let { chain ->
+                try {
+                    WorkspaceRepository.cleanIfCurrent(chain = chain)
+                } catch (cleanupFailure: Throwable) {
+                    failure.addSuppressed(exception = cleanupFailure)
+                }
+            }
+            throw failure
         }
     }
 
@@ -308,7 +332,13 @@ object HomeRepository {
                 workspace.path = saveLocalWorkspace(workspace)
             }
             saveLocalAuthor(author)
-            WorkspaceRepository.loadWorkspace(workspace, preparedCacheRoot = preparedCacheRoot(workspace.path))
+            val loadContext = currentCoroutineContext()
+            loadContext.ensureActive()
+            WorkspaceRepository.loadWorkspace(
+                workspaceData = workspace,
+                preparedCacheRoot = preparedCacheRoot(workspace.path),
+                onPrepared = { loadContext.ensureActive() },
+            )
         }
     }
 
@@ -350,63 +380,84 @@ object HomeRepository {
         customPalettePath: String?,
         apolloProjPath: String?,
     ) {
-        withContext(Dispatchers.Default) {
-            val importedFile = resolveImportedFile(path)
-            val workspace = when {
-                !apolloProjPath.isNullOrBlank() -> {
-                    val abletonWorkspace = if (importedFile.isProjectArchive()) {
+        var installedChain: Chain? = null
+        try {
+            withContext(Dispatchers.Default) {
+                val importedFile = resolveImportedFile(path)
+                val workspace = when {
+                    !apolloProjPath.isNullOrBlank() -> {
+                        val abletonWorkspace = if (importedFile.isProjectArchive()) {
+                            AbletonConverter.convertZipToWorkspace(importedFile, palettePath = customPalettePath)
+                        } else {
+                            AbletonConverter.convertToWorkspace(importedFile, customPalettePath)
+                        }
+
+                        val apolloWorkspace = ApolloConverter.convertToWorkspace(
+                            apolloProjPath,
+                            palettePath = null,
+                        )
+                        val maxMacroIndex = maxOf(
+                            apolloWorkspace.lights.findMaxMacroIndex(),
+                            abletonWorkspace.sampling.findMaxMacroIndex(),
+                            abletonWorkspace.lights.findMaxMacroIndex()
+                        )
+                        val macroCount = maxOf(maxMacroIndex + 1, apolloWorkspace.macros.size, abletonWorkspace.macros.size, 1)
+                        val mergedMacros = List(macroCount) { idx ->
+                            apolloWorkspace.macros.getOrNull(idx)
+                                ?: abletonWorkspace.macros.getOrNull(idx)
+                                ?: Macro(0)
+                        }
+                        abletonWorkspace.copy(
+                            lights = apolloWorkspace.lights,
+                            launchpadDevices = apolloWorkspace.launchpadDevices.ifEmpty { abletonWorkspace.launchpadDevices },
+                            macros = mergedMacros
+                        )
+                    }
+
+                    importedFile.isProjectArchive() -> {
                         AbletonConverter.convertZipToWorkspace(importedFile, palettePath = customPalettePath)
-                    } else {
+                    }
+
+                    else -> {
                         AbletonConverter.convertToWorkspace(importedFile, customPalettePath)
                     }
-
-                    val apolloWorkspace = ApolloConverter.convertToWorkspace(
-                        apolloProjPath,
-                        palettePath = null,
-                    )
-                    val maxMacroIndex = maxOf(
-                        apolloWorkspace.lights.findMaxMacroIndex(),
-                        abletonWorkspace.sampling.findMaxMacroIndex(),
-                        abletonWorkspace.lights.findMaxMacroIndex()
-                    )
-                    val macroCount = maxOf(maxMacroIndex + 1, apolloWorkspace.macros.size, abletonWorkspace.macros.size, 1)
-                    val mergedMacros = List(macroCount) { idx ->
-                        apolloWorkspace.macros.getOrNull(idx)
-                            ?: abletonWorkspace.macros.getOrNull(idx)
-                            ?: Macro(0)
-                    }
-                    abletonWorkspace.copy(
-                        lights = apolloWorkspace.lights,
-                        launchpadDevices = apolloWorkspace.launchpadDevices.ifEmpty { abletonWorkspace.launchpadDevices },
-                        macros = mergedMacros
-                    )
                 }
 
-                importedFile.isProjectArchive() -> {
-                    AbletonConverter.convertZipToWorkspace(importedFile, palettePath = customPalettePath)
-                }
+                workspace.path = importedFile.path
+                cacheMobileWorkspace(importedFile.path, workspace)
 
-                else -> {
-                    AbletonConverter.convertToWorkspace(importedFile, customPalettePath)
+                val loadingDevicesMsg = runCatching { getString(Res.string.home_loading_loading_devices) }.getOrDefault("Loading devices & chains...")
+                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                    0.95f,
+                    statusText = loadingDevicesMsg,
+                    detailText = workspace.title,
+                )
+                val loadContext = currentCoroutineContext()
+                loadContext.ensureActive()
+                WorkspaceRepository.loadWorkspace(
+                    workspaceData = workspace,
+                    preparedCacheRoot = preparedCacheRoot(workspace.path),
+                    onPrepared = {
+                        installedChain = WorkspaceRepository.lightsChain
+                        loadContext.ensureActive()
+                    },
+                )
+                val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
+                dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
+                    1.0f,
+                    statusText = loadedMsg,
+                    detailText = workspace.title,
+                )
+            }
+        } catch (failure: Throwable) {
+            installedChain?.let { chain ->
+                try {
+                    WorkspaceRepository.cleanIfCurrent(chain = chain)
+                } catch (cleanupFailure: Throwable) {
+                    failure.addSuppressed(exception = cleanupFailure)
                 }
             }
-
-            workspace.path = importedFile.path
-            cacheMobileWorkspace(importedFile.path, workspace)
-
-            val loadingDevicesMsg = runCatching { getString(Res.string.home_loading_loading_devices) }.getOrDefault("Loading devices & chains...")
-            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
-                0.95f,
-                statusText = loadingDevicesMsg,
-                detailText = workspace.title,
-            )
-            WorkspaceRepository.loadWorkspace(workspace, preparedCacheRoot = preparedCacheRoot(workspace.path))
-            val loadedMsg = runCatching { getString(Res.string.home_loading_project_loaded) }.getOrDefault("Project loaded!")
-            dev.anthonyhfm.amethyst.core.loading.ProjectLoadingManager.reporter.update(
-                1.0f,
-                statusText = loadedMsg,
-                detailText = workspace.title,
-            )
+            throw failure
         }
     }
 

@@ -43,6 +43,8 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlin.math.max
 import kotlin.math.roundToInt
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
@@ -58,6 +60,11 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
         )
     }
     private val activeHoldKeys = mutableSetOf<String>()
+    private val activeHoldKeysLock = SynchronizedObject()
+
+    private fun isHeld(ownerKey: String): Boolean = synchronized(activeHoldKeysLock) {
+        ownerKey in activeHoldKeys
+    }
     override val state = MutableStateFlow(LoopChainDeviceState())
     override val helpRef = "Loop"
 
@@ -267,10 +274,12 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     }
                 } else {
                     // Hold mode: mark key active, send first signal immediately
-                    activeHoldKeys.add(ownerKey)
+                    synchronized(activeHoldKeysLock) {
+                        activeHoldKeys.add(ownerKey)
+                    }
                     signalExit?.invoke(listOf(signal))
 
-                    val intervalMs = loopIntervalMs(bpm).toDouble()
+                    val intervalMs = loopIntervalMs(bpm).coerceAtLeast(minimumValue = 1L).toDouble()
                     val cycleAnchorMs = Heaven.time
                     val offSignal = when (signal) {
                         is Signal.LED -> signal.copy(color = Color.Black)
@@ -279,7 +288,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     }
 
                     Heaven.schedule(intervalMs / 2.0, owner = signalOwner) {
-                        if (activeHoldKeys.contains(ownerKey) && state.value.onHold) {
+                        if (isHeld(ownerKey = ownerKey) && state.value.onHold) {
                             signalExit?.invoke(listOf(offSignal))
                         }
                     }
@@ -309,7 +318,9 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     return@forEach
                 }
 
-                activeHoldKeys.remove(ownerKey)
+                synchronized(activeHoldKeysLock) {
+                    activeHoldKeys.remove(ownerKey)
+                }
 
                 // Emit a final off to stop the held loop cleanly
                 signalExit?.invoke(
@@ -348,7 +359,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
         )
 
         Heaven.schedule(nextDelayMs, owner = signalOwner) {
-            if (!activeHoldKeys.contains(ownerKey) || !state.value.onHold) {
+            if (!isHeld(ownerKey = ownerKey) || !state.value.onHold) {
                 return@schedule
             }
 
@@ -361,7 +372,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
             }
 
             Heaven.schedule(intervalMs / 2.0, owner = signalOwner) {
-                if (activeHoldKeys.contains(ownerKey) && state.value.onHold) {
+                if (isHeld(ownerKey = ownerKey) && state.value.onHold) {
                     signalExit?.invoke(listOf(offSignal))
                 }
             }
@@ -381,6 +392,9 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
     }
 
     override fun onChoke() {
+        synchronized(activeHoldKeysLock) {
+            activeHoldKeys.clear()
+        }
         // Cancel all scheduled Heaven tasks owned by this device
         // The loop device uses Pair(this, "${coords.first},${coords.second}") as owner
         Heaven.cancelJobs { job ->

@@ -30,8 +30,9 @@ internal class ScheduledJobQueue {
     }
 
     fun removeAll(filter: (ScheduledJob) -> Boolean): Int {
+        val matchingIds = heap.filter(predicate = filter).map { it.id }.toSet()
         val before = heap.size
-        heap.removeAll(filter)
+        heap.removeAll { it.id in matchingIds }
         heapify()
         return before - heap.size
     }

@@ -425,7 +425,7 @@ class AmethystMidiManager(
             val device = element.launchpadDevice ?: continue
             val conn = device.connection
             val active = activeConnections[conn.device.id]
-            val isLive = active != null &&
+            val isLive = device.isOutputHealthy && active != null &&
                 active.input?.portId == conn.input.portId &&
                 active.output?.portId == conn.output.portId &&
                 conn.input.isOpen &&
@@ -663,7 +663,8 @@ class AmethystMidiManager(
     }
 
     private fun hasDeadConnections(): Boolean = synchronized(stateLock) {
-        activeConnections.values.any { it.input?.isOpen == false || it.output?.isOpen == false }
+        activeConnections.values.any { it.input?.isOpen == false || it.output?.isOpen == false } ||
+            elementsProvider().any { it.launchpadDevice?.isOutputHealthy == false }
     }
 
     private suspend fun rescanAndReport(failureMessage: String) {
@@ -685,7 +686,12 @@ class AmethystMidiManager(
         // 1) Drop dead connections (closed ports, vanished device, or the connection's own
         //    ports no longer present on the device) and close their native resources.
         val removedConnections = synchronized(stateLock) {
-            val deadIds = activeConnections.filterValues { isConnectionDead(it, discoveredById) }.keys.toList()
+            val unhealthyDeviceIds = elements.mapNotNull { element ->
+                element.launchpadDevice?.takeIf { !it.isOutputHealthy }?.connection?.device?.id
+            }.toSet()
+            val deadIds = activeConnections.filter { (id, connection) ->
+                id in unhealthyDeviceIds || isConnectionDead(conn = connection, discoveredById = discoveredById)
+            }.keys.toList()
             deadIds.mapNotNull { activeConnections.remove(it) }
         }
         removedConnections.forEach { conn ->
@@ -749,6 +755,10 @@ class AmethystMidiManager(
     }
 
     suspend fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray) {
+        if (!WorkspaceRepository.isReady) {
+            return
+        }
+
         val input = launchpadDevice?.handleMidiInput(msg) ?: return
         val (visX, visY) = rotateMidiCoordinate(
             x = input.pitch % 10,

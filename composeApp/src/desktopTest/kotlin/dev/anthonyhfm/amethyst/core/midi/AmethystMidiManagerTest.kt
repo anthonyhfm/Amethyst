@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.core.midi
 
+import androidx.compose.ui.graphics.Color
+import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlinx.coroutines.delay
@@ -13,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -44,6 +47,36 @@ class AmethystMidiManagerTest {
         )
         managersToClose += manager
         return manager
+    }
+
+    @Test
+    fun unhealthyOutputWorkerIsReprobedEvenWhenThePortRemainsOpen(): Unit = runBlocking {
+        val access = FakeMidiAccess()
+        val device = FakeMidiDevice(id = "failed-worker", name = "Launchpad X").apply {
+            inquiryResponse = launchpadXInquiryResponse(MAT1JACZYYY_LPX_REVISION)
+            keepOutputOpenOnClose = true
+        }
+        access.setDevices(newDevices = listOf(device))
+        val element = ViewportLaunchpadX()
+        val manager = newManager(access = access, elementsProvider = { listOf(element) })
+        manager.refreshConnections()
+        waitUntil(description = "initial binding") { element.launchpadDevice != null }
+        val original = element.launchpadDevice!!
+        device.failOutputSends = true
+        original.sendUpdate(
+            updates = listOf(RawLEDUpdate(index = 11, color = Color.Red)),
+            colors = Array(size = 101) { Color.Black },
+        )
+        waitUntil(description = "output worker failure") { !original.isOutputHealthy }
+        assertTrue(actual = original.midiOutput.isOpen)
+
+        device.failOutputSends = false
+        manager.refreshConnections()
+        waitUntil(description = "new healthy output worker", timeoutMs = 5_000) {
+            val replacement = element.launchpadDevice
+            replacement != null && replacement !== original && replacement.isOutputHealthy
+        }
+        assertTrue(actual = device.probeAttempts.get() >= 2)
     }
 
     // ---------------------------------------------------------------------
@@ -313,6 +346,11 @@ class FakeMidiDevice(
     /** Test knob: the Device Inquiry response to answer with, or null to never respond (foreign gear). */
     var inquiryResponse: ByteArray? = null
 
+    @Volatile
+    var failOutputSends: Boolean = false
+
+    var keepOutputOpenOnClose: Boolean = false
+
     /** Which of this device's input ports receives the inquiry response, if any. */
     var respondingInputPortId: String? = inputPorts.firstOrNull()?.id
 
@@ -345,7 +383,11 @@ class FakeMidiOutput(
     @Volatile
     override var isOpen: Boolean = true
 
-    override fun send(data: ByteArray) { /* no-op: not exercised by these tests */ }
+    override fun send(data: ByteArray) {
+        if (device.failOutputSends) {
+            throw IllegalStateException("Output send failed")
+        }
+    }
 
     override fun sendSysEx(data: ByteArray) { /* no-op: not exercised by these tests */ }
 
@@ -357,7 +399,9 @@ class FakeMidiOutput(
     }
 
     override fun close() {
-        isOpen = false
+        if (!device.keepOutputOpenOnClose) {
+            isOpen = false
+        }
     }
 }
 

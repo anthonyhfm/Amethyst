@@ -27,11 +27,17 @@ abstract class LaunchpadDevice(
     private val desiredColors = Array(101) { Color.Black }
     @Volatile
     private var closed = false
+    @Volatile
+    var isOutputHealthy: Boolean = true
+        private set
 
     init {
         outscope.launch {
             var lastSentColors: Array<Color>? = null
             for (colors in frameChannel) {
+                if (!isOutputHealthy) {
+                    break
+                }
                 val updates = colors.mapIndexedNotNull { index, color ->
                     if (lastSentColors?.get(index) == color) null
                     else RawLEDUpdate(index.toByte(), color)
@@ -44,8 +50,7 @@ abstract class LaunchpadDevice(
                 if (result.isSuccess) {
                     lastSentColors = colors
                 } else {
-                    println("MIDI output ${midiOutput.portId} failed: ${result.exceptionOrNull()?.message}")
-                    midiOutput.close()
+                    failOutput(cause = result.exceptionOrNull())
                     break
                 }
             }
@@ -57,7 +62,9 @@ abstract class LaunchpadDevice(
     abstract fun clear()
 
     fun sendUpdate(updates: List<RawLEDUpdate>, colors: Array<Color>) {
-        if (closed || updates.isEmpty()) return
+        if (closed || !isOutputHealthy || updates.isEmpty()) {
+            return
+        }
         val latest = synchronized(desiredColorsLock) {
             updates.forEach { update ->
                 val index = update.index.toInt() and 0xFF
@@ -79,14 +86,25 @@ abstract class LaunchpadDevice(
     }
 
     protected fun sendMidi(data: ByteArray) {
-        if (closed) return
+        if (closed || !isOutputHealthy) {
+            return
+        }
         outscope.launch {
             runCatching { midiOutput.send(data) }
                 .onFailure {
-                    println("MIDI output ${midiOutput.portId} failed: ${it.message}")
-                    midiOutput.close()
+                    failOutput(cause = it)
                 }
         }
+    }
+
+    private fun failOutput(cause: Throwable?) {
+        isOutputHealthy = false
+        frameChannel.close()
+        println("MIDI output ${midiOutput.portId} failed: ${cause?.message}")
+        runCatching { midiOutput.close() }
+            .onFailure {
+                println("MIDI output ${midiOutput.portId} close failed: ${it.message}")
+            }
     }
 
     protected fun encodeFastLedUpdates(updates: List<RawLEDUpdate>): List<ByteArray>? {
@@ -118,6 +136,7 @@ abstract class LaunchpadDevice(
     override fun close() {
         if (closed) return
         closed = true
+        isOutputHealthy = false
         frameChannel.close()
         outscope.cancel()
     }

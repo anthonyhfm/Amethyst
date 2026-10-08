@@ -1057,4 +1057,5 @@
     <string name="workspace_swap_launchpad_title">Swap Launchpad model</string>
     <string name="workspace_swap_launchpad_confirm">Swap model</string>
     <string name="workspace_swap_launchpad_description">Choose a replacement layout. Bindings stay with this device.</string>
+    <string name="home_import_wizard_open_failed">The project was converted, but could not be opened. Please try again.</string>
 </resources>

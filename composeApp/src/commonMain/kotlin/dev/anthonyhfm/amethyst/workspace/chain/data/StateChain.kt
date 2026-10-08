@@ -42,23 +42,39 @@ data class StateChain(
 
     private fun <T : Chain> unpackInto(chain: T): T {
         val restoredIds = mutableSetOf<String>()
-        val restored = devices.mapIndexed { index, deviceState ->
-            val device = DeviceRegistry.unpack(deviceState)
-            device.selectionUUID = restoredDeviceId(
-                savedId = deviceIds.getOrNull(index),
-                generatedId = device.selectionUUID,
-                reservedIds = restoredIds,
-            )
-            if (index in mutedDeviceIndices || deviceState.isMuted) {
-                device.state.value.isMuted = true
+        val restored = mutableListOf<GenericChainDevice<*>>()
+        try {
+            devices.forEachIndexed { index, deviceState ->
+                val device = DeviceRegistry.unpack(state = deviceState)
+                restored.add(element = device)
+                device.selectionUUID = restoredDeviceId(
+                    savedId = deviceIds.getOrNull(index = index),
+                    generatedId = device.selectionUUID,
+                    reservedIds = restoredIds,
+                )
+                if (index in mutedDeviceIndices || deviceState.isMuted) {
+                    device.state.value.isMuted = true
+                }
             }
-            device
+
+            chain.restoreDevices(restored = restored)
+            ensureUniqueDeviceIds(root = chain)
+            return chain
+        } catch (failure: Throwable) {
+            restored.forEach { device ->
+                try {
+                    device.dispose()
+                } catch (cleanupFailure: Throwable) {
+                    failure.addSuppressed(exception = cleanupFailure)
+                }
+            }
+            try {
+                chain.dispose()
+            } catch (cleanupFailure: Throwable) {
+                failure.addSuppressed(exception = cleanupFailure)
+            }
+            throw failure
         }
-
-        chain.restoreDevices(restored)
-        ensureUniqueDeviceIds(chain)
-
-        return chain
     }
 
     companion object {

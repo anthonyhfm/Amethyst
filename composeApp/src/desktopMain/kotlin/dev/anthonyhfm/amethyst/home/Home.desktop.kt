@@ -271,7 +271,11 @@ actual fun Home(
                             path = route.liveSetPath,
                             navigator = navigator,
                             onOpenWorkspace = {
-                                DesktopHubDownload.completeImport(File(route.liveSetPath))
+                                runCatching {
+                                    DesktopHubDownload.completeImport(file = File(route.liveSetPath))
+                                }.onFailure { failure ->
+                                    println("Import record could not be saved: ${failure.message}")
+                                }
                                 onOpenWorkspace()
                             },
                             onCancel = {

@@ -83,11 +83,18 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 object WorkspaceRepository {
     private val changeRevision = atomic(0L)
     private val savedRevision = atomic(0L)
     private val loadingWorkspace = atomic(false)
+    private val workspaceReady = atomic(false)
+    private val workspaceLifecycleLock = SynchronizedObject()
+
+    val isReady: Boolean
+        get() = workspaceReady.value
 
     val lightsChainScrollState = ScrollAreaState()
     val samplingChainScrollState = ScrollAreaState()
@@ -912,17 +919,30 @@ object WorkspaceRepository {
         workspaceData: SavableWorkspaceData,
         fromRemote: Boolean = false,
         preparedCacheRoot: String? = null,
+        onPrepared: () -> Unit = {},
     ) {
-        loadingWorkspace.value = true
-        try {
-            loadWorkspaceContent(
-                workspaceData = workspaceData,
-                fromRemote = fromRemote,
-                preparedCacheRoot = preparedCacheRoot,
-            )
-            savedRevision.value = changeRevision.value
-        } finally {
-            loadingWorkspace.value = false
+        synchronized(workspaceLifecycleLock) {
+            workspaceReady.value = false
+            loadingWorkspace.value = true
+            try {
+                loadWorkspaceContent(
+                    workspaceData = workspaceData,
+                    fromRemote = fromRemote,
+                    preparedCacheRoot = preparedCacheRoot,
+                )
+                onPrepared()
+                savedRevision.value = changeRevision.value
+                workspaceReady.value = true
+            } catch (failure: Throwable) {
+                try {
+                    cleanContent()
+                } catch (cleanupFailure: Throwable) {
+                    failure.addSuppressed(exception = cleanupFailure)
+                }
+                throw failure
+            } finally {
+                loadingWorkspace.value = false
+            }
         }
     }
 
@@ -1393,9 +1413,15 @@ object WorkspaceRepository {
         val previousSampling = samplingChain
         lightsChain = Chain()
         samplingChain = AudioChain()
-        Echo.attachAudioChain(chain = samplingChain)
-        previousLights.dispose()
-        previousSampling.dispose()
+        try {
+            Echo.attachAudioChain(chain = samplingChain)
+        } finally {
+            try {
+                previousLights.dispose()
+            } finally {
+                previousSampling.dispose()
+            }
+        }
     }
 
     private fun logAudioMemory(stage: String) {
@@ -1406,45 +1432,72 @@ object WorkspaceRepository {
     }
 
     fun clean() {
-        resetChainScrollStates()
-        AutoPlayRepository.stopAutoPlay()
-        TimelineRepository.stop()
-        TimelineRepository.loadTracks(emptyList())
-        UndoManager.clear()
-        SelectionManager.clear()
-        clearEverything(restartContinuousLights = false)
-        disposeWorkspaceChains()
-        AudioLibraryRepository.clear()
-        dev.anthonyhfm.amethyst.core.util.FileHelper.clearCache()
-        dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache.configurePersistentRoot(root = null)
-        dev.anthonyhfm.amethyst.core.engine.audio.source.ProjectPcmFiles.clear()
-        StemExtractionRepository.reset()
-        TransmitChainDevice.clearReceivers()
-        AutomappingManager.reset()
-
-        // Re-setup signal exits
-        setupChains()
-        
-        // Clear devices
-        ViewportRepository.devices.value.forEach { device ->
-            midiManager.detachElement(device)
-            device.close()
+        synchronized(workspaceLifecycleLock) {
+            workspaceReady.value = false
+            cleanContent()
         }
-        ViewportRepository.clear()
-        
-        // Reset state
-        bounds = Pair(IntOffset(0, 0), IntSize(0, 0))
+    }
+
+    internal fun cleanIfCurrent(chain: Chain) {
+        synchronized(workspaceLifecycleLock) {
+            if (lightsChain === chain) {
+                workspaceReady.value = false
+                cleanContent()
+            }
+        }
+    }
+
+    private fun cleanContent() {
+        var cleanupFailure: Throwable? = null
+        fun finish(action: () -> Unit) {
+            try {
+                action()
+            } catch (failure: Throwable) {
+                val previous = cleanupFailure
+                if (previous == null) {
+                    cleanupFailure = failure
+                } else {
+                    previous.addSuppressed(exception = failure)
+                }
+            }
+        }
+
+        finish { resetChainScrollStates() }
+        finish { AutoPlayRepository.stopAutoPlay() }
+        finish { TimelineRepository.stop() }
+        finish { TimelineRepository.loadTracks(loadedTracks = emptyList()) }
+        finish { UndoManager.clear() }
+        finish { SelectionManager.clear() }
+        finish { clearEverything(restartContinuousLights = false) }
+        finish { disposeWorkspaceChains() }
+        finish { AudioLibraryRepository.clear() }
+        finish { dev.anthonyhfm.amethyst.core.util.FileHelper.clearCache() }
+        finish { dev.anthonyhfm.amethyst.core.engine.audio.source.PreparedAudioSourceCache.configurePersistentRoot(root = null) }
+        finish { dev.anthonyhfm.amethyst.core.engine.audio.source.ProjectPcmFiles.clear() }
+        finish { StemExtractionRepository.reset() }
+        finish { TransmitChainDevice.clearReceivers() }
+        finish { AutomappingManager.reset() }
+        finish { setupChains() }
+
+        ViewportRepository.devices.value.forEach { device ->
+            finish { midiManager.detachElement(element = device) }
+            finish { device.close() }
+        }
+        finish { ViewportRepository.clear() }
+
+        bounds = Pair(first = IntOffset(x = 0, y = 0), second = IntSize(width = 0, height = 0))
         workspaceMeta = null
-        publishMacros(listOf(Macro(1)))
+        finish { publishMacros(macros = listOf(Macro(value = 1))) }
         _parameterMappings.value = emptyList()
-        replaceMode(LayoutWorkspaceMode())
-        _bpm.update { 120.00 }
-        _projectName.update { null }
+        finish { replaceMode(mode = LayoutWorkspaceMode()) }
+        _bpm.value = 120.00
+        _projectName.value = null
         _showAudioLibrary.value = false
         previousMode = LayoutWorkspaceMode()
-        _gridType.update { GridUtils.GridType.Flexible.Medium }
+        _gridType.value = GridUtils.GridType.Flexible.Medium
         savedRevision.value = changeRevision.value
-        logAudioMemory(stage = "workspace.closed")
+        finish { logAudioMemory(stage = "workspace.closed") }
+        cleanupFailure?.let { throw it }
     }
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)

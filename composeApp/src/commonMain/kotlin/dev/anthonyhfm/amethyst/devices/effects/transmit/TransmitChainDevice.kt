@@ -19,6 +19,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
+import dev.anthonyhfm.amethyst.core.engine.elements.isOn
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
@@ -32,6 +33,9 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
@@ -42,18 +46,19 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
     override fun timelineDuration(context: TimelineDurationContext) =
         TimelineDuration.None
     private val channels = (1..MAX_CHANNELS).toList()
-    private var isAttachedToChain = false
+    private val isAttachedToChain = atomic(false)
+    private val automationLock = SynchronizedObject()
 
     override val state = MutableStateFlow(TransmitChainDeviceState())
     override val helpRef = "Transmit"
 
     override fun onAddedToChain() {
-        isAttachedToChain = true
+        isAttachedToChain.value = true
         updateRegistration()
     }
 
     override fun onRemovedFromChain() {
-        isAttachedToChain = false
+        isAttachedToChain.value = false
         unregisterReceiver()
         super.onRemovedFromChain()
     }
@@ -130,14 +135,50 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
         }
     }
 
+    override fun signalEnter(n: List<Signal>) {
+        synchronized(automationLock) {
+            if (n.any { it.isOn() }) {
+                triggerDialAutomations()
+            }
+        }
+        val signals = n.filterIsInstance<Signal.LED>()
+        if (signals.isNotEmpty()) {
+            ledSignalEnter(n = signals)
+        }
+    }
+
+    override fun onAutomationTick() {
+        ledSignalEnter(n = emptyList())
+    }
+
     override fun ledSignalEnter(n: List<Signal.LED>) {
-        when (state.value.mode) {
+        val current = state.value
+        when (current.mode) {
             TransmitChainDeviceState.Mode.Send -> {
-                matchingReceivers(
-                    channel = state.value.channel,
-                    busId = state.value.busId,
-                ).forEach { receiver ->
-                    receiver.receiveSignals(n)
+                val dispatch = currentTransmitDispatch()
+                val rootDispatch = dispatch.activeSenders.isEmpty()
+                if (!dispatch.activeSenders.add(element = this)) {
+                    return
+                }
+
+                try {
+                    matchingReceivers(
+                        channel = current.channel,
+                        busId = current.busId,
+                    ).forEach { receiver ->
+                        if (dispatch.receivers.add(element = receiver)) {
+                            receiver.receiveSignals(
+                                signals = n,
+                                channel = current.channel,
+                                busId = current.busId,
+                            )
+                        }
+                    }
+                } finally {
+                    dispatch.activeSenders.remove(element = this)
+                    if (rootDispatch) {
+                        dispatch.receivers.clear()
+                    }
                 }
             }
 
@@ -182,22 +223,37 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
         }
     }
 
-    private fun receiveSignals(signals: List<Signal.LED>) {
-        if (isAttachedToChain && state.value.mode == TransmitChainDeviceState.Mode.Receive) {
+    private fun receiveSignals(
+        signals: List<Signal.LED>,
+        channel: Int,
+        busId: String,
+    ) {
+        val current = state.value
+        if (
+            isAttachedToChain.value &&
+            !current.isMuted &&
+            current.mode == TransmitChainDeviceState.Mode.Receive &&
+            current.channel == channel &&
+            current.busId == busId
+        ) {
             signalExit?.invoke(signals)
         }
     }
 
     private fun updateRegistration() {
-        if (isAttachedToChain && state.value.mode == TransmitChainDeviceState.Mode.Receive) {
-            receivers[selectionUUID] = this
-        } else {
-            receivers.remove(selectionUUID)
+        synchronized(registryLock) {
+            if (isAttachedToChain.value && state.value.mode == TransmitChainDeviceState.Mode.Receive) {
+                receivers[selectionUUID] = this
+            } else {
+                receivers.remove(key = selectionUUID)
+            }
         }
     }
 
     private fun unregisterReceiver() {
-        receivers.remove(selectionUUID)
+        synchronized(registryLock) {
+            receivers.remove(key = selectionUUID)
+        }
     }
 
     companion object : ChainDeviceFactory<TransmitChainDeviceState> {
@@ -206,20 +262,25 @@ class TransmitChainDevice : LEDChainDevice<TransmitChainDeviceState>() {
         override fun create() = TransmitChainDevice()
 
         private const val MAX_CHANNELS = 16
+        private val registryLock = SynchronizedObject()
         private val receivers: MutableMap<String, TransmitChainDevice> = mutableMapOf()
 
         internal fun clearReceivers() {
-            receivers.clear()
+            synchronized(registryLock) {
+                receivers.clear()
+            }
         }
 
         private fun matchingReceivers(channel: Int, busId: String): List<TransmitChainDevice> {
-            return receivers.values
-                .filter {
-                    it.state.value.mode == TransmitChainDeviceState.Mode.Receive &&
-                        it.state.value.channel == channel &&
-                        it.state.value.busId == busId
+            return synchronized(registryLock) {
+                receivers.values.filter { receiver ->
+                    val current = receiver.state.value
+                    current.mode == TransmitChainDeviceState.Mode.Receive &&
+                        !current.isMuted &&
+                        current.channel == channel &&
+                        current.busId == busId
                 }
-                .toList()
+            }
         }
     }
 }
