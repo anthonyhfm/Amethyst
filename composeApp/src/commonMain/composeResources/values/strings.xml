@@ -1061,6 +1061,18 @@
     <string name="workspace_swap_launchpad_description">Choose a replacement layout. Bindings stay with this device.</string>
     <string name="composition_length_follows_clip">Length follows timeline clip</string>
     <string name="home_import_wizard_open_failed">The project was converted, but could not be opened. Please try again.</string>
+    <string name="locators_menu">Locators</string>
+    <string name="locators_default_name">Locator</string>
+    <string name="locators_add">Add locator at playhead</string>
+    <string name="locators_edit">Edit locator</string>
+    <string name="locators_name">Name</string>
+    <string name="locators_beat">Beat (1 = beginning)</string>
+    <string name="locators_help">Locators follow musical beats when BPM changes. Click a flag to jump, drag to move, or double-click to edit. Double-click empty space to add a locator.</string>
+    <string name="locators_invalid">Enter a name and a beat of 1 or greater.</string>
+    <string name="locators_jump">Jump</string>
+    <string name="locators_delete">Delete</string>
+    <string name="locators_cancel">Cancel</string>
+    <string name="locators_save">Save</string>
     <string name="timeline_metronome">Metronome</string>
     <string name="timeline_metronome_enabled">On</string>
     <string name="timeline_metronome_disabled">Off</string>

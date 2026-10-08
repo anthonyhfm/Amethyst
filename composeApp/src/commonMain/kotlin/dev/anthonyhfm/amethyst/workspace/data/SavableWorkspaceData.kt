@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.core.util.UUID
 import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.TimelineLocator
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Polymorphic
@@ -43,6 +44,8 @@ data class SavableWorkspaceData(
     val audioSources: List<AudioSource> = emptyList(),
     @ProtoNumber(12)
     val parameterMappings: List<ParameterMapping> = emptyList(),
+    @ProtoNumber(13)
+    val timelineLocators: List<TimelineLocator> = emptyList(),
 
     @Transient
     var path: String? = null, // This is not serialized, used for file operations

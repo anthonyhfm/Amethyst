@@ -1053,6 +1053,18 @@
     <string name="workspace_swap_launchpad_description">Wähle ein neues Layout. Alle Bindungen bleiben bei diesem Device.</string>
     <string name="composition_length_follows_clip">Länge folgt Timeline-Clip</string>
     <string name="home_import_wizard_open_failed">Das Projekt wurde konvertiert, konnte aber nicht geöffnet werden. Bitte versuche es erneut.</string>
+    <string name="locators_menu">Locatoren</string>
+    <string name="locators_default_name">Locator</string>
+    <string name="locators_add">Locator am Abspielkopf hinzufügen</string>
+    <string name="locators_edit">Locator bearbeiten</string>
+    <string name="locators_name">Name</string>
+    <string name="locators_beat">Beat (1 = Anfang)</string>
+    <string name="locators_help">Locatoren folgen bei BPM-Änderungen den musikalischen Beats. Flagge anklicken zum Anspringen, ziehen zum Verschieben oder doppelklicken zum Bearbeiten. Ein Doppelklick in einen freien Bereich erstellt einen Locator.</string>
+    <string name="locators_invalid">Bitte einen Namen und einen Beat ab 1 eingeben.</string>
+    <string name="locators_jump">Anspringen</string>
+    <string name="locators_delete">Löschen</string>
+    <string name="locators_cancel">Abbrechen</string>
+    <string name="locators_save">Speichern</string>
     <string name="timeline_metronome">Metronom</string>
     <string name="timeline_metronome_enabled">An</string>
     <string name="timeline_metronome_disabled">Aus</string>

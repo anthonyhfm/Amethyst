@@ -54,6 +54,7 @@ import dev.anthonyhfm.amethyst.core.network.sync.toViewportDeviceType
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
+import dev.anthonyhfm.amethyst.timeline.locators.TimelineLocatorRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryUnlink
@@ -954,6 +955,7 @@ object WorkspaceRepository {
         resetChainScrollStates()
         AutoPlayRepository.stopAutoPlay()
         TimelineRepository.loadTracks(loadedTracks = emptyList())
+        TimelineLocatorRepository.load(locators = emptyList())
         UndoManager.clear()
         SelectionManager.clear()
         clearEverything(restartContinuousLights = false)
@@ -1043,6 +1045,7 @@ object WorkspaceRepository {
         reportDeviceProgress(0.98f, "Restoring project data")
         dev.anthonyhfm.amethyst.core.loading.ProjectLoadMetrics.measure("workspace.timeline") {
             TimelineRepository.loadTracks(workspaceData.timelineData)
+            TimelineLocatorRepository.load(locators = workspaceData.timelineLocators)
             migrateAudioEntries()
             canonicalizeSampleSources(samplingChain)
         }
@@ -1277,6 +1280,7 @@ object WorkspaceRepository {
             sampling = StateChain.pack(samplingChain),
             autoPlay = workspaceMeta?.autoPlay ?: AutoPlayData(emptyMap()),
             timelineData = TimelineRepository.tracks.value,
+            timelineLocators = TimelineLocatorRepository.locators.value,
             macros = _macros.value,
             parameterMappings = _parameterMappings.value,
             settings = WorkspaceSettings(
@@ -1466,6 +1470,7 @@ object WorkspaceRepository {
         finish { AutoPlayRepository.stopAutoPlay() }
         finish { TimelineRepository.stop() }
         finish { TimelineRepository.loadTracks(loadedTracks = emptyList()) }
+        finish { TimelineLocatorRepository.load(locators = emptyList()) }
         finish { UndoManager.clear() }
         finish { SelectionManager.clear() }
         finish { clearEverything(restartContinuousLights = false) }

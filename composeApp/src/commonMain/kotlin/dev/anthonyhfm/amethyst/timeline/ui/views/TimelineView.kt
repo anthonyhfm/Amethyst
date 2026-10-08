@@ -24,6 +24,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.ui.components.TimelineRuler
+import dev.anthonyhfm.amethyst.timeline.ui.components.TimelineLocatorRow
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +58,12 @@ fun TimelineView(
             .fillMaxSize()
             .background(timelinePalette.canvas)
     ) {
+        TimelineLocatorRow(
+            viewport = viewport,
+            bpm = bpm,
+            gridType = gridType,
+        )
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()

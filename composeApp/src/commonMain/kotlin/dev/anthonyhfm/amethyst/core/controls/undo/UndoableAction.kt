@@ -21,6 +21,11 @@ import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryUnlink
 
 sealed interface UndoableAction {
+    data class TimelineLocatorsChange(
+        val beforeLocators: List<dev.anthonyhfm.amethyst.timeline.data.TimelineLocator>,
+        val afterLocators: List<dev.anthonyhfm.amethyst.timeline.data.TimelineLocator>,
+    ) : UndoableAction
+
     data class VirtualDeviceModelChange(
         val deviceId: String,
         val beforeType: ViewportDeviceType,

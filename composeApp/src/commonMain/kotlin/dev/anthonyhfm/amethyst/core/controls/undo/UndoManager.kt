@@ -133,6 +133,11 @@ object UndoManager {
             val action = undoStack.removeAt(undoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.TimelineLocatorsChange -> {
+                    dev.anthonyhfm.amethyst.timeline.locators.TimelineLocatorRepository.load(locators = action.beforeLocators)
+                    redoStack.add(element = action)
+                }
+
                 is UndoableAction.VirtualDeviceModelChange -> {
                     restoreVirtualDeviceModel(action = action, isUndo = true)
                     redoStack.add(element = action)
@@ -781,6 +786,11 @@ object UndoManager {
             val action = redoStack.removeAt(redoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.TimelineLocatorsChange -> {
+                    dev.anthonyhfm.amethyst.timeline.locators.TimelineLocatorRepository.load(locators = action.afterLocators)
+                    undoStack.add(element = action)
+                }
+
                 is UndoableAction.VirtualDeviceModelChange -> {
                     restoreVirtualDeviceModel(action = action, isUndo = false)
                     undoStack.add(element = action)
