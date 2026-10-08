@@ -167,6 +167,7 @@ class DrumGroupDeviceAdapter(
                                                 offset = offset,
                                                 outputOffset = outputOffset,
                                                 chainDepth = chainDepth,
+                                                inputNote = branch.branchInfo.sendingNote.value,
                                             ).toDeviceStates()
                                         } else if (kaskobiMultiHashMatches) {
                                             MultiEffectAdapter(
@@ -197,7 +198,11 @@ class DrumGroupDeviceAdapter(
                                             random = randomDevice,
                                             midiContainer = null,
                                             instrumentContainer = instrumentContainer,
-                                            drumContainer = drumContainer
+                                            drumContainer = drumContainer,
+                                            inputNote = branch.branchInfo.sendingNote.value,
+                                            offset = offset,
+                                            outputOffset = outputOffset,
+                                            chainDepth = chainDepth,
                                         ).toDeviceStates()
                                     } catch (e: Exception) {
                                         println("Error reading random multisampling plugin, falling back to normal chain")

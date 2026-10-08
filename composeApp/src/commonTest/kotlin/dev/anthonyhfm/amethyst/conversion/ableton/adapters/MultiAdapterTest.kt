@@ -76,6 +76,7 @@ class MultiAdapterTest {
         minKey: Int,
         maxKey: Int,
         transpose: Float,
+        selector: Int = 0,
     ): InstrumentGroupDevice.Branches.InstrumentBranch {
         return InstrumentGroupDevice.Branches.InstrumentBranch(
             id = id,
@@ -96,8 +97,8 @@ class MultiAdapterTest {
                 )
             ),
             branchSelectorRange = InstrumentGroupDevice.Branches.InstrumentBranch.BranchSelectorRange(
-                min = InstrumentGroupDevice.Branches.InstrumentBranch.BranchSelectorRange.MinMax(id),
-                max = InstrumentGroupDevice.Branches.InstrumentBranch.BranchSelectorRange.MinMax(id),
+                min = InstrumentGroupDevice.Branches.InstrumentBranch.BranchSelectorRange.MinMax(value = selector),
+                max = InstrumentGroupDevice.Branches.InstrumentBranch.BranchSelectorRange.MinMax(value = selector),
             ),
             masterDevice = InstrumentGroupDevice.Branches.InstrumentBranch.MixerDevice(
                 speaker = InstrumentGroupDevice.Branches.InstrumentBranch.MixerDevice.Speaker(AbletonManual(true))
@@ -130,6 +131,7 @@ class MultiAdapterTest {
             offset = IntOffset.Zero,
             outputOffset = IntOffset.Zero,
             chainDepth = 0,
+            inputNote = 36,
         )
 
         val result = adapter.toDeviceStates()
@@ -138,9 +140,9 @@ class MultiAdapterTest {
         assertEquals(3, multiState.groups.size)
 
         // Verify that all 3 steps now have transposeSemitones = 0f
-        val step0Sample = assertIs<SampleChainDeviceState>(multiState.groups[0].stateChain.devices.first())
-        val step1Sample = assertIs<SampleChainDeviceState>(multiState.groups[1].stateChain.devices.first())
-        val step2Sample = assertIs<SampleChainDeviceState>(multiState.groups[2].stateChain.devices.first())
+        val step0Sample = assertIs<SampleChainDeviceState>(multiState.groups[0].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
+        val step1Sample = assertIs<SampleChainDeviceState>(multiState.groups[1].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
+        val step2Sample = assertIs<SampleChainDeviceState>(multiState.groups[2].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
 
         assertEquals(0f, step0Sample.transposeSemitones, "Step 0 transpose")
         assertEquals(0f, step1Sample.transposeSemitones, "Step 1 transpose compensated from -1f")
@@ -170,12 +172,13 @@ class MultiAdapterTest {
             offset = IntOffset.Zero,
             outputOffset = IntOffset.Zero,
             chainDepth = 0,
+            inputNote = 36,
         )
 
         val multiState = assertIs<MultiGroupChainDeviceState>(adapter.toDeviceStates().first())
         assertEquals(3, multiState.groups.size)
         multiState.groups.forEach { group ->
-            val sample = assertIs<SampleChainDeviceState>(group.stateChain.devices.first())
+            val sample = assertIs<SampleChainDeviceState>(group.stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
             assertEquals(0f, sample.transposeSemitones)
         }
     }
@@ -203,14 +206,15 @@ class MultiAdapterTest {
             offset = IntOffset.Zero,
             outputOffset = IntOffset.Zero,
             chainDepth = 0,
+            inputNote = 36,
         )
 
         val result = adapter.toDeviceStates()
         val multiState = assertIs<MultiGroupChainDeviceState>(result.first())
 
-        val step0Sample = assertIs<SampleChainDeviceState>(multiState.groups[0].stateChain.devices.first())
-        val step1Sample = assertIs<SampleChainDeviceState>(multiState.groups[1].stateChain.devices.first())
-        val step2Sample = assertIs<SampleChainDeviceState>(multiState.groups[2].stateChain.devices.first())
+        val step0Sample = assertIs<SampleChainDeviceState>(multiState.groups[0].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
+        val step1Sample = assertIs<SampleChainDeviceState>(multiState.groups[1].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
+        val step2Sample = assertIs<SampleChainDeviceState>(multiState.groups[2].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
 
         assertEquals(3f, step0Sample.transposeSemitones, "Step 0 preserves base transpose 3f")
         assertEquals(3f, step1Sample.transposeSemitones, "Step 1 preserves base transpose 3f")
@@ -226,7 +230,7 @@ class MultiAdapterTest {
             chainSelector = InstrumentGroupDevice.ChainSelector(),
             branches = listOf(
                 createInstrumentBranch(id = 0, minKey = 0, maxKey = 127, transpose = -5f),
-                createInstrumentBranch(id = 1, minKey = 0, maxKey = 127, transpose = -5f),
+                createInstrumentBranch(id = 1, minKey = 0, maxKey = 127, transpose = -5f, selector = 1),
             ).let { InstrumentGroupDevice.Branches(it) }
         )
 
@@ -238,13 +242,14 @@ class MultiAdapterTest {
             offset = IntOffset.Zero,
             outputOffset = IntOffset.Zero,
             chainDepth = 0,
+            inputNote = 36,
         )
 
         val result = adapter.toDeviceStates()
         val multiState = assertIs<MultiGroupChainDeviceState>(result.first())
 
-        val step0Sample = assertIs<SampleChainDeviceState>(multiState.groups[0].stateChain.devices.first())
-        val step1Sample = assertIs<SampleChainDeviceState>(multiState.groups[1].stateChain.devices.first())
+        val step0Sample = assertIs<SampleChainDeviceState>(multiState.groups[0].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
+        val step1Sample = assertIs<SampleChainDeviceState>(multiState.groups[1].stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
 
         // In macro mode, no pitch shift was applied by Outbreak Multi, so transpose remains as set
         assertEquals(-5f, step0Sample.transposeSemitones)
@@ -275,7 +280,7 @@ class MultiAdapterTest {
         val compensated = adapter.testCompensate(chokeDevice, 2f)
         val unwrappedChoke = assertIs<ChokeChainDeviceState>(compensated)
         val unwrappedGroup = assertIs<GroupChainDeviceState>(unwrappedChoke.stateChain.devices.first())
-        val unwrappedSample = assertIs<SampleChainDeviceState>(unwrappedGroup.groups.first().stateChain.devices.first())
+        val unwrappedSample = assertIs<SampleChainDeviceState>(unwrappedGroup.groups.first().stateChain.devices.filterIsInstance<SampleChainDeviceState>().single())
 
         assertEquals(0f, unwrappedSample.transposeSemitones)
     }

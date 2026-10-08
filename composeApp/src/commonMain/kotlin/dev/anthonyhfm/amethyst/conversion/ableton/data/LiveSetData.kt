@@ -278,8 +278,51 @@ data class MidiClip(
 
     @XmlElement
     @XmlSerialName("Notes")
-    val notes: Notes
+    val notes: Notes,
+
+    @XmlElement
+    @XmlSerialName("Loop")
+    val loop: Loop? = null,
+
+    @XmlElement
+    @XmlSerialName("Disabled")
+    val disabled: Disabled = Disabled(),
 ) {
+    @Serializable
+    data class Loop(
+        @XmlElement
+        @XmlSerialName("LoopStart")
+        val start: CurrentTimeStamp = CurrentTimeStamp(value = 0.0),
+
+        @XmlElement
+        @XmlSerialName("LoopEnd")
+        val end: CurrentTimeStamp = CurrentTimeStamp(value = 0.0),
+
+        @XmlElement
+        @XmlSerialName("StartRelative")
+        val startRelative: CurrentTimeStamp = CurrentTimeStamp(value = 0.0),
+
+        @XmlElement
+        @XmlSerialName("LoopOn")
+        val enabled: LoopOn = LoopOn(),
+
+        @XmlElement
+        @XmlSerialName("OutMarker")
+        val outMarker: CurrentTimeStamp? = null,
+    ) {
+        @Serializable
+        data class LoopOn(
+            @XmlSerialName("Value")
+            val value: Boolean = false,
+        )
+    }
+
+    @Serializable
+    data class Disabled(
+        @XmlSerialName("Value")
+        val value: Boolean = false,
+    )
+
     @Serializable
     data class ClipName(
         @XmlSerialName("Value")
@@ -334,6 +377,9 @@ data class MidiClip(
 
                         @XmlSerialName("Velocity")
                         val velocity: Float,
+
+                        @XmlSerialName("IsEnabled")
+                        val isEnabled: Boolean = true,
                     )
                 }
             }

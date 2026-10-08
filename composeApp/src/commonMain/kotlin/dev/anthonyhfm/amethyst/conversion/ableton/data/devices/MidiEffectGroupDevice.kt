@@ -95,6 +95,8 @@ data class MidiEffectGroupDevice(
     @Serializable
     data class ChainSelector(
         @XmlElement
+        val manual: AbletonManual<Int> = AbletonManual(value = 0),
+        @XmlElement
         val keyMidi: KeyMidi? = null,
         @XmlElement
         val midiControllerRange: AbletonMidiControllerRange? = null,
@@ -187,7 +189,10 @@ data class MidiEffectGroupDevice(
             @Serializable
             data class ZoneSettings(
                 @XmlElement
-                val keyRange: KeyRange
+                val keyRange: KeyRange,
+                @XmlElement
+                @XmlSerialName("VelocityRange")
+                val velocityRange: AbletonRackVelocityRange = AbletonRackVelocityRange(),
             ) {
                 @Serializable
                 data class KeyRange(

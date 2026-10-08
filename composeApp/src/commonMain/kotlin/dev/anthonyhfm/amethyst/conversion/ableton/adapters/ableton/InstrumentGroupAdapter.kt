@@ -104,6 +104,8 @@ class InstrumentGroupAdapter(
                                 )
                             }
 
+                            appendRackVelocityRange(range = branch.zoneSettings.velocityRange)
+
                             // Multisampling logic
                             val branchElements = branch.deviceChain.deviceChain.devices.devices
 
@@ -201,7 +203,10 @@ class InstrumentGroupAdapter(
                                                 random = randomDevice,
                                                 midiContainer = null,
                                                 instrumentContainer = if (firstContainerIsInstrument) instrumentContainer else null,
-                                                drumContainer = if (!firstContainerIsInstrument) drumContainer else null
+                                                drumContainer = if (!firstContainerIsInstrument) drumContainer else null,
+                                                offset = offset,
+                                                outputOffset = outputOffset,
+                                                chainDepth = chainDepth,
                                             ).toDeviceStates()
                                         } catch (e: Exception) {
                                             println("Error reading random multisampling plugin, falling back to normal chain")

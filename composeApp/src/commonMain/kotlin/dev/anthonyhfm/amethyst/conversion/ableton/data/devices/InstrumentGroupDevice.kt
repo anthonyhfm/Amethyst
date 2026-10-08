@@ -106,6 +106,8 @@ data class InstrumentGroupDevice(
     @Serializable
     data class ChainSelector(
         @XmlElement
+        val manual: AbletonManual<Int> = AbletonManual(value = 0),
+        @XmlElement
         val keyMidi: ChainSelector.KeyMidi? = null,
         @XmlElement
         val midiControllerRange: AbletonMidiControllerRange? = null,
@@ -198,7 +200,10 @@ data class InstrumentGroupDevice(
             @Serializable
             data class ZoneSettings(
                 @XmlElement
-                val keyRange: Branches.InstrumentBranch.ZoneSettings.KeyRange
+                val keyRange: Branches.InstrumentBranch.ZoneSettings.KeyRange,
+                @XmlElement
+                @XmlSerialName("VelocityRange")
+                val velocityRange: AbletonRackVelocityRange = AbletonRackVelocityRange(),
             ) {
                 @Serializable
                 data class KeyRange(

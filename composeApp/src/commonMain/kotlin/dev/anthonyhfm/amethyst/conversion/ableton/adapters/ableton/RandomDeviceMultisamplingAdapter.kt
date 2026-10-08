@@ -1,132 +1,49 @@
 package dev.anthonyhfm.amethyst.conversion.ableton.adapters.ableton
 
+import androidx.compose.ui.unit.IntOffset
 import dev.anthonyhfm.amethyst.conversion.ableton.adapters.AbletonAdapter
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.DrumGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.InstrumentGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiEffectGroupDevice
 import dev.anthonyhfm.amethyst.conversion.ableton.data.devices.MidiRandom
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
-import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
-import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState.TYPE
-import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
-class RandomDeviceMultisamplingAdapter (
+class RandomDeviceMultisamplingAdapter(
     private val random: MidiRandom,
     private val midiContainer: MidiEffectGroupDevice?,
     private val instrumentContainer: InstrumentGroupDevice?,
-    private val drumContainer: DrumGroupDevice?
+    private val drumContainer: DrumGroupDevice?,
+    private val inputNote: Int? = null,
+    private val offset: IntOffset = IntOffset.Zero,
+    private val outputOffset: IntOffset = IntOffset.Zero,
+    private val chainDepth: Int = 0,
 ) : AbletonAdapter() {
     override fun toDeviceStates(): List<DeviceState> {
-        val randomChance = random.chance.manual.value
-        val multiSteps = random.choices.manual.value
-        val altModeEnabled = random.alternate.manual.value
-
-        var instrumentBranches: List<InstrumentGroupDevice.Branches.InstrumentBranch> = emptyList()
-        var midiBranches: List<MidiEffectGroupDevice.Branches.MidiEffectBranch> = emptyList()
-        var drumBranches: List<DrumGroupDevice.Branches.DrumBranch> = emptyList()
-
-        if (midiContainer != null) {
-            midiBranches = midiContainer.branches.branches.map {
-                val min = it.zoneSettings.keyRange.min.value
-                val max = it.zoneSettings.keyRange.max.value
-
-                List(max - min + 1) { _ ->
-                    it.copy()
-                }
-            }.flatten()
-        } else if (instrumentContainer != null) {
-            instrumentBranches = instrumentContainer.branches.branches.map {
-                val min = it.zoneSettings.keyRange.min.value
-                val max = it.zoneSettings.keyRange.max.value
-
-                List(max - min + 1) { _ ->
-                    it.copy()
-                }
-            }.flatten()
-        } else if (drumContainer != null) {
-            drumBranches = drumContainer.branches.branches.map {
-                listOf(it.copy())
-            }.flatten()
+        if (random.chance.manual.value != 1.0 || !random.alternate.manual.value) {
+            return emptyList()
         }
-
-        val containerOnState = instrumentContainer?.on?.manual?.value
-            ?: midiContainer?.on?.manual?.value
-            ?: drumContainer?.on?.manual?.value
-            ?: true
-
-        val isKeyRangeOrDrum = drumContainer != null || (instrumentContainer?.branches?.branches?.any {
-            it.zoneSettings.keyRange.min.value != 0 || it.zoneSettings.keyRange.max.value != 127
-        } == true)
-
-        if (randomChance == 1.0 && altModeEnabled) {
-            return listOf(
-                MultiGroupChainDeviceState(
-                    type = TYPE.FORWARD,
-                    groups = List(multiSteps.toInt()) { step ->
-                        when {
-                            instrumentContainer != null -> {
-                                Group(
-                                    name = instrumentBranches.getOrNull(step)?.name?.effectiveName?.value ?: "Chain #",
-                                    stateChain = StateChain(
-                                        devices = mutableListOf<DeviceState>().apply {
-                                            instrumentBranches.getOrNull(step)?.let { br ->
-                                                addAll(
-                                                    elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                        resolveAdapter(child)
-                                                            ?.toDeviceStates()
-                                                            ?.firstOrNull()
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                            midiContainer != null -> {
-                                Group(
-                                    name = midiBranches.getOrNull(step)?.name?.effectiveName?.value ?: "Chain #",
-                                    stateChain = StateChain(
-                                        devices = mutableListOf<DeviceState>().apply {
-                                            midiBranches.getOrNull(step)?.let { br ->
-                                                addAll(
-                                                    elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                        resolveAdapter(child)
-                                                            ?.toDeviceStates()
-                                                            ?.firstOrNull()
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                            drumContainer != null -> {
-                                Group(
-                                    name = drumBranches.getOrNull(step)?.name?.effectiveName?.value ?: "Chain #",
-                                    stateChain = StateChain(
-                                        devices = mutableListOf<DeviceState>().apply {
-                                            drumBranches.getOrNull(step)?.let { br ->
-                                                addAll(
-                                                    elements = br.deviceChain.deviceChain.devices.devices.mapNotNull { child ->
-                                                        resolveAdapter(child)
-                                                            ?.toDeviceStates()
-                                                            ?.firstOrNull()
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                            else -> Group("Empty")
-                        }
-                    }.withMultiPitchCompensation(isKeyRangeOrDrum)
-                )
-            ).withMuteState(containerOnState)
+        val steps = random.choices.manual.value.takeIf { it.isFinite() }?.toInt() ?: return emptyList()
+        val direction = if (random.sign.manual.value == 1) {
+            -1
+        } else {
+            1
         }
-
-        println("Random device does not have Chance 100% and Alt mode, skipping...; Values: chance=$randomChance, steps=$multiSteps, alt=$altModeEnabled")
-        return listOf()
+        val scale = random.scale.manual.value.takeIf { it.isFinite() }?.toInt() ?: return emptyList()
+        return AbletonMultisamplingAdapter(
+            midiContainer = midiContainer,
+            instrumentContainer = instrumentContainer,
+            drumContainer = drumContainer,
+            steps = if (random.on.manual.value) {
+                steps
+            } else {
+                1
+            },
+            noteMode = true,
+            inputNote = inputNote,
+            stepPitch = scale * direction,
+            offset = offset,
+            outputOffset = outputOffset,
+            chainDepth = chainDepth,
+        ).toDeviceStates()
     }
 }

@@ -108,6 +108,8 @@ data class DrumGroupDevice(
     @Serializable
     data class ChainSelector(
         @XmlElement
+        val manual: AbletonManual<Int> = AbletonManual(value = 0),
+        @XmlElement
         val keyMidi: ChainSelector.KeyMidi? = null,
         @XmlElement
         val midiControllerRange: AbletonMidiControllerRange? = null,
@@ -152,6 +154,8 @@ data class DrumGroupDevice(
             data class BranchInfo(
                 val receivingNote: ReceivingNote,
                 val chokeGroup: ChokeGroup = ChokeGroup(),
+                @XmlSerialName("SendingNote")
+                val sendingNote: ReceivingNote = ReceivingNote(value = 60),
             ) {
                 @Serializable
                 data class ReceivingNote(
@@ -218,7 +222,10 @@ data class DrumGroupDevice(
             @Serializable
             data class ZoneSettings(
                 @XmlElement
-                val keyRange: KeyRange
+                val keyRange: KeyRange,
+                @XmlElement
+                @XmlSerialName("VelocityRange")
+                val velocityRange: AbletonRackVelocityRange = AbletonRackVelocityRange(),
             ) {
                 @Serializable
                 data class KeyRange(

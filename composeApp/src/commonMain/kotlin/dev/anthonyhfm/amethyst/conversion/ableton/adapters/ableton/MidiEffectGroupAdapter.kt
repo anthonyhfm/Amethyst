@@ -113,6 +113,8 @@ class MidiEffectGroupAdapter(
                                 )
                             }
 
+                            appendRackVelocityRange(range = branch.zoneSettings.velocityRange)
+
                             // Multisampling logic
                             val branchElements = branch.deviceChain.deviceChain.devices.devices
 
@@ -220,7 +222,10 @@ class MidiEffectGroupAdapter(
                                                 random = randomDevice,
                                                 midiContainer = lightsContainer,
                                                 instrumentContainer = null,
-                                                drumContainer = null
+                                                drumContainer = null,
+                                                offset = offset,
+                                                outputOffset = outputOffset,
+                                                chainDepth = chainDepth,
                                             ).toDeviceStates()
                                         } catch (e: Exception) {
                                             println("Error reading random multisampling plugin, falling back to normal chain")

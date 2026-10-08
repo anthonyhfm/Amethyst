@@ -49,7 +49,7 @@ class AbletonPitcherChainDevice : GenericChainDevice<AbletonPitcherChainDeviceSt
                 AbletonNoteSpace.withPitch(
                     signal = signal,
                     note = note,
-                    pitch = (note.pitch + state.value.pitch).coerceIn(0, 127),
+                    pitch = state.value.absolutePitch ?: (note.pitch + state.value.pitch).coerceIn(0, 127),
                 )
             }
         })
@@ -64,5 +64,6 @@ class AbletonPitcherChainDevice : GenericChainDevice<AbletonPitcherChainDeviceSt
 
 @Serializable
 data class AbletonPitcherChainDeviceState(
-    val pitch: Int = 0
+    val pitch: Int = 0,
+    val absolutePitch: Int? = null,
 ) : DeviceState()

@@ -14,6 +14,8 @@ import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonKeyMidi
 import dev.anthonyhfm.amethyst.conversion.ableton.data.utils.AbletonMidiControllerRange
 import dev.anthonyhfm.amethyst.core.midi.data.DRUM_RACK_TO_XY
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 object AbletonTutorialDetector {
@@ -276,8 +278,6 @@ object AbletonTutorialDetector {
 
         val msPerBeat = beatsToMilliseconds(beats = 1.0, bpm = bpm)
         clips.forEach { clip ->
-            val clipStartBeats = clip.currentStart.value
-
             val keyTracks = clip.notes.keyTracks.tracks
 
             keyTracks.forEach keyTrackLoop@{ keyTrack ->
@@ -290,23 +290,22 @@ object AbletonTutorialDetector {
                 keyTrack.notes.notes.forEach { note ->
                     val velocity = note.velocity
 
-                    if (velocity <= 0f) {
+                    if (velocity <= 0f || !note.isEnabled) {
                         return@forEach
                     }
 
-                    val timeBeats = note.time
-                    val durationBeats = note.duration
-
-                    val timelineStartBeats = clipStartBeats + timeBeats - tutorialStartBeats
-                    val timelineEndBeats = timelineStartBeats + durationBeats
-
-                    if (timelineEndBeats < timelineStartBeats) return@forEach
-
-                    notes += NoteEvent(
-                        startBeats = timelineStartBeats,
-                        endBeats = timelineEndBeats,
-                        padIndex = padIndex
+                    val projectedNotes = projectNoteToArrangement(
+                        clip = clip,
+                        time = note.time,
+                        duration = note.duration,
                     )
+                    for ((start, end) in projectedNotes) {
+                        notes += NoteEvent(
+                            startBeats = start - tutorialStartBeats,
+                            endBeats = end - tutorialStartBeats,
+                            padIndex = padIndex,
+                        )
+                    }
                 }
             }
         }
@@ -348,14 +347,91 @@ object AbletonTutorialDetector {
         val collapsed: Map<Double, List<AutoPlayData.Action>> =
             result.mapValues { (_, list) ->
                 list
-                    .groupBy { it.x to it.y }
-                    .values
-                    .map { actionsAtPad ->
-                        actionsAtPad.find { it.down } ?: actionsAtPad.first()
-                    }
+                    .distinct()
+                    .sortedBy { it.down }
             }
 
         return collapsed
+    }
+
+    internal fun projectNoteToArrangement(
+        clip: MidiClip,
+        time: Double,
+        duration: Double,
+    ): List<Pair<Double, Double>> {
+        val clipStart = clip.currentStart.value
+        val clipEnd = clip.currentEnd.value
+        val clipLength = clipEnd - clipStart
+        if (
+            clip.disabled.value || !clipStart.isFinite() || !clipEnd.isFinite() ||
+            !clipLength.isFinite() || clipLength <= 0.0 ||
+            !time.isFinite() || !duration.isFinite() || duration < 0.0
+        ) {
+            return emptyList()
+        }
+
+        val loop = clip.loop
+        val loopStart = loop?.start?.value ?: 0.0
+        val loopEnd = loop?.end?.value ?: 0.0
+        val loopLength = loopEnd - loopStart
+        val looping = loop?.enabled?.value == true && loopLength.isFinite() && loopLength > 0.0
+        val sourceEnd = if (looping) {
+            loopEnd
+        } else {
+            loop?.outMarker?.value
+        }
+        var sourceStart = loopStart + if (looping) {
+            loop?.startRelative?.value ?: 0.0
+        } else {
+            0.0
+        }
+        if (
+            !sourceStart.isFinite() || !loopStart.isFinite() || !loopEnd.isFinite() ||
+            sourceEnd?.isFinite() == false
+        ) {
+            return emptyList()
+        }
+        if (looping && sourceStart >= loopEnd) {
+            sourceStart = loopStart + (sourceStart - loopStart) -
+                floor((sourceStart - loopStart) / loopLength) * loopLength
+        }
+
+        var offset = time - sourceStart
+        val repeats = looping && time >= loopStart && time < loopEnd
+        if (sourceEnd != null && time >= sourceEnd) {
+            return emptyList()
+        }
+        if (repeats && offset < 0.0) {
+            offset += ceil(-offset / loopLength) * loopLength
+        }
+        if (offset < 0.0) {
+            return emptyList()
+        }
+
+        val result = mutableListOf<Pair<Double, Double>>()
+        while (offset < clipLength) {
+            val start = clipStart + offset
+            val sourceBoundary = if (sourceEnd != null) {
+                start + sourceEnd - time
+            } else {
+                clipEnd
+            }
+            val end = minOf(
+                start + duration,
+                clipEnd,
+                sourceBoundary,
+            )
+            result += start to end
+            if (!repeats) {
+                break
+            }
+            val nextOffset = offset + loopLength
+            if (nextOffset <= offset) {
+                break
+            }
+            offset = nextOffset
+        }
+        return result
     }
 
     private fun detectTutorialInLayoutTracks(layout: AbletonLayout): List<MidiTrack> {
@@ -400,7 +476,7 @@ object AbletonTutorialDetector {
         if (timelineClips.isEmpty()) return emptyList()
 
         val nonEmptyClips = timelineClips
-            .filter { clip -> clip.notes.keyTracks.tracks.isNotEmpty() }
+            .filter { clip -> !clip.disabled.value && clip.notes.keyTracks.tracks.isNotEmpty() }
             .sortedBy { it.currentStart.value }
 
         if (!track.name.contains("tutorial", ignoreCase = true)) {
