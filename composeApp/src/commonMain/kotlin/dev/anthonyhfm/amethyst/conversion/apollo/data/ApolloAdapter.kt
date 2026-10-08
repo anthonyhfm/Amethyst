@@ -25,6 +25,8 @@ import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloRotateAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloSwitchAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.adapters.ApolloToneAdapter
 import dev.anthonyhfm.amethyst.devices.DeviceState
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
+import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 
 abstract class ApolloAdapter<T: ApolloModel.Device>(
     protected val model: T
@@ -33,6 +35,28 @@ abstract class ApolloAdapter<T: ApolloModel.Device>(
     abstract fun toDeviceState(): DeviceState
 
     companion object {
+        fun resolveChain(model: ApolloModel.Chain): StateChain {
+            val devices = model.devices.map { wrapper ->
+                resolveAdapter(model = wrapper.device).also { device ->
+                    device.isMuted = !wrapper.enabled
+                }
+            }
+            return StateChain(
+                devices = if (model.enabled) {
+                    devices
+                } else {
+                    listOf(CoordinateFilterChainDeviceState()) + devices
+                },
+                mutedDeviceIndices = model.devices.mapIndexedNotNull { index, wrapper ->
+                    if (wrapper.enabled) {
+                        null
+                    } else {
+                        index + if (model.enabled) { 0 } else { 1 }
+                    }
+                },
+            )
+        }
+
         fun resolveAdapter(model: ApolloModel.Device): DeviceState {
             return when (model) {
                 is ApolloModel.Device.KeyFilter -> ApolloKeyFilterAdapter(model)

@@ -15,11 +15,7 @@ class ApolloGroupAdapter(
             groups = model.chains.map {
                 Group(
                     name = it.name,
-                    stateChain = StateChain(
-                        devices = it.devices.map {
-                            resolveAdapter(it.device)
-                        }
-                    )
+                    stateChain = resolveChain(model = it)
                 )
             }
         )

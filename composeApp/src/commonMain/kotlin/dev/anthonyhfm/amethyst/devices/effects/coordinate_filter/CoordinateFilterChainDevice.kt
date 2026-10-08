@@ -46,6 +46,7 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.containsLocalPad
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -239,6 +240,9 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
 
     private fun isFiltered(device: LaunchpadViewportElement, localX: Int, localY: Int): Boolean {
         val snapshot = state.value
+        if (snapshot.followSignalLaunchpad) {
+            return Pair(first = localX, second = localY) in snapshot.filters
+        }
         val global = localX + device.position.value.x.toInt() to localY + device.position.value.y.toInt()
         return snapshot.padFilters.contains(
             LaunchpadPadFilter(launchpadId = device.launchpadId, localX = localX, localY = localY),
@@ -252,6 +256,20 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         if (enabled == isAlreadyFiltered) return
 
         val stateBefore = state.value
+        if (stateBefore.followSignalLaunchpad) {
+            val local = Pair(first = localX, second = localY)
+            state.update { currentState ->
+                currentState.copy(
+                    filters = if (enabled) {
+                        currentState.filters + local
+                    } else {
+                        currentState.filters.filterNot { it == local }
+                    },
+                )
+            }
+            pushStateChange(before = stateBefore, after = state.value)
+            return
+        }
 
         state.update { currentState ->
             val global = localX + device.position.value.x.toInt() to localY + device.position.value.y.toInt()
@@ -271,19 +289,30 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         pushStateChange(stateBefore, state.value)
     }
 
-    internal fun resolvedFilters(devices: List<LaunchpadViewportElement> = Heaven.devices): Set<Pair<Int, Int>> =
-        state.value.globalFilters.toSet() +
-            (if (state.value.padFilters.isEmpty()) state.value.filters.toSet() else emptySet()) +
-            state.value.padFilters.mapNotNull { filter ->
+    internal fun resolvedFilters(devices: List<LaunchpadViewportElement> = Heaven.devices): Set<Pair<Int, Int>> {
+        val snapshot = state.value
+        if (snapshot.followSignalLaunchpad) {
+            return devices.flatMap { device ->
+                snapshot.filters.map { (x, y) ->
+                    Pair(first = x + device.position.value.x.toInt(), second = y + device.position.value.y.toInt())
+                }
+            }.toSet()
+        }
+        return snapshot.globalFilters.toSet() +
+            (if (snapshot.padFilters.isEmpty()) { snapshot.filters.toSet() } else { emptySet() }) +
+            snapshot.padFilters.mapNotNull { filter ->
                 val device = devices.firstOrNull { it.launchpadId == filter.launchpadId }
                     ?: devices.singleOrNull()
                     ?: return@mapNotNull null
                 if (!device.containsLocalPad(x = filter.localX, y = filter.localY)) {
                     return@mapNotNull null
                 }
-                filter.localX + device.position.value.x.toInt() to
-                    filter.localY + device.position.value.y.toInt()
+                Pair(
+                    first = filter.localX + device.position.value.x.toInt(),
+                    second = filter.localY + device.position.value.y.toInt(),
+                )
             }
+    }
 
     fun refreshVirtualDevices() {
         val signals = resolvedFilters().map { (x, y) ->
@@ -305,10 +334,24 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         val globalFilters = resolvedFilters()
 
         val filteredSignals = n.filter { signal ->
-            when (signal) {
-                is Signal.LED  -> globalFilters.contains(Pair(signal.x, signal.y))
-                is Signal.Midi -> globalFilters.contains(Pair(signal.x, signal.y))
-                else -> false
+            val coordinate = when (signal) {
+                is Signal.LED -> Pair(first = signal.x, second = signal.y)
+                is Signal.Midi -> Pair(first = signal.x, second = signal.y)
+                else -> return@filter false
+            }
+            if (state.value.followSignalLaunchpad) {
+                val device = resolveLaunchpadOrigin(
+                    origin = signal.origin,
+                    x = coordinate.first,
+                    y = coordinate.second,
+                )
+                val local = Pair(
+                    first = coordinate.first - (device?.position?.value?.x?.toInt() ?: 0),
+                    second = coordinate.second - (device?.position?.value?.y?.toInt() ?: 0),
+                )
+                local in state.value.filters
+            } else {
+                coordinate in globalFilters
             }
         }
 
@@ -337,5 +380,6 @@ data class CoordinateFilterChainDeviceState(
     /** Legacy field – kept for backward-compatible deserialization only. Not written on save. */
     val filters: List<Pair<Int, Int>> = emptyList(),
     val padFilters: List<LaunchpadPadFilter> = emptyList(),
-    val globalFilters: List<Pair<Int, Int>> = emptyList()
+    val globalFilters: List<Pair<Int, Int>> = emptyList(),
+    val followSignalLaunchpad: Boolean = false
 ) : DeviceState()

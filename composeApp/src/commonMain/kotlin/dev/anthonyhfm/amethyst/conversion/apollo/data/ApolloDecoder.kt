@@ -1,6 +1,8 @@
 package dev.anthonyhfm.amethyst.conversion.apollo.data
 
 import dev.anthonyhfm.amethyst.conversion.apollo.ApolloConverter
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.LaunchpadPadFilter
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
@@ -25,35 +27,9 @@ class ApolloDecoder(
             error("Apollo version $version is not supported. Current max supported version is $MAX_APOLLO_VERSION")
         }
 
-        // Set version BEFORE decoding so ApolloDataResolver version gates work correctly
         ApolloConverter.version = version
 
         val project = resolver.readNextType(reader) as ApolloModel.Project
-
-        val lights = when {
-            project.tracks.isEmpty() -> StateChain(devices = emptyList())
-            project.tracks.size == 1 -> StateChain(
-                devices = project.tracks.first().chain.devices.map {
-                    ApolloAdapter.resolveAdapter(it.device)
-                }
-            )
-            else -> StateChain(
-                devices = listOf(
-                    GroupChainDeviceState(
-                        groups = project.tracks.mapIndexed { index, track ->
-                            Group(
-                                name = track.name.ifBlank { "Track ${index + 1}" },
-                                stateChain = StateChain(
-                                    devices = track.chain.devices.map {
-                                        ApolloAdapter.resolveAdapter(it.device)
-                                    }
-                                )
-                            )
-                        }
-                    )
-                )
-            )
-        }
 
         val launchpadDevices = project.tracks.mapIndexed { index, track ->
             SavableWorkspaceData.SavableViewportLaunchpad.LaunchpadPro(
@@ -66,6 +42,44 @@ class ApolloDecoder(
                     positionX = 0f,
                     positionY = 0f
                 )
+            )
+        }
+
+        val launchpadIds = launchpadDevices.map { it.id }
+        val trackChains = project.tracks.mapIndexed { index, track ->
+            val launchpadId = launchpadIds[index]
+            val imported = ApolloAdapter.resolveChain(model = track.chain).bindApolloLaunchpads(
+                launchpadId = launchpadId,
+                launchpadIds = launchpadIds,
+            )
+            val inputFilter = CoordinateFilterChainDeviceState(
+                padFilters = if (track.enabled) {
+                    (0..9).flatMap { x ->
+                        (0..9).map { y -> LaunchpadPadFilter(launchpadId = launchpadId, localX = x, localY = y) }
+                    }
+                } else {
+                    emptyList()
+                },
+            )
+            imported.copy(
+                devices = listOf(inputFilter) + imported.devices,
+                mutedDeviceIndices = imported.mutedDeviceIndices.map { it + 1 },
+            )
+        }
+        val lights = when (trackChains.size) {
+            0 -> StateChain()
+            1 -> trackChains.first()
+            else -> StateChain(
+                devices = listOf(
+                    GroupChainDeviceState(
+                        groups = project.tracks.mapIndexed { index, track ->
+                            Group(
+                                name = track.name.ifBlank { "Track ${index + 1}" },
+                                stateChain = trackChains[index],
+                            )
+                        },
+                    )
+                ),
             )
         }
 

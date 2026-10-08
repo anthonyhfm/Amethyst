@@ -21,14 +21,10 @@ class ApolloMultiAdapter(
             groups = model.chains.map { chain ->
                 Group(
                     name = chain.name,
-                    stateChain = StateChain(
-                        devices = chain.devices.map { resolveAdapter(it.device) }
-                    )
+                    stateChain = resolveChain(model = chain)
                 )
             },
-            preprocessChain = StateChain(
-                devices = model.preprocess.devices.map { resolveAdapter(it.device) }
-            )
+            preprocessChain = resolveChain(model = model.preprocess)
         )
     }
 }

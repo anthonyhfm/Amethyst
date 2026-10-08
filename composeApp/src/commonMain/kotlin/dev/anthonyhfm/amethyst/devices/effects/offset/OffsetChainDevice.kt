@@ -53,11 +53,21 @@ import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.TimelineDuration
 import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 
+import dev.anthonyhfm.amethyst.conversion.apollo.utils.APOLLO_MODE_LIGHT
+import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
+
 class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
     override fun timelineDuration(context: TimelineDurationContext) =
         TimelineDuration.None
     override val state = MutableStateFlow(OffsetChainDeviceState())
     override val helpRef = "Offset"
+    override val title: String
+        get() = if (state.value.targetLaunchpadIndex != null) {
+            "Output"
+        } else {
+            "Offset"
+        }
 
     @Composable
     override fun Content() {
@@ -65,7 +75,7 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
 
         ChainDeviceShell(
-            title = "Offset",
+            title = title,
             isSelected = isSelected,
             isDragging = isDragging.value,
             modifier = Modifier.width(156.dp),
@@ -76,9 +86,12 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
                 verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Coordinates()
-
-                OffsetButtons()
+                if (state.value.targetLaunchpadIndex != null) {
+                    Text(text = "Launchpad ${(state.value.targetLaunchpadIndex ?: 0) + 1}")
+                } else {
+                    Coordinates()
+                    OffsetButtons()
+                }
             }
         }
     }
@@ -94,13 +107,13 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
         ) {
             CoordinateChip(
                 label = "X",
-                value = deviceState.offsetX,
+                value = if (deviceState.isAbsolute) { deviceState.absoluteX } else { deviceState.offsetX },
                 modifier = Modifier.weight(1f)
             )
 
             CoordinateChip(
                 label = "Y",
-                value = deviceState.offsetY,
+                value = if (deviceState.isAbsolute) { deviceState.absoluteY } else { deviceState.offsetY },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -253,6 +266,40 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
     }
 
     override fun ledSignalEnter(n: List<Signal.LED>) {
+        val snapshot = state.value
+        if (snapshot.targetLaunchpadIndex != null) {
+            val target = if (snapshot.targetLaunchpadId != null) {
+                Heaven.devices.firstOrNull { it.launchpadId == snapshot.targetLaunchpadId }
+            } else {
+                Heaven.devices.getOrNull(snapshot.targetLaunchpadIndex)
+            }
+            if (target == null) {
+                return
+            }
+            val routed = n.mapNotNull { signal ->
+                val source = resolveLaunchpadOrigin(
+                    origin = signal.origin,
+                    x = signal.x,
+                    y = signal.y,
+                ) ?: return@mapNotNull null
+                signal.copy(
+                    origin = target,
+                    x = signal.x - source.position.value.x.toInt() + target.position.value.x.toInt(),
+                    y = signal.y - source.position.value.y.toInt() + target.position.value.y.toInt(),
+                )
+            }
+            if (routed.isNotEmpty()) {
+                signalExit?.invoke(routed)
+            }
+            return
+        }
+        if (snapshot.apolloMove) {
+            val moved = n.mapNotNull { signal -> moveApolloSignal(signal = signal, snapshot = snapshot) }
+            if (moved.isNotEmpty()) {
+                signalExit?.invoke(moved)
+            }
+            return
+        }
         val movedSignals = n.map { signal ->
             signal.copy(
                 x = signal.x + state.value.offsetX,
@@ -293,6 +340,44 @@ class OffsetChainDevice : LEDChainDevice<OffsetChainDeviceState>() {
         }
     }
 
+    private fun moveApolloSignal(signal: Signal.LED, snapshot: OffsetChainDeviceState): Signal.LED? {
+        if (signal.extras[APOLLO_MODE_LIGHT] == 1) {
+            return signal
+        }
+        val source = resolveLaunchpadOrigin(
+            origin = signal.origin,
+            x = signal.x,
+            y = signal.y,
+        )
+        val deviceX = source?.position?.value?.x?.toInt() ?: 0
+        val deviceY = source?.position?.value?.y?.toInt() ?: 0
+        val localX = signal.x - deviceX
+        val localY = signal.y - deviceY
+        val edgeless = snapshot.gridMode == OffsetChainDeviceState.GridMode.EDGELESS
+        if (edgeless && !snapshot.isAbsolute && (localX !in 1..8 || localY !in 1..8)) {
+            return null
+        }
+        var x = if (snapshot.isAbsolute) { snapshot.absoluteX } else { localX + snapshot.offsetX }
+        var y = if (snapshot.isAbsolute) { snapshot.absoluteY } else { localY - snapshot.offsetY }
+        val min = if (edgeless) { 1 } else { 0 }
+        val max = if (edgeless) { 8 } else { 9 }
+        if (snapshot.wrap) {
+            x = wrapInRange(value = x, min = min, max = max)
+            y = wrapInRange(value = y, min = min, max = max)
+        }
+        if (!edgeless && y == 10 && x in 4..5) {
+            return signal.copy(
+                x = deviceX + 9,
+                y = deviceY,
+                extras = signal.extras + (APOLLO_MODE_LIGHT to 1),
+            )
+        }
+        if (x !in min..max || y !in min..max || (x == 9 && y == 0)) {
+            return null
+        }
+        return signal.copy(x = deviceX + x, y = deviceY + y)
+    }
+
     private fun wrapInRange(value: Int, min: Int, max: Int): Int {
         val size = max - min + 1
         return min + ((value - min).mod(size))
@@ -311,6 +396,12 @@ data class OffsetChainDeviceState(
     val offsetY: Int = 0,
     val gridMode: GridMode = GridMode.NONE,
     val wrap: Boolean = false,
+    val isAbsolute: Boolean = false,
+    val absoluteX: Int = 0,
+    val absoluteY: Int = 0,
+    val apolloMove: Boolean = false,
+    val targetLaunchpadIndex: Int? = null,
+    val targetLaunchpadId: String? = null,
 ) : DeviceState() {
     enum class GridMode {
         NONE,

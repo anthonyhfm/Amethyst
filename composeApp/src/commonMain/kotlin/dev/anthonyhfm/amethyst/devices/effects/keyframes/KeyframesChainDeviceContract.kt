@@ -68,6 +68,9 @@ sealed interface KeyframesChainDeviceContract {
         val rootKeyLaunchpadId: String? = null,
         val rootKeyLocalX: Int? = null,
         val rootKeyLocalY: Int? = null,
+        val terminalGate: Float = 0.5f,
+        val apolloPattern: Boolean = false,
+        val apolloLaunchpadId: String? = null,
     ) : DeviceState()
 
     @Serializable
@@ -92,6 +95,7 @@ sealed interface KeyframesChainDeviceContract {
         val localX: Int? = null,
         val localY: Int? = null,
         val abletonPitch: Int? = null,
+        val apolloIndex: Int? = null,
     ) {
         /** True when this entry carries device-local coordinate data. */
         val isDeviceAnchored: Boolean get() = launchpadId != null && localX != null && localY != null

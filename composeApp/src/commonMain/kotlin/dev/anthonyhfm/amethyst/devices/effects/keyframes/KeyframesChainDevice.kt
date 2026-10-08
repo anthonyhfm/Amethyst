@@ -73,6 +73,9 @@ import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.snapshotFlow
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
+import dev.anthonyhfm.amethyst.conversion.apollo.utils.APOLLO_FRAME_INDEX
+import dev.anthonyhfm.amethyst.conversion.apollo.utils.APOLLO_MODE_LIGHT
+
 private fun keyframeLoopTargetTimeNanos(
     epochNanos: Long,
     iteration: Long,
@@ -112,10 +115,13 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private fun timelineTrigger(color: Color): Signal.LED {
         val root = rootPosition()
+        val apolloDevice = state.value.apolloLaunchpadId?.let { id ->
+            Heaven.devices.firstOrNull { it.launchpadId == id }
+        }
         return Signal.LED(
-            origin = this,
-            x = root?.first ?: 0,
-            y = root?.second ?: 0,
+            origin = apolloDevice ?: this,
+            x = root?.first ?: apolloDevice?.position?.value?.x?.toInt() ?: 0,
+            y = root?.second ?: apolloDevice?.position?.value?.y?.toInt() ?: 0,
             color = color,
         )
     }
@@ -130,12 +136,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         if (current.playbackMode == PlaybackMode.Loop || current.playbackMode == PlaybackMode.Continuous) {
             return TimelineDuration.Unbounded
         }
-        // Mirrors renderAnimation(): every rendered transition is delayed by the
-        // previous frame's timing and the entering frame's gate. The synthetic
-        // terminal frame uses the default 0.5 gate.
         val duration = current.frames.indices.sumOf { index ->
             val frame = current.frames[index]
-            val enteringGate = current.frames.getOrNull(index + 1)?.gate ?: 0.5f
+            val enteringGate = current.frames.getOrNull(index + 1)?.gate ?: current.terminalGate
             (frame.timing.toMsValue(context.bpm) * (enteringGate * 2f)).toLong()
         } * current.repeats.coerceAtLeast(0)
         return TimelineDuration.Finite(duration.coerceAtLeast(0L))
@@ -227,7 +230,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         // Render again whenever bpm changes
         stateObserverScope.launch {
             combine(
-                state.map { it.frames }.distinctUntilChanged(),
+                state.map { Pair(first = it.frames, second = it.terminalGate) }.distinctUntilChanged(),
                 WorkspaceRepository.bpm
             ) { _, _ -> }.collect {
                 renderAnimation()
@@ -595,6 +598,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 val before = state.value
                 state.update {
                     it.copy(
+                        terminalGate = if (it.apolloPattern && event.frameIndex == it.frames.lastIndex) { event.gate } else { it.terminalGate },
                         frames = it.frames.toMutableList().apply {
                             set(
                                 index = event.frameIndex,
@@ -610,6 +614,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                 val before = state.value
                 state.update {
                     it.copy(
+                        terminalGate = if (it.apolloPattern && it.frames.lastIndex in event.frameIndices) { event.gate } else { it.terminalGate },
                         frames = it.frames.toMutableList().apply {
                             event.frameIndices.forEach { frameIndex ->
                                 if (frameIndex in 0 until size) {
@@ -699,7 +704,14 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
             is Event.OnChangeRootKey -> {
                 val before = state.value
-                state.update { it.copy(rootKey = event.rootKey, rootKeyLaunchpadId = null, rootKeyLocalX = null, rootKeyLocalY = null) }
+                state.update {
+                    it.copy(
+                        rootKey = event.rootKey,
+                        rootKeyLaunchpadId = if (it.apolloPattern) { it.apolloLaunchpadId } else { null },
+                        rootKeyLocalX = null,
+                        rootKeyLocalY = null,
+                    )
+                }
                 pushStateChange(before, state.value)
             }
 
@@ -1000,7 +1012,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         val extrasCache = mutableMapOf<AbletonNoteSpace.Note, Map<String, Int>>()
 
         val frames = state.value.frames + Frame(
-            timing = Timing.Rythm(Timing.Rythm.RythmTiming._1_16),
+            timing = Timing.Rythm(timing = Timing.Rythm.RythmTiming._1_16),
+            gate = state.value.terminalGate,
             _internalUuid = UUID.randomUUID()
         )
 
@@ -1093,7 +1106,21 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             y = gy,
             launchpadId = launchpadId.takeIf { isDeviceAnchored },
         ) ?: this
-        val signal = Signal.LED(origin = origin, x = gx, y = gy, color = color, layer = 0)
+        val signal = Signal.LED(
+            origin = origin,
+            x = gx,
+            y = gy,
+            color = color,
+            layer = 0,
+            extras = apolloIndex?.let { index ->
+                buildMap {
+                    put(key = APOLLO_FRAME_INDEX, value = index)
+                    if (index == 100) {
+                        put(key = APOLLO_MODE_LIGHT, value = 1)
+                    }
+                }
+            } ?: emptyMap(),
+        )
         val pitch = abletonPitch ?: return signal
         val canonicalIndex = AbletonNoteSpace.padIndex(pitch = pitch)
         val virtualNoteDevice = if (isAbletonVirtualNote && isDeviceAnchored) {
@@ -1329,6 +1356,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private fun transformSignals(signals: List<Signal>, triggerSignal: Signal.LED): List<Signal> {
         val state = state.value
+        if (state.apolloPattern) {
+            return transformApolloSignals(signals = signals, triggerSignal = triggerSignal)
+        }
         val rootKey = rootPosition()
 
         if (rootKey == null && state.rootKeyLaunchpadId != null) {
@@ -1395,6 +1425,65 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     )
                 }
             } else signal
+        }
+    }
+
+    private fun transformApolloSignals(signals: List<Signal>, triggerSignal: Signal.LED): List<Signal> {
+        val snapshot = state.value
+        val device = resolveLaunchpadOrigin(
+            origin = triggerSignal.origin,
+            x = triggerSignal.x,
+            y = triggerSignal.y,
+        )
+        val deviceX = device?.position?.value?.x?.toInt() ?: 0
+        val deviceY = device?.position?.value?.y?.toInt() ?: 0
+        val triggerX = triggerSignal.x - deviceX
+        val triggerY = triggerSignal.y - deviceY
+        val root = snapshot.rootKey
+
+        return signals.mapNotNull { signal ->
+            if (signal !is Signal.LED) {
+                return@mapNotNull signal
+            }
+            val entryDevice = signal.origin as? LaunchpadViewportElement
+            val entryX = signal.x - (entryDevice?.position?.value?.x?.toInt() ?: 0)
+            val entryY = signal.y - (entryDevice?.position?.value?.y?.toInt() ?: 0)
+            val index = signal.extras[APOLLO_FRAME_INDEX] ?: if (entryX == 9 && entryY == 0) {
+                100
+            } else {
+                entryX + (9 - entryY) * 10
+            }
+            var x = index % 10
+            var y = index / 10
+            var modeLight = index == 100 && root == null
+
+            if (root != null) {
+                x += triggerX - root % 10
+                y += root / 10 - triggerY
+                if (snapshot.wrap) {
+                    x = x.mod(10)
+                    y = y.mod(10)
+                }
+                modeLight = y == -1 && x in 4..5
+            }
+
+            val coordinates = when {
+                modeLight -> Pair(first = 9, second = 0)
+                x in 0..9 && y in 0..9 && x + y * 10 != 99 -> Pair(first = x, second = 9 - y)
+                else -> return@mapNotNull null
+            }
+            val extras = (triggerSignal.extras + signal.extras).toMutableMap()
+            extras.remove(key = APOLLO_MODE_LIGHT)
+            if (modeLight) {
+                extras[APOLLO_MODE_LIGHT] = 1
+            }
+            signal.copy(
+                origin = device ?: triggerSignal.origin,
+                x = deviceX + coordinates.first,
+                y = deviceY + coordinates.second,
+                extras = extras,
+                macroValues = triggerSignal.macroValues,
+            )
         }
     }
 

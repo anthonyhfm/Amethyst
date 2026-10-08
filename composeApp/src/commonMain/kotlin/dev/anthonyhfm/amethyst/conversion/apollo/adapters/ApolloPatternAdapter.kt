@@ -3,6 +3,8 @@ package dev.anthonyhfm.amethyst.conversion.apollo.adapters
 import dev.anthonyhfm.amethyst.conversion.apollo.data.ApolloAdapter
 import dev.anthonyhfm.amethyst.conversion.apollo.data.ApolloModel
 import dev.anthonyhfm.amethyst.conversion.apollo.utils.toTiming
+import dev.anthonyhfm.amethyst.conversion.apollo.utils.apolloPadCoordinates
+import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 
@@ -14,8 +16,8 @@ class ApolloPatternAdapter(
             val entries = mutableListOf<KeyframesChainDeviceContract.KeyframesEntry>()
             apolloFrame.colors.forEachIndexed { index, color ->
                 if (color.r != 0.toByte() || color.g != 0.toByte() || color.b != 0.toByte()) {
-                    val x = index % 10
-                    val y = 9 - (index / 10)
+                    val coordinates = apolloPadCoordinates(index = index) ?: return@forEachIndexed
+                    val (x, y) = coordinates
                     entries.add(
                         KeyframesChainDeviceContract.KeyframesEntry(
                             x = x,
@@ -23,6 +25,7 @@ class ApolloPatternAdapter(
                             r = color.r.toInt() / 63f,
                             g = color.g.toInt() / 63f,
                             b = color.b.toInt() / 63f,
+                            apolloIndex = index,
                         )
                     )
                 }
@@ -30,7 +33,7 @@ class ApolloPatternAdapter(
 
             KeyframesChainDeviceContract.Frame(
                 timing = apolloFrame.time.toTiming(),
-                gate = 0.5f, // 100% gate in Amethyst = 0.5f (Amethyst stores gate as 0..1 where 0.5=100%)
+                gate = model.gate.toFloat() / 2f,
                 entries = entries
             )
         }
@@ -44,11 +47,21 @@ class ApolloPatternAdapter(
 
         return KeyframesChainDeviceContract.KeyframesChainDeviceState(
             frames = frames.ifEmpty {
-                listOf(KeyframesChainDeviceContract.Frame(timing = model.frames.firstOrNull()?.time?.toTiming() ?: dev.anthonyhfm.amethyst.core.util.Timing.Rythm(dev.anthonyhfm.amethyst.core.util.Timing.Rythm.RythmTiming._1_4)))
+                listOf(
+                    KeyframesChainDeviceContract.Frame(
+                        timing = Timing.Rythm(timing = Timing.Rythm.RythmTiming._1_4),
+                        gate = model.gate.toFloat() / 2f,
+                    )
+                )
             },
             repeats = model.repeats,
             playbackMode = playbackMode,
-            rootKey = model.rootKey,
+            rootKey = model.rootKey?.let { root ->
+                val (x, y) = apolloPadCoordinates(index = root) ?: return@let null
+                x + y * 10
+            },
+            terminalGate = model.gate.toFloat() / 2f,
+            apolloPattern = true,
             wrap = model.wrap,
             infinity = model.infinite,
             pinch = model.pinch.toFloat(),

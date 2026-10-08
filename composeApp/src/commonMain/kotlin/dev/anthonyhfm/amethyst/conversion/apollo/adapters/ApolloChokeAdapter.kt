@@ -14,11 +14,7 @@ class ApolloChokeAdapter(
     override fun toDeviceState(): DeviceState {
         return ChokeChainDeviceState(
             target = model.target,
-            stateChain = StateChain(
-                devices = model.chain.devices.map {
-                    resolveAdapter(it.device)
-                }
-            )
+            stateChain = resolveChain(model = model.chain)
         )
     }
 }
