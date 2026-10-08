@@ -20,6 +20,8 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalFocusManager
+import kotlin.math.floor
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
@@ -34,6 +36,7 @@ fun TimelineRuler(
     gridType: GridUtils.GridType,
     modifier: Modifier = Modifier
 ) {
+    val focusManager = LocalFocusManager.current
     val zoomLevel = viewport.zoomX
     val scrollOffsetPx = viewport.scrollX
     val textMeasurer = rememberTextMeasurer()
@@ -50,6 +53,7 @@ fun TimelineRuler(
             .height(timelineDimensions.rulerHeight)
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
+                    focusManager.clearFocus()
                     if (latestViewport.zoomX > 0f) {
                         val timeMs = latestViewport.screenToTimeMs(offset.x).toLong().coerceAtLeast(0L)
                         TimelineRepository.setPlayheadPosition(timeMs)
@@ -82,59 +86,50 @@ fun TimelineRuler(
 
         val viewportWidthPx = size.width
 
-        val startTimeMsInclusive = viewport.screenToTimeMs(0f).toLong().coerceAtLeast(0L)
-        val firstGridTimeMs = if (startTimeMsInclusive == 0L) 0L
-            else ((startTimeMsInclusive / intervalMs) * intervalMs).coerceAtLeast(0L)
-        val firstMajorTimeMs = if (startTimeMsInclusive == 0L) 0L
-            else ((startTimeMsInclusive / majorIntervalMs) * majorIntervalMs).coerceAtLeast(0L)
-        val endTimeMsExclusive = viewport.screenToTimeMs(viewportWidthPx).toLong()
-            .coerceAtLeast(firstGridTimeMs)
-
-        var majorSegmentTimeMs = firstMajorTimeMs
-        while (majorSegmentTimeMs <= endTimeMsExclusive + majorIntervalMs) {
-            val startX = viewport.timeMsToScreenX(majorSegmentTimeMs.toDouble())
-            val endX = viewport.timeMsToScreenX((majorSegmentTimeMs + majorIntervalMs).toDouble())
+        val startTimeMs = viewport.screenToTimeMs(screenX = 0f).coerceAtLeast(0.0)
+        val endTimeMs = viewport.screenToTimeMs(screenX = viewportWidthPx)
+        var majorIndex = intervals.majorIndexAt(timeMs = startTimeMs)
+        while (intervals.majorTimeAt(index = majorIndex) <= endTimeMs + intervals.exactMajorIntervalMs) {
+            val startX = viewport.timeMsToScreenX(timeMs = intervals.majorTimeAt(index = majorIndex).toDouble())
+            val endX = viewport.timeMsToScreenX(timeMs = intervals.majorTimeAt(index = majorIndex + 1).toDouble())
             val clampedStartX = startX.coerceAtLeast(0f)
             val clampedEndX = endX.coerceAtMost(size.width)
-            if (((majorSegmentTimeMs / majorIntervalMs) % 2L) == 0L && clampedEndX > clampedStartX) {
+            if (majorIndex % 2L == 0L && clampedEndX > clampedStartX) {
                 drawRect(
                     color = timelinePalette.rulerAccent.copy(alpha = 0.36f),
-                    topLeft = Offset(clampedStartX, 0f),
-                    size = Size(clampedEndX - clampedStartX, size.height)
+                    topLeft = Offset(x = clampedStartX, y = 0f),
+                    size = Size(width = clampedEndX - clampedStartX, height = size.height),
                 )
             }
-            majorSegmentTimeMs += majorIntervalMs
+            majorIndex++
         }
 
-        val beatMs = (60000.0 / bpm).toLong().coerceAtLeast(1L)
-        val barMs = beatMs * 4
-
-        var t = firstGridTimeMs
-        while (t <= endTimeMsExclusive + intervalMs) {
-            val x = viewport.timeMsToScreenX(t.toDouble())
-
-            if (x > viewportWidthPx + 1f) break
+        val beatMs = GridUtils.beatDurationMs(bpm = bpm)
+        val barMs = beatMs * 4.0
+        var index = intervals.indexAt(timeMs = startTimeMs)
+        while (intervals.timeAt(index = index) <= endTimeMs + intervals.exactIntervalMs) {
+            val x = viewport.timeMsToScreenX(timeMs = intervals.timeAt(index = index).toDouble())
+            if (x > viewportWidthPx + 1f) {
+                break
+            }
             if (x >= -1f) {
-                val isMajor = (t % majorIntervalMs == 0L)
+                val isMajor = intervals.isMajor(index = index)
                 val tickHeight = if (isMajor) size.height * 0.58f else size.height * 0.28f
-
                 drawLine(
                     color = if (isMajor) timelinePalette.tickMajor else timelinePalette.tickMinor,
-                    start = Offset(x, size.height - tickHeight),
-                    end = Offset(x, size.height - dividerStrokePx),
+                    start = Offset(x = x, y = size.height - tickHeight),
+                    end = Offset(x = x, y = size.height - dividerStrokePx),
                     strokeWidth = if (isMajor) 1.5f else 1f,
-                    cap = StrokeCap.Round
+                    cap = StrokeCap.Round,
                 )
             }
-
-            t += intervalMs
+            index++
         }
 
         val pixelSpacingForLabels = 40f
-        val minLabelInterval = (pixelSpacingForLabels / zoomLevel).toLong().coerceAtLeast(1L)
+        val minLabelInterval = (pixelSpacingForLabels / zoomLevel).toDouble().coerceAtLeast(1.0)
 
-        val showBars = barMs >= minLabelInterval
-        val showBeats = beatMs >= minLabelInterval && beatMs < barMs
+        val showBeats = beatMs >= minLabelInterval
         var lastLabelRight = -Float.MAX_VALUE
 
         fun drawLabel(label: String, x: Float, style: TextStyle, backgroundAlpha: Float) {
@@ -167,83 +162,50 @@ fun TimelineRuler(
         }
 
         if (beatMs * zoomLevel > viewportWidthPx) {
-            var labelTimeMs = firstGridTimeMs
-            while (labelTimeMs <= endTimeMsExclusive + intervalMs) {
+            var labelIndex = intervals.indexAt(timeMs = startTimeMs)
+            while (intervals.timeAt(index = labelIndex) <= endTimeMs + intervals.exactIntervalMs) {
+                val labelTimeMs = intervals.timeAt(index = labelIndex)
                 val x = viewport.timeMsToScreenX(timeMs = labelTimeMs.toDouble())
                 if (x >= -10f && x <= viewportWidthPx + 10f) {
                     drawLabel(
                         label = "$labelTimeMs ms",
                         x = x,
-                        style = TextStyle(
-                            color = timelinePalette.rulerText,
-                            fontSize = 10.sp,
-                        ),
+                        style = TextStyle(color = timelinePalette.rulerText, fontSize = 10.sp),
                         backgroundAlpha = 0.56f,
                     )
                 }
-                labelTimeMs += intervalMs
+                labelIndex++
             }
-        } else if (showBars) {
-            val firstBar = ((startTimeMsInclusive / barMs)).coerceAtLeast(0L)
-            val lastBar = ((endTimeMsExclusive / barMs) + 1).coerceAtLeast(firstBar)
-
-            for (barIndex in firstBar..lastBar) {
-                val barTimeMs = barIndex * barMs
-                val x = viewport.timeMsToScreenX(barTimeMs.toDouble())
-
+        } else {
+            val labelStepBeats = if (showBeats) {
+                1L
+            } else {
+                var bars = 1L
+                while (barMs * bars < minLabelInterval) {
+                    bars *= 2L
+                }
+                bars * 4L
+            }
+            val firstBeat = floor(startTimeMs / beatMs / labelStepBeats).toLong() * labelStepBeats
+            val lastBeat = floor(endTimeMs / beatMs).toLong() + labelStepBeats
+            var beatIndex = firstBeat
+            while (beatIndex <= lastBeat) {
+                val beatTimeMs = GridUtils.beatTimeMs(beatIndex = beatIndex, bpm = bpm)
+                val x = viewport.timeMsToScreenX(timeMs = beatTimeMs.toDouble())
                 if (x >= -10f && x <= viewportWidthPx + 10f) {
-                    val barNumber = barIndex + 1
+                    val isBar = beatIndex % 4L == 0L
+                    val label = if (isBar) "${beatIndex / 4L + 1L}" else "${beatIndex % 4L + 1L}"
                     drawLabel(
-                        label = "$barNumber",
+                        label = label,
                         x = x,
                         style = TextStyle(
-                            color = timelinePalette.rulerText,
-                            fontSize = 11.sp
+                            color = timelinePalette.rulerText.copy(alpha = if (isBar) 1f else 0.76f),
+                            fontSize = if (isBar) 11.sp else 10.sp,
                         ),
-                        backgroundAlpha = 0.72f
-                    )
-
-                    if (showBeats) {
-                        for (beat in 1..3) {
-                            val beatTimeMs = barTimeMs + (beat * beatMs)
-                            val beatX = viewport.timeMsToScreenX(beatTimeMs.toDouble())
-
-                            if (beatX >= -10f && beatX <= viewportWidthPx + 10f) {
-                                drawLabel(
-                                    label = "${beat + 1}",
-                                    x = beatX,
-                                    style = TextStyle(
-                                        color = timelinePalette.rulerText.copy(alpha = 0.76f),
-                                        fontSize = 10.sp
-                                    ),
-                                    backgroundAlpha = 0.4f
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        } else if (showBeats) {
-            val firstBeat = ((startTimeMsInclusive / beatMs)).coerceAtLeast(0L)
-            val lastBeat = ((endTimeMsExclusive / beatMs) + 1).coerceAtLeast(firstBeat)
-
-            for (beatIndex in firstBeat..lastBeat) {
-                val beatTimeMs = beatIndex * beatMs
-                val x = viewport.timeMsToScreenX(beatTimeMs.toDouble())
-
-                if (x >= -10f && x <= viewportWidthPx + 10f) {
-                    val barNumber = (beatIndex / 4) + 1
-                    val beatInBar = (beatIndex % 4) + 1
-                    drawLabel(
-                        label = "$barNumber.$beatInBar",
-                        x = x,
-                        style = TextStyle(
-                            color = timelinePalette.rulerText,
-                            fontSize = 10.sp
-                        ),
-                        backgroundAlpha = 0.56f
+                        backgroundAlpha = if (isBar) 0.72f else 0.4f,
                     )
                 }
+                beatIndex += labelStepBeats
             }
         }
 

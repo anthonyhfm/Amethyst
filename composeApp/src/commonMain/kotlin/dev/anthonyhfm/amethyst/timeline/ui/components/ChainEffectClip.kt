@@ -33,6 +33,13 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.input.pointer.isAltPressed
+import dev.anthonyhfm.amethyst.timeline.ui.timelineClipGestures
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectEditMode
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
+import kotlin.math.roundToLong
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -60,27 +67,35 @@ fun ChainEffectClip(
     onMove: (Long) -> Unit,
     onResize: (Long, Long) -> Unit,
     onDoubleClick: () -> Unit,
+    resolveEdit: (ChainEffectEditMode, Long, Boolean) -> ChainEffectSpan,
 ) {
-    val palette = TimelineTheme.palette
+    val focusManager = LocalFocusManager.current
+    val windowInfo = LocalWindowInfo.current
     val dimensions = TimelineTheme.dimensions
 
     var dragDeltaPx by remember(entry.clipId, entry.startTimeMs) { mutableFloatStateOf(0f) }
     var resizeLeftDeltaPx by remember(entry.clipId, entry.startTimeMs) { mutableFloatStateOf(0f) }
     var resizeRightDeltaPx by remember(entry.clipId, entry.durationMs) { mutableFloatStateOf(0f) }
 
+    val snapEnabled = !windowInfo.keyboardModifiers.isAltPressed
+    fun resolve(mode: ChainEffectEditMode, deltaPx: Float): ChainEffectSpan {
+        return resolveEdit(mode, (deltaPx / viewport.zoomX).roundToLong(), snapEnabled)
+    }
+    val preview = when {
+        resizeLeftDeltaPx != 0f -> resolve(mode = ChainEffectEditMode.LEFT_EDGE, deltaPx = resizeLeftDeltaPx)
+        resizeRightDeltaPx != 0f -> resolve(mode = ChainEffectEditMode.RIGHT_EDGE, deltaPx = resizeRightDeltaPx)
+        dragDeltaPx != 0f -> resolve(mode = ChainEffectEditMode.MOVE, deltaPx = dragDeltaPx)
+        else -> ChainEffectSpan(startMs = entry.startTimeMs, durationMs = entry.durationMs)
+    }
     val projectedSpan = projectTimelineSpanPx(
-        startTimeMs = entry.startTimeMs.toDouble(),
-        endTimeMs = entry.endTimeMs.toDouble(),
+        startTimeMs = preview.startMs.toDouble(),
+        endTimeMs = preview.endMs.toDouble(),
         zoomX = viewport.zoomX,
     )
-    val contentStartPx = (projectedSpan.startPx + resizeLeftDeltaPx.roundToInt())
-    val contentEndPx = (projectedSpan.endPx + resizeRightDeltaPx.roundToInt())
-
     val clipWindow = computeVisibleClipWindowPx(
-        contentStartPx = contentStartPx,
-        contentEndPx = contentEndPx,
+        contentStartPx = projectedSpan.startPx,
+        contentEndPx = projectedSpan.endPx,
         viewport = viewport,
-        screenOffsetPx = dragDeltaPx.roundToInt(),
     )
     if (clipWindow == null || clipWindow.visibleWidthPx <= 0) return
 
@@ -109,26 +124,27 @@ fun ChainEffectClip(
             .clip(clipShape)
             .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
             .border(if (isSelected) 1.5.dp else 1.dp, clipColors.border, clipShape)
-            .pointerInput(entry.clipId, entry.startTimeMs, viewport.zoomX) {
-                detectTapGestures(
-                    onTap = { onSelect() },
-                    onDoubleTap = { onDoubleClick() },
-                )
-            }
-            .pointerInput(entry.clipId, entry.startTimeMs, viewport.zoomX) {
-                detectDragGestures(
-                    onDragStart = { dragDeltaPx = 0f; onSelect() },
-                    onDrag = { change, amount ->
-                        dragDeltaPx += amount.x
-                        change.consume()
-                    },
-                    onDragEnd = {
-                        onMove((entry.startTimeMs + dragDeltaPx / viewport.zoomX).toLong().coerceAtLeast(0L))
-                        dragDeltaPx = 0f
-                    },
-                    onDragCancel = { dragDeltaPx = 0f },
-                )
-            }
+            .timelineClipGestures(
+                gestureKey = entry.clipId,
+                onPress = { _, _ ->
+                    focusManager.clearFocus()
+                    onSelect()
+                },
+                onDragStart = { dragDeltaPx = 0f },
+                onDrag = { change, amount ->
+                    dragDeltaPx += amount.x
+                    change.consume()
+                },
+                onDragEnd = {
+                    val span = resolve(mode = ChainEffectEditMode.MOVE, deltaPx = dragDeltaPx)
+                    if (span.startMs != entry.startTimeMs) {
+                        onMove(span.startMs)
+                    }
+                    dragDeltaPx = 0f
+                },
+                onDragCancel = { dragDeltaPx = 0f },
+                onDoubleClick = onDoubleClick,
+            )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -164,8 +180,6 @@ fun ChainEffectClip(
             }
         }
 
-        val barMs = (60_000.0 / dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.bpm.value.coerceAtLeast(1.0)).toLong() * 4L
-
         if (clipWindow.isLeftEdgeVisible) {
             Box(
                 modifier = Modifier
@@ -175,17 +189,18 @@ fun ChainEffectClip(
                     .pointerHoverIcon(PointerIcon.ResizeLeft)
                     .pointerInput(entry.clipId, entry.startTimeMs, viewport.zoomX) {
                         detectDragGestures(
-                            onDragStart = { onSelect() },
+                            onDragStart = {
+                                focusManager.clearFocus()
+                                onSelect()
+                            },
                             onDrag = { change, amount ->
                                 change.consume()
                                 resizeLeftDeltaPx += amount.x
                             },
                             onDragEnd = {
                                 if (resizeLeftDeltaPx != 0f) {
-                                    val deltaMs = (resizeLeftDeltaPx / viewport.zoomX).toLong()
-                                    val rawNewStartMs = (entry.startTimeMs + deltaMs).coerceAtLeast(0L)
-                                    val newDurationMs = (entry.endTimeMs - rawNewStartMs).coerceAtLeast(barMs)
-                                    onResize(rawNewStartMs, newDurationMs)
+                                    val span = resolve(mode = ChainEffectEditMode.LEFT_EDGE, deltaPx = resizeLeftDeltaPx)
+                                    onResize(span.startMs, span.durationMs)
                                 }
                                 resizeLeftDeltaPx = 0f
                             },
@@ -204,16 +219,18 @@ fun ChainEffectClip(
                     .pointerHoverIcon(PointerIcon.ResizeRight)
                     .pointerInput(entry.clipId, entry.durationMs, viewport.zoomX) {
                         detectDragGestures(
-                            onDragStart = { onSelect() },
+                            onDragStart = {
+                                focusManager.clearFocus()
+                                onSelect()
+                            },
                             onDrag = { change, amount ->
                                 change.consume()
                                 resizeRightDeltaPx += amount.x
                             },
                             onDragEnd = {
                                 if (resizeRightDeltaPx != 0f) {
-                                    val deltaMs = (resizeRightDeltaPx / viewport.zoomX).toLong()
-                                    val newDurationMs = (entry.durationMs + deltaMs).coerceAtLeast(barMs)
-                                    onResize(entry.startTimeMs, newDurationMs)
+                                    val span = resolve(mode = ChainEffectEditMode.RIGHT_EDGE, deltaPx = resizeRightDeltaPx)
+                                    onResize(span.startMs, span.durationMs)
                                 }
                                 resizeRightDeltaPx = 0f
                             },

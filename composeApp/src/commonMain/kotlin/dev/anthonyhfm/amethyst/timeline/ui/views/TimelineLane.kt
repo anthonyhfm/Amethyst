@@ -46,10 +46,13 @@ import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectEditMode
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -131,7 +134,12 @@ fun TimelineLane(
     onMoveChainEffect: (String, Long) -> Unit = { _, _ -> },
     onResizeChainEffect: (String, Long, Long) -> Unit = { _, _, _ -> },
     onOpenChainEffect: (String) -> Unit = {},
+    resolveChainEffectEdit: (String, ChainEffectEditMode, Long, Boolean) -> ChainEffectSpan = { clipId, _, _, _ ->
+        val entry = (track as MidiTimelineTrack).chainEffectEntries.values.first { it.clipId == clipId }
+        ChainEffectSpan(startMs = entry.startTimeMs, durationMs = entry.durationMs)
+    },
 ) {
+    val focusManager = LocalFocusManager.current
     val windowInfo = LocalWindowInfo.current
     val zoomLevel = viewport.zoomX
     val bpm by WorkspaceRepository.bpm.collectAsState()
@@ -207,7 +215,19 @@ fun TimelineLane(
                         val event = awaitPointerEvent()
                         if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
                             val change = event.changes.firstOrNull() ?: continue
+                            if (change.isConsumed) {
+                                continue
+                            }
+                            focusManager.clearFocus()
                             val pos = change.position
+                            val chainHit = (track as? MidiTimelineTrack)?.chainEffectEntries?.values?.firstOrNull { entry ->
+                                val timeMs = currentViewport.value.screenToTimeMs(screenX = pos.x)
+                                timeMs >= entry.startTimeMs && timeMs < entry.endTimeMs
+                            }
+                            if (chainHit != null) {
+                                onSelectChainEffect(chainHit.clipId)
+                                continue
+                            }
                             val headerHit = findHeaderEntryHit(
                                 track = track,
                                 x = pos.x.toDouble() + currentViewport.value.scrollX.toDouble(),
@@ -416,7 +436,9 @@ fun TimelineLane(
                 )
                 .clipToBounds()
                 .rightClickable { position ->
-                    if (track is MidiTimelineTrack) {
+                    val timeMs = currentViewport.value.screenToTimeMs(screenX = position.x).toLong()
+                    if (track is MidiTimelineTrack && !isPointInsideAnyEntry(track = track, timeMs = timeMs)) {
+                        focusManager.clearFocus()
                         contextMenuPosition = position
                         showContextMenu = true
                     }
@@ -697,6 +719,9 @@ fun TimelineLane(
                                         onResizeChainEffect(chainEntry.clipId, newStart, newDuration)
                                     },
                                     onDoubleClick = { onOpenChainEffect(chainEntry.clipId) },
+                                    resolveEdit = { mode, deltaMs, snapEnabled ->
+                                        resolveChainEffectEdit(chainEntry.clipId, mode, deltaMs, snapEnabled)
+                                    },
                                 )
                             }
                         }

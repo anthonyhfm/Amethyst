@@ -60,6 +60,8 @@ import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import dev.anthonyhfm.amethyst.timeline.ui.timelineClipGestures
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -118,6 +120,7 @@ fun MidiClip(
     gridType: GridUtils.GridType,
     dragCallbacks: TimelineClipDragCallbacks? = null,
 ) {
+    val focusManager = LocalFocusManager.current
     val windowInfo = LocalWindowInfo.current
     val zoomLevel = viewport.zoomX
     val timelineDimensions = TimelineTheme.dimensions
@@ -258,343 +261,338 @@ fun MidiClip(
             .height(timelineDimensions.laneHeight)
             .onGloballyPositioned { clipCoordinates = it },
         trigger = {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .clip(clipShape)
-                    .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
-                    .then(
-                        if (isSelected) Modifier.border(2.dp, clipColors.border, clipShape)
-                        else Modifier
-                    )
             ) {
-        if (!renaming) {
-            Text(
-                text = midiEntry.name,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(timelineDimensions.clipHeaderHeight)
-                    .background(clipColors.header, clipHeaderShape)
-                    .pointerInput(midiEntry.startTimeMs) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.type == PointerEventType.Press) {
-                                    val change = event.changes.firstOrNull()
-                                    if (change != null) {
-                                        val isShiftPressed = event.keyboardModifiers.isShiftPressed
-                                        if (isShiftPressed) {
-                                            // Multi-select mode
-                                            SelectionManager.select(
-                                                Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entryStartMs),
-                                                single = false
-                                            )
-                                        } else if (!isSelected) {
-                                            // Single select mode
-                                            onSelectEntry()
-                                        }
-                                        change.consume()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                if (!isSelected) onSelectEntry()
-                                dragPointerInRoot = clipCoordinates?.localToRoot(offset) ?: Offset.Unspecified
-                                if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
-                                    dragCallbacks?.onStart?.invoke(dragPointerInRoot)
-                                }
-                            },
-                            onDragEnd = {
-                                if (dragCallbacks != null) {
-                                    dragCallbacks.onEnd()
-                                } else if (dragOffsetPx.value != 0f) {
-                                    val newStart = previewStartMs
-                                    if (newStart != midiEntry.startTimeMs) onMoveEntry(newStart)
-                                }
-                                dragOffsetPx.value = 0f
-                            },
-                            onDragCancel = {
-                                dragCallbacks?.onCancel?.invoke()
-                                dragOffsetPx.value = 0f
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                dragOffsetPx.value += dragAmount.x
-                                if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
-                                    dragPointerInRoot += dragAmount
-                                    dragCallbacks?.onDrag?.invoke(dragPointerInRoot)
-                                }
-                            }
-                        )
-                    }
-                    .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleClick() }) }
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                style = Theme[typography][small].copy(lineHeight = Theme[typography][small].fontSize),
-                color = clipColors.content,
-                maxLines = 1
-            )
-        } else {
-            val customTextSelectionColors = TextSelectionColors(
-                handleColor = timelinePalette.selectionStroke,
-                backgroundColor = timelinePalette.selectionFill
-            )
-
-            CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
-                BasicTextField(
-                    value = textValue.value,
-                    onValueChange = { textValue.value = it },
-                    singleLine = true,
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(timelineDimensions.clipHeaderHeight)
-                        .background(clipColors.header, clipHeaderShape)
-                        .focusRequester(focusRequester)
-                        .onFocusSelectAll(textValue)
-                        .onKeyEvent { ev ->
-                            if (ev.key == Key.Enter) {
-                                TimelineCommandExecutor.execute(
-                                    TimelineEditCommand.RenameEntry(
-                                        trackIndex = trackIndex,
-                                        entryStartTime = midiEntry.startTimeMs,
-                                        newName = textValue.value.text
-                                    )
+                        .fillMaxHeight()
+                        .clip(clipShape)
+                        .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
+                        .then(
+                            if (isSelected) {
+                                Modifier.border(width = 2.dp, color = clipColors.border, shape = clipShape)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    if (!renaming) {
+                        Text(
+                            text = midiEntry.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(timelineDimensions.clipHeaderHeight)
+                                .background(clipColors.header, clipHeaderShape)
+                                .timelineClipGestures(
+                                    gestureKey = midiEntry.startTimeMs,
+                                    onPress = { _, shiftPressed ->
+                                        focusManager.clearFocus()
+                                        if (shiftPressed) {
+                                            SelectionManager.select(
+                                                element = Selectable.TimelineEntryItem(trackIndex = trackIndex, entryStartMs = entryStartMs),
+                                                single = false,
+                                            )
+                                        } else if (!isSelected) {
+                                            onSelectEntry()
+                                        }
+                                    },
+                                    onDragStart = { offset ->
+                                        dragPointerInRoot = clipCoordinates?.localToRoot(offset) ?: Offset.Unspecified
+                                        if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
+                                            dragCallbacks?.onStart?.invoke(dragPointerInRoot)
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        if (dragCallbacks != null) {
+                                            dragCallbacks.onEnd()
+                                        } else if (dragOffsetPx.value != 0f) {
+                                            val newStart = previewStartMs
+                                            if (newStart != midiEntry.startTimeMs) {
+                                                onMoveEntry(newStart)
+                                            }
+                                        }
+                                        dragOffsetPx.value = 0f
+                                    },
+                                    onDragCancel = {
+                                        dragCallbacks?.onCancel?.invoke()
+                                        dragOffsetPx.value = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragOffsetPx.value += dragAmount.x
+                                        if (dragPointerInRoot.x.isFinite() && dragPointerInRoot.y.isFinite()) {
+                                            dragPointerInRoot += dragAmount
+                                            dragCallbacks?.onDrag?.invoke(dragPointerInRoot)
+                                        }
+                                    },
+                                    onDoubleClick = onDoubleClick,
                                 )
-                                renamingEntryIndex.value = null
-                                return@onKeyEvent true
-                            }
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = Theme[typography][small].copy(lineHeight = Theme[typography][small].fontSize),
+                            color = clipColors.content,
+                            maxLines = 1
+                        )
+                    } else {
+                        val customTextSelectionColors = TextSelectionColors(
+                            handleColor = timelinePalette.selectionStroke,
+                            backgroundColor = timelinePalette.selectionFill
+                        )
 
-                            if (ev.key == Key.Escape) {
-                                renamingEntryIndex.value = null
-                                textValue.value = TextFieldValue(midiEntry.name)
-                                return@onKeyEvent true
-                            }
+                        CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
+                            BasicTextField(
+                                value = textValue.value,
+                                onValueChange = { textValue.value = it },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(timelineDimensions.clipHeaderHeight)
+                                    .background(clipColors.header, clipHeaderShape)
+                                    .focusRequester(focusRequester)
+                                    .onFocusSelectAll(textValue)
+                                    .onKeyEvent { ev ->
+                                        if (ev.key == Key.Enter) {
+                                            TimelineCommandExecutor.execute(
+                                                TimelineEditCommand.RenameEntry(
+                                                    trackIndex = trackIndex,
+                                                    entryStartTime = midiEntry.startTimeMs,
+                                                    newName = textValue.value.text
+                                                )
+                                            )
+                                            renamingEntryIndex.value = null
+                                            return@onKeyEvent true
+                                        }
 
-                            return@onKeyEvent false
-                        }
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Unspecified,
-                        imeAction = ImeAction.Done
-                    ),
-                    textStyle = Theme[typography][small].copy(
-                        lineHeight = Theme[typography][small].fontSize,
-                        color = clipColors.content
-                    ),
-                    cursorBrush = SolidColor(clipColors.content),
-                )
-            }
-        }
+                                        if (ev.key == Key.Escape) {
+                                            renamingEntryIndex.value = null
+                                            textValue.value = TextFieldValue(midiEntry.name)
+                                            return@onKeyEvent true
+                                        }
 
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .pointerInput(midiEntry.startTimeMs, zoomLevel, bpm, gridType) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val startMs = computeSnappedTimeFromViewport(
-                                screenX = currentClipScreenLeftPx.value + offset.x,
-                                viewport = currentViewport.value,
-                                bpm = bpm,
-                                gridType = gridType,
-                                snapEnabled = currentSnapEnabled.value,
+                                        return@onKeyEvent false
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.None,
+                                    autoCorrectEnabled = false,
+                                    keyboardType = KeyboardType.Unspecified,
+                                    imeAction = ImeAction.Done
+                                ),
+                                textStyle = Theme[typography][small].copy(
+                                    lineHeight = Theme[typography][small].fontSize,
+                                    color = clipColors.content
+                                ),
+                                cursorBrush = SolidColor(clipColors.content),
                             )
-                            rangeStartMs = startMs
-                            rangeEndMs = startMs
-                            rangeActive = true
-                        },
-                        onDrag = { change, _ ->
-                            if (rangeActive && rangeStartMs != null) {
-                                val currentMs = computeSnappedTimeFromViewport(
-                                    screenX = currentClipScreenLeftPx.value + change.position.x,
-                                    viewport = currentViewport.value,
-                                    bpm = bpm,
-                                    gridType = gridType,
-                                    snapEnabled = currentSnapEnabled.value,
-                                )
-                                if (currentMs != rangeEndMs) {
-                                    rangeEndMs = currentMs
-                                }
-                                change.consume()
-                            }
-                        },
-                        onDragEnd = {
-                            if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                                val start = rangeStartMs!!.coerceAtLeast(0L)
-                                val end = rangeEndMs!!.coerceAtLeast(0L)
-                                val normalizedStart = kotlin.math.min(start, end)
-                                val normalizedEnd = kotlin.math.max(start, end)
-                                if (normalizedEnd > normalizedStart) {
-                                    SelectionManager.select(
-                                        Selectable.TimelineRange(
-                                            trackIndex = trackIndex,
-                                            startMs = normalizedStart,
-                                            endMs = normalizedEnd
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .pointerInput(midiEntry.startTimeMs, zoomLevel, bpm, gridType) {
+                                detectDragGestures(
+                                    onDragStart = { offset ->
+                                        val startMs = computeSnappedTimeFromViewport(
+                                            screenX = currentClipScreenLeftPx.value + offset.x,
+                                            viewport = currentViewport.value,
+                                            bpm = bpm,
+                                            gridType = gridType,
+                                            snapEnabled = currentSnapEnabled.value,
                                         )
+                                        rangeStartMs = startMs
+                                        rangeEndMs = startMs
+                                        rangeActive = true
+                                    },
+                                    onDrag = { change, _ ->
+                                        if (rangeActive && rangeStartMs != null) {
+                                            val currentMs = computeSnappedTimeFromViewport(
+                                                screenX = currentClipScreenLeftPx.value + change.position.x,
+                                                viewport = currentViewport.value,
+                                                bpm = bpm,
+                                                gridType = gridType,
+                                                snapEnabled = currentSnapEnabled.value,
+                                            )
+                                            if (currentMs != rangeEndMs) {
+                                                rangeEndMs = currentMs
+                                            }
+                                            change.consume()
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                                            val start = rangeStartMs!!.coerceAtLeast(0L)
+                                            val end = rangeEndMs!!.coerceAtLeast(0L)
+                                            val normalizedStart = kotlin.math.min(start, end)
+                                            val normalizedEnd = kotlin.math.max(start, end)
+                                            if (normalizedEnd > normalizedStart) {
+                                                SelectionManager.select(
+                                                    Selectable.TimelineRange(
+                                                        trackIndex = trackIndex,
+                                                        startMs = normalizedStart,
+                                                        endMs = normalizedEnd
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        rangeActive = false
+                                        rangeStartMs = null
+                                        rangeEndMs = null
+                                    },
+                                    onDragCancel = {
+                                        rangeActive = false
+                                        rangeStartMs = null
+                                        rangeEndMs = null
+                                    }
+                                )
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                // Range-Overlay wie beim AudioClip
+                                if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
+                                    val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
+                                    val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
+                                    val clipStartMs = midiEntry.startTimeMs
+                                    val clipEndMs = midiEntry.startTimeMs + midiEntry.durationMs
+                                    val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
+                                    val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
+                                    if (visibleEnd > visibleStart) {
+                                        val startX = projectTimelineSpanPx(
+                                            startTimeMs = visibleStart.toDouble(),
+                                            endTimeMs = visibleStart.toDouble(),
+                                            zoomX = zoomLevel,
+                                        ).startPx - clipWindow.visibleContentStartPx
+                                        val endX = projectTimelineSpanPx(
+                                            startTimeMs = visibleEnd.toDouble(),
+                                            endTimeMs = visibleEnd.toDouble(),
+                                            zoomX = zoomLevel,
+                                        ).startPx - clipWindow.visibleContentStartPx
+                                        drawRect(
+                                            color = timelinePalette.selectionFill,
+                                            topLeft = Offset(startX.toFloat(), 0f),
+                                            size = Size((endX - startX).coerceAtLeast(1).toFloat(), size.height)
+                                        )
+                                    }
+                                }
+                            }
+                    ) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .padding(vertical = 3.dp)
+                        ) {
+                            if (midiEntry.notes.isNotEmpty() && zoomLevel > 0f) {
+                                val rowHeight = (size.height / 100f).coerceAtLeast(1f)
+                                val noteHeight = (rowHeight * 0.72f).coerceIn(1f, 3f)
+                                val minimumNoteWidth = 1f
+                                val backgroundLuminance = (clipColors.background.red * 0.2126f) +
+                                    (clipColors.background.green * 0.7152f) +
+                                    (clipColors.background.blue * 0.0722f)
+
+                                midiEntry.notes.forEach { note ->
+                                    val left = ((midiEntry.startTimeMs.toDouble() + note.startTimeMs) * zoomLevel.toDouble() -
+                                        clipWindow.visibleContentStartPx).toFloat()
+                                    val right = ((midiEntry.startTimeMs.toDouble() + note.endTimeMs) * zoomLevel.toDouble() -
+                                        clipWindow.visibleContentStartPx).toFloat()
+                                    if (right < 0f || left > size.width
+                                    ) return@forEach
+
+                                    val width = (right - left).coerceAtLeast(minimumNoteWidth)
+                                    val pitch = note.resolvedPadIndex.coerceIn(0, 99)
+                                    val top = ((99 - pitch) / 99f) * (size.height - noteHeight)
+                                    val sourceColor = if (note.isGradient) {
+                                        val (r, g, b) = GradientInterpolator.interpolate(note.led.gradient!!, 0.5f)
+                                        Color(r, g, b)
+                                    } else {
+                                        Color(note.led.red, note.led.green, note.led.blue)
+                                    }
+                                    val sourceLuminance = (sourceColor.red * 0.2126f) +
+                                        (sourceColor.green * 0.7152f) +
+                                        (sourceColor.blue * 0.0722f)
+                                    val previewColor = if (abs(sourceLuminance - backgroundLuminance) < 0.20f) {
+                                        lerp(sourceColor, clipColors.content, 0.52f)
+                                    } else {
+                                        sourceColor
+                                    }
+
+                                    drawRoundRect(
+                                        color = previewColor.copy(alpha = if (isSelected) 0.95f else 0.82f),
+                                        topLeft = Offset(left, top),
+                                        size = Size(width, noteHeight),
+                                        cornerRadius = CornerRadius(noteHeight * 0.35f),
                                     )
                                 }
                             }
-                            rangeActive = false
-                            rangeStartMs = null
-                            rangeEndMs = null
-                        },
-                        onDragCancel = {
-                            rangeActive = false
-                            rangeStartMs = null
-                            rangeEndMs = null
                         }
+
+                    }
+                }
+
+                if (clipWindow.isLeftEdgeVisible) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .width(timelineDimensions.resizeHandleWidth)
+                            .fillMaxHeight()
+                            .pointerHoverIcon(PointerIcon.ResizeLeft)
+                            .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                                detectDragGestures(
+                                    onDragStart = { onSelectEntry() },
+                                    onDragEnd = {
+                                        if (resizeLeftDeltaPx != 0f) {
+                                            val trimmedSpan = trimSpan()
+                                            onResizeEntry(
+                                                midiEntry.startTimeMs,
+                                                trimmedSpan.startMs,
+                                                trimmedSpan.durationMs,
+                                            )
+                                        }
+                                        resizeLeftDeltaPx = 0f
+                                    },
+                                    onDragCancel = { resizeLeftDeltaPx = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        resizeLeftDeltaPx += dragAmount.x
+                                    }
+                                )
+                            }
                     )
                 }
-                .drawWithContent {
-                    drawContent()
-                    // Range-Overlay wie beim AudioClip
-                    if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                        val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
-                        val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
-                        val clipStartMs = midiEntry.startTimeMs
-                        val clipEndMs = midiEntry.startTimeMs + midiEntry.durationMs
-                        val visibleStart = start.coerceIn(clipStartMs, clipEndMs)
-                        val visibleEnd = end.coerceIn(clipStartMs, clipEndMs)
-                        if (visibleEnd > visibleStart) {
-                            val startX = projectTimelineSpanPx(
-                                startTimeMs = visibleStart.toDouble(),
-                                endTimeMs = visibleStart.toDouble(),
-                                zoomX = zoomLevel,
-                            ).startPx - clipWindow.visibleContentStartPx
-                            val endX = projectTimelineSpanPx(
-                                startTimeMs = visibleEnd.toDouble(),
-                                endTimeMs = visibleEnd.toDouble(),
-                                zoomX = zoomLevel,
-                            ).startPx - clipWindow.visibleContentStartPx
-                            drawRect(
-                                color = timelinePalette.selectionFill,
-                                topLeft = Offset(startX.toFloat(), 0f),
-                                size = Size((endX - startX).coerceAtLeast(1).toFloat(), size.height)
-                            )
-                        }
-                    }
-                }
-        ) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .padding(vertical = 3.dp)
-            ) {
-                if (midiEntry.notes.isNotEmpty() && zoomLevel > 0f) {
-                    val rowHeight = (size.height / 100f).coerceAtLeast(1f)
-                    val noteHeight = (rowHeight * 0.72f).coerceIn(1f, 3f)
-                    val minimumNoteWidth = 1f
-                    val backgroundLuminance = (clipColors.background.red * 0.2126f) +
-                        (clipColors.background.green * 0.7152f) +
-                        (clipColors.background.blue * 0.0722f)
-
-                    midiEntry.notes.forEach { note ->
-                        val left = ((midiEntry.startTimeMs.toDouble() + note.startTimeMs) * zoomLevel.toDouble() -
-                            clipWindow.visibleContentStartPx).toFloat()
-                        val right = ((midiEntry.startTimeMs.toDouble() + note.endTimeMs) * zoomLevel.toDouble() -
-                            clipWindow.visibleContentStartPx).toFloat()
-                        if (right < 0f || left > size.width
-                        ) return@forEach
-
-                        val width = (right - left).coerceAtLeast(minimumNoteWidth)
-                        val pitch = note.resolvedPadIndex.coerceIn(0, 99)
-                        val top = ((99 - pitch) / 99f) * (size.height - noteHeight)
-                        val sourceColor = if (note.isGradient) {
-                            val (r, g, b) = GradientInterpolator.interpolate(note.led.gradient!!, 0.5f)
-                            Color(r, g, b)
-                        } else {
-                            Color(note.led.red, note.led.green, note.led.blue)
-                        }
-                        val sourceLuminance = (sourceColor.red * 0.2126f) +
-                            (sourceColor.green * 0.7152f) +
-                            (sourceColor.blue * 0.0722f)
-                        val previewColor = if (abs(sourceLuminance - backgroundLuminance) < 0.20f) {
-                            lerp(sourceColor, clipColors.content, 0.52f)
-                        } else {
-                            sourceColor
-                        }
-
-                        drawRoundRect(
-                            color = previewColor.copy(alpha = if (isSelected) 0.95f else 0.82f),
-                            topLeft = Offset(left, top),
-                            size = Size(width, noteHeight),
-                            cornerRadius = CornerRadius(noteHeight * 0.35f),
-                        )
-                    }
-                }
-            }
-
-            // Left resize handle
-            if (clipWindow.isLeftEdgeVisible) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .width(timelineDimensions.resizeHandleWidth)
-                        .fillMaxHeight()
-                        .pointerHoverIcon(PointerIcon.ResizeLeft)
-                        .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
-                            detectDragGestures(
-                                onDragStart = { onSelectEntry() },
-                                onDragEnd = {
-                                    if (resizeLeftDeltaPx != 0f) {
-                                        val trimmedSpan = trimSpan()
-                                        onResizeEntry(
-                                            midiEntry.startTimeMs,
-                                            trimmedSpan.startMs,
-                                            trimmedSpan.durationMs,
-                                        )
+                if (clipWindow.isRightEdgeVisible) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(timelineDimensions.resizeHandleWidth)
+                            .fillMaxHeight()
+                            .pointerHoverIcon(PointerIcon.ResizeRight)
+                            .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
+                                detectDragGestures(
+                                    onDragStart = { onSelectEntry() },
+                                    onDragEnd = {
+                                        if (resizeRightDeltaPx != 0f) {
+                                            val trimmedSpan = trimSpan()
+                                            onResizeEntry(
+                                                midiEntry.startTimeMs,
+                                                trimmedSpan.startMs,
+                                                trimmedSpan.durationMs,
+                                            )
+                                        }
+                                        resizeRightDeltaPx = 0f
+                                    },
+                                    onDragCancel = { resizeRightDeltaPx = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        resizeRightDeltaPx += dragAmount.x
                                     }
-                                    resizeLeftDeltaPx = 0f
-                                },
-                                onDragCancel = { resizeLeftDeltaPx = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    resizeLeftDeltaPx += dragAmount.x
-                                }
-                            )
-                        }
-                )
-            }
-            // Right resize handle
-            if (clipWindow.isRightEdgeVisible) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .width(timelineDimensions.resizeHandleWidth)
-                        .fillMaxHeight()
-                        .pointerHoverIcon(PointerIcon.ResizeRight)
-                        .pointerInput(midiEntry.startTimeMs, zoomLevel, gridIntervalMs) {
-                            detectDragGestures(
-                                onDragStart = { onSelectEntry() },
-                                onDragEnd = {
-                                    if (resizeRightDeltaPx != 0f) {
-                                        val trimmedSpan = trimSpan()
-                                        onResizeEntry(
-                                            midiEntry.startTimeMs,
-                                            trimmedSpan.startMs,
-                                            trimmedSpan.durationMs,
-                                        )
-                                    }
-                                    resizeRightDeltaPx = 0f
-                                },
-                                onDragCancel = { resizeRightDeltaPx = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    resizeRightDeltaPx += dragAmount.x
-                                }
-                            )
-                        }
-                )
-            }
-        }
+                                )
+                            }
+                    )
+                }
             }
         }
     ) {

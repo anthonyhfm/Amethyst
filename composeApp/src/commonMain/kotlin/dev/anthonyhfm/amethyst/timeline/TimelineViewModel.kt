@@ -23,6 +23,10 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.toTimelineEntrySelection
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectEditMode
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
+import dev.anthonyhfm.amethyst.timeline.utils.resolveChainEffectSpan
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
@@ -69,6 +73,8 @@ class TimelineViewModel : ViewModel() {
     val playheadPositionMs = TimelineRepository.playheadPositionMs
     val isPlaying = TimelineRepository.isPlaying
 
+    private var lastPianoRollEntry: Pair<Int, Long>? = null
+
     private val _openChainEffectClipId = MutableStateFlow<String?>(null)
     val openChainEffectClipId: StateFlow<String?> = _openChainEffectClipId.asStateFlow()
 
@@ -90,6 +96,7 @@ class TimelineViewModel : ViewModel() {
         }
         TimelineKeyHandler.nudgeTimelineTime = ::nudgeSelectedTimelineTime
         TimelineKeyHandler.insertMidiClip = ::insertMidiClipForSelection
+        TimelineKeyHandler.togglePianoRollView = ::togglePianoRollView
         viewModelScope.launch {
             TimelineRepository.tracks.collect { repoTracks ->
                 _tracks.value = repoTracks
@@ -203,11 +210,6 @@ class TimelineViewModel : ViewModel() {
         SelectionManager.replaceSelections(updated)
     }
 
-    private fun snapToGrid(timeMs: Long, intervalMs: Long): Long {
-        if (intervalMs <= 0) return timeMs.coerceAtLeast(0L)
-        val q = timeMs.toDouble() / intervalMs.toDouble()
-        return (kotlin.math.round(q) * intervalMs).toLong().coerceAtLeast(0L)
-    }
 
     private fun cropEntryEnd(entry: AudioEntry, newEndMs: Long): AudioEntry? = entry.cropAudioEntryEnd(newEndMs)
 
@@ -406,8 +408,7 @@ class TimelineViewModel : ViewModel() {
             val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
                 at
             } else {
-                val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
-                snapToGrid(at, intervals.intervalMs)
+                snapTimelineTime(timeMs = at)
             }.coerceAtLeast(0L)
 
             // Fast Header Probe (< 1 ms) to get length and format without decoding full PCM
@@ -522,8 +523,7 @@ class TimelineViewModel : ViewModel() {
         val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
             at
         } else {
-            val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
-            snapToGrid(at, intervals.intervalMs)
+            snapTimelineTime(timeMs = at)
         }.coerceAtLeast(0L)
         val entry = AudioEntry(
             startTimeMs = snappedStart,
@@ -733,10 +733,7 @@ class TimelineViewModel : ViewModel() {
         val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
             newStartMs.coerceAtLeast(0L)
         } else {
-            val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
-            val gridInterval = intervals.intervalMs
-            val isAlreadySnapped = gridInterval > 0 && newStartMs % gridInterval == 0L
-            if (isAlreadySnapped) newStartMs else snapToGrid(newStartMs, gridInterval)
+            snapTimelineTime(timeMs = newStartMs)
         }
         val movedEntry = entry.copyWithShiftedStartMs(snappedStart)
         val resolved = resolveOverlapAsymmetric(track, movedEntry, originStartMs = oldStartMs) ?: run {
@@ -1106,10 +1103,14 @@ class TimelineViewModel : ViewModel() {
         mutateChainEffectRuntime(trackIndex, clipId) { moveProcessor(fromIndex, toIndex) }
     }
 
-    fun moveChainEffect(trackIndex: Int, clipId: String, requestedStartMs: Long) {
+    fun moveChainEffect(trackIndex: Int, clipId: String, requestedStartMs: Long, snapEnabled: Boolean = true) {
         val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
         val entry = track.chainEffectEntries.values.firstOrNull { it.clipId == clipId } ?: return
-        val newStart = snapTimelineTime(requestedStartMs)
+        val newStart = if (snapEnabled) {
+            snapTimelineTime(timeMs = requestedStartMs)
+        } else {
+            requestedStartMs.coerceAtLeast(0L)
+        }
         val blockers = track.allOneDimensionalEntries().filterNot { it is ChainEffectEntry && it.clipId == clipId }
         if (blockers.any { newStart >= it.startTimeMs && newStart < it.endTimeMs }) return
 
@@ -1129,6 +1130,44 @@ class TimelineViewModel : ViewModel() {
         selectChainEffect(trackIndex, moved)
     }
 
+    internal fun resolveChainEffectEdit(
+        trackIndex: Int,
+        clipId: String,
+        mode: ChainEffectEditMode,
+        deltaMs: Long,
+        snapEnabled: Boolean,
+    ): ChainEffectSpan? {
+        val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return null
+        val entry = track.chainEffectEntries.values.firstOrNull { it.clipId == clipId } ?: return null
+        val runtime = TimelineRepository.chainEffectRuntime(clipId = clipId) ?: return null
+        val composition = runtime.source is CompositionChainDevice
+        val minimum = if (composition) 1L else GridUtils.beatTimeMs(beatIndex = 4L, bpm = WorkspaceRepository.bpm.value)
+        val maximum = if (composition) {
+            Long.MAX_VALUE
+        } else {
+            when (val natural = runtime.naturalDuration()) {
+                is TimelineDuration.Finite -> natural.milliseconds.coerceAtLeast(minimum)
+                TimelineDuration.None -> minimum
+                TimelineDuration.Unbounded -> Long.MAX_VALUE
+            }
+        }
+        return resolveChainEffectSpan(
+            entry = entry,
+            mode = mode,
+            deltaMs = deltaMs,
+            blockers = track.allOneDimensionalEntries().filterNot { it is ChainEffectEntry && it.clipId == clipId },
+            minDurationMs = minimum,
+            maxDurationMs = maximum,
+            snapTime = { timeMs ->
+                if (snapEnabled) {
+                    snapTimelineTime(timeMs = timeMs)
+                } else {
+                    timeMs
+                }
+            },
+        )
+    }
+
     fun resizeChainEffect(
         trackIndex: Int,
         clipId: String,
@@ -1138,19 +1177,34 @@ class TimelineViewModel : ViewModel() {
         val track = _tracks.value.getOrNull(trackIndex) as? MidiTimelineTrack ?: return
         val entry = track.chainEffectEntries.values.firstOrNull { it.clipId == clipId } ?: return
         val runtime = TimelineRepository.chainEffectRuntime(clipId) ?: return
-        val newStart = requestedStartMs.coerceAtLeast(0L)
-        val blockers = track.allOneDimensionalEntries().filterNot { it is ChainEffectEntry && it.clipId == clipId }
-        if (blockers.any { newStart >= it.startTimeMs && newStart < it.endTimeMs }) return
-        val nextStart = blockers.map { it.startTimeMs }.filter { it > newStart }.minOrNull()
-        val available = nextStart?.minus(newStart) ?: Long.MAX_VALUE
+        val composition = runtime.source is CompositionChainDevice
         val natural = runtime.naturalDuration()
-        val minDurationMs = oneBeatMs() * 4L
-        val naturalLimit = when (natural) {
-            is TimelineDuration.Finite -> natural.milliseconds.coerceAtLeast(minDurationMs)
-            TimelineDuration.None -> oneBeatMs() * 4L
-            TimelineDuration.Unbounded -> Long.MAX_VALUE
+        val minDurationMs = if (composition) 1L else GridUtils.beatTimeMs(beatIndex = 4L, bpm = WorkspaceRepository.bpm.value)
+        val naturalLimit = if (composition) {
+            Long.MAX_VALUE
+        } else {
+            when (natural) {
+                is TimelineDuration.Finite -> natural.milliseconds.coerceAtLeast(minDurationMs)
+                TimelineDuration.None -> minDurationMs
+                TimelineDuration.Unbounded -> Long.MAX_VALUE
+            }
         }
-        val duration = requestedDurationMs.coerceAtLeast(minDurationMs).coerceAtMost(minOf(available, naturalLimit))
+        val mode = if (requestedStartMs != entry.startTimeMs) ChainEffectEditMode.LEFT_EDGE else ChainEffectEditMode.RIGHT_EDGE
+        val delta = if (mode == ChainEffectEditMode.LEFT_EDGE) requestedStartMs - entry.startTimeMs else requestedDurationMs - entry.durationMs
+        val span = resolveChainEffectEdit(
+            trackIndex = trackIndex,
+            clipId = clipId,
+            mode = mode,
+            deltaMs = delta,
+            snapEnabled = false,
+        ) ?: return
+        val newStart = span.startMs
+        val duration = span.durationMs
+        if (newStart == entry.startTimeMs && duration == entry.durationMs) {
+            return
+        }
+        val blockers = track.allOneDimensionalEntries().filterNot { it is ChainEffectEntry && it.clipId == clipId }
+        val available = blockers.filter { it.startTimeMs > newStart }.minOfOrNull { it.startTimeMs - newStart } ?: Long.MAX_VALUE
         val cap = when {
             natural is TimelineDuration.Unbounded -> duration
             natural is TimelineDuration.Finite && duration >= naturalLimit && available >= naturalLimit -> null
@@ -1212,14 +1266,12 @@ class TimelineViewModel : ViewModel() {
         allOneDimensionalEntries().any { timeMs >= it.startTimeMs && timeMs < it.endTimeMs }
 
     private fun snapTimelineTime(timeMs: Long): Long {
-        val gridType = WorkspaceRepository.gridType.value
-        if (gridType is GridUtils.GridType.NoGrid) return timeMs.coerceAtLeast(0L)
-        val interval = GridUtils.computeWithGridType(
-            _viewport.value.zoomX,
-            WorkspaceRepository.bpm.value,
-            gridType,
-        ).intervalMs
-        return snapToGrid(timeMs, interval)
+        return GridUtils.snapToGrid(
+            timeMs = timeMs,
+            zoomLevel = _viewport.value.zoomX,
+            bpm = WorkspaceRepository.bpm.value,
+            gridType = WorkspaceRepository.gridType.value,
+        )
     }
 
     private fun nudgeSelectedTimelineTime(direction: Int): Boolean {
@@ -1227,12 +1279,12 @@ class TimelineViewModel : ViewModel() {
             .filterIsInstance<Selectable.TimelineTime>()
             .firstOrNull()
             ?: return false
-        val intervalMs = GridUtils.computeWithGridType(
-            _viewport.value.zoomX,
-            WorkspaceRepository.bpm.value,
-            WorkspaceRepository.gridType.value,
-        ).intervalMs
-        val targetTimeMs = adjacentTimelineGridTimeMs(selection.timeMs, intervalMs, direction)
+        val intervals = GridUtils.computeWithGridType(
+            zoomLevel = _viewport.value.zoomX,
+            bpm = WorkspaceRepository.bpm.value,
+            gridType = WorkspaceRepository.gridType.value,
+        )
+        val targetTimeMs = intervals.adjacentTime(timeMs = selection.timeMs, direction = direction)
         SelectionManager.select(selection.copy(timeMs = targetTimeMs))
         updateViewport { viewport ->
             val viewportWidth = viewport.viewportWidth
@@ -1260,10 +1312,26 @@ class TimelineViewModel : ViewModel() {
         TimelineKeyHandler.duplicateChainEffectClip = null
         TimelineKeyHandler.nudgeTimelineTime = null
         TimelineKeyHandler.insertMidiClip = null
+        TimelineKeyHandler.togglePianoRollView = null
         super.onCleared()
     }
 
+    fun togglePianoRollView(): Boolean {
+        val selected = SelectionManager.selections.value
+            .filterIsInstance<Selectable.TimelineEntryItem>()
+            .lastOrNull { it.clipId == null && _tracks.value.getOrNull(it.trackIndex) is MidiTimelineTrack }
+        val target = selected?.let { it.trackIndex to it.entryStartMs } ?: lastPianoRollEntry ?: return false
+        val track = _tracks.value.getOrNull(target.first) as? MidiTimelineTrack ?: return false
+        val entry = track.entries[target.second] ?: return false
+        enterPianoRollForEntry(
+            clipContext = TimelineClipContext.midi(trackIndex = target.first, entry = entry),
+            entry = entry,
+        )
+        return true
+    }
+
     private fun enterPianoRollForEntry(clipContext: TimelineClipContext, entry: MidiEntry) {
+        lastPianoRollEntry = clipContext.trackIndex to clipContext.entryStartMs
         SelectionManager.select(clipContext.toTimelineEntrySelection())
         openPianoRollForEntry(clipContext, entry)
     }
@@ -1318,8 +1386,7 @@ class TimelineViewModel : ViewModel() {
         val snappedStart = if (gridType is GridUtils.GridType.NoGrid) {
             newStartMs.coerceAtLeast(0L)
         } else {
-            val intervals = GridUtils.computeWithGridType(_viewport.value.zoomX, bpm, gridType)
-            snapToGrid(newStartMs, intervals.intervalMs)
+            snapTimelineTime(timeMs = newStartMs)
         }
         
         val blockers = track.allOneDimensionalEntries().filterNot { it is MidiEntry && it.startTimeMs == oldStartMs }
@@ -1441,22 +1508,26 @@ class TimelineViewModel : ViewModel() {
         ).coerceAtLeast(1L)
         val startChanged = newStartMs != oldStartMs
 
-        val movedNotes = if (startChanged) {
-            val delta = newStartMs - oldStartMs
-            entry.notes.map { n -> n.copy(startTimeMs = (n.startTimeMs + delta).coerceAtLeast(0L)) }
-        } else entry.notes
+        val deltaMs = newStartMs - oldStartMs
+        val trimmedNotes = entry.notes.mapNotNull { note ->
+            val shiftedStart = note.startTimeMs - deltaMs
+            val shiftedEnd = note.endTimeMs - deltaMs
+            val start = shiftedStart.coerceAtLeast(0L)
+            val end = shiftedEnd.coerceAtMost(clampedDuration)
+            if (end <= start) {
+                null
+            } else {
+                note.copy(startTimeMs = start, durationMs = end - start)
+            }
+        }
 
-        if (startChanged) track.entries.remove(oldStartMs)
-        val updated = entry.copy(startTimeMs = newStartMs, durationMs = clampedDuration, notes = movedNotes)
+        if (startChanged) {
+            track.entries.remove(oldStartMs)
+        }
+        val updated = entry.copy(startTimeMs = newStartMs, durationMs = clampedDuration, notes = trimmedNotes)
         track.entries[newStartMs] = updated
-
-        val maxEnd = updated.notes.maxOfOrNull { it.endTimeMs } ?: updated.endTimeMs
-        val finalDuration = minOf(
-            (maxEnd - updated.startTimeMs).coerceAtLeast(updated.durationMs),
-            nextStart?.minus(newStartMs) ?: Long.MAX_VALUE,
-        ).coerceAtLeast(1L)
-        if (finalDuration != updated.durationMs) {
-            track.entries[newStartMs] = updated.copy(durationMs = finalDuration)
+        if (lastPianoRollEntry == (trackIndex to oldStartMs)) {
+            lastPianoRollEntry = trackIndex to newStartMs
         }
 
         val newTrackInstance = track.copyWithEntries()

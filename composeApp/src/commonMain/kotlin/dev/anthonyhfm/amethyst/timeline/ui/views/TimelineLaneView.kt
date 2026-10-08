@@ -55,6 +55,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.TimelineClipMoveEngine
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -444,11 +445,22 @@ fun TimelineLaneView(
                     onCreateMidiClip = { startMs, endMs -> onCreateMidiEntry(index, startMs, endMs) },
                     onCreateChainEffect = { startMs -> viewModel.createChainEffectEntry(index, startMs) },
                     onSelectChainEffect = { clipId -> viewModel.selectChainEffectClip(index, clipId) },
-                    onMoveChainEffect = { clipId, newStart -> viewModel.moveChainEffect(index, clipId, newStart) },
+                    onMoveChainEffect = { clipId, newStart ->
+                        viewModel.moveChainEffect(trackIndex = index, clipId = clipId, requestedStartMs = newStart, snapEnabled = false)
+                    },
                     onResizeChainEffect = { clipId, newStart, newDuration ->
                         viewModel.resizeChainEffect(index, clipId, newStart, newDuration)
                     },
                     onOpenChainEffect = { clipId -> viewModel.openChainEffect(index, clipId) },
+                    resolveChainEffectEdit = { clipId, mode, deltaMs, snapEnabled ->
+                        viewModel.resolveChainEffectEdit(
+                            trackIndex = index,
+                            clipId = clipId,
+                            mode = mode,
+                            deltaMs = deltaMs,
+                            snapEnabled = snapEnabled,
+                        ) ?: ChainEffectSpan(startMs = 0L, durationMs = 1L)
+                    },
                 )
             }
         }

@@ -19,10 +19,11 @@ actual fun Modifier.rightClickable(onRightClick: (position: Offset) -> Unit): Mo
     Modifier.pointerInput(onRightClick) {
         awaitPointerEventScope {
             while (true) {
-                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                val event = awaitPointerEvent(pass = PointerEventPass.Main)
 
                 if (event.type == PointerEventType.Press &&
                     event.buttons.isSecondaryPressed &&
+                    event.changes.none { it.isConsumed } &&
                     !event.keyboardModifiers.isMetaPressed &&
                     !event.keyboardModifiers.isCtrlPressed) {
                     event.changes.forEach { e -> e.consume() }

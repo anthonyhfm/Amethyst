@@ -32,39 +32,38 @@ internal fun Modifier.timelineGridOverlay(
         if (pxPerGrid < 4f) { drawContent(); return@drawWithContent }
         fun drawGridLines() {
             val viewportWidthPx = size.width
-            val startTimeMsInclusive = viewport.screenToTimeMs(0f).toLong().coerceAtLeast(0L)
-            val firstGridTimeMs = if (startTimeMsInclusive == 0L) 0L else ((startTimeMsInclusive / intervalMs) * intervalMs).coerceAtLeast(0L)
-            val firstMajorTimeMs = if (startTimeMsInclusive == 0L) 0L else ((startTimeMsInclusive / majorIntervalMs) * majorIntervalMs).coerceAtLeast(0L)
-            val endTimeMsExclusive = viewport.screenToTimeMs(viewportWidthPx).toLong().coerceAtLeast(firstGridTimeMs)
-            var majorTimeMs = firstMajorTimeMs
-            while (majorTimeMs <= endTimeMsExclusive + majorIntervalMs) {
-                val startX = viewport.timeMsToScreenX(majorTimeMs.toDouble())
-                val endX = viewport.timeMsToScreenX((majorTimeMs + majorIntervalMs).toDouble())
+            val startTimeMs = viewport.screenToTimeMs(screenX = 0f).coerceAtLeast(0.0)
+            val endTimeMs = viewport.screenToTimeMs(screenX = viewportWidthPx)
+            var majorIndex = intervals.majorIndexAt(timeMs = startTimeMs)
+            while (intervals.majorTimeAt(index = majorIndex) <= endTimeMs + intervals.exactMajorIntervalMs) {
+                val startX = viewport.timeMsToScreenX(timeMs = intervals.majorTimeAt(index = majorIndex).toDouble())
+                val endX = viewport.timeMsToScreenX(timeMs = intervals.majorTimeAt(index = majorIndex + 1).toDouble())
                 val clampedStartX = startX.coerceAtLeast(0f)
                 val clampedEndX = endX.coerceAtMost(viewportWidthPx)
-                if (((majorTimeMs / majorIntervalMs) % 2L) == 0L && clampedEndX > clampedStartX) {
+                if (majorIndex % 2L == 0L && clampedEndX > clampedStartX) {
                     drawRect(
                         color = timelinePalette.gridMajor.copy(alpha = 0.08f),
-                        topLeft = Offset(clampedStartX, ignoreTopPx),
-                        size = Size(clampedEndX - clampedStartX, size.height - ignoreTopPx)
+                        topLeft = Offset(x = clampedStartX, y = ignoreTopPx),
+                        size = Size(width = clampedEndX - clampedStartX, height = size.height - ignoreTopPx),
                     )
                 }
-                majorTimeMs += majorIntervalMs
+                majorIndex++
             }
-            var t = firstGridTimeMs
-            while (t <= endTimeMsExclusive + intervalMs) {
-                val x = viewport.timeMsToScreenX(t.toDouble())
-                if (x > viewportWidthPx + 1f) break
+            var index = intervals.indexAt(timeMs = startTimeMs)
+            while (intervals.timeAt(index = index) <= endTimeMs + intervals.exactIntervalMs) {
+                val x = viewport.timeMsToScreenX(timeMs = intervals.timeAt(index = index).toDouble())
+                if (x > viewportWidthPx + 1f) {
+                    break
+                }
                 if (x >= -1f) {
-                    val isMajor = (t % majorIntervalMs == 0L)
                     drawLine(
-                        color = if (isMajor) timelinePalette.gridMajor else timelinePalette.gridMinor,
-                        start = Offset(x, ignoreTopPx),
-                        end = Offset(x, size.height),
-                        strokeWidth = 1f
+                        color = if (intervals.isMajor(index = index)) timelinePalette.gridMajor else timelinePalette.gridMinor,
+                        start = Offset(x = x, y = ignoreTopPx),
+                        end = Offset(x = x, y = size.height),
+                        strokeWidth = 1f,
                     )
                 }
-                t += intervalMs
+                index++
             }
         }
         if (drawBehind) {

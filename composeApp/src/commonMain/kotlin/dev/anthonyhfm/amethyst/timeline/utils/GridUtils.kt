@@ -4,6 +4,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.round
 import kotlin.math.pow
+import kotlin.math.roundToLong
 
 object GridUtils {
     private val candidates = longArrayOf(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000)
@@ -14,8 +15,34 @@ object GridUtils {
         val intervalMs: Long,
         val majorEvery: Int,
         val majorIntervalMs: Long,
-        val type: GridType
-    )
+        val type: GridType,
+        val exactIntervalMs: Double = intervalMs.toDouble(),
+        val exactMajorIntervalMs: Double = majorIntervalMs.toDouble(),
+    ) {
+        fun timeAt(index: Long): Long = (index * exactIntervalMs).roundToLong()
+
+        fun majorTimeAt(index: Long): Long = (index * exactMajorIntervalMs).roundToLong()
+
+        fun indexAt(timeMs: Double): Long = floor(timeMs / exactIntervalMs).toLong().coerceAtLeast(0L)
+
+        fun majorIndexAt(timeMs: Double): Long = floor(timeMs / exactMajorIntervalMs).toLong().coerceAtLeast(0L)
+
+        fun adjacentTime(timeMs: Long, direction: Int): Long {
+            var index = indexAt(timeMs = timeMs.toDouble())
+            if (direction >= 0) {
+                while (timeAt(index = index) <= timeMs) {
+                    index++
+                }
+            } else {
+                while (index > 0L && timeAt(index = index) >= timeMs) {
+                    index--
+                }
+            }
+            return timeAt(index = index).coerceAtLeast(0L)
+        }
+
+        fun isMajor(index: Long): Boolean = index % majorEvery == 0L
+    }
 
     // --- Bestehende dynamische Berechnung (Fallback) ---
     fun compute(zoomLevel: Float): GridIntervals {
@@ -36,12 +63,8 @@ object GridUtils {
     fun snapToGrid(timeMs: Long, zoomLevel: Float, bpm: Double? = null, gridType: GridType? = null): Long {
         if (gridType is GridType.NoGrid) return timeMs.coerceAtLeast(0L)
         val intervals = if (gridType == null || gridType is GridType.None) compute(zoomLevel) else computeWithGridType(zoomLevel, bpm ?: 120.0, gridType)
-        val interval = intervals.intervalMs
-        if (interval <= 0) return timeMs
-        // Stabileres Runden: anstatt round(quotient) -> floor(quotient + 0.5) vermeidet negative Rundungsartefakte
-        val quotient = timeMs.toDouble() / interval.toDouble()
-        val snapped = floor(quotient + 0.5).toLong() * interval
-        return if (snapped < 0) 0 else snapped
+        val index = floor(timeMs.toDouble() / intervals.exactIntervalMs + 0.5).toLong()
+        return intervals.timeAt(index = index).coerceAtLeast(0L)
     }
 
     /**
@@ -56,11 +79,12 @@ object GridUtils {
         thresholdPx: Float = 0f
     ): Long {
         if (gridType is GridType.NoGrid) return timeMs.coerceAtLeast(0L)
-        val intervals = if (gridType == null || gridType is GridType.None) compute(zoomLevel) else computeWithGridType(zoomLevel, bpm ?: 120.0, gridType)
-        val interval = intervals.intervalMs
-        if (interval <= 0) return timeMs
-        val quotient = timeMs.toDouble() / interval.toDouble()
-        val snappedCandidate = kotlin.math.floor(quotient + 0.5).toLong() * interval
+        val snappedCandidate = snapToGrid(
+            timeMs = timeMs,
+            zoomLevel = zoomLevel,
+            bpm = bpm,
+            gridType = gridType,
+        )
         val diffMs = snappedCandidate - timeMs
         val diffPx = kotlin.math.abs(diffMs.toFloat() * zoomLevel)
         return if (thresholdPx > 0f && diffPx > thresholdPx) timeMs.coerceAtLeast(0L) else snappedCandidate.coerceAtLeast(0L)
@@ -91,37 +115,45 @@ object GridUtils {
                 } ?: musicalSubdivisions.last()
                 val ms = fractionToMs(frac = chosenFraction)
                 val majorMs = maxOf(ms, barMs.roundToLongSafe())
-                GridIntervals(ms, (majorMs.toDouble() / ms).ceilInt(), majorMs, gridType)
+                GridIntervals(ms, (maxOf(chosenFraction, 1.0) / chosenFraction).ceilInt(), majorMs, gridType, barMs * chosenFraction, maxOf(barMs * chosenFraction, barMs))
             }
             is GridType.Fixed.Bar_1 -> {
-                val ms = barMs.roundToLongSafe(); GridIntervals(ms, 1, ms, gridType)
+                val ms = barMs.roundToLongSafe(); GridIntervals(ms, 1, ms, gridType, barMs, barMs)
             }
             is GridType.Fixed.Bar_2 -> {
-                val ms = (barMs * 2).roundToLongSafe(); GridIntervals(barMs.roundToLongSafe(), 2, ms, gridType)
+                val ms = (barMs * 2).roundToLongSafe(); GridIntervals(barMs.roundToLongSafe(), 2, ms, gridType, barMs, barMs * 2)
             }
             is GridType.Fixed.Bar_4 -> {
-                val ms = (barMs * 4).roundToLongSafe(); GridIntervals(barMs.roundToLongSafe(), 4, ms, gridType)
+                val ms = (barMs * 4).roundToLongSafe(); GridIntervals(barMs.roundToLongSafe(), 4, ms, gridType, barMs, barMs * 4)
             }
             is GridType.Fixed.Bar_8 -> {
-                val ms = (barMs * 8).roundToLongSafe(); GridIntervals(barMs.roundToLongSafe(), 8, ms, gridType)
+                val ms = (barMs * 8).roundToLongSafe(); GridIntervals(barMs.roundToLongSafe(), 8, ms, gridType, barMs, barMs * 8)
             }
             is GridType.Fixed._1_2 -> {
-                val ms = fractionToMs(1.0 / 2.0); GridIntervals(ms, 2, barMs.roundToLongSafe(), gridType)
+                val ms = fractionToMs(1.0 / 2.0); GridIntervals(ms, 2, barMs.roundToLongSafe(), gridType, barMs / 2, barMs)
             }
             is GridType.Fixed._1_4 -> {
-                val ms = fractionToMs(1.0 / 4.0); GridIntervals(ms, 4, barMs.roundToLongSafe(), gridType)
+                val ms = fractionToMs(1.0 / 4.0); GridIntervals(ms, 4, barMs.roundToLongSafe(), gridType, barMs / 4, barMs)
             }
             is GridType.Fixed._1_8 -> {
-                val ms = fractionToMs(1.0 / 8.0); GridIntervals(ms, 8, barMs.roundToLongSafe(), gridType)
+                val ms = fractionToMs(1.0 / 8.0); GridIntervals(ms, 8, barMs.roundToLongSafe(), gridType, barMs / 8, barMs)
             }
             is GridType.Fixed._1_16 -> {
-                val ms = fractionToMs(1.0 / 16.0); GridIntervals(ms, 16, barMs.roundToLongSafe(), gridType)
+                val ms = fractionToMs(1.0 / 16.0); GridIntervals(ms, 16, barMs.roundToLongSafe(), gridType, barMs / 16, barMs)
             }
             is GridType.Fixed._1_32 -> {
-                val ms = fractionToMs(1.0 / 32.0); GridIntervals(ms, 32, barMs.roundToLongSafe(), gridType)
+                val ms = fractionToMs(1.0 / 32.0); GridIntervals(ms, 32, barMs.roundToLongSafe(), gridType, barMs / 32, barMs)
             }
         }
     }
+
+    fun beatDurationMs(bpm: Double): Double {
+        val safeBpm = bpm.takeIf { it.isFinite() && it > 0.0 } ?: 120.0
+        return 60_000.0 / safeBpm
+    }
+
+    fun beatTimeMs(beatIndex: Long, bpm: Double): Long =
+        (beatIndex * beatDurationMs(bpm = bpm)).roundToLong()
 
     private fun Double.roundToLongSafe(): Long = round(this).toLong().coerceAtLeast(1L)
     private fun Double.ceilInt(): Int = ceil(this).toInt().coerceAtLeast(1)

@@ -13,6 +13,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +48,7 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 @Composable
 fun BPMChanger() {
+    val focusManager = LocalFocusManager.current
     val bpm by WorkspaceRepository.bpm.collectAsState()
     var bpmText: String by remember { mutableStateOf(bpm.toString()) }
     var isFocused by remember { mutableStateOf(false) }
@@ -94,10 +103,26 @@ fun BPMChanger() {
                     color = Theme[colors][foreground],
                 ),
                 cursorBrush = SolidColor(Theme[colors][foreground]),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() },
+                ),
                 singleLine = true,
                 modifier = Modifier
-                    .width(56.dp)
+                    .width(width = 56.dp)
+                    .onPreviewKeyEvent { event ->
+                        if (event.key == Key.Enter) {
+                            if (event.type == KeyEventType.KeyDown) {
+                                focusManager.clearFocus()
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     .onFocusChanged {
                         isFocused = it.isFocused
                         WorkspaceRepository.isInputFocused = it.isFocused
