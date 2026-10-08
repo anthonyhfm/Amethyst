@@ -58,6 +58,9 @@ import com.composeunstyled.Icon
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.composition_length_follows_clip
+import org.jetbrains.compose.resources.stringResource
 import dev.anthonyhfm.amethyst.core.util.Timing
 import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Slider
@@ -127,20 +130,28 @@ fun PlaybackOptions(
 
             Spacer(Modifier.weight(1f))
 
-            TimingControl(
-                timing = options.timing,
-                onTimingChange = { timing -> device.updatePlaybackOptions { it.copy(timing = timing) } },
-            )
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(24.dp)
-                    .background(Theme[chainColorTokens][chainBorder]),
-            )
-            GateControl(
-                gate = options.gate,
-                onGateChange = { gate -> device.updatePlaybackOptions { it.copy(gate = gate) } },
-            )
+            if (device.isTimelineClip()) {
+                Text(
+                    text = stringResource(resource = Res.string.composition_length_follows_clip),
+                    style = Theme[typography][small],
+                    color = Theme[colors][mutedForeground],
+                )
+            } else {
+                TimingControl(
+                    timing = options.timing,
+                    onTimingChange = { timing -> device.updatePlaybackOptions { it.copy(timing = timing) } },
+                )
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(24.dp)
+                        .background(Theme[chainColorTokens][chainBorder]),
+                )
+                GateControl(
+                    gate = options.gate,
+                    onGateChange = { gate -> device.updatePlaybackOptions { it.copy(gate = gate) } },
+                )
+            }
         }
     }
 }

@@ -398,7 +398,7 @@ object TimelineRepository {
         }
         sortedChainEffectEntries.forEach { entry ->
             if (entry.shouldPlayAt(positionMs, anySoloedTrack) && activeChainEffectIds.add(entry.entry.clipId)) {
-                chainEffectRuntimes[entry.entry.clipId]?.start()
+                chainEffectRuntimes[entry.entry.clipId]?.start(positionMs = positionMs)
             }
         }
     }
@@ -578,7 +578,7 @@ object TimelineRepository {
                 runtime.stop()
                 val currentTracked = sortedChainEffectEntries.firstOrNull { it.entry.clipId == updated.clipId }
                 if (_isPlaying.value && currentTracked?.shouldPlayAt(_playheadPositionMs.value, hasSoloedTracks()) == true) {
-                    runtime.start()
+                    runtime.start(positionMs = _playheadPositionMs.value)
                     activeChainEffectIds.add(updated.clipId)
                 }
             }
@@ -721,6 +721,8 @@ object TimelineRepository {
         val anySoloedTrack = hasSoloedTracks()
 
         stopActivePlayback()
+        chainEffectRuntimes.values.forEach { it.stopCompositionPreview() }
+        TimelineMetronome.start(positionMs = baselinePlayheadMs, bpm = WorkspaceRepository.bpm.value)
 
         val entriesToStart = sortedAudioEntries.filter { it.shouldPlayAt(baselinePlayheadMs, anySoloedTrack) }
         activeEntries.addAll(startAudioEntriesBatch(entriesToStart, baselinePlayheadMs))
@@ -733,7 +735,7 @@ object TimelineRepository {
         }
         sortedChainEffectEntries.forEach { entry ->
             if (entry.shouldPlayAt(baselinePlayheadMs, anySoloedTrack)) {
-                chainEffectRuntimes[entry.entry.clipId]?.start()
+                chainEffectRuntimes[entry.entry.clipId]?.start(positionMs = baselinePlayheadMs)
                 activeChainEffectIds.add(entry.entry.clipId)
             }
         }
@@ -742,12 +744,15 @@ object TimelineRepository {
     }
 
     fun pause() {
+        TimelineMetronome.stop()
         _isPlaying.value = false
         stopPlayback()
         stopActivePlayback()
     }
 
     fun stop() {
+        TimelineMetronome.stop()
+        chainEffectRuntimes.values.forEach { it.stopCompositionPreview() }
         _isPlaying.value = false
         stopPlayback()
         stopActivePlayback()
@@ -766,6 +771,7 @@ object TimelineRepository {
             baselineMark = TimeSource.Monotonic.markNow()
             // Beim Seek während Playback: alle aktiven stoppen + neu bestücken
             stopActivePlayback()
+            TimelineMetronome.start(positionMs = coerced, bpm = WorkspaceRepository.bpm.value)
             lastPlayheadMs = coerced
             rebuildSortedEntries()
             nextStartIndex = binarySearchFirst(sortedAudioEntries) { it.entry.startTimeUs >= msToUs(coerced) }
@@ -782,8 +788,7 @@ object TimelineRepository {
             }
             sortedChainEffectEntries.forEach { entry ->
                 if (entry.shouldPlayAt(coerced, anySoloedTrack)) {
-                    // Seeking intentionally retriggers a Chain Effect from chain time zero.
-                    chainEffectRuntimes[entry.entry.clipId]?.start()
+                    chainEffectRuntimes[entry.entry.clipId]?.start(positionMs = coerced)
                     activeChainEffectIds.add(entry.entry.clipId)
                 }
             }
@@ -800,8 +805,12 @@ object TimelineRepository {
                     val elapsed = mark.elapsedNow().inWholeMilliseconds
                     val newPos = baselinePlayheadMs + elapsed
                     _playheadPositionMs.value = newPos
-                    processPlaybackIncremental(newPos)
-                    delay(computeTickDelay(newPos))
+                    TimelineMetronome.tick(positionMs = newPos, bpm = WorkspaceRepository.bpm.value)
+                    processPlaybackIncremental(currentMs = newPos)
+                    delay(timeMillis = minOf(
+                        computeTickDelay(currentMs = newPos),
+                        TimelineMetronome.tickDelay(positionMs = newPos, bpm = WorkspaceRepository.bpm.value),
+                    ))
                 } else {
                     delay(8L)
                 }
@@ -855,7 +864,7 @@ object TimelineRepository {
                 if (entry.entry.startTimeMs >= lastPlayheadMs && entry.entry.startTimeMs <= currentMs &&
                     entry.overlapsPlaybackWindow(lastPlayheadMs, currentMs, anySoloedTrack)
                 ) {
-                    chainEffectRuntimes[entry.entry.clipId]?.start()
+                    chainEffectRuntimes[entry.entry.clipId]?.start(positionMs = currentMs)
                     if (entry.shouldPlayAt(currentMs, anySoloedTrack)) {
                         activeChainEffectIds.add(entry.entry.clipId)
                     } else {
@@ -920,7 +929,7 @@ object TimelineRepository {
             }
             sortedChainEffectEntries.forEach { e ->
                 if (e.shouldPlayAt(currentMs, anySoloedTrack)) {
-                    chainEffectRuntimes[e.entry.clipId]?.start()
+                    chainEffectRuntimes[e.entry.clipId]?.start(positionMs = currentMs)
                     activeChainEffectIds.add(e.entry.clipId)
                 }
             }

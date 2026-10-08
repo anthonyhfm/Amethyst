@@ -15,6 +15,7 @@ import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.midi.data.MidiInputData
 import dev.anthonyhfm.amethyst.devices.effects.composition.ui.views.CompositionLayout
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 
@@ -27,6 +28,9 @@ class CompositionWorkspaceMode(
     override val claimMidiInputs: Boolean = true
 
     override fun onActivate() {
+        if (device.isTimelineClip()) {
+            TimelineRepository.pause()
+        }
         Heaven.clear()
         device.startWorkspacePreview()
     }

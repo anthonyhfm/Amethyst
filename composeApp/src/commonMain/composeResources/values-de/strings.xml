@@ -1051,5 +1051,9 @@
     <string name="workspace_swap_launchpad_title">Launchpad-Modell tauschen</string>
     <string name="workspace_swap_launchpad_confirm">Modell tauschen</string>
     <string name="workspace_swap_launchpad_description">Wähle ein neues Layout. Alle Bindungen bleiben bei diesem Device.</string>
+    <string name="composition_length_follows_clip">Länge folgt Timeline-Clip</string>
     <string name="home_import_wizard_open_failed">Das Projekt wurde konvertiert, konnte aber nicht geöffnet werden. Bitte versuche es erneut.</string>
+    <string name="timeline_metronome">Metronom</string>
+    <string name="timeline_metronome_enabled">An</string>
+    <string name="timeline_metronome_disabled">Aus</string>
 </resources>

@@ -30,6 +30,7 @@ import dev.anthonyhfm.amethyst.devices.effects.composition.graph.CompositionGrap
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.GraphProcessor
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.defaultCompositionGraph
 import dev.anthonyhfm.amethyst.devices.effects.composition.graph.hasOriginBinding
+import dev.anthonyhfm.amethyst.timeline.CompositionAudioPreview
 import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.ui.components.primitives.Button
 import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
@@ -51,13 +52,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Chokeable, TimelineTriggerable {
     override val state = MutableStateFlow(CompositionChainDeviceState())
     override val helpRef = "Composition"
 
-    private val customMode = CompositionWorkspaceMode(this)
+    private val customMode = CompositionWorkspaceMode(device = this)
+    private var disposed = false
     private var activeFrame: ActiveFrame? = null
+    private val editorPlaybackLock = SynchronizedObject()
+    private val audioPreview = CompositionAudioPreview()
+    private val clipContext = mutableStateOf<CompositionClipContext?>(null)
     private var playbackRun: PlaybackRun? = null
     private var playbackOrigin: Any? = this
     private val playing = mutableStateOf(false)
@@ -100,12 +107,19 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     }
 
     override fun dispose() {
+        disposed = true
         stateObserverScope.cancel()
         pause()
+        if (WorkspaceRepository.mode.value === customMode) {
+            WorkspaceRepository.switchToPreviousMode()
+        }
         super.dispose()
     }
 
     override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
+        clipContext.value?.let { context ->
+            return TimelineDuration.Finite(milliseconds = context.durationMs.coerceAtLeast(minimumValue = 1L))
+        }
         val options = state.value.playbackOptions
         if (options.repeat) return TimelineDuration.Unbounded
         val duration = options.timing.toMsValue(context.bpm.toDouble()) * options.gate.coerceIn(0.05f, 4f)
@@ -113,20 +127,43 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     }
 
     override fun startTimelineTrigger() {
-        if (workspacePreviewActive) {
+        startTimelineAt(positionMs = clipContext.value?.startTimeMs ?: 0L)
+    }
+
+    fun startTimelineAt(positionMs: Long) {
+        if (disposed) {
+            return
+        }
+        val context = clipContext.value
+        if (context == null && workspacePreviewActive) {
             play()
         } else {
-            startChainVoice(origin = this, triggerOrigin = null)
+            startChainVoice(
+                origin = this,
+                triggerOrigin = null,
+                startProgress = context?.progressAt(positionMs = positionMs) ?: 0f,
+            )
         }
     }
 
     override fun stopTimelineTrigger() {
+        stopAllChainVoices()
         if (workspacePreviewActive) {
             pause()
-        } else {
-            stopAllChainVoices()
         }
     }
+
+    fun bindTimelineClip(context: CompositionClipContext) {
+        synchronized(lock = editorPlaybackLock) {
+            if (clipContext.value != context) {
+                pause()
+                clipContext.value = context
+                playbackProgress.value = playbackProgress.value.coerceIn(minimumValue = 0f, maximumValue = 1f)
+            }
+        }
+    }
+
+    fun isTimelineClip(): Boolean = clipContext.value != null
 
     override fun onChoke() {
         stopAllChainVoices()
@@ -166,6 +203,9 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     // ==========================================
 
     fun play() {
+        if (disposed) {
+            return
+        }
         val startProgress = playbackProgress.value.takeUnless { it >= 1f } ?: 0f
         startEditorPlayback(
             origin = playbackOrigin,
@@ -176,17 +216,24 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     }
 
     fun pause() {
-        playbackRun = null
-        playing.value = false
-        Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-        clearActiveFrame()
+        synchronized(lock = editorPlaybackLock) {
+            playbackRun?.let { run ->
+                playbackProgress.value = run.progressAt(durationMs = playbackDurationMs().toDouble())
+            }
+            playbackRun = null
+            playing.value = false
+            Heaven.cancelJobsForOwner(owner = this, identifier = PLAYBACK_IDENTIFIER)
+            audioPreview.stop()
+            clearActiveFrame()
+        }
     }
 
     fun isPlaying(): Boolean = playing.value
 
     fun playbackProgress(): Float = playbackProgress.value
 
-    fun playbackDurationMs(): Long = state.value.playbackOptions.durationMs().toLong()
+    fun playbackDurationMs(): Long = clipContext.value?.durationMs?.coerceAtLeast(minimumValue = 1L)
+        ?: state.value.playbackOptions.durationMs().toLong()
 
     /** Starts the editor-only preview from the beginning for a captured pad press. */
     fun triggerWorkspacePreview(x: Int? = null, y: Int? = null) {
@@ -205,9 +252,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
      */
     fun startWorkspacePreview() {
         workspacePreviewActive = true
-        playbackRun = null
-        playing.value = false
-        Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
+        pause()
         activeFrame = null
         stopAllChainVoices()
         Heaven.clear()
@@ -215,10 +260,7 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
 
     /** Stops the editor-only preview and leaves every device black. */
     fun stopWorkspacePreview() {
-        playbackRun = null
-        playing.value = false
-        Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-        clearActiveFrame()
+        pause()
         Heaven.clear()
         activeFrame = null
         stopAllChainVoices()
@@ -226,23 +268,28 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     }
 
     fun seekTo(progress: Float) {
-        val clampedProgress = progress.coerceIn(0f, 1f)
-        playbackProgress.value = clampedProgress
-        val run = playbackRun
-        if (run?.livePreview != false) {
+        if (disposed) {
+            return
+        }
+        synchronized(lock = editorPlaybackLock) {
+            val clampedProgress = progress.coerceIn(minimumValue = 0f, maximumValue = 1f)
+            val run = playbackRun
+            pause()
+            playbackProgress.value = clampedProgress
             renderLivePlaybackFrame(
                 progress = clampedProgress,
                 origin = run?.origin ?: playbackOrigin,
                 triggerOrigin = run?.triggerOrigin,
             )
-        } else {
-            renderPlaybackFrame(progress = clampedProgress, origin = run.origin)
-        }
-
-        if (playing.value) {
-            Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-            val activeRun = playbackRun ?: return
-            scheduleEditorPlaybackFrame(activeRun.firstFrameAtOrAfter(clampedProgress))
+            if (run != null) {
+                startEditorPlayback(
+                    origin = run.origin,
+                    progress = clampedProgress,
+                    repeat = run.repeat,
+                    livePreview = run.livePreview,
+                    triggerOrigin = run.triggerOrigin,
+                )
+            }
         }
     }
 
@@ -269,90 +316,66 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
         livePreview: Boolean = false,
         triggerOrigin: Vec2? = null,
     ) {
-        Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-        val effectiveLivePreview = livePreview || state.value.graph.hasOriginBinding()
-        if (!effectiveLivePreview && state.value.renderedAnimation.isEmpty()) renderAnimation()
-        playbackOrigin = origin
-        val run = PlaybackRun(
-            origin = origin,
-            frames = if (effectiveLivePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
-            repeat = repeat,
-            livePreview = effectiveLivePreview,
-            triggerOrigin = if (effectiveLivePreview) triggerOrigin else null,
-        )
-        playbackRun = run
-        playing.value = true
-        scheduleEditorPlaybackFrame(run.firstFrameAtOrAfter(progress.coerceIn(0f, 1f)))
-    }
-
-    private fun scheduleEditorPlaybackFrame(frameIndex: Int, delayMs: Double = 0.0) {
-        Heaven.schedule(delayInMs = delayMs, owner = this, identifier = PLAYBACK_IDENTIFIER) {
-            val run = playbackRun ?: return@schedule
-            val options = state.value.playbackOptions
-            val frameIntervalMs = compositionFrameIntervalMs()
-            val durationMs = options.durationMs().coerceAtLeast(frameIntervalMs)
-            val frame = run.frames.getOrElse(frameIndex) { run.frames.last() }
-            val progress = frame.progress
-            playbackProgress.value = progress
-            if (run.livePreview) {
-                renderLivePlaybackFrame(progress = progress, origin = run.origin, triggerOrigin = run.triggerOrigin)
-            } else {
-                emitFrame(frame.signals.map { it.copy(origin = run.origin) })
+        synchronized(lock = editorPlaybackLock) {
+            if (disposed) {
+                return
             }
-
-            when {
-                frameIndex < run.frames.lastIndex -> {
-                    val nextProgress = run.frames[frameIndex + 1].progress
-                    scheduleEditorPlaybackFrame(
-                        frameIndex = frameIndex + 1,
-                        delayMs = ((nextProgress - progress) * durationMs).coerceAtLeast(0.0),
-                    )
-                }
-                run.repeat -> {
-                    Heaven.schedule(
-                        delayInMs = frameIntervalMs,
-                        owner = this,
-                        identifier = PLAYBACK_IDENTIFIER,
-                    ) {
-                        if (playbackRun !== run) return@schedule
-                        playbackProgress.value = 0f
-                        playbackRun = run.copy(
-                            frames = if (run.livePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
-                        )
-                        scheduleEditorPlaybackFrame(0)
-                    }
-                }
-                else -> {
-                    Heaven.schedule(
-                        delayInMs = frameIntervalMs,
-                        owner = this,
-                        identifier = PLAYBACK_IDENTIFIER,
-                    ) {
-                        if (playbackRun === run) finishEditorPlayback()
-                    }
-                }
-            }
+            pause()
+            playbackOrigin = origin
+            val run = PlaybackRun(
+                origin = origin,
+                repeat = repeat,
+                livePreview = livePreview,
+                triggerOrigin = triggerOrigin,
+                startProgress = progress.coerceIn(minimumValue = 0f, maximumValue = 1f),
+                startedAt = TimeSource.Monotonic.markNow(),
+            )
+            playbackRun = run
+            playing.value = true
+            scheduleEditorPlaybackFrame(run = run)
         }
     }
 
-    private fun finishEditorPlayback() {
-        playbackRun = null
-        playing.value = false
-        Heaven.cancelJobsForOwner(this, PLAYBACK_IDENTIFIER)
-        clearActiveFrame()
-    }
-
-    private fun renderPlaybackFrame(progress: Float, origin: Any?) {
-        val frame = state.value.renderedAnimation
-            .firstOrNull { it.progress >= progress }
-            ?: state.value.renderedAnimation.lastOrNull()
-        if (frame != null) {
-            emitFrame(frame.signals.map { it.copy(origin = origin) })
+    private fun scheduleEditorPlaybackFrame(run: PlaybackRun, delayMs: Double = 0.0) {
+        Heaven.schedule(delayInMs = delayMs, owner = this, identifier = PLAYBACK_IDENTIFIER) {
+            synchronized(lock = editorPlaybackLock) {
+                if (playbackRun !== run) {
+                    return@synchronized
+                }
+                val durationMs = playbackDurationMs().coerceAtLeast(minimumValue = 1L).toDouble()
+                val progress = run.progressAt(durationMs = durationMs)
+                playbackProgress.value = progress
+                renderLivePlaybackFrame(progress = progress, origin = run.origin, triggerOrigin = run.triggerOrigin)
+                clipContext.value?.let { context ->
+                    audioPreview.sync(
+                        context = context,
+                        positionMs = context.startTimeMs + context.localTimeMs(progress = progress),
+                    )
+                }
+                if (progress >= 1f) {
+                    audioPreview.stop()
+                    if (state.value.playbackOptions.repeat) {
+                        val repeated = run.copy(startProgress = 0f, startedAt = TimeSource.Monotonic.markNow())
+                        playbackRun = repeated
+                        scheduleEditorPlaybackFrame(run = repeated)
+                    } else {
+                        playbackRun = null
+                        playing.value = false
+                        clearActiveFrame()
+                    }
+                } else {
+                    val remainingMs = (1f - progress) * durationMs
+                    scheduleEditorPlaybackFrame(
+                        run = run,
+                        delayMs = minOf(a = compositionFrameIntervalMs(), b = remainingMs),
+                    )
+                }
+            }
         }
     }
 
     private fun renderLivePlaybackFrame(progress: Float, origin: Any?, triggerOrigin: Vec2? = null) {
-        val durationMs = state.value.playbackOptions.durationMs().coerceAtLeast(1.0)
+        val durationMs = playbackDurationMs().coerceAtLeast(minimumValue = 1L).toDouble()
         emitFrame(
             GraphProcessor.renderFrame(
                 graph = state.value.graph,
@@ -403,8 +426,8 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     // Polyphonic Chain Playback
     // ==========================================
 
-    private fun startChainVoice(origin: Any?, triggerOrigin: Vec2?): Long {
-        val effectiveLivePreview = state.value.graph.hasOriginBinding()
+    private fun startChainVoice(origin: Any?, triggerOrigin: Vec2?, startProgress: Float = 0f): Long {
+        val effectiveLivePreview = clipContext.value != null || state.value.graph.hasOriginBinding()
         if (!effectiveLivePreview && state.value.renderedAnimation.isEmpty()) {
             renderAnimation()
         }
@@ -414,9 +437,17 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
             val v = ChainVoice(
                 id = id,
                 origin = origin,
-                frames = if (effectiveLivePreview) buildLivePreviewFrames() else state.value.renderedAnimation,
+                frames = if (clipContext.value != null) {
+                    listOf(RenderedCompositionFrame(progress = 0f, signals = emptyList()))
+                } else if (effectiveLivePreview) {
+                    buildLivePreviewFrames()
+                } else {
+                    state.value.renderedAnimation
+                },
                 livePreview = effectiveLivePreview,
                 triggerOrigin = if (effectiveLivePreview) triggerOrigin else null,
+                startProgress = startProgress,
+                startedAt = TimeSource.Monotonic.markNow(),
             )
             activeChainVoices[id] = v
             Pair(id, v)
@@ -429,11 +460,16 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
     private fun scheduleChainVoiceFrame(voiceId: Long, frameIndex: Int, delayMs: Double = 0.0) {
         Heaven.schedule(delayInMs = delayMs, owner = this, identifier = voiceId) {
             val voice = synchronized(chainVoicesLock) { activeChainVoices[voiceId] } ?: return@schedule
-            val options = state.value.playbackOptions
             val frameIntervalMs = compositionFrameIntervalMs()
-            val durationMs = options.durationMs().coerceAtLeast(frameIntervalMs)
-            val frame = voice.frames.getOrElse(frameIndex) { voice.frames.last() }
-            val progress = frame.progress
+            val durationMs = playbackDurationMs().toDouble().coerceAtLeast(minimumValue = frameIntervalMs)
+            val frame = voice.frames.getOrElse(index = frameIndex) { voice.frames.last() }
+            val progress = if (clipContext.value != null) {
+                (voice.startProgress + voice.startedAt.elapsedNow().inWholeNanoseconds / 1_000_000.0 / durationMs)
+                    .toFloat()
+                    .coerceIn(minimumValue = 0f, maximumValue = 1f)
+            } else {
+                frame.progress
+            }
 
             val signals = if (voice.livePreview) {
                 GraphProcessor.renderFrame(
@@ -449,7 +485,17 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
 
             emitChainVoiceFrame(voiceId, signals)
 
-            if (frameIndex < voice.frames.lastIndex) {
+            if (clipContext.value != null) {
+                if (progress >= 1f) {
+                    finishChainVoice(voiceId = voiceId)
+                } else {
+                    scheduleChainVoiceFrame(
+                        voiceId = voiceId,
+                        frameIndex = 0,
+                        delayMs = minOf(a = frameIntervalMs, b = (1f - progress) * durationMs),
+                    )
+                }
+            } else if (frameIndex < voice.frames.lastIndex) {
                 val nextProgress = voice.frames[frameIndex + 1].progress
                 scheduleChainVoiceFrame(
                     voiceId = voiceId,
@@ -549,6 +595,9 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
 
     /** Renders the graph into a transient cache at the configured performance frame rate. */
     fun renderAnimation() {
+        if (disposed) {
+            return
+        }
         val durationMs = playbackDurationMs().coerceAtLeast(1L)
         val intervalMs = compositionFrameIntervalMs()
         val frameCount = kotlin.math.ceil(durationMs / intervalMs).toInt().coerceAtLeast(1)
@@ -623,13 +672,17 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
 
     private data class PlaybackRun(
         val origin: Any?,
-        val frames: List<RenderedCompositionFrame>,
         val repeat: Boolean,
         val livePreview: Boolean,
         val triggerOrigin: Vec2? = null,
+        val startProgress: Float,
+        val startedAt: TimeMark,
     ) {
-        fun firstFrameAtOrAfter(progress: Float): Int =
-            frames.indexOfFirst { it.progress >= progress }.takeIf { it >= 0 } ?: frames.lastIndex
+        fun progressAt(durationMs: Double): Float {
+            return (startProgress + startedAt.elapsedNow().inWholeNanoseconds / 1_000_000.0 / durationMs.coerceAtLeast(minimumValue = 1.0))
+                .toFloat()
+                .coerceIn(minimumValue = 0f, maximumValue = 1f)
+        }
     }
 
     private data class ChainVoice(
@@ -638,6 +691,8 @@ class CompositionChainDevice : LEDChainDevice<CompositionChainDeviceState>(), Ch
         val frames: List<RenderedCompositionFrame>,
         val livePreview: Boolean,
         val triggerOrigin: Vec2? = null,
+        val startProgress: Float,
+        val startedAt: TimeMark,
         var activeCoordinates: Set<Pair<Int, Int>> = emptySet(),
     )
 

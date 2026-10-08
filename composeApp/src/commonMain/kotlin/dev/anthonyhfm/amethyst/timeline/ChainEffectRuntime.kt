@@ -6,6 +6,8 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.util.mainDispatcherOrDefault
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionClipContext
 import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.DeviceRegistry
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
@@ -47,6 +49,7 @@ class ChainEffectRuntime(
 
     init {
         source?.collaborationSyncEnabled = false
+        bindCompositionClip()
         configurePrivateChain(processors)
         wirePrivateChain()
         observeRuntimeState()
@@ -55,6 +58,9 @@ class ChainEffectRuntime(
     val isPlayable: Boolean get() = source is TimelineTriggerable && source?.isMuted == false
 
     fun naturalDuration(): TimelineDuration {
+        if (source is CompositionChainDevice) {
+            return TimelineDuration.Finite(milliseconds = entry.durationMs.coerceAtLeast(minimumValue = 1L))
+        }
         val workspaceSize = WorkspaceRepository.bounds.second
         val context = TimelineDurationContext(
             bpm = bpmProvider(),
@@ -104,8 +110,9 @@ class ChainEffectRuntime(
             "The first Chain Effect device must implement TimelineTriggerable"
         }
         stop()
-        source?.onRemovedFromChain()
+        source?.dispose()
         source = device
+        bindCompositionClip()
         source?.collaborationSyncEnabled = false
         wirePrivateChain()
         observeRuntimeState()
@@ -138,9 +145,18 @@ class ChainEffectRuntime(
         notifyChanged()
     }
 
-    fun start() {
+    fun start(positionMs: Long = entry.startTimeMs) {
         stop()
-        (source as? TimelineTriggerable)?.startTimelineTrigger()
+        val composition = source as? CompositionChainDevice
+        if (composition != null) {
+            composition.startTimelineAt(positionMs = positionMs)
+        } else {
+            (source as? TimelineTriggerable)?.startTimelineTrigger()
+        }
+    }
+
+    fun stopCompositionPreview() {
+        (source as? CompositionChainDevice)?.pause()
     }
 
     fun stop() {
@@ -162,6 +178,17 @@ class ChainEffectRuntime(
 
     internal fun updateEntryMetadata(updated: ChainEffectEntry) {
         entry = updated
+        bindCompositionClip()
+    }
+
+    private fun bindCompositionClip() {
+        (source as? CompositionChainDevice)?.bindTimelineClip(
+            context = CompositionClipContext(
+                clipId = entry.clipId,
+                startTimeMs = entry.startTimeMs,
+                durationMs = entry.durationMs,
+            )
+        )
     }
 
     private fun wirePrivateChain() {
