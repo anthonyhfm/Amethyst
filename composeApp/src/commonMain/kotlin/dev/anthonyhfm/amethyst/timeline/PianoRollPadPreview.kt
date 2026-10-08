@@ -48,6 +48,16 @@ internal class PianoRollPadPreview(
         render(key = key, pad = pad)
     }
 
+    fun showSnapshot(key: Pair<Int, Int>, signal: Signal.LED) {
+        press(
+            key = key,
+            signal = signal,
+            gradient = null,
+            durationMs = 1L,
+            repeat = true,
+        )
+    }
+
     private fun render(key: Pair<Int, Int>, pad: HeldPad): Unit = synchronized(lock) {
         if (heldPads[key] !== pad) {
             return@synchronized

@@ -307,7 +307,7 @@ internal fun NoteBox(
             )
             .size(
                 width = with(density) { layout.widthPx.toDp() },
-                height = 22.dp
+                height = metrics.noteHeightDp
             )
             .alpha(if (isOutOfBounds) 0.4f else 1f)
             .let {

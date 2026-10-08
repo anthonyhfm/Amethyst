@@ -3,6 +3,7 @@ package dev.anthonyhfm.amethyst.core.controls.shortcuts
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
@@ -16,6 +17,7 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
+import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
@@ -164,6 +166,9 @@ object ShortcutManager {
         if (WorkspaceRepository.isInputFocused) return false
 
         val isCtrl = keyEvent.isCtrlPressed || keyEvent.isMetaPressed
+        if (keyEvent.key == Key.Tab && keyEvent.isShiftPressed && !isCtrl && !keyEvent.isAltPressed) {
+            return TimelineKeyHandler.togglePianoRollView?.invoke() == true
+        }
 
         // Undo / Redo
         if (isCtrl && keyEvent.key == Key.Z) {

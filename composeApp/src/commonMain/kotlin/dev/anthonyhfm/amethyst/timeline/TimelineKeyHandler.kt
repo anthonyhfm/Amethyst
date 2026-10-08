@@ -27,6 +27,7 @@ object TimelineKeyHandler {
     internal var deleteChainEffectClip: ((Int, String) -> Unit)? = null
     internal var duplicateChainEffectClip: ((Int, String) -> Unit)? = null
     internal var insertMidiClip: (() -> Boolean)? = null
+    internal var togglePianoRollView: (() -> Boolean)? = null
     internal var nudgeTimelineTime: ((Int) -> Boolean)? = null
     /** Multiplies the horizontal zoom by the given factor; wired by the lane view. */
     internal var zoomTimeline: ((Float) -> Boolean)? = null
@@ -92,6 +93,9 @@ object TimelineKeyHandler {
         if (WorkspaceRepository.isInputFocused) return false
 
         return when {
+            keyEvent.key == Key.Tab && keyEvent.isShiftPressed &&
+                !keyEvent.hasPrimaryShortcutModifier() && !keyEvent.isAltPressed ->
+                togglePianoRollView?.invoke() == true
             keyEvent.key == Key.Escape && keyEvent.hasNoShortcutModifier() ->
                 closeChainEffectPanel?.invoke() == true
             keyEvent.key == Key.Spacebar && keyEvent.hasNoShortcutModifier() -> handleTogglePlayPause()

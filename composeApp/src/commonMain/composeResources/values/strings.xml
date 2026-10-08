@@ -1064,4 +1064,6 @@
     <string name="timeline_metronome">Metronome</string>
     <string name="timeline_metronome_enabled">On</string>
     <string name="timeline_metronome_disabled">Off</string>
+    <string name="piano_roll_note_zoom_in">Increase note height</string>
+    <string name="piano_roll_note_zoom_out">Decrease note height</string>
 </resources>

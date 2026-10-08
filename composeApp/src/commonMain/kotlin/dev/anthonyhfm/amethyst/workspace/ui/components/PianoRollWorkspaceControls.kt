@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ChevronsUpDown
+import com.composables.icons.lucide.ChevronsDownUp
 import com.composables.icons.lucide.Magnet
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ListFilter
@@ -135,6 +137,21 @@ fun PianoRollWorkspaceControls(
                 onClick = { mode.zoomToFit() },
                 imageVector = Lucide.Maximize2,
                 contentDescription = stringResource(resource = Res.string.workspace_topappbar_zoom_fit) + " (X)",
+                enabled = mode.canZoom,
+            )
+        }
+
+        WorkspaceToolbarSurface {
+            WorkspaceToolbarIconButton(
+                onClick = { mode.zoomNotesOut() },
+                imageVector = Lucide.ChevronsDownUp,
+                contentDescription = stringResource(resource = Res.string.piano_roll_note_zoom_out),
+                enabled = mode.canZoom,
+            )
+            WorkspaceToolbarIconButton(
+                onClick = { mode.zoomNotesIn() },
+                imageVector = Lucide.ChevronsUpDown,
+                contentDescription = stringResource(resource = Res.string.piano_roll_note_zoom_in),
                 enabled = mode.canZoom,
             )
         }

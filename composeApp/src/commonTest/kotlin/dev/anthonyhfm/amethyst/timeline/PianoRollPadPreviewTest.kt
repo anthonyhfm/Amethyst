@@ -73,6 +73,17 @@ class PianoRollPadPreviewTest {
     }
 
     @Test
+    fun snapshotIsStaticUntilClearedAndRestoresTheUnderlyingLayer() {
+        val harness = PreviewHarness()
+        harness.preview.showSnapshot(key = 0 to 11, signal = signal())
+        harness.advanceTo(timeMs = 1000.0)
+        assertEquals(expected = Color.Green, actual = harness.signals.last().color)
+        assertTrue(actual = harness.pendingFrames.isEmpty())
+        harness.preview.clear()
+        assertEquals(expected = Color.Black, actual = harness.signals.last().color)
+    }
+
+    @Test
     fun heldGradientRepeatsAtItsDuration() {
         val harness = PreviewHarness()
         harness.preview.press(key = 0 to 11, signal = signal(), gradient = gradient, durationMs = 200L)

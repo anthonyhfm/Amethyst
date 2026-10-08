@@ -137,7 +137,7 @@ fun PianoRollEditorCanvas(
     val totalPitches = pitches.size
     val beatDurationMs = millisecondsPerBeat(bpm)
 
-    val noteHeightDp: Dp = 22.dp
+    val noteHeightDp: Dp = 22.dp * viewport.zoomY
     val beatsPerBar = 4
     val clipBeats = entry.durationMs.toFloat() / beatDurationMs.toFloat()
 
@@ -145,7 +145,7 @@ fun PianoRollEditorCanvas(
     val oobOverhangRightMs = (entry.durationMs * 0.25).toLong().coerceAtLeast(2000L)
     val totalBeatsWithOverhang = (entry.durationMs + oobOverhangRightMs).toFloat() / beatDurationMs.toFloat()
 
-    val metrics = remember(pitches, density, gridResolution, viewport.zoomX, oobOverhangMs, beatDurationMs) {
+    val metrics = remember(pitches, density, gridResolution, viewport.zoomX, viewport.zoomY, oobOverhangMs, beatDurationMs) {
         PianoRollMetrics(
             totalPitches = totalPitches,
             noteHeightDp = noteHeightDp,
@@ -162,6 +162,21 @@ fun PianoRollEditorCanvas(
     val latestTotalBeatsWithOverhang by rememberUpdatedState(totalBeatsWithOverhang)
 
     val canvasHeightDp = noteHeightDp * totalPitches
+    var previousNoteHeightPx by remember { mutableStateOf(value = metrics.noteHeightPx) }
+    LaunchedEffect(key1 = metrics.noteHeightPx) {
+        val anchoredScroll = pianoRollVerticalZoomScrollOffset(
+            scrollOffsetPx = pianoRollVerticalScrollState.value.toFloat(),
+            anchorPx = latestViewport.viewportHeight / 2f,
+            oldNoteHeightPx = previousNoteHeightPx,
+            newNoteHeightPx = metrics.noteHeightPx,
+            totalPitches = totalPitches,
+            deviceHeaderHeightPx = headerOffsetPx,
+        )
+        withFrameNanos { }
+        withFrameNanos { }
+        pianoRollVerticalScrollState.scrollTo(value = anchoredScroll.roundToInt())
+        previousNoteHeightPx = metrics.noteHeightPx
+    }
 
     LaunchedEffect(Unit) {
         val initialScrollX = metrics.timeMsToXPx(0L).coerceAtLeast(0f)
@@ -196,7 +211,6 @@ fun PianoRollEditorCanvas(
     var draftNote by remember { mutableStateOf<MidiNote?>(null) }
     var draftAnchorCellStartMs by remember { mutableStateOf<Long?>(null) }
     var viewportWidthPx by remember { mutableStateOf(0) }
-    var lastPointerX by remember { mutableStateOf<Float?>(null) }
     var lastTapUptimeMillis by remember { mutableStateOf<Long?>(null) }
     var lastTapPosition by remember { mutableStateOf<Offset?>(null) }
 
@@ -676,7 +690,21 @@ fun PianoRollEditorCanvas(
                     }
                 }
             } else {
-                Row(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pianoRollScrollControls(
+                            legendWidthPx = with(density) { 100.dp.toPx() },
+                            onPan = { delta ->
+                                if (delta.x != 0f) {
+                                    latestOnViewportChange(latestViewport.panBy(dx = delta.x))
+                                }
+                            },
+                            onZoom = { scaleFactor, anchorPx ->
+                                zoomViewport(scaleFactor = scaleFactor, anchorPx = anchorPx)
+                            },
+                        )
+                ) {
                     Column(
                         modifier = Modifier
                             .width(100.dp)
@@ -717,7 +745,7 @@ fun PianoRollEditorCanvas(
                             .onSizeChanged { size ->
                                 viewportWidthPx = size.width
                                 val totalWidthPx = viewport.zoomX * beatDurationMs.toFloat() * latestTotalBeatsWithOverhang
-                                val updatedViewport = viewport.withConstrainedViewport(
+                                val updatedViewport = viewport.copy(viewportHeight = size.height.toFloat()).withConstrainedViewport(
                                     viewportWidth = size.width.toFloat(),
                                     contentWidth = totalWidthPx
                                 )
@@ -730,49 +758,6 @@ fun PianoRollEditorCanvas(
                                     scaleFactor = scaleFactor,
                                     anchorPx = position.x,
                                 )
-                            }
-                            .pointerInput(Unit) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                                        ModifierKeysState.updateFromPointerModifiers(modifiers = event.keyboardModifiers)
-                                        val change = event.changes.firstOrNull() ?: continue
-                                        if (event.type == PointerEventType.Exit) {
-                                            lastPointerX = null
-                                        } else if (event.type != PointerEventType.Scroll) {
-                                            lastPointerX = change.position.x
-                                        }
-                                        if (event.type != PointerEventType.Scroll) {
-                                            continue
-                                        }
-                                        val delta = change.scrollDelta
-                                        val zoomModifier = event.keyboardModifiers.isCtrlPressed ||
-                                            event.keyboardModifiers.isMetaPressed
-                                        if (zoomModifier && delta.y != 0f) {
-                                            val anchorPx = resolveViewportRelativeCursorX(
-                                                trackedPointerX = lastPointerX,
-                                                eventPointerX = change.position.x,
-                                            )
-                                            zoomViewport(
-                                                scaleFactor = wheelZoomScaleFactor(scrollDelta = -delta.y),
-                                                anchorPx = anchorPx,
-                                            )
-                                            event.changes.forEach { it.consume() }
-                                        } else {
-                                            val horizontalDelta = if (event.keyboardModifiers.isShiftPressed) {
-                                                if (delta.x != 0f) delta.x else delta.y
-                                            } else {
-                                                delta.x
-                                            }
-                                            if (horizontalDelta != 0f) {
-                                                latestOnViewportChange(
-                                                    latestViewport.panBy(dx = horizontalDelta * 40f)
-                                                )
-                                                event.changes.forEach { it.consume() }
-                                            }
-                                        }
-                                    }
-                                }
                             }
                             .pointerInput(activeTool, trackIndex, entryStartMs) {
                                 awaitEachGesture {

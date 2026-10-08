@@ -1056,4 +1056,6 @@
     <string name="timeline_metronome">Metronom</string>
     <string name="timeline_metronome_enabled">An</string>
     <string name="timeline_metronome_disabled">Aus</string>
+    <string name="piano_roll_note_zoom_in">Notenhöhe vergrößern</string>
+    <string name="piano_roll_note_zoom_out">Notenhöhe verkleinern</string>
 </resources>

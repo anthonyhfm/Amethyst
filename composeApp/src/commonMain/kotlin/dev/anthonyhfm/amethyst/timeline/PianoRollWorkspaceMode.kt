@@ -101,12 +101,15 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
     private var zoomOutHandler: (() -> Unit)? = null
     private var zoomFitHandler: (() -> Unit)? = null
     private var zoomSelectionHandler: (() -> Unit)? = null
+    private var zoomNotesHandler: ((Float) -> Unit)? = null
     private val padPreview = PianoRollPadPreview()
     private val notePreview = PianoRollPadPreview(layer = Int.MAX_VALUE - 1)
+    private val framePreview = PianoRollPadPreview(layer = Int.MAX_VALUE - 2)
 
     override fun onDeactivate() {
         padPreview.clear()
         notePreview.clear()
+        framePreview.clear()
         pressedKeysState.value = emptyMap()
         modeClose?.invoke()
     }
@@ -188,6 +191,14 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
 
     fun zoomOut() {
         zoomOutHandler?.invoke()
+    }
+
+    fun zoomNotesIn() {
+        zoomNotesHandler?.invoke(1.25f)
+    }
+
+    fun zoomNotesOut() {
+        zoomNotesHandler?.invoke(0.8f)
     }
 
     fun zoomToFit() {
@@ -610,6 +621,19 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
 
         SideEffect {
             this@PianoRollWorkspaceMode.isPlaying = isPlaying
+            if (isPlaying) {
+                framePreview.clear()
+            }
+            zoomNotesHandler = { scaleDelta ->
+                applyViewportChange(
+                    viewport.copy(
+                        zoomY = (viewport.zoomY * scaleDelta).coerceIn(
+                            minimumValue = viewport.minZoomY,
+                            maximumValue = viewport.maxZoomY,
+                        )
+                    )
+                )
+            }
             zoomInHandler = {
                 applyViewportChange(
                     zoomPianoRollViewport(
@@ -676,6 +700,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
                 zoomOutHandler = null
                 zoomFitHandler = null
                 zoomSelectionHandler = null
+                zoomNotesHandler = null
             }
         }
 
@@ -1405,10 +1430,16 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (WorkspaceRepository.isInputFocused) return false
+        if (WorkspaceRepository.isInputFocused) {
+            return false
+        }
 
         if (event.type == KeyEventType.KeyDown) {
             val isMetaOrCtrl = event.isMetaPressed || event.isCtrlPressed
+            if (event.key == Key.Tab && event.isShiftPressed && !isMetaOrCtrl && !event.isAltPressed) {
+                requestClose()
+                return true
+            }
 
             if (isMetaOrCtrl) {
                 when (event.key) {
@@ -1529,6 +1560,7 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         if (isPlaying) {
             return
         }
+        framePreview.clear()
         previewPad(
             deviceIndex = note.resolvedDeviceIndex,
             padIndex = note.resolvedPadIndex,
@@ -1564,6 +1596,29 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         )
     }
 
+    private fun previewFrame(timeMs: Long) {
+        framePreview.clear()
+        notePreview.clear()
+        if (isPlaying) {
+            return
+        }
+        val entry = currentEntry ?: return
+        pianoRollFrameColors(notes = entry.notes, timeMs = timeMs, clipDurationMs = entry.durationMs)
+            .forEach { (key, color) ->
+                val device = Heaven.devices.getOrNull(index = key.first) ?: return@forEach
+                val position = device.globalPadForMidiIndex(index = key.second) ?: return@forEach
+                framePreview.showSnapshot(
+                    key = key,
+                    signal = Signal.LED(
+                        origin = this,
+                        x = position.first,
+                        y = position.second,
+                        color = color,
+                    ),
+                )
+            }
+    }
+
     private fun requestClose() {
         WorkspaceRepository.switchToPreviousMode()
     }
@@ -1593,6 +1648,9 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         )
             .coerceIn(0L, entry.durationMs)
         selectedTimeMs = nextMs
+        if (!createHeldNotes) {
+            previewFrame(timeMs = nextMs)
+        }
         if (createHeldNotes && nextMs != currentMs) {
             stepHeldPadNotes(currentMs = currentMs, nextMs = nextMs)
         }
