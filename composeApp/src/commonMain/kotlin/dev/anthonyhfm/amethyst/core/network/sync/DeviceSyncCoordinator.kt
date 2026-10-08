@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.network.sync
 
+import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectContract.ConnectEvent
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
 object DeviceSyncCoordinator {
@@ -17,6 +18,13 @@ object DeviceSyncCoordinator {
 
     fun onDevicePlaced(element: LaunchpadViewportElement) {
         broadcaster?.onDevicePlaced(element)
+    }
+
+    fun onDeviceModelChanged(
+        element: LaunchpadViewportElement,
+        pending: List<ConnectEvent.DeviceStateChanged>,
+    ) {
+        broadcaster?.onDeviceModelChanged(element = element, pending = pending)
     }
 
     fun onDeviceRemoved(deviceId: String) {

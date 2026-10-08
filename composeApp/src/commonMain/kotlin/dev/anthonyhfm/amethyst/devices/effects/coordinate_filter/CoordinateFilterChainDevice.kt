@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,9 +41,11 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
+import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.containsLocalPad
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +99,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
 
         stateObserverScope.launch {
             state
-                .map { it.filters to it.padFilters }
+                .map { Triple(it.filters, it.padFilters, it.globalFilters) }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
@@ -148,7 +151,8 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
 
     @Composable
     private fun VirtualDeviceContainer() {
-        val original = Heaven.devices.firstOrNull() ?: return
+        val viewportDevices by ViewportRepository.devices.collectAsState()
+        val original = viewportDevices.firstOrNull() ?: return
         val currentState by state.collectAsState()
 
         val newInstance = remember(original) {
@@ -165,28 +169,16 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
             }
         }
 
-        fun buildPreviewUpdates(): List<RawLEDUpdate> {
-            return if (currentState.padFilters.isNotEmpty()) {
-                currentState.padFilters
-                    .filter { it.launchpadId == original.launchpadId }
-                    .map {
-                        val posX = it.localX + original.layout.offsetX
-                        val posY = (original.layout.rows - 1 - it.localY) + original.layout.offsetY
-                        RawLEDUpdate(
-                            index = posX + posY * 10,
-                            color = Color.Green
-                        )
-                    }
-            } else {
-                // Legacy fallback: global coordinate pairs (from old saves / Ableton imports).
-                currentState.filters.map { (gx, gy) ->
-                    RawLEDUpdate(
-                        index = gx + (9 - gy) * 10,
-                        color = Color.Green
-                    )
-                }
+        fun buildPreviewUpdates(): List<RawLEDUpdate> =
+            resolvedFilters(devices = listOf(original)).map { (x, y) ->
+                val localX = x - original.position.value.x.toInt()
+                val localY = y - original.position.value.y.toInt()
+                RawLEDUpdate(
+                    index = localX + original.layout.offsetX +
+                        (original.layout.rows - 1 - localY + original.layout.offsetY) * 10,
+                    color = Color.Green,
+                )
             }
-        }
 
         newInstance.onCapturePad = { (down, localX, localY) ->
             if (down) {
@@ -194,7 +186,11 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
             }
         }
 
-        LaunchedEffect(currentState.padFilters, currentState.filters) {
+        DisposableEffect(newInstance) {
+            onDispose { newInstance.close() }
+        }
+
+        LaunchedEffect(newInstance, currentState.padFilters, currentState.filters, currentState.globalFilters) {
             newInstance.previewState.clear()
             newInstance.previewState.sendToPreview(buildPreviewUpdates())
         }
@@ -215,7 +211,7 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     private fun beginVirtualDrag(device: LaunchpadViewportElement, localX: Int, localY: Int) {
         isDragging.value = true
         dragVisitedPads.clear()
-        dragRemoveMode = state.value.padFilters.contains(LaunchpadPadFilter(device.launchpadId, localX, localY))
+        dragRemoveMode = isFiltered(device = device, localX = localX, localY = localY)
 
         applyDragAt(device, localX, localY)
     }
@@ -241,56 +237,58 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
         setFilterState(device, localX, localY, enabled = !dragRemoveMode)
     }
 
+    private fun isFiltered(device: LaunchpadViewportElement, localX: Int, localY: Int): Boolean {
+        val snapshot = state.value
+        val global = localX + device.position.value.x.toInt() to localY + device.position.value.y.toInt()
+        return snapshot.padFilters.contains(
+            LaunchpadPadFilter(launchpadId = device.launchpadId, localX = localX, localY = localY),
+        ) || global in snapshot.globalFilters || (snapshot.padFilters.isEmpty() && global in snapshot.filters)
+    }
+
     private fun setFilterState(device: LaunchpadViewportElement, localX: Int, localY: Int, enabled: Boolean) {
         val padFilter = LaunchpadPadFilter(device.launchpadId, localX, localY)
-        val isAlreadyFiltered = state.value.padFilters.contains(padFilter)
+        val isAlreadyFiltered = isFiltered(device = device, localX = localX, localY = localY)
 
         if (enabled == isAlreadyFiltered) return
 
         val stateBefore = state.value
 
         state.update { currentState ->
-            if (enabled) {
-                currentState.copy(padFilters = currentState.padFilters + padFilter)
-            } else {
-                currentState.copy(padFilters = currentState.padFilters.filter { it != padFilter })
-            }
+            val global = localX + device.position.value.x.toInt() to localY + device.position.value.y.toInt()
+            val activeGlobals = currentState.globalFilters +
+                if (currentState.padFilters.isEmpty()) currentState.filters else emptyList()
+            currentState.copy(
+                filters = if (currentState.padFilters.isEmpty()) emptyList() else currentState.filters,
+                globalFilters = activeGlobals.filterNot { it == global },
+                padFilters = if (enabled) {
+                    currentState.padFilters + padFilter
+                } else {
+                    currentState.padFilters.filterNot { it == padFilter }
+                },
+            )
         }
 
         pushStateChange(stateBefore, state.value)
     }
 
-    fun refreshVirtualDevices() {
-        val signals = if (state.value.padFilters.isNotEmpty()) {
-            val resolved = state.value.padFilters.mapNotNull { filter ->
-                val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
-                    ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
+    internal fun resolvedFilters(devices: List<LaunchpadViewportElement> = Heaven.devices): Set<Pair<Int, Int>> =
+        state.value.globalFilters.toSet() +
+            (if (state.value.padFilters.isEmpty()) state.value.filters.toSet() else emptySet()) +
+            state.value.padFilters.mapNotNull { filter ->
+                val device = devices.firstOrNull { it.launchpadId == filter.launchpadId }
+                    ?: devices.singleOrNull()
                     ?: return@mapNotNull null
-                Signal.LED(
-                    origin = this,
-                    x = filter.localX + device.position.value.x.toInt(),
-                    y = filter.localY + device.position.value.y.toInt(),
-                    color = Color.Green,
-                    layer = 0
-                )
-            }
-            if (resolved.isNotEmpty()) {
-                resolved
-            } else if (state.value.filters.isNotEmpty()) {
-                state.value.filters.map {
-                    Signal.LED(origin = this, x = it.first, y = it.second, color = Color.Green, layer = 0)
+                if (!device.containsLocalPad(x = filter.localX, y = filter.localY)) {
+                    return@mapNotNull null
                 }
-            } else {
-                state.value.padFilters.map {
-                    Signal.LED(origin = this, x = it.localX, y = it.localY, color = Color.Green, layer = 0)
-                }
+                filter.localX + device.position.value.x.toInt() to
+                    filter.localY + device.position.value.y.toInt()
             }
-        } else {
-            state.value.filters.map {
-                Signal.LED(origin = this, x = it.first, y = it.second, color = Color.Green, layer = 0)
-            }
-        }
 
+    fun refreshVirtualDevices() {
+        val signals = resolvedFilters().map { (x, y) ->
+            Signal.LED(origin = this, x = x, y = y, color = Color.Green, layer = 0)
+        }
         Heaven.clear {
             if (WorkspaceRepository.mode.value === customMode) {
                 Heaven.midiEnter(signals)
@@ -299,30 +297,12 @@ class CoordinateFilterChainDevice : GenericChainDevice<CoordinateFilterChainDevi
     }
 
     fun onSetKeyFilter(device: LaunchpadViewportElement, localX: Int, localY: Int) {
-        val padFilter = LaunchpadPadFilter(device.launchpadId, localX, localY)
-        val isAlreadyFiltered = state.value.padFilters.contains(padFilter)
+        val isAlreadyFiltered = isFiltered(device = device, localX = localX, localY = localY)
         setFilterState(device, localX, localY, enabled = !isAlreadyFiltered)
     }
 
     override fun signalEnter(n: List<Signal>) {
-        val resolvedPadFilters = state.value.padFilters.mapNotNull { filter ->
-            val device = Heaven.devices.firstOrNull { it.launchpadId == filter.launchpadId }
-                ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
-                ?: return@mapNotNull null
-            Pair(
-                filter.localX + device.position.value.x.toInt(),
-                filter.localY + device.position.value.y.toInt()
-            )
-        }.toSet()
-
-        val globalFilters: Set<Pair<Int, Int>> = if (resolvedPadFilters.isNotEmpty()) {
-            resolvedPadFilters
-        } else if (state.value.filters.isNotEmpty()) {
-            // Legacy fallback: global coordinate pairs (from old saves / Ableton imports)
-            state.value.filters.toSet()
-        } else {
-            state.value.padFilters.map { Pair(it.localX, it.localY) }.toSet()
-        }
+        val globalFilters = resolvedFilters()
 
         val filteredSignals = n.filter { signal ->
             when (signal) {
@@ -356,5 +336,6 @@ data class LaunchpadPadFilter(
 data class CoordinateFilterChainDeviceState(
     /** Legacy field – kept for backward-compatible deserialization only. Not written on save. */
     val filters: List<Pair<Int, Int>> = emptyList(),
-    val padFilters: List<LaunchpadPadFilter> = emptyList()
+    val padFilters: List<LaunchpadPadFilter> = emptyList(),
+    val globalFilters: List<Pair<Int, Int>> = emptyList()
 ) : DeviceState()

@@ -66,6 +66,8 @@ sealed interface KeyframesChainDeviceContract {
         @Transient
         val renderedAnimation: List<Pair<Int, List<Signal>>> = emptyList(),
         val rootKeyLaunchpadId: String? = null,
+        val rootKeyLocalX: Int? = null,
+        val rootKeyLocalY: Int? = null,
     ) : DeviceState()
 
     @Serializable
@@ -93,5 +95,6 @@ sealed interface KeyframesChainDeviceContract {
     ) {
         /** True when this entry carries device-local coordinate data. */
         val isDeviceAnchored: Boolean get() = launchpadId != null && localX != null && localY != null
+        val isAbletonVirtualNote: Boolean get() = abletonPitch != null && localX == -1 - abletonPitch && localY == -1
     }
 }

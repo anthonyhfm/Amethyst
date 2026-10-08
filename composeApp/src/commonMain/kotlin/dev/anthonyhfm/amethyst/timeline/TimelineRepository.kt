@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.timeline
 
+import dev.anthonyhfm.amethyst.workspace.LaunchpadBindingRemapper
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.core.util.mainDispatcherOrDefault
 import dev.anthonyhfm.amethyst.core.util.UUID
@@ -124,6 +127,7 @@ object TimelineRepository {
     private val activeEntries = mutableSetOf<TrackAudioEntry>()
     private val activeMidiEntries = mutableSetOf<TrackMidiEntry>()
     private val activeChainEffectIds = mutableSetOf<String>()
+    private val chainEffectStateLock = SynchronizedObject()
     private val chainEffectRuntimes = mutableMapOf<String, ChainEffectRuntime>()
 
     // Basis für Zeitberechnung (wird nur bei Play & Seek aktualisiert)
@@ -299,19 +303,47 @@ object TimelineRepository {
         }
     }
 
-    fun updateTracksSnapshot(updatedTracks: List<TimelineTrack<*>>) {
-        normalizeTrackIdentityAndRouting(updatedTracks)
-        updatedTracks.forEach { track ->
-            track.normalizeAutomationState()
+    internal fun remapLaunchpadBindings(remapper: LaunchpadBindingRemapper) =
+        synchronized(chainEffectStateLock) {
+            val updatedTracks = tracks.value.map { track ->
+                if (track is MidiTimelineTrack) {
+                    track.copyWithEntries().apply {
+                        val remappedEntries = chainEffectEntries.mapValues { (_, entry) ->
+                            val runtime = chainEffectRuntimes[entry.clipId]
+                            if (runtime != null) {
+                                runtime.remapLaunchpadBindings(remapper = remapper)
+                            } else {
+                                entry.copy(
+                                    source = entry.source?.let { remapper.remap(state = it) },
+                                    processors = remapper.remap(chain = entry.processors),
+                                )
+                            }
+                        }
+                        chainEffectEntries.clear()
+                        chainEffectEntries.putAll(from = remappedEntries)
+                    }
+                } else {
+                    track
+                }
+            }
+            updateTracksSnapshot(updatedTracks = updatedTracks)
         }
-        recordPersistedTracks(updatedTracks)
-        _tracks.value = updatedTracks
-        rebuildSortedEntries()
-        if (_isPlaying.value) {
-            syncActiveEntriesWithCurrentTracks()
-            refreshPlaybackAt()
-        } else {
-            syncEntriesAtPosition(_playheadPositionMs.value)
+
+    fun updateTracksSnapshot(updatedTracks: List<TimelineTrack<*>>) {
+        synchronized(chainEffectStateLock) {
+            normalizeTrackIdentityAndRouting(updatedTracks)
+            updatedTracks.forEach { track ->
+                track.normalizeAutomationState()
+            }
+            recordPersistedTracks(updatedTracks)
+            _tracks.value = updatedTracks
+            rebuildSortedEntries()
+            if (_isPlaying.value) {
+                syncActiveEntriesWithCurrentTracks()
+                refreshPlaybackAt()
+            } else {
+                syncEntriesAtPosition(_playheadPositionMs.value)
+            }
         }
     }
 
@@ -468,78 +500,87 @@ object TimelineRepository {
     }
 
     private fun reconcileChainEffectRuntimes() {
-        val persistedById = sortedChainEffectEntries.associateBy { it.entry.clipId }
-        val removedIds = chainEffectRuntimes.keys - persistedById.keys
-        removedIds.forEach { clipId ->
-            chainEffectRuntimes.remove(clipId)?.dispose()
-            activeChainEffectIds.remove(clipId)
-        }
-
-        persistedById.forEach { (clipId, tracked) ->
-            val existing = chainEffectRuntimes[clipId]
-            val persisted = tracked.entry
-            val topologyChanged = existing != null && (
-                existing.entry.source != persisted.source ||
-                    existing.entry.processors != persisted.processors
-                )
-            val startChanged = existing?.entry?.startTimeMs != persisted.startTimeMs
-            if (existing == null || topologyChanged) {
-                existing?.dispose()
+        synchronized(chainEffectStateLock) {
+            val persistedById = sortedChainEffectEntries.associateBy { it.entry.clipId }
+            val removedIds = chainEffectRuntimes.keys - persistedById.keys
+            removedIds.forEach { clipId ->
+                chainEffectRuntimes.remove(clipId)?.dispose()
                 activeChainEffectIds.remove(clipId)
-                chainEffectRuntimes[clipId] = ChainEffectRuntime(
-                    entry = persisted,
-                    bpmProvider = { WorkspaceRepository.bpm.value },
-                    onStateOrDurationChanged = ::onChainEffectRuntimeChanged,
-                )
-            } else {
-                if (startChanged && activeChainEffectIds.remove(clipId)) {
-                    existing.stop()
+            }
+
+            persistedById.forEach { (clipId, tracked) ->
+                val existing = chainEffectRuntimes[clipId]
+                val persisted = tracked.entry
+                val topologyChanged = existing != null && (
+                    existing.entry.source != persisted.source ||
+                        existing.entry.processors != persisted.processors
+                    )
+                val startChanged = existing?.entry?.startTimeMs != persisted.startTimeMs
+                if (existing == null || topologyChanged) {
+                    chainEffectRuntimes.remove(key = clipId)?.dispose()
+                    activeChainEffectIds.remove(clipId)
+                    chainEffectRuntimes[clipId] = ChainEffectRuntime(
+                        entry = persisted,
+                        bpmProvider = { WorkspaceRepository.bpm.value },
+                        onStateOrDurationChanged = ::onChainEffectRuntimeChanged,
+                    )
+                } else {
+                    if (startChanged && activeChainEffectIds.remove(clipId)) {
+                        existing.stop()
+                    }
+                    existing.updateEntryMetadata(persisted)
                 }
-                existing.updateEntryMetadata(persisted)
             }
         }
     }
 
     private fun onChainEffectRuntimeChanged(runtime: ChainEffectRuntime) {
-        val tracked = sortedChainEffectEntries.firstOrNull { it.entry.clipId == runtime.entry.clipId } ?: return
-        val track = tracked.track
-        val current = track.chainEffectEntries.values.firstOrNull { it.clipId == runtime.entry.clipId } ?: return
-        val nextStart = track.allOneDimensionalEntries()
-            .asSequence()
-            .filterNot { it is ChainEffectEntry && it.clipId == current.clipId }
-            .map { it.startTimeMs }
-            .filter { it > current.startTimeMs }
-            .minOrNull()
-        val resolved = resolveChainEffectLength(
-            naturalDuration = runtime.naturalDuration(),
-            existingCapMs = current.maxDurationMs,
-            nextClipStartMs = nextStart,
-            clipStartMs = current.startTimeMs,
-            bpm = WorkspaceRepository.bpm.value,
-            hasSource = runtime.isPlayable,
-        )
-        val updated = runtime.snapshot(
-            durationMs = resolved.durationMs,
-            maxDurationMs = resolved.maxDurationMs,
-        )
-        if (updated == current) return
+        synchronized(chainEffectStateLock) {
+            if (chainEffectRuntimes[runtime.entry.clipId] !== runtime) {
+                return@synchronized
+            }
+            val tracked = sortedChainEffectEntries.firstOrNull { it.entry.clipId == runtime.entry.clipId } ?: return@synchronized
+            val track = tracked.track
+            val current = track.chainEffectEntries.values.firstOrNull { it.clipId == runtime.entry.clipId } ?: return@synchronized
+            val nextStart = track.allOneDimensionalEntries()
+                .asSequence()
+                .filterNot { it is ChainEffectEntry && it.clipId == current.clipId }
+                .map { it.startTimeMs }
+                .filter { it > current.startTimeMs }
+                .minOrNull()
+            val resolved = resolveChainEffectLength(
+                naturalDuration = runtime.naturalDuration(),
+                existingCapMs = current.maxDurationMs,
+                nextClipStartMs = nextStart,
+                clipStartMs = current.startTimeMs,
+                bpm = WorkspaceRepository.bpm.value,
+                hasSource = runtime.isPlayable,
+            )
+            val updated = runtime.snapshot(
+                durationMs = resolved.durationMs,
+                maxDurationMs = resolved.maxDurationMs,
+            )
+            if (updated == current) {
+                return@synchronized
+            }
 
-        val updatedTrack = track.copyWithEntries().apply {
-            chainEffectEntries.remove(current.startTimeMs)
-            chainEffectEntries[updated.startTimeMs] = updated
-        }
-        val updatedTracks = tracks.value.toMutableList().apply { this[tracked.trackIndex] = updatedTrack }
-        recordPersistedTracks(updatedTracks)
-        _tracks.value = updatedTracks
-        runtime.updateEntryMetadata(updated)
-        rebuildSortedEntries()
+            val updatedTrack = track.copyWithEntries().apply {
+                chainEffectEntries.remove(current.startTimeMs)
+                chainEffectEntries[updated.startTimeMs] = updated
+            }
+            val updatedTracks = tracks.value.toMutableList().apply { this[tracked.trackIndex] = updatedTrack }
+            recordPersistedTracks(updatedTracks)
+            _tracks.value = updatedTracks
+            runtime.updateEntryMetadata(updated)
+            rebuildSortedEntries()
 
-        if (activeChainEffectIds.remove(updated.clipId)) {
-            runtime.stop()
-            val currentTracked = sortedChainEffectEntries.firstOrNull { it.entry.clipId == updated.clipId }
-            if (_isPlaying.value && currentTracked?.shouldPlayAt(_playheadPositionMs.value, hasSoloedTracks()) == true) {
-                runtime.start()
-                activeChainEffectIds.add(updated.clipId)
+            if (activeChainEffectIds.remove(updated.clipId)) {
+                runtime.stop()
+                val currentTracked = sortedChainEffectEntries.firstOrNull { it.entry.clipId == updated.clipId }
+                if (_isPlaying.value && currentTracked?.shouldPlayAt(_playheadPositionMs.value, hasSoloedTracks()) == true) {
+                    runtime.start()
+                    activeChainEffectIds.add(updated.clipId)
+                }
             }
         }
     }
@@ -938,21 +979,25 @@ object TimelineRepository {
 
     /** Synchronously packs private runtime state before workspace serialization. */
     fun flushChainEffectRuntimeState() {
-        val updatedTracks = tracks.value.map { track ->
-            if (track !is MidiTimelineTrack) return@map track
-            track.copyWithEntries(
-                chainEffectsToCopy = track.chainEffectEntries.mapValues { (_, entry) ->
-                    chainEffectRuntimes[entry.clipId]?.snapshot(
-                        durationMs = entry.durationMs,
-                        maxDurationMs = entry.maxDurationMs,
-                        startTimeMs = entry.startTimeMs,
-                    ) ?: entry
+        synchronized(chainEffectStateLock) {
+            val updatedTracks = tracks.value.map { track ->
+                if (track !is MidiTimelineTrack) {
+                    return@map track
                 }
-            )
+                track.copyWithEntries(
+                    chainEffectsToCopy = track.chainEffectEntries.mapValues { (_, entry) ->
+                        chainEffectRuntimes[entry.clipId]?.snapshot(
+                            durationMs = entry.durationMs,
+                            maxDurationMs = entry.maxDurationMs,
+                            startTimeMs = entry.startTimeMs,
+                        ) ?: entry
+                    }
+                )
+            }
+            recordPersistedTracks(updatedTracks)
+            _tracks.value = updatedTracks
+            rebuildSortedEntries()
         }
-        recordPersistedTracks(updatedTracks)
-        _tracks.value = updatedTracks
-        rebuildSortedEntries()
     }
 
     private fun updatePlayingEntries() { /* Legacy Vollscan behalten für Fallback oder Debug; jetzt ersetzt durch processPlaybackIncremental */ }

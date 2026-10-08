@@ -67,14 +67,23 @@ fun launchpadPreviewViewController(index: Int, darkMode: Boolean) = ComposeUIVie
     }
 }
 
+fun isReplacingLaunchpadFromIosPicker(): Boolean = WorkspaceRepository.devicePickerReplacementId.value != null
+
+fun dismissLaunchpadFromIosPicker() {
+    WorkspaceRepository.closeDevicePicker()
+}
+
 fun addVirtualLaunchpadFromIosPicker(index: Int) {
     if (index !in 0..6) {
         return
     }
 
+    val replacementId = WorkspaceRepository.devicePickerReplacementId.value
     CoroutineScope(context = Dispatchers.Main).launch {
-        WorkspaceRepository.addVirtualDevice(
-            element = launchpadForPicker(index = index, interactive = true)
+        WorkspaceRepository.completeDevicePicker(
+            element = launchpadForPicker(index = index, interactive = true),
+            replacementId = replacementId,
         )
+        WorkspaceRepository.closeDevicePicker()
     }
 }

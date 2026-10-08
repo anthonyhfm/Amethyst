@@ -212,7 +212,8 @@ object AmethystConnectContract {
         @Serializable
         enum class DeviceProperty {
             ROTATION,
-            STYLE
+            STYLE,
+            MODEL
         }
 
         @Serializable

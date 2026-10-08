@@ -40,7 +40,6 @@ import dev.anthonyhfm.amethyst.devices.TimelineDuration
 import dev.anthonyhfm.amethyst.devices.TimelineDurationContext
 import dev.anthonyhfm.amethyst.devices.TimelineTriggerable
 
-private const val MAX_PITCH_PER_DEVICE = 100
 private const val DEFAULT_DURATION_MS = 4000L
 private const val NO_TRACK_INDEX = -1
 
@@ -70,19 +69,7 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
         Heaven.cancelJobsForOwner(this)
         isStandalonePlaying = false
         standaloneNotes.forEach { note ->
-            val (x, y) = pitchToXY(note.pitch)
-            signalExit?.invoke(
-                listOf(
-                    Signal.LED(
-                        origin = this,
-                        x = x,
-                        y = y,
-                        color = Color.Black,
-                        layer = note.led.layer,
-                        blendingMode = note.led.blendingMode,
-                    )
-                )
-            )
+            emitNote(note = note, color = Color.Black)
         }
         standaloneNotes = emptyList()
     }
@@ -160,7 +147,6 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
         standaloneNotes = entry.notes.filter { it.endTimeMs > startOffsetMs }
 
         standaloneNotes.forEach { note ->
-            val (x, y) = pitchToXY(note.pitch)
             if (note.isGradient) {
                 val gradient = note.led.gradient!!
                 val frameIntervalMs = 1000.0 / Heaven.fps
@@ -170,38 +156,20 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
                     val capturedFraction = fraction
                     Heaven.schedule(delayInMs = t - startOffsetMs, owner = this) {
                         val (r, g, b) = GradientInterpolator.interpolate(gradient, capturedFraction)
-                        signalExit?.invoke(listOf(Signal.LED(
-                            origin = this,
-                            x = x,
-                            y = y,
-                            color = Color(r, g, b),
-                            layer = note.led.layer,
-                            blendingMode = note.led.blendingMode
-                        )))
+                        emitNote(note = note, color = Color(r, g, b))
                     }
                     t += frameIntervalMs
                 }
             } else {
                 Heaven.schedule(delayInMs = (note.startTimeMs - startOffsetMs).coerceAtLeast(0L).toDouble(), owner = this) {
-                    signalExit?.invoke(listOf(Signal.LED(
-                        origin = this,
-                        x = x,
-                        y = y,
+                    emitNote(
+                        note = note,
                         color = Color(note.led.red, note.led.green, note.led.blue),
-                        layer = note.led.layer,
-                        blendingMode = note.led.blendingMode
-                    )))
+                    )
                 }
             }
             Heaven.schedule(delayInMs = (note.endTimeMs - startOffsetMs).toDouble(), owner = this) {
-                signalExit?.invoke(listOf(Signal.LED(
-                    origin = this,
-                    x = x,
-                    y = y,
-                    color = Color.Black,
-                    layer = note.led.layer,
-                    blendingMode = note.led.blendingMode
-                )))
+                emitNote(note = note, color = Color.Black)
             }
         }
 
@@ -265,15 +233,20 @@ class PianoRollChainDevice : LEDChainDevice<PianoRollChainDeviceState>(), Timeli
         }
     }
 
-    /**
-     * Converts a MIDI pitch value to X,Y coordinates on a launchpad grid.
-     * Note: This logic is shared with MidiEntry.pitchToXY() in TimelineEntry.kt
-     */
-    private fun pitchToXY(pitch: Int): Pair<Int, Int> {
-        val localPitch = pitch % MAX_PITCH_PER_DEVICE
-        val x = localPitch % 10
-        val y = 9 - (localPitch / 10)
-        return Pair(x, y)
+    private fun emitNote(note: MidiNote, color: Color) {
+        val (x, y) = state.value.midiEntry.pitchToXY(note = note) ?: return
+        signalExit?.invoke(
+            listOf(
+                Signal.LED(
+                    origin = this,
+                    x = x,
+                    y = y,
+                    color = color,
+                    layer = note.led.layer,
+                    blendingMode = note.led.blendingMode,
+                ),
+            ),
+        )
     }
 
     companion object : ChainDeviceFactory<PianoRollChainDeviceState> {

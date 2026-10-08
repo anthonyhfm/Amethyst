@@ -36,10 +36,11 @@ actual fun LaunchpadViewportElementActions(
 ) {
     val styleDialogState = rememberDialogState()
     val buttonCount = remember(element.hasStyleOptions) {
-        3 + if (element.hasStyleOptions) 1 else 0
+        4 + if (element.hasStyleOptions) 1 else 0
     }
     val width = buttonCount * ActionButtonSize
 
+    val swapLabel = stringResource(resource = Res.string.workspace_viewport_launchpad_actions_swap)
     val connectionLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_connection_ios)
     val styleTitleLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_style_dialog_title_ios)
     val rotateLabel = stringResource(Res.string.workspace_viewport_launchpad_actions_rotate_ios)
@@ -75,6 +76,7 @@ actual fun LaunchpadViewportElementActions(
             actionView.rebuildLaunchpadActions(
                 element = element,
                 connectionLabel = connectionLabel,
+                swapLabel = swapLabel,
                 styleTitleLabel = styleTitleLabel,
                 rotateLabel = rotateLabel,
                 deleteLabel = deleteLabel,
@@ -108,6 +110,7 @@ actual fun LaunchpadViewportElementActions(
 private fun UIVisualEffectView.rebuildLaunchpadActions(
     element: LaunchpadViewportElement,
     connectionLabel: String,
+    swapLabel: String,
     styleTitleLabel: String,
     rotateLabel: String,
     deleteLabel: String,
@@ -123,6 +126,18 @@ private fun UIVisualEffectView.rebuildLaunchpadActions(
     }
 
     val buttons = buildList {
+        add(
+            actionButton(
+                systemImageName = "arrow.left.arrow.right",
+                accessibilityLabel = swapLabel,
+                tintColor = UIColor.labelColor,
+                onClick = {
+                    WorkspaceRepository.openDevicePicker(replacingDeviceId = element.launchpadId)
+                    IosWorkspaceBridge.onShowDevicePicker?.invoke()
+                },
+            ),
+        )
+
         add(
             actionButton(
                 systemImageName = "cable.connector",

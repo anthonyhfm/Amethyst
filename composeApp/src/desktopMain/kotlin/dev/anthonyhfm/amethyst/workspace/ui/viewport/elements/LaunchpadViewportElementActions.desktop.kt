@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ArrowLeftRight
 import com.composables.icons.lucide.Cable
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
@@ -75,6 +76,13 @@ actual fun LaunchpadViewportElementActions(
             onClick = { WorkspaceRepository.openDeviceConfigurator(element.selectionUUID) },
             icon = Lucide.Cable,
             contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_connection),
+            backgroundHoverColor = actionButtonBgHover,
+        )
+
+        LaunchpadActionButton(
+            onClick = { WorkspaceRepository.openDevicePicker(replacingDeviceId = element.launchpadId) },
+            icon = Lucide.ArrowLeftRight,
+            contentDescription = stringResource(resource = Res.string.workspace_viewport_launchpad_actions_swap),
             backgroundHoverColor = actionButtonBgHover,
         )
 

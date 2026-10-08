@@ -67,6 +67,7 @@ import kotlin.math.pow
 import kotlin.math.roundToLong
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.containsLocalPad
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
 import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.snapshotFlow
@@ -98,9 +99,14 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
             null
         }
 
+        val localX = snapshot.rootKeyLocalX ?: root % 10
+        val localY = snapshot.rootKeyLocalY ?: root / 10
+        if (launchpadId != null && (device == null || !device.containsLocalPad(x = localX, y = localY))) {
+            return null
+        }
         return Pair(
-            first = root % 10 + (device?.position?.value?.x?.toInt() ?: 0),
-            second = root / 10 + (device?.position?.value?.y?.toInt() ?: 0),
+            first = localX + (device?.position?.value?.x?.toInt() ?: 0),
+            second = localY + (device?.position?.value?.y?.toInt() ?: 0),
         )
     }
 
@@ -693,7 +699,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
             is Event.OnChangeRootKey -> {
                 val before = state.value
-                state.update { it.copy(rootKey = event.rootKey, rootKeyLaunchpadId = null) }
+                state.update { it.copy(rootKey = event.rootKey, rootKeyLaunchpadId = null, rootKeyLocalX = null, rootKeyLocalY = null) }
                 pushStateChange(before, state.value)
             }
 
@@ -873,9 +879,10 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
         val currentFrame = state.value.frames.getOrNull(state.value.currentFrameIndex)
             ?: return
-        val desiredColors = currentFrame.entries.associate {
-            VirtualDevicePixel(it.resolveGlobal().first, it.resolveGlobal().second) to Color(it.r, it.g, it.b)
-        }
+        val desiredColors = currentFrame.entries.mapNotNull { entry ->
+            val (x, y) = entry.resolveGlobal() ?: return@mapNotNull null
+            VirtualDevicePixel(x = x, y = y) to Color(entry.r, entry.g, entry.b)
+        }.toMap()
 
         val changedSignals = synchronized(virtualDeviceColorsLock) {
             val previousColors = virtualDeviceColors.toMap()
@@ -924,7 +931,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         _isPreviewPlaying.value = true
         val framePixels = state.value.frames
             .flatMap { it.entries }
-            .map { it.resolveGlobal() }
+            .mapNotNull { it.resolveGlobal() }
         val cachedPixels = synchronized(virtualDeviceColorsLock) {
             virtualDeviceColors.keys.map { it.x to it.y }
         }
@@ -1062,14 +1069,15 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     /** Resolves the entry's coordinates to global and returns a coloured signal.
      *  Falls back to entry (x, y) if the anchored device is not currently in [Heaven.devices]. */
-    private fun KeyframesEntry.resolveGlobal(): Pair<Int, Int> {
+    private fun KeyframesEntry.resolveGlobal(): Pair<Int, Int>? {
         if (isDeviceAnchored) {
             val device = Heaven.devices.firstOrNull { it.launchpadId == launchpadId }
-                ?: if (Heaven.devices.size == 1) Heaven.devices.first() else null
-            if (device != null) {
-                return Pair(localX!! + device.position.value.x.toInt(), localY!! + device.position.value.y.toInt())
+                ?: Heaven.devices.singleOrNull()
+                ?: return Pair(x, y)
+            if (!isAbletonVirtualNote && !device.containsLocalPad(x = localX!!, y = localY!!)) {
+                return null
             }
-            return Pair(x, y)
+            return Pair(localX!! + device.position.value.x.toInt(), localY!! + device.position.value.y.toInt())
         }
         return Pair(x, y)
     }
@@ -1077,8 +1085,8 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
     private fun KeyframesEntry.resolveToSignal(
         color: Color,
         extrasCache: MutableMap<AbletonNoteSpace.Note, Map<String, Int>>? = null,
-    ): Signal.LED {
-        val (gx, gy) = resolveGlobal()
+    ): Signal.LED? {
+        val (gx, gy) = resolveGlobal() ?: return null
         val origin = resolveLaunchpadOrigin(
             origin = null,
             x = gx,
@@ -1087,8 +1095,16 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         ) ?: this
         val signal = Signal.LED(origin = origin, x = gx, y = gy, color = color, layer = 0)
         val pitch = abletonPitch ?: return signal
-        val targetX = gx - (localX ?: 0)
-        val targetY = gy - (localY ?: 0)
+        val canonicalIndex = AbletonNoteSpace.padIndex(pitch = pitch)
+        val virtualNoteDevice = if (isAbletonVirtualNote && isDeviceAnchored) {
+            Heaven.devices.firstOrNull { it.launchpadId == launchpadId }
+        } else {
+            null
+        }
+        val targetX = virtualNoteDevice?.let { it.position.value.x.toInt() + it.layout.mainOffsetX - 1 }
+            ?: gx - (canonicalIndex?.rem(10) ?: localX ?: 0)
+        val targetY = virtualNoteDevice?.let { it.position.value.y.toInt() + it.layout.mainOffsetY - 1 }
+            ?: gy - (canonicalIndex?.div(10)?.let { 9 - it } ?: localY ?: 0)
         return AbletonNoteSpace.withPitch(
             signal = signal,
             note = AbletonNoteSpace.Note(pitch = pitch, targetX = targetX, targetY = targetY),
@@ -1111,14 +1127,14 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private fun KeyframesEntry.toSignal(
         extrasCache: MutableMap<AbletonNoteSpace.Note, Map<String, Int>>? = null,
-    ): Signal.LED = resolveToSignal(
+    ): Signal.LED? = resolveToSignal(
         color = Color(red = r, green = g, blue = b),
         extrasCache = extrasCache,
     )
 
     private fun KeyframesEntry.toOffSignal(
         extrasCache: MutableMap<AbletonNoteSpace.Note, Map<String, Int>>? = null,
-    ): Signal.LED = resolveToSignal(
+    ): Signal.LED? = resolveToSignal(
         color = Color.Black,
         extrasCache = extrasCache,
     )
@@ -1315,6 +1331,9 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         val state = state.value
         val rootKey = rootPosition()
 
+        if (rootKey == null && state.rootKeyLaunchpadId != null) {
+            return emptyList()
+        }
         if (rootKey == null) {
             return signals.map { signal ->
                 if (signal is Signal.LED) {

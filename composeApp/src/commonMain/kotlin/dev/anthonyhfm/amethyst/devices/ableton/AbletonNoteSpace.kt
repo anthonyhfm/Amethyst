@@ -37,8 +37,8 @@ internal object AbletonNoteSpace {
                 y in position.y.toInt() until position.y.toInt() + device.layout.rows
         } ?: return null
 
-        val targetX = target.position.value.x.toInt()
-        val targetY = target.position.value.y.toInt()
+        val targetX = target.position.value.x.toInt() + target.layout.mainOffsetX - 1
+        val targetY = target.position.value.y.toInt() + target.layout.mainOffsetY - 1
         val localX = x - targetX
         val localY = y - targetY
         val localIndex = localX + (9 - localY) * 10

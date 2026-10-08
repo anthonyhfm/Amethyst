@@ -8,6 +8,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportE
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 class DeviceSyncReceiver(
     private val provider: AmethystConnectProvider,
@@ -71,6 +72,25 @@ class DeviceSyncReceiver(
 
     private suspend fun handleDevicePropertyChanged(event: ConnectEvent.DevicePropertyChanged) {
         when (event.property) {
+            ConnectEvent.DeviceProperty.MODEL -> {
+                val model = runCatching {
+                    Json.decodeFromString<ViewportDeviceModelChange>(string = event.value)
+                }.getOrNull() ?: return
+                val replacement = ViewportDeviceFactory.create(
+                    type = model.type,
+                    id = event.deviceId,
+                    position = Offset.Zero,
+                )
+                model.style?.let { style -> replacement.applyNetworkStyle(key = style) }
+                if (!WorkspaceRepository.replaceVirtualDevice(
+                    deviceId = event.deviceId,
+                    replacement = replacement,
+                    fromRemote = true,
+                    undoable = false,
+                )) {
+                    replacement.close()
+                }
+            }
             ConnectEvent.DeviceProperty.ROTATION -> {
                 event.value.toFloatOrNull()?.let { rotation ->
                     WorkspaceRepository.updateVirtualDeviceRotation(

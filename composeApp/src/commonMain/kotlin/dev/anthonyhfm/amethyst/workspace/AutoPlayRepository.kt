@@ -31,6 +31,7 @@ import kotlinx.atomicfu.atomic
 import dev.anthonyhfm.amethyst.workspace.data.AutoPlayData
 import dev.anthonyhfm.amethyst.workspace.data.Macro
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.containsGlobalPad
 import kotlin.concurrent.Volatile
 import kotlin.math.roundToLong
 
@@ -202,12 +203,18 @@ object AutoPlayRepository {
             launchpadId = action.launchpadId,
         ) ?: this
 
+    internal fun isActionAvailable(action: AutoPlayData.Action): Boolean {
+        val id = action.launchpadId ?: return true
+        val device = ViewportRepository.devices.value.firstOrNull { it.launchpadId == id } ?: return false
+        return device.containsGlobalPad(x = action.x, y = action.y)
+    }
+
     private fun midiSignals(
         actions: List<AutoPlayData.Action>,
         silentReplay: Boolean = false,
         macroValues: List<Int> = currentSignalMacroValues(),
     ): List<Signal.Midi> =
-        actions.map { action ->
+        actions.filter(::isActionAvailable).map { action ->
             Signal.Midi(
                 origin = originFor(action),
                 x = action.x,
@@ -305,7 +312,7 @@ object AutoPlayRepository {
             actionsAppliedThroughOffset = false
             
             // Clear green lights manually
-            val clearSignals = previousLearningActions.map {
+            val clearSignals = previousLearningActions.filter(::isActionAvailable).map {
                 Signal.LED(origin = originFor(it), x = it.x, y = it.y, color = Color.Black, layer = 101)
             }
             Heaven.midiEnter(clearSignals)
@@ -382,7 +389,7 @@ object AutoPlayRepository {
                     }
                     if (settings?.autoPlayShowLights == true) {
                         WorkspaceRepository.lightsChain.signalEnter(
-                            batch.map {
+                            batch.filter(::isActionAvailable).map {
                                 Signal.LED(
                                     origin = originFor(it),
                                     x = it.x,
@@ -396,7 +403,7 @@ object AutoPlayRepository {
 
                     if (settings?.autoPlayShowButtonPresses == true) {
                         Heaven.midiEnter(
-                            batch.map {
+                            batch.filter(::isActionAvailable).map {
                                 Signal.LED(
                                     origin = originFor(it),
                                     x = it.x,
@@ -522,7 +529,7 @@ object AutoPlayRepository {
         }
         initialMacros = null
         if (previousLearningActions.isNotEmpty()) {
-            val clearSignals = previousLearningActions.map {
+            val clearSignals = previousLearningActions.filter(::isActionAvailable).map {
                 Signal.LED(origin = originFor(it), x = it.x, y = it.y, color = Color.Black, layer = 101)
             }
             Heaven.midiEnter(clearSignals)
@@ -574,13 +581,13 @@ object AutoPlayRepository {
     }
 
     private fun executeActions(actions: List<AutoPlayData.Action>) {
-        val downActions = actions.filter { it.down }
+        val downActions = actions.filter { it.down && isActionAvailable(action = it) }
         if (downActions.isEmpty()) return
 
         for (batch in autoPlayActionBatches(actions = downActions)) {
             val macroSnapshot = currentSignalMacroValues()
             WorkspaceRepository.samplingChain.signalEnter(
-                batch.map {
+                batch.filter(::isActionAvailable).map {
                     Signal.Midi(
                         origin = originFor(it),
                         x = it.x,
@@ -594,7 +601,7 @@ object AutoPlayRepository {
             val settings = WorkspaceRepository.workspaceMeta?.settings
             if (settings?.autoPlayShowLights == true) {
                 WorkspaceRepository.lightsChain.signalEnter(
-                    batch.map {
+                    batch.filter(::isActionAvailable).map {
                         Signal.LED(
                             origin = originFor(it),
                             x = it.x,
@@ -613,7 +620,7 @@ object AutoPlayRepository {
         val time = sortedActionTimes.getOrNull(learningIndex) ?: return
         val actions = autoplay.actions[time] ?: return
 
-        val expectedDown = actions.filter { it.down }
+        val expectedDown = actions.filter { it.down && isActionAvailable(action = it) }
         
         if (expectedDown.isEmpty()) {
             learningIndex++
@@ -626,7 +633,7 @@ object AutoPlayRepository {
             return
         }
 
-        val clearSignals = previousLearningActions.map {
+        val clearSignals = previousLearningActions.filter(::isActionAvailable).map {
             Signal.LED(origin = originFor(it), x = it.x, y = it.y, color = Color.Black, layer = 101)
         }
         
@@ -652,7 +659,7 @@ object AutoPlayRepository {
         val expectedActions = autoplay.actions[time] ?: return
 
         // Check if any "down" actions at this step are matched by the input
-        val expectedDown = expectedActions.filter { it.down }.map { it.x to it.y }.toSet()
+        val expectedDown = expectedActions.filter { it.down && isActionAvailable(action = it) }.map { it.x to it.y }.toSet()
         val inputDown = signals.filter { it.velocity > 0 }.map { it.x to it.y }.toSet()
 
         if (inputDown.intersect(expectedDown).isNotEmpty()) {

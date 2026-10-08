@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.workspace_swap_launchpad_title
+import amethyst.composeapp.generated.resources.workspace_swap_launchpad_description
+import amethyst.composeapp.generated.resources.workspace_swap_launchpad_confirm
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.workspace_insert_launchpad_add
 import amethyst.composeapp.generated.resources.workspace_insert_launchpad_cancel
@@ -38,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,13 +51,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
-import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScaleToFit
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadIdealised
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadMk2
@@ -62,7 +63,6 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadProMk3
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportLaunchpadX
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
-import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlinx.coroutines.launch
@@ -94,6 +94,8 @@ private enum class AndroidLaunchpadModel(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AndroidInsertLaunchpadSheet() {
+    val replacementId by WorkspaceRepository.devicePickerReplacementId.collectAsState()
+    val isReplacing = replacementId != null
     val coroutineScope = rememberCoroutineScope()
     var selectedModel by rememberSaveable { mutableStateOf(AndroidLaunchpadModel.Pro) }
     var otherDevices by rememberSaveable { mutableStateOf(false) }
@@ -145,12 +147,12 @@ internal fun AndroidInsertLaunchpadSheet() {
                         verticalArrangement = Arrangement.spacedBy(space = 16.dp),
                     ) {
                         Text(
-                            text = stringResource(resource = Res.string.workspace_insert_launchpad_title),
+                            text = stringResource(resource = if (isReplacing) Res.string.workspace_swap_launchpad_title else Res.string.workspace_insert_launchpad_title),
                             style = MaterialTheme.typography.headlineSmall,
                         )
 
                         Text(
-                            text = stringResource(resource = Res.string.workspace_insert_launchpad_description),
+                            text = stringResource(resource = if (isReplacing) Res.string.workspace_swap_launchpad_description else Res.string.workspace_insert_launchpad_description),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -214,22 +216,7 @@ internal fun AndroidInsertLaunchpadSheet() {
                         coroutineScope.launch {
                             try {
                                 val device = selectedModel.createDevice(interactive = true)
-                                val rightEdge = ViewportRepository.devices.value.maxOfOrNull { existingDevice ->
-                                    existingDevice.position.value.x + existingDevice.size.width
-                                } ?: 0f
-
-                                device.position.value = Offset(
-                                    x = rightEdge,
-                                    y = 0f,
-                                )
-
-                                if (WorkspaceRepository.addVirtualDevice(element = device)) {
-                                    SelectionManager.select(
-                                        element = Selectable.VirtualViewportDevice(element = device),
-                                    )
-                                } else {
-                                    device.close()
-                                }
+                                WorkspaceRepository.completeDevicePicker(element = device)
                             } finally {
                                 isAdding = false
                             }
@@ -243,7 +230,7 @@ internal fun AndroidInsertLaunchpadSheet() {
                         .fillMaxWidth(),
                     enabled = !isAdding && !isDismissing,
                 ) {
-                    Text(text = stringResource(resource = Res.string.workspace_insert_launchpad_add))
+                    Text(text = stringResource(resource = if (isReplacing) Res.string.workspace_swap_launchpad_confirm else Res.string.workspace_insert_launchpad_add))
                 }
 
                 TextButton(

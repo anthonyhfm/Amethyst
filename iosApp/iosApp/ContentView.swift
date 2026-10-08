@@ -109,6 +109,7 @@ private struct LaunchpadPickerSheet: View {
 
     @State private var category: Category = .novation
     @State private var selectedIndex = 0
+    private let isReplacing = IosLaunchpadPickerKt.isReplacingLaunchpadFromIosPicker()
 
     private var visibleOptions: [Option] {
         options.filter { $0.category == category }
@@ -126,7 +127,7 @@ private struct LaunchpadPickerSheet: View {
         NavigationStack {
             GeometryReader { geometry in
                 VStack(spacing: 8) {
-                    Text("Choose a Launchpad for this workspace")
+                    Text(isReplacing ? "Choose a replacement layout. Bindings stay with this device." : "Choose a Launchpad for this workspace")
                         .font(.subheadline)
                         .foregroundStyle(theme.mutedForeground)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -193,7 +194,7 @@ private struct LaunchpadPickerSheet: View {
                         IosLaunchpadPickerKt.addVirtualLaunchpadFromIosPicker(index: Int32(selectedIndex))
                         onDismiss()
                     } label: {
-                        Label("Add to Workspace", systemImage: "plus")
+                        Label(isReplacing ? "Swap model" : "Add to Workspace", systemImage: isReplacing ? "arrow.left.arrow.right" : "plus")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 50)
@@ -208,7 +209,7 @@ private struct LaunchpadPickerSheet: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .background(theme.background.ignoresSafeArea())
-            .navigationTitle("Add device")
+            .navigationTitle(isReplacing ? "Swap Launchpad model" : "Add device")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -464,6 +465,9 @@ struct ContentView: View {
                     .sheet(isPresented: $showDevicePickerSheet) {
                         LaunchpadPickerSheet(darkMode: colorScheme == .dark) {
                             showDevicePickerSheet = false
+                        }
+                        .onDisappear {
+                            IosLaunchpadPickerKt.dismissLaunchpadFromIosPicker()
                         }
                     }
                     .sheet(isPresented: $showDeviceConfigurationSheet) {

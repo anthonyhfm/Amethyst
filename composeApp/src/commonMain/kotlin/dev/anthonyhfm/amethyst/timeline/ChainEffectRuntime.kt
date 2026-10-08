@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline
 
+import dev.anthonyhfm.amethyst.workspace.LaunchpadBindingRemapper
 import androidx.compose.ui.graphics.Color
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
@@ -42,6 +43,7 @@ class ChainEffectRuntime(
     private val scope = CoroutineScope(mainDispatcherOrDefault("ChainEffectRuntime") + SupervisorJob())
     private val stateJobs = mutableListOf<Job>()
     private val activeOutputs = mutableMapOf<OutputKey, Signal.LED>()
+    private var remappingBindings = false
 
     init {
         source?.collaborationSyncEnabled = false
@@ -67,6 +69,22 @@ class ChainEffectRuntime(
             sourceDuration,
             processors.timelineDuration(context),
         ).serialDuration()
+    }
+
+    internal fun remapLaunchpadBindings(
+        remapper: LaunchpadBindingRemapper,
+    ): ChainEffectEntry {
+        remappingBindings = true
+        stateJobs.forEach(Job::cancel)
+        stateJobs.clear()
+        try {
+            source?.let { device -> remapper.remap(device = device) }
+            remapper.remap(chain = processors)
+            return snapshot().also { updated -> updateEntryMetadata(updated = updated) }
+        } finally {
+            remappingBindings = false
+            observeRuntimeState()
+        }
     }
 
     fun snapshot(
@@ -165,7 +183,11 @@ class ChainEffectRuntime(
         }
     }
 
-    private fun notifyChanged() = onStateOrDurationChanged(this)
+    private fun notifyChanged() {
+        if (!remappingBindings) {
+            onStateOrDurationChanged(this)
+        }
+    }
 
     private fun emitToHeaven(signals: List<Signal>) {
         val ledSignals = signals.filterIsInstance<Signal.LED>()

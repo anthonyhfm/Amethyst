@@ -50,6 +50,8 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.controls.automation.LiveAutomationTarget
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
+import dev.anthonyhfm.amethyst.core.network.sync.toViewportDeviceType
+import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
 import dev.anthonyhfm.amethyst.core.network.sync.DeviceSyncCoordinator
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
@@ -213,11 +215,37 @@ object WorkspaceRepository {
         _showDeviceConfigurator.update { null }
     }
 
-    fun openDevicePicker() {
+    private val _devicePickerReplacementId = MutableStateFlow<String?>(null)
+    val devicePickerReplacementId: StateFlow<String?> = _devicePickerReplacementId.asStateFlow()
+
+    fun openDevicePicker(replacingDeviceId: String? = null) {
+        _devicePickerReplacementId.value = replacingDeviceId
         _showDevicePicker.update { true }
     }
 
+    suspend fun completeDevicePicker(
+        element: LaunchpadViewportElement,
+        replacementId: String? = _devicePickerReplacementId.value,
+    ): Boolean {
+        val changed = if (replacementId != null) {
+            replaceVirtualDevice(deviceId = replacementId, replacement = element)
+        } else {
+            val rightEdge = ViewportRepository.devices.value.maxOfOrNull { device ->
+                device.position.value.x + device.size.width
+            } ?: 0f
+            element.position.value = Offset(x = rightEdge, y = 0f)
+            addVirtualDevice(element = element)
+        }
+        if (changed && replacementId == null) {
+            SelectionManager.select(element = Selectable.VirtualViewportDevice(element = element))
+        } else if (!changed) {
+            element.close()
+        }
+        return changed
+    }
+
     fun closeDevicePicker() {
+        _devicePickerReplacementId.value = null
         _showDevicePicker.update { false }
     }
 
@@ -638,6 +666,92 @@ object WorkspaceRepository {
         deviceRefresh.emit(Unit)
         updateWorkspaceBounds()
         return true
+    }
+
+    fun replaceVirtualDevice(
+        deviceId: String,
+        replacement: LaunchpadViewportElement,
+        fromRemote: Boolean = false,
+        undoable: Boolean = true,
+    ): Boolean {
+        val devices = ViewportRepository.devices.value
+        val index = devices.indexOfFirst { it.launchpadId == deviceId || it.selectionUUID == deviceId }
+        val original = devices.getOrNull(index) ?: return false
+        if (original.toViewportDeviceType() == replacement.toViewportDeviceType()) {
+            return false
+        }
+
+        val pendingStateChanges = ChainSyncCoordinator.pauseForDeviceModelChange()
+        var remapper: LaunchpadBindingRemapper? = null
+        try {
+            TimelineRepository.pause()
+            AutoPlayRepository.stopAutoPlay()
+            val bindingRemapper = LaunchpadBindingRemapper(
+                launchpadId = original.launchpadId,
+                position = original.position.value,
+                oldLayout = original.layout,
+                newLayout = replacement.layout,
+                rotationDegrees = original.rotationDegrees.floatValue,
+            )
+            remapper = bindingRemapper
+            val beforeType = original.toViewportDeviceType()
+            val beforeStyle = (original as? dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64)?.style
+            replacement.launchpadId = original.launchpadId
+            replacement.selectionUUID = original.selectionUUID
+            replacement.position = original.position
+            replacement.rotationDegrees.floatValue = original.rotationDegrees.floatValue
+            replacement.savedMidiDeviceId = original.savedMidiDeviceId
+            replacement.savedInputPortId = original.savedInputPortId
+            replacement.savedInputPortName = original.savedInputPortName
+            replacement.savedOutputPortId = original.savedOutputPortId
+            replacement.savedOutputPortName = original.savedOutputPortName
+            replacement.onCapturePad = original.onCapturePad
+            midiManager.detachElement(element = original)
+            Heaven.clear()
+            ViewportRepository.setDevices(newDevices = devices.toMutableList().apply { this[index] = replacement })
+            SelectionManager.replaceSelections(updatedSelections = SelectionManager.selections.value.map { selection ->
+                when {
+                    selection is Selectable.VirtualViewportDevice && selection.element === original ->
+                        Selectable.VirtualViewportDevice(element = replacement)
+                    selection === original -> replacement
+                    else -> selection
+                }
+            })
+            bindingRemapper.remap(chain = lightsChain)
+            bindingRemapper.remap(chain = samplingChain)
+            TimelineRepository.remapLaunchpadBindings(remapper = bindingRemapper)
+            workspaceMeta?.let { meta -> meta.autoPlay = bindingRemapper.remap(data = meta.autoPlay) }
+            original.close()
+            midiManager.refreshConnections()
+            markDirty()
+            updateWorkspaceBounds()
+            deviceRefresh.tryEmit(value = Unit)
+            when (val currentMode = mode.value) {
+                is CoordinateFilterWorkspaceMode -> currentMode.wake()
+                is KeyframesWorkspaceMode -> currentMode.wake()
+            }
+            if (undoable && !fromRemote) {
+                UndoManager.addAction(action = UndoableAction.VirtualDeviceModelChange(
+                    deviceId = replacement.launchpadId,
+                    beforeType = beforeType,
+                    afterType = replacement.toViewportDeviceType(),
+                    beforeStyle = beforeStyle,
+                    afterStyle = (replacement as? dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64)?.style,
+                ))
+            }
+            if (!fromRemote) {
+                DeviceSyncCoordinator.onDeviceModelChanged(element = replacement, pending = pendingStateChanges)
+            }
+            return true
+        } finally {
+            val appliedRemapper = remapper
+            val pending = if (fromRemote && appliedRemapper != null) {
+                pendingStateChanges.map { event -> event.copy(state = appliedRemapper.remap(state = event.state)) }
+            } else {
+                emptyList()
+            }
+            ChainSyncCoordinator.resumeAfterDeviceModelChange(pending = pending)
+        }
     }
 
     suspend fun removeVirtualDeviceById(

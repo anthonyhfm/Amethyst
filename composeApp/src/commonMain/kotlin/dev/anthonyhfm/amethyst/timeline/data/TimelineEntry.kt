@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.timeline.automation.TimelineTrackAutomationState
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.globalPadForMidiIndex
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -226,17 +227,9 @@ data class MidiEntry(
     @kotlinx.serialization.Transient
     private val lastSentGradientColor = mutableMapOf<MidiNote, Triple<Float, Float, Float>>()
 
-    private fun pitchToXY(note: MidiNote): Pair<Int, Int> {
-        val deviceIndex = note.resolvedDeviceIndex
-        val localPitch = note.resolvedPadIndex
-        val x = localPitch % 10
-        val y = 9 - (localPitch / 10)
-        
-        val device = Heaven.devices.getOrNull(deviceIndex)
-        val globalX = x + (device?.position?.value?.x?.toInt() ?: 0)
-        val globalY = y + (device?.position?.value?.y?.toInt() ?: 0)
-        
-        return Pair(globalX, globalY)
+    internal fun pitchToXY(note: MidiNote): Pair<Int, Int>? {
+        val device = Heaven.devices.getOrNull(index = note.resolvedDeviceIndex) ?: return null
+        return device.globalPadForMidiIndex(index = note.resolvedPadIndex)
     }
 
     override fun start(startAt: Long?, automation: TimelineTrackAutomationState) {
@@ -302,7 +295,7 @@ data class MidiEntry(
             val last = lastSentGradientColor[note]
             val eps = 0.004f  // ~1/255
             if (last == null || abs(last.first - r) > eps || abs(last.second - g) > eps || abs(last.third - b) > eps) {
-                val (x, y) = pitchToXY(note)
+                val (x, y) = pitchToXY(note = note) ?: continue
                 Heaven.midiEnter(listOf(Signal.LED(
                     origin = activeSignalOwner,
                     x = x, y = y,
@@ -332,7 +325,7 @@ data class MidiEntry(
     }
 
     private fun sendNoteOn(note: MidiNote) {
-        val (x, y) = pitchToXY(note)
+        val (x, y) = pitchToXY(note = note) ?: return
         val color = if (note.isGradient) {
             val (r, g, b) = GradientInterpolator.interpolate(note.led.gradient!!, 0f)
             Color(r, g, b)
@@ -354,7 +347,7 @@ data class MidiEntry(
     }
 
     private fun sendNoteOff(note: MidiNote) {
-        val (x, y) = pitchToXY(note)
+        val (x, y) = pitchToXY(note = note) ?: return
         val signal = Signal.LED(
             origin = activeSignalOwner,
             x = x,

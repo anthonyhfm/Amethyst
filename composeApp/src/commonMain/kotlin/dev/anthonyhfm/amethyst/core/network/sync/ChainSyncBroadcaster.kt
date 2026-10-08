@@ -36,6 +36,31 @@ class ChainSyncBroadcaster(
     private val observedDevices = mutableMapOf<String, ObservedDevice>()
     private var scanJob: Job? = null
 
+    private var modelChangePaused = false
+    private var resumeAfterModelChange = false
+
+    fun pauseForDeviceModelChange(): List<ConnectEvent.DeviceStateChanged> {
+        val pending = pendingStateChanges.values.map { change ->
+            ConnectEvent.DeviceStateChanged(chainPath = change.chainPath, path = change.path, state = change.state)
+        }
+        resumeAfterModelChange = scanJob != null
+        stop()
+        modelChangePaused = true
+        return pending
+    }
+
+    fun resumeAfterDeviceModelChange(pending: List<ConnectEvent.DeviceStateChanged>) {
+        modelChangePaused = false
+        if (resumeAfterModelChange) {
+            start()
+        }
+        if (pending.isNotEmpty()) {
+            scope.launch {
+                pending.forEach { event -> provider.send(event = event) }
+            }
+        }
+    }
+
     fun start() {
         if (scanJob != null) return
         refreshDeviceStateObservers()
@@ -166,6 +191,9 @@ class ChainSyncBroadcaster(
     }
 
     fun onDeviceStateChanged(device: GenericChainDevice<*>, state: DeviceState) {
+        if (modelChangePaused) {
+            return
+        }
         val lightsPath = dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.lightsChain.pathOf(device)
         val samplingPath = dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.samplingChain.pathOf(device)
         val chainPath = when {

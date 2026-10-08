@@ -9,6 +9,8 @@ import dev.anthonyhfm.amethyst.workspace.AutoPlayRepository
 import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.canonicalMidiOrigin
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.globalPadForMidiIndex
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.rotateMidiCoordinate
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -748,21 +750,22 @@ class AmethystMidiManager(
 
     suspend fun LaunchpadViewportElement.onMidiMessage(msg: ByteArray) {
         val input = launchpadDevice?.handleMidiInput(msg) ?: return
-        val offset = position.value.copy(
-            x = position.value.x - layout.offsetX,
-            y = position.value.y,
+        val (visX, visY) = rotateMidiCoordinate(
+            x = input.pitch % 10,
+            y = input.pitch / 10,
+            layout = layout,
+            rotationDegrees = rotationDegrees.floatValue,
         )
+        val visiblePitch = visY * 10 + visX
+        val (globalX, globalY) = globalPadForMidiIndex(index = visiblePitch) ?: return
 
         if (WorkspaceRepository.mode.value.claimMidiInputs) {
-            WorkspaceRepository.mode.value.onMidiInput(input, offset)
+            WorkspaceRepository.mode.value.onMidiInput(
+                data = input.copy(pitch = visiblePitch),
+                offset = canonicalMidiOrigin(),
+            )
             return
         }
-
-        val x = input.pitch % 10
-        val y = input.pitch / 10
-        val (visX, visY) = rotateMidiCoordinate(x, y, layout, rotationDegrees.floatValue)
-        val globalX = offset.x.toInt() + visX
-        val globalY = offset.y.toInt() + (9 - visY)
 
         if (AutomappingManager.isMappingActive()) {
             if (input.velocity != 0) {

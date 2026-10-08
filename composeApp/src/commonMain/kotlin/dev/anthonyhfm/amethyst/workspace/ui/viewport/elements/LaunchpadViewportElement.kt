@@ -35,7 +35,7 @@ abstract class LaunchpadViewportElement(
     abstract override var size: Size
     abstract val layout: LaunchpadLayout
 
-    override val selectionUUID: String = UUID.randomUUID()
+    override var selectionUUID: String = UUID.randomUUID()
 
     var launchpadId: String = UUID.randomUUID()
 
@@ -127,12 +127,9 @@ abstract class LaunchpadViewportElement(
                 if (mode.claimMidiInputs) {
                     val localX = translatedX - position.value.x.toInt()
                     val localY = translatedY - position.value.y.toInt()
-                    val pitch = (9 - localY) * 10 + localX
+                    val pitch = layout.midiIndexForLocalPad(x = localX, y = localY)
                     
-                    val offset = position.value.copy(
-                        x = position.value.x - layout.offsetX,
-                        y = position.value.y - layout.offsetY
-                    )
+                    val offset = canonicalMidiOrigin()
                     
                     val data = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
                         pitch = pitch,
@@ -170,19 +167,16 @@ abstract class LaunchpadViewportElement(
                 if (mode.claimMidiInputs) {
                     val localX = translatedX - position.value.x.toInt()
                     val localY = translatedY - position.value.y.toInt()
-                    val pitch = (9 - localY) * 10 + localX
+                    val pitch = layout.midiIndexForLocalPad(x = localX, y = localY)
                     
-                    val offset = position.value.copy(
-                        x = position.value.x - layout.offsetX,
-                        y = position.value.y - layout.offsetY
-                    )
+                    val offset = canonicalMidiOrigin()
                     
                     val previousPad = lastDragPad
                     if (previousPad != Pair(translatedX, translatedY)) {
                         previousPad?.let { (oldX, oldY) ->
                             val oldLocalX = oldX - position.value.x.toInt()
                             val oldLocalY = oldY - position.value.y.toInt()
-                            val oldPitch = (9 - oldLocalY) * 10 + oldLocalX
+                            val oldPitch = layout.midiIndexForLocalPad(x = oldLocalX, y = oldLocalY)
                             val oldData = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
                                 pitch = oldPitch,
                                 velocity = 0
@@ -225,12 +219,9 @@ abstract class LaunchpadViewportElement(
                     lastDragPad?.let { (x, y) ->
                         val localX = x - position.value.x.toInt()
                         val localY = y - position.value.y.toInt()
-                        val pitch = (9 - localY) * 10 + localX
+                        val pitch = layout.midiIndexForLocalPad(x = localX, y = localY)
                         
-                        val offset = position.value.copy(
-                            x = position.value.x - layout.offsetX,
-                            y = position.value.y - layout.offsetY
-                        )
+                        val offset = canonicalMidiOrigin()
                         
                         val data = dev.anthonyhfm.amethyst.core.midi.data.MidiInputData(
                             pitch = pitch,

@@ -1,5 +1,8 @@
 package dev.anthonyhfm.amethyst.core.controls.undo
 
+import androidx.compose.ui.geometry.Offset
+import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
+import dev.anthonyhfm.amethyst.core.network.sync.ViewportDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.editor.currentGroupsForDevice
@@ -106,11 +109,35 @@ object UndoManager {
         publishState()
     }
 
+    private fun restoreVirtualDeviceModel(action: UndoableAction.VirtualDeviceModelChange, isUndo: Boolean) {
+        val replacement = ViewportDeviceFactory.create(
+            type = if (isUndo) action.beforeType else action.afterType,
+            id = action.deviceId,
+            position = Offset.Zero,
+        )
+        val style = if (isUndo) action.beforeStyle else action.afterStyle
+        if (replacement is ViewportMidiFighter64 && style != null) {
+            replacement.style = style
+        }
+        if (!WorkspaceRepository.replaceVirtualDevice(
+            deviceId = action.deviceId,
+            replacement = replacement,
+            undoable = false,
+        )) {
+            replacement.close()
+        }
+    }
+
     fun undo() {
         if (undoStack.isNotEmpty()) {
             val action = undoStack.removeAt(undoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.VirtualDeviceModelChange -> {
+                    restoreVirtualDeviceModel(action = action, isUndo = true)
+                    redoStack.add(element = action)
+                }
+
                 is UndoableAction.AudioLibrarySourceUnlink -> {
                     action.change.undo()
                     redoStack.add(action)
@@ -754,6 +781,11 @@ object UndoManager {
             val action = redoStack.removeAt(redoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.VirtualDeviceModelChange -> {
+                    restoreVirtualDeviceModel(action = action, isUndo = false)
+                    undoStack.add(element = action)
+                }
+
                 is UndoableAction.AudioLibrarySourceUnlink -> {
                     action.change.redo()
                     undoStack.add(action)

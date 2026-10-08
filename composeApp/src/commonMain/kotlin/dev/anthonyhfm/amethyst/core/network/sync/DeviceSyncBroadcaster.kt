@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectProvider
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 class DeviceSyncBroadcaster(
     private val provider: AmethystConnectProvider,
@@ -21,6 +22,22 @@ class DeviceSyncBroadcaster(
                     positionY = element.position.value.y
                 )
             )
+            WorkspaceSyncCoordinator.triggerVerification()
+        }
+    }
+
+    fun onDeviceModelChanged(
+        element: LaunchpadViewportElement,
+        pending: List<ConnectEvent.DeviceStateChanged>,
+    ) {
+        val model = ViewportDeviceModelChange.from(element = element)
+        scope.launch {
+            pending.forEach { event -> provider.send(event = event) }
+            provider.send(event = ConnectEvent.DevicePropertyChanged(
+                deviceId = element.launchpadId,
+                property = ConnectEvent.DeviceProperty.MODEL,
+                value = Json.encodeToString(value = model),
+            ))
             WorkspaceSyncCoordinator.triggerVerification()
         }
     }

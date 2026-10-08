@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.core.controls.undo
 
+import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData.SavableViewportLaunchpad.MidiFighter64.MidiFighter64Style
+import dev.anthonyhfm.amethyst.workspace.data.SavableWorkspaceData.SavableViewportLaunchpad.ViewportDeviceType
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -19,6 +21,14 @@ import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryUnlink
 
 sealed interface UndoableAction {
+    data class VirtualDeviceModelChange(
+        val deviceId: String,
+        val beforeType: ViewportDeviceType,
+        val afterType: ViewportDeviceType,
+        val beforeStyle: MidiFighter64Style?,
+        val afterStyle: MidiFighter64Style?,
+    ) : UndoableAction
+
     data class AudioLibrarySourceUnlink(
         val change: AudioLibraryUnlink.Change,
     ) : UndoableAction

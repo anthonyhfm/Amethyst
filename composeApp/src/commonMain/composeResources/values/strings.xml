@@ -1053,4 +1053,8 @@
     <string name="piano_roll_selection_count">Selected light notes: %1$d</string>
     <string name="piano_roll_solid">Color</string>
     <string name="piano_roll_gradient">Gradient</string>
+    <string name="workspace_viewport_launchpad_actions_swap">Swap Launchpad model</string>
+    <string name="workspace_swap_launchpad_title">Swap Launchpad model</string>
+    <string name="workspace_swap_launchpad_confirm">Swap model</string>
+    <string name="workspace_swap_launchpad_description">Choose a replacement layout. Bindings stay with this device.</string>
 </resources>

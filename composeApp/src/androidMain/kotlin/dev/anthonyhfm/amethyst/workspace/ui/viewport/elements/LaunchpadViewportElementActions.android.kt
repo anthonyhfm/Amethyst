@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Rotate90DegreesCw
 import androidx.compose.material.icons.outlined.Style
@@ -90,6 +91,15 @@ actual fun LaunchpadViewportElementActions(
                     contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_style),
                 )
             }
+        }
+
+        IconButton(
+            onClick = { WorkspaceRepository.openDevicePicker(replacingDeviceId = element.launchpadId) },
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.SwapHoriz,
+                contentDescription = stringResource(resource = Res.string.workspace_viewport_launchpad_actions_swap),
+            )
         }
 
         FilledIconButton(

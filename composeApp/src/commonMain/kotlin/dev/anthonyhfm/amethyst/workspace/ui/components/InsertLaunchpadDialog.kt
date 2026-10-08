@@ -1,5 +1,10 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
+import amethyst.composeapp.generated.resources.Res
+import amethyst.composeapp.generated.resources.workspace_swap_launchpad_title
+import amethyst.composeapp.generated.resources.workspace_swap_launchpad_description
+import amethyst.composeapp.generated.resources.workspace_swap_launchpad_confirm
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,13 +20,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
@@ -59,9 +64,6 @@ import dev.anthonyhfm.amethyst.ui.theme.selectionBorder
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
-import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
-import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 
@@ -80,6 +82,8 @@ private enum class LaunchpadCategory(
 
 @Composable
 fun InsertLaunchpadDialog() {
+    val replacementId by WorkspaceRepository.devicePickerReplacementId.collectAsState()
+    val isReplacing = replacementId != null
     val coroutineScope = rememberCoroutineScope()
     val dialogState = rememberDialogState(initiallyVisible = true)
     val options = remember {
@@ -140,8 +144,8 @@ fun InsertLaunchpadDialog() {
         },
     ) {
         AlertDialogHeader {
-            AlertDialogTitle("Add Virtual Launchpad Device")
-            AlertDialogDescription("Compare the layouts at a comfortable size, then add the controller that fits this workspace best.")
+            AlertDialogTitle(text = if (isReplacing) stringResource(resource = Res.string.workspace_swap_launchpad_title) else "Add Virtual Launchpad Device")
+            AlertDialogDescription(text = if (isReplacing) stringResource(resource = Res.string.workspace_swap_launchpad_description) else "Compare the layouts at a comfortable size, then add the controller that fits this workspace best.")
         }
 
         Column(
@@ -229,27 +233,14 @@ fun InsertLaunchpadDialog() {
                         else -> return@Button
                     }
                     coroutineScope.launch {
-                        val rightEdge = ViewportRepository.devices.value.maxOfOrNull { existingDevice ->
-                            existingDevice.position.value.x + existingDevice.size.width
-                        } ?: 0f
-
-                        device.position.value = Offset(
-                            x = rightEdge,
-                            y = 0f,
-                        )
-
-                        if (WorkspaceRepository.addVirtualDevice(element = device)) {
-                            SelectionManager.select(
-                                element = Selectable.VirtualViewportDevice(element = device)
-                            )
-                        }
+                        WorkspaceRepository.completeDevicePicker(element = device)
 
                         WorkspaceRepository.closeDevicePicker()
                     }
                 },
                 size = ButtonSize.Small,
             ) {
-                Text("Add to Workspace")
+                Text(text = if (isReplacing) stringResource(resource = Res.string.workspace_swap_launchpad_confirm) else "Add to Workspace")
             }
         }
     }

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import com.composeunstyled.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -21,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
-import dev.anthonyhfm.amethyst.core.engine.heaven.Heaven
 import dev.anthonyhfm.amethyst.core.engine.heaven.RawLEDUpdate
 import dev.anthonyhfm.amethyst.core.engine.heaven.isLit
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -39,6 +39,7 @@ import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMidiFighter64
 import dev.anthonyhfm.amethyst.ui.launchpad.viewport.ViewportMystrix
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.primaryForeground
+import dev.anthonyhfm.amethyst.workspace.ViewportRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
@@ -87,7 +88,7 @@ class PreviewChainDevice : GenericChainDevice<PreviewChainDeviceState>() {
     override fun Content() {
         val selections by SelectionManager.selections.collectAsState()
         val isSelected = selections.any { it.selectionUUID == this.selectionUUID }
-        val devices = Heaven.devices
+        val devices by ViewportRepository.devices.collectAsState()
         val signals by signalBuffer.collectAsState()
 
         val cardWidth = when {
@@ -117,7 +118,7 @@ class PreviewChainDevice : GenericChainDevice<PreviewChainDeviceState>() {
         original: LaunchpadViewportElement,
         signals: Map<Pair<Int, Int>, Signal.LED>,
     ) {
-        val previewViewport = remember(original.launchpadId) {
+        val previewViewport = remember(original) {
             createPreviewViewport(original).also { preview ->
                 preview.position = original.position
                 // Route pad interactions through this device's signalExit so the signal
@@ -138,7 +139,11 @@ class PreviewChainDevice : GenericChainDevice<PreviewChainDeviceState>() {
             }
         }
 
-        LaunchedEffect(signals) {
+        DisposableEffect(previewViewport) {
+            onDispose { previewViewport.close() }
+        }
+
+        LaunchedEffect(previewViewport, signals) {
             previewViewport.previewState.clear()
             previewViewport.previewState.sendToPreview(
                 buildPreviewUpdates(signals.values.toList(), original)

@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.core.network.sync
 
+import dev.anthonyhfm.amethyst.core.network.connect.AmethystConnectContract.ConnectEvent
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.devices.DeviceState
@@ -17,6 +18,15 @@ object ChainSyncCoordinator {
         if (this.broadcaster === broadcaster) {
             this.broadcaster = null
         }
+    }
+
+    fun pauseForDeviceModelChange(): List<ConnectEvent.DeviceStateChanged> =
+        broadcaster?.pauseForDeviceModelChange() ?: emptyList()
+
+    fun resumeAfterDeviceModelChange(
+        pending: List<ConnectEvent.DeviceStateChanged> = emptyList(),
+    ) {
+        broadcaster?.resumeAfterDeviceModelChange(pending = pending)
     }
 
     fun onDevicePlaced(chain: Chain, device: GenericChainDevice<*>, atIndex: Int) {

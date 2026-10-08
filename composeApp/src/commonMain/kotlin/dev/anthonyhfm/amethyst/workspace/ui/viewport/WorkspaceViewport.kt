@@ -447,7 +447,11 @@ fun WorkspaceViewport(
                 if (!selected) return@forEach
 
                 val isIosTray = platform is Platform.iOS
-                val iosButtonCount = if ((element as? LaunchpadViewportElement)?.hasStyleOptions == true) 4 else 3
+                val iosButtonCount = if ((element as? LaunchpadViewportElement)?.hasStyleOptions == true) {
+                    5
+                } else {
+                    4
+                }
                 val trayWidthDp = if (isIosTray) iosButtonCount * 44f else 164f
                 var traySize by remember(element.selectionUUID, trayWidthDp) {
                     mutableStateOf(Size(trayWidthDp * density, 44f * density))

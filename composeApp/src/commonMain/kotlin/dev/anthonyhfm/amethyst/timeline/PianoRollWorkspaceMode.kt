@@ -50,6 +50,7 @@ import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.globalPadForMidiIndex
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportConfig
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.ViewportPanBoundsPolicy
@@ -1547,13 +1548,14 @@ class PianoRollWorkspaceMode : WorkspaceMode() {
         repeat: Boolean,
     ) {
         val device = Heaven.devices.getOrNull(deviceIndex) ?: return
+        val (x, y) = device.globalPadForMidiIndex(index = padIndex) ?: return
         val preview = if (repeat) padPreview else notePreview
         preview.press(
             key = deviceIndex to padIndex,
             signal = Signal.LED(
                 origin = this,
-                x = device.position.value.x.toInt() + padIndex % 10 - device.layout.offsetX,
-                y = device.position.value.y.toInt() + device.layout.rows - 1 - (padIndex / 10 - device.layout.offsetY),
+                x = x,
+                y = y,
                 color = color,
             ),
             gradient = gradient,
