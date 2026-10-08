@@ -979,6 +979,8 @@
     <string name="settings_general_language_title">Language</string>
     <string name="profile_title">Profile</string>
     <string name="account_section_title">Account</string>
+    <string name="account_restoring_session">Restoring your session…</string>
+    <string name="account_restore_retry">Try again to restore your account, or sign out to start a new session.</string>
     <string name="account_security_title">Security</string>
     <string name="account_email_title">Email</string>
     <string name="common_not_added">Not set</string>

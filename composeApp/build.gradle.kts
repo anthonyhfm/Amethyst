@@ -146,6 +146,7 @@ kotlin {
             }
 
             implementation(projects.nativeEngine)
+            implementation("net.java.dev.jna:jna:5.19.1")
             implementation(libs.kotlinx.coroutines.swing)
             implementation("io.github.vyfor:kpresence:0.6.6")
             implementation("com.github.junrar:junrar:8.1.1")

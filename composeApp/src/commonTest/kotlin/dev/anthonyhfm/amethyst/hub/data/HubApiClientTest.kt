@@ -10,15 +10,221 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HubApiClientTest {
+    @Test
+    fun aLateRefreshCannotRestoreASessionAfterSignOut() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var persisted: HubSessionTokens? = HubSessionTokens(
+            accessToken = "old-access",
+            refreshToken = "old-refresh",
+            expiresIn = 300
+        )
+        val client = client(
+            bearerToken = "old-access",
+            refreshToken = "old-refresh",
+            onSessionChanged = { persisted = it },
+            handler = {
+                started.complete(Unit)
+                release.await()
+                respond(
+                    """{"accessToken":"late-access","refreshToken":"late-refresh","expiresIn":300}""",
+                    headers = jsonHeaders
+                )
+            }
+        )
+
+        try {
+            val refresh = async { runCatching { client.refreshSession() } }
+            started.await()
+            client.clearSession()
+            release.complete(Unit)
+
+            val error = assertIs<HubApiException>(refresh.await().exceptionOrNull())
+            assertEquals("session_changed", error.errorCode)
+            assertFalse(client.isAuthenticated)
+            assertNull(persisted)
+        } finally {
+            release.complete(Unit)
+            client.close()
+        }
+    }
+
+    @Test
+    fun aLateRefreshRejectionCannotEraseANewerLogin() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var deletes = 0
+        val client = client(
+            bearerToken = "old-access",
+            refreshToken = "old-refresh",
+            onSessionChanged = { tokens ->
+                if (tokens == null) {
+                    deletes++
+                }
+            },
+            handler = {
+                started.complete(Unit)
+                release.await()
+                respond("""{"error":"invalid_credentials"}""", HttpStatusCode.Unauthorized, jsonHeaders)
+            }
+        )
+
+        try {
+            val refresh = async { runCatching { client.refreshSession() } }
+            started.await()
+            client.acceptAuthentication(
+                result = HubAuthResult(accessToken = "new-access", refreshToken = "new-refresh", expiresIn = 300)
+            )
+            release.complete(Unit)
+            assertIs<HubApiException>(refresh.await().exceptionOrNull())
+            assertEquals("new-access", client.bearerToken)
+            assertEquals("new-refresh", client.refreshToken)
+            assertEquals(0, deletes)
+        } finally {
+            release.complete(Unit)
+            client.close()
+        }
+    }
+
+    @Test
+    fun transientSessionReadCanBeRetriedWithoutDeletingTheStoredSession() = runTest {
+        var unavailable = true
+        var writes = 0
+        val store = object : HubSessionStore {
+            override fun load(): HubSessionTokens? {
+                if (unavailable) {
+                    throw HubSessionStorageException(message = "Storage is temporarily unavailable.")
+                }
+                return HubSessionTokens(accessToken = "access", refreshToken = "refresh", expiresIn = 300)
+            }
+
+            override fun save(tokens: HubSessionTokens?) {
+                writes++
+            }
+        }
+        val client = client(handler = { respond(accountJson(), headers = jsonHeaders) })
+        try {
+            client.attachSessionStore(store = store)
+            assertTrue(client.sessionRestorePending)
+            assertFalse(client.isAuthenticated)
+            assertEquals("Storage is temporarily unavailable.", client.sessionStorageError)
+
+            unavailable = false
+            assertTrue(client.retrySessionStorage())
+            assertFalse(client.sessionRestorePending)
+            assertTrue(client.isAuthenticated)
+            assertNull(client.sessionStorageError)
+            assertEquals(0, writes)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun refreshKeepsRotatedTokensAndRetriesSavingBeforeAnotherRotation() = runTest {
+        var storageUnavailable = true
+        var persisted: HubSessionTokens? = null
+        var refreshRequests = 0
+        val client = client(
+            bearerToken = "expired",
+            refreshToken = "refresh-1",
+            onSessionChanged = { tokens ->
+                if (storageUnavailable) {
+                    throw HubSessionStorageException(message = "Storage is temporarily unavailable.")
+                }
+                persisted = tokens
+            },
+            handler = { request ->
+                if (request.url.encodedPath == "/v1/auth/refresh") {
+                    refreshRequests++
+                    val next = refreshRequests + 1
+                    respond(
+                        """{"accessToken":"access-$next","refreshToken":"refresh-$next","expiresIn":300}""",
+                        headers = jsonHeaders
+                    )
+                } else if (request.headers[HttpHeaders.Authorization] == "Bearer expired") {
+                    respond("""{"error":"unauthorized"}""", HttpStatusCode.Unauthorized, jsonHeaders)
+                } else {
+                    respond(accountJson(), headers = jsonHeaders)
+                }
+            }
+        )
+
+        try {
+            assertEquals("artist", GetAccountUseCase(client = client).execute().username)
+            assertEquals("refresh-2", client.refreshToken)
+            assertTrue(client.isAuthenticated)
+            assertNull(persisted)
+            assertFailsWith<HubSessionStorageException> { client.refreshSession() }
+            assertEquals(1, refreshRequests)
+
+            storageUnavailable = false
+            assertTrue(client.retrySessionStorage())
+            assertEquals("refresh-2", persisted?.refreshToken)
+            client.refreshSession()
+            assertEquals("refresh-3", persisted?.refreshToken)
+            assertEquals(2, refreshRequests)
+            assertNull(client.sessionStorageError)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun offlineProfileRequestPreservesRestoredTokens() = runTest {
+        var writes = 0
+        val client = client(
+            bearerToken = "access",
+            refreshToken = "refresh",
+            onSessionChanged = { writes++ },
+            handler = { throw IllegalStateException("Offline") }
+        )
+
+        try {
+            assertFailsWith<IllegalStateException> { GetAccountUseCase(client = client).execute() }
+            assertTrue(client.isAuthenticated)
+            assertEquals("refresh", client.refreshToken)
+            assertEquals(0, writes)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun rejectedRefreshClearsThePersistedSession() = runTest {
+        var deletes = 0
+        val client = client(
+            bearerToken = "expired",
+            refreshToken = "revoked",
+            onSessionChanged = { tokens ->
+                assertNull(tokens)
+                deletes++
+            },
+            handler = {
+                respond("""{"error":"invalid_credentials"}""", HttpStatusCode.Unauthorized, jsonHeaders)
+            }
+        )
+        try {
+            assertFailsWith<HubApiException> { GetAccountUseCase(client = client).execute() }
+            assertFalse(client.isAuthenticated)
+            assertEquals(1, deletes)
+        } finally {
+            client.close()
+        }
+    }
+
     @Test
     fun loginStoresNativeTokensAndReportsSessionChanges() = runTest {
         var changed: HubSessionTokens? = null

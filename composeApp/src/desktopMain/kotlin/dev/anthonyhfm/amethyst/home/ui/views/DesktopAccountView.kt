@@ -66,9 +66,39 @@ fun DesktopAccountView() {
                     )
                 }
 
-                SignedOutAccount(
-                    hub = hub
-                )
+                if (hub.restoringSession) {
+                    TypographyH2(
+                        text = stringResource(Res.string.account_section_title)
+                    )
+
+                    TypographyP(
+                        text = stringResource(
+                            resource = if (hub.busy) {
+                                Res.string.account_restoring_session
+                            } else {
+                                Res.string.account_restore_retry
+                            }
+                        )
+                    )
+
+                    Button(
+                        onClick = { hub.refresh() },
+                        enabled = !hub.busy
+                    ) {
+                        Text(text = stringResource(Res.string.home_hub_retry))
+                    }
+
+                    Button(
+                        onClick = { hub.signOut() },
+                        enabled = !hub.busy
+                    ) {
+                        Text(text = stringResource(Res.string.account_sign_out))
+                    }
+                } else {
+                    SignedOutAccount(
+                        hub = hub
+                    )
+                }
             }
         }
     } else {
@@ -88,6 +118,15 @@ fun DesktopAccountView() {
                 TypographyP(
                     text = hub.error!!
                 )
+            }
+
+            if (hub.sessionStorageNeedsRetry) {
+                Button(
+                    onClick = { hub.refresh() },
+                    enabled = !hub.busy
+                ) {
+                    Text(text = stringResource(Res.string.home_hub_retry))
+                }
             }
 
             if (hub.message != null) {

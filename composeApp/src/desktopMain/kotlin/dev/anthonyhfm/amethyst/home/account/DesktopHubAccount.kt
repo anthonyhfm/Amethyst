@@ -11,12 +11,14 @@ import dev.anthonyhfm.amethyst.hub.data.HubArtistProfileInput
 import dev.anthonyhfm.amethyst.hub.data.HubAuthResult
 import dev.anthonyhfm.amethyst.hub.data.HubAvatarInput
 import dev.anthonyhfm.amethyst.hub.data.HubRepository
+import dev.anthonyhfm.amethyst.hub.data.HubSessionStorageException
 import dev.anthonyhfm.amethyst.hub.data.invalidateHubAvatar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collect
 import java.util.Base64
 
 class DesktopHubAccount private constructor() {
@@ -33,7 +35,15 @@ class DesktopHubAccount private constructor() {
     var busy by mutableStateOf(false)
         private set
 
-    var error by mutableStateOf<String?>(null)
+    var error by mutableStateOf(repository.client.sessionStorageError)
+        private set
+
+    var restoringSession by mutableStateOf(
+        repository.client.isAuthenticated || repository.client.sessionRestorePending
+    )
+        private set
+
+    var sessionStorageNeedsRetry by mutableStateOf(repository.client.sessionStorageError != null)
         private set
 
     var message by mutableStateOf<String?>(null)
@@ -46,6 +56,19 @@ class DesktopHubAccount private constructor() {
         private set
 
     init {
+        scope.launch {
+            var previousStorageError: String? = null
+            repository.client.sessionStorageErrors.collect { storageError ->
+                sessionStorageNeedsRetry = storageError != null
+                if (storageError != null) {
+                    error = storageError
+                } else if (error == previousStorageError) {
+                    error = null
+                }
+                previousStorageError = storageError
+            }
+        }
+
         if (repository.client.isAuthenticated) {
             refresh()
         }
@@ -66,12 +89,25 @@ class DesktopHubAccount private constructor() {
     }
 
     fun refresh() {
-        if (!repository.client.isAuthenticated) {
+        if (!repository.client.isAuthenticated && !repository.client.sessionRestorePending &&
+            repository.client.sessionStorageError == null
+        ) {
             return
         }
 
         runAction {
-            acceptAccount(repository.getAccount.execute())
+            requireSessionStorage()
+            if (repository.client.isAuthenticated) {
+                acceptAccount(value = repository.getAccount.execute())
+            }
+        }
+    }
+
+    private fun requireSessionStorage() {
+        if (!repository.client.retrySessionStorage()) {
+            throw HubSessionStorageException(
+                message = repository.client.sessionStorageError ?: "Your saved session could not be accessed. Try again."
+            )
         }
     }
 
@@ -83,6 +119,7 @@ class DesktopHubAccount private constructor() {
         email: String = "",
     ) {
         runAction {
+            requireSessionStorage()
             val result = if (register) {
                 service.registerAndLogin(
                     username = username,
@@ -295,6 +332,12 @@ class DesktopHubAccount private constructor() {
 
                 error = cause.message ?: cause.toString()
             } finally {
+                sessionStorageNeedsRetry = repository.client.sessionStorageError != null
+                restoringSession = repository.client.sessionRestorePending ||
+                    (account == null && repository.client.isAuthenticated)
+                repository.client.sessionStorageError?.let { value ->
+                    error = value
+                }
                 busy = false
             }
         }

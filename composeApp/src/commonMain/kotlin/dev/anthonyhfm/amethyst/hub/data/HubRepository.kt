@@ -6,6 +6,11 @@ interface HubSessionStore {
     fun save(tokens: HubSessionTokens?)
 }
 
+class HubSessionStorageException(
+    message: String,
+    val statusCode: Int? = null,
+) : Exception(message)
+
 class HubRepository internal constructor(val client: HubApiClient) {
     constructor(
         baseUrl: String = HubApiClient.DEFAULT_BASE_URL,
@@ -91,11 +96,10 @@ class HubRepository internal constructor(val client: HubApiClient) {
 }
 
 private fun persistedHubClient(baseUrl: String, store: HubSessionStore): HubApiClient {
-    val tokens = store.load()
     return HubApiClient(
         baseUrl = baseUrl,
-        bearerToken = tokens?.accessToken,
-        refreshToken = tokens?.refreshToken,
         onSessionChanged = store::save,
-    )
+    ).also { client ->
+        client.attachSessionStore(store = store)
+    }
 }
