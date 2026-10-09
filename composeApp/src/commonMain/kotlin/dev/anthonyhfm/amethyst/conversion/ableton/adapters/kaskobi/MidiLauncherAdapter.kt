@@ -21,10 +21,16 @@ class MidiLauncherAdapter(
         val palette = AbletonConverter.palette
         val filePath: String = fileRef.resolvePath()
 
-        val skipSilence = MidiLauncherParameters(
+        val parameters = MidiLauncherParameters(
             device = device,
             hash = hash
-        ).value(
+        )
+        val playbackBpm = parameters.value(
+            name = "MIDIext1Tempo",
+            indicesByHash = mapOf("f135067227057b08f8d2d2ae66a22f8d" to 0)
+        )?.takeIf { it.isFinite() && it > 0.0 } ?: AbletonConverter.bpm
+
+        val skipSilence = parameters.value(
             name = "Skip Silence",
             indicesByHash = mapOf(
                 "2ef098a53fe4e9a4b035588561080343" to 0,
@@ -45,7 +51,7 @@ class MidiLauncherAdapter(
         var keyframes = MidiFileImporter.loadData(
             data = data,
             palette = palette,
-            bpm = AbletonConverter.bpm,
+            bpm = playbackBpm,
             launchpad = AbletonConverter.launchpadTarget(offset = offset).midiImportTarget(),
             preserveEndOfTrackTiming = true,
         )

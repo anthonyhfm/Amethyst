@@ -495,30 +495,17 @@ object AbletonTutorialDetector {
         val targets = mutableMapOf<Int, PageAutomationTarget>()
 
         for (track in tracks) {
-            val explicitTargets = track.deviceChain.devices.zipWithNext().mapNotNull { (candidate, following) ->
+            val explicitRacks = track.deviceChain.devices.zipWithNext().mapNotNull { (candidate, following) ->
                 if (candidate is MxDeviceMidiEffect && isPageSwitcher(candidate)) {
-                    chainSelectorTarget(following)?.let { targetId ->
-                        targetId to PageAutomationTarget(
-                            track = track,
-                            sourceOffset = AbletonPageIndexing.sourceOffset(
-                                selectorMinimum = chainSelectorMinimum(following),
-                            ),
-                        )
-                    }
+                    following.takeIf { chainSelectorTarget(device = it) != null }
                 } else null
             }
 
-            if (explicitTargets.isNotEmpty()) {
-                explicitTargets.forEach { (targetId, target) -> targets[targetId] = target }
-                continue
+            val pageDevices = explicitRacks.ifEmpty {
+                collectAllDevices(devices = track.deviceChain.devices)
             }
 
-            // Compatibility fallback for tracks whose Page Switcher file is unavailable.
-            // Keep this per-track: an explicit Page Switcher on one controller track must
-            // not suppress the restricted legacy targets on another controller track.
-            // Older projects commonly bind pages to Macro 1 rather than the version-specific
-            // last rack macro, so accept Macro 1 when its key/range metadata is page-sized.
-            for (device in collectAllDevices(track.deviceChain.devices)) {
+            for (device in pageDevices) {
                 val selectorTarget = PageAutomationTarget(
                     track = track,
                     sourceOffset = AbletonPageIndexing.sourceOffset(
@@ -535,7 +522,7 @@ object AbletonTutorialDetector {
                                 targetId = macro.automationTarget?.id,
                                 keyMidi = macro.keyMidi,
                                 controllerRange = macro.midiControllerRange,
-                                force = true,
+                                force = explicitRacks.isEmpty(),
                             )
                         }
                         device.macro0?.let { macro ->
@@ -557,7 +544,7 @@ object AbletonTutorialDetector {
                                 targetId = macro.automationTarget?.id,
                                 keyMidi = macro.keyMidi,
                                 controllerRange = macro.midiControllerRange,
-                                force = true,
+                                force = explicitRacks.isEmpty(),
                             )
                         }
                         device.macro0?.let { macro ->
@@ -579,7 +566,7 @@ object AbletonTutorialDetector {
                                 targetId = macro.automationTarget?.id,
                                 keyMidi = macro.keyMidi,
                                 controllerRange = macro.midiControllerRange,
-                                force = true,
+                                force = explicitRacks.isEmpty(),
                             )
                         }
                         device.macro0?.let { macro ->
