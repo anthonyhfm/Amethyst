@@ -18,6 +18,7 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.narrower
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.wider
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.GridIntervals
 import dev.anthonyhfm.amethyst.timeline.utils.TimelineClipUtils
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
@@ -28,7 +29,7 @@ object TimelineKeyHandler {
     internal var duplicateChainEffectClip: ((Int, String) -> Unit)? = null
     internal var insertMidiClip: (() -> Boolean)? = null
     internal var togglePianoRollView: (() -> Boolean)? = null
-    internal var nudgeTimelineTime: ((Int) -> Boolean)? = null
+    internal var nudgeTimelineTime: ((Int, Boolean) -> Boolean)? = null
     /** Multiplies the horizontal zoom by the given factor; wired by the lane view. */
     internal var zoomTimeline: ((Float) -> Boolean)? = null
 
@@ -131,11 +132,12 @@ object TimelineKeyHandler {
             keyEvent.hasZoomModifier() && keyEvent.isZoomOutKey() ->
                 zoomTimeline?.invoke(1f / KEYBOARD_ZOOM_STEP) == true
 
-            // Time-cursor navigation: move to the previous/next musical grid line.
-            keyEvent.hasNoShortcutModifier() && keyEvent.key == Key.DirectionLeft ->
-                nudgeTimelineTime?.invoke(-1) == true
-            keyEvent.hasNoShortcutModifier() && keyEvent.key == Key.DirectionRight ->
-                nudgeTimelineTime?.invoke(+1) == true
+            !keyEvent.hasPrimaryShortcutModifier() && !keyEvent.isAltPressed &&
+                keyEvent.key == Key.DirectionLeft ->
+                nudgeTimelineTime?.invoke(-1, keyEvent.isShiftPressed) == true
+            !keyEvent.hasPrimaryShortcutModifier() && !keyEvent.isAltPressed &&
+                keyEvent.key == Key.DirectionRight ->
+                nudgeTimelineTime?.invoke(+1, keyEvent.isShiftPressed) == true
 
             // Track navigation: ↑/↓ with optional Shift to extend selection
             !keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.DirectionUp ->
@@ -563,6 +565,73 @@ object TimelineKeyHandler {
 
     private fun KeyEvent.hasNoShortcutModifier(): Boolean {
         return !isCtrlPressed && !isMetaPressed && !isShiftPressed && !isAltPressed
+    }
+}
+
+internal fun adjacentTimelineTimeSelection(
+    selection: Selectable,
+    intervals: GridIntervals,
+    direction: Int,
+    extend: Boolean,
+): Selectable? {
+    val trackIndex: Int
+    val anchorTimeMs: Long
+    val currentTimeMs: Long
+
+    when (selection) {
+        is Selectable.TimelineTime -> {
+            trackIndex = selection.trackIndex
+            anchorTimeMs = selection.timeMs
+            currentTimeMs = selection.timeMs
+        }
+
+        is Selectable.TimelineRange -> {
+            trackIndex = selection.trackIndex
+            anchorTimeMs = selection.anchorTimeMs
+            currentTimeMs = if (anchorTimeMs == selection.startMs) {
+                selection.endMs
+            } else {
+                selection.startMs
+            }
+        }
+
+        else -> return null
+    }
+
+    if (direction == 0) {
+        return selection
+    }
+
+    if (!extend && selection is Selectable.TimelineRange) {
+        return Selectable.TimelineTime(
+            trackIndex = trackIndex,
+            timeMs = if (direction < 0) {
+                selection.startMs
+            } else {
+                selection.endMs
+            }
+        )
+    }
+
+    var targetTimeMs = intervals.adjacentTime(timeMs = currentTimeMs, direction = direction)
+    val crossesAnchor = currentTimeMs < anchorTimeMs && targetTimeMs > anchorTimeMs ||
+        currentTimeMs > anchorTimeMs && targetTimeMs < anchorTimeMs
+    if (extend && crossesAnchor) {
+        targetTimeMs = anchorTimeMs
+    }
+
+    return if (extend && targetTimeMs != anchorTimeMs) {
+        Selectable.TimelineRange(
+            trackIndex = trackIndex,
+            startMs = minOf(anchorTimeMs, targetTimeMs),
+            endMs = maxOf(anchorTimeMs, targetTimeMs),
+            anchorTimeMs = anchorTimeMs
+        )
+    } else {
+        Selectable.TimelineTime(
+            trackIndex = trackIndex,
+            timeMs = targetTimeMs
+        )
     }
 }
 

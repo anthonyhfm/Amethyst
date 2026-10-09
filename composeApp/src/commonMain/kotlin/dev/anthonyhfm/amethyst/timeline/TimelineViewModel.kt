@@ -202,7 +202,19 @@ class TimelineViewModel : ViewModel() {
                 is Selectable.TimelineRange -> {
                     val newStart = GridUtils.snapToGrid(sel.startMs, zoom, bpm, gridType)
                     val newEnd = GridUtils.snapToGrid(sel.endMs, zoom, bpm, gridType).coerceAtLeast(newStart)
-                    if (newStart != sel.startMs || newEnd != sel.endMs) Selectable.TimelineRange(trackIndex = sel.trackIndex, startMs = newStart, endMs = newEnd) else sel
+                    if (newStart != sel.startMs || newEnd != sel.endMs) {
+                        sel.copy(
+                            startMs = newStart,
+                            endMs = newEnd,
+                            anchorTimeMs = if (sel.anchorTimeMs == sel.startMs) {
+                                newStart
+                            } else {
+                                newEnd
+                            }
+                        )
+                    } else {
+                        sel
+                    }
                 }
                 else -> sel
             }
@@ -1274,18 +1286,34 @@ class TimelineViewModel : ViewModel() {
         )
     }
 
-    private fun nudgeSelectedTimelineTime(direction: Int): Boolean {
+    private fun nudgeSelectedTimelineTime(direction: Int, extend: Boolean): Boolean {
         val selection = SelectionManager.selections.value
-            .filterIsInstance<Selectable.TimelineTime>()
-            .firstOrNull()
+            .firstOrNull { it is Selectable.TimelineTime || it is Selectable.TimelineRange }
             ?: return false
         val intervals = GridUtils.computeWithGridType(
             zoomLevel = _viewport.value.zoomX,
             bpm = WorkspaceRepository.bpm.value,
             gridType = WorkspaceRepository.gridType.value,
         )
-        val targetTimeMs = intervals.adjacentTime(timeMs = selection.timeMs, direction = direction)
-        SelectionManager.select(selection.copy(timeMs = targetTimeMs))
+        val targetSelection = adjacentTimelineTimeSelection(
+            selection = selection,
+            intervals = intervals,
+            direction = direction,
+            extend = extend
+        ) ?: return false
+        val targetTimeMs = when (targetSelection) {
+            is Selectable.TimelineTime -> targetSelection.timeMs
+            is Selectable.TimelineRange -> {
+                if (targetSelection.anchorTimeMs == targetSelection.startMs) {
+                    targetSelection.endMs
+                } else {
+                    targetSelection.startMs
+                }
+            }
+
+            else -> return false
+        }
+        SelectionManager.select(element = targetSelection)
         updateViewport { viewport ->
             val viewportWidth = viewport.viewportWidth
             if (viewportWidth <= 0f) return@updateViewport viewport
