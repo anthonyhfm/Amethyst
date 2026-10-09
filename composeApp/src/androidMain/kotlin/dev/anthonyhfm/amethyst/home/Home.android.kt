@@ -58,7 +58,9 @@ actual fun Home(
 ) {
     val navigator = rememberNavController()
     val currentBackStackEntry by navigator.currentBackStackEntryAsState()
-    val currentTab = HomeNavigationTab.fromRoute(currentBackStackEntry?.destination?.route)
+    val currentTab = HomeNavigationTab.fromDestination(
+        destination = currentBackStackEntry?.destination
+    )
     var selectedProject by remember { mutableStateOf<Pair<String, String>?>(null) }
     var openError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()

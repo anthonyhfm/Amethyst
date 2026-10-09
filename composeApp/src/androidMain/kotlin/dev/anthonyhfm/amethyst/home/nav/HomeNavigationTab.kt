@@ -13,6 +13,8 @@ import com.composables.icons.lucide.UserRound
 
 import org.jetbrains.compose.resources.StringResource
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 
 enum class HomeNavigationTab(
     val labelRes: StringResource,
@@ -42,15 +44,29 @@ enum class HomeNavigationTab(
 
     val label: String @Composable get() = stringResource(labelRes)
 
-    val routeName: String?
-        get() = route::class.qualifiedName
-
     companion object {
-        fun fromRoute(route: String?): HomeNavigationTab {
-            if (route == HomeNavRoute.ProfileAuth::class.qualifiedName) return Settings
-            if (route == HomeNavRoute.ProfileEdit::class.qualifiedName) return Settings
-            if (route == HomeNavRoute.HubLiked::class.qualifiedName || route == HomeNavRoute.HubDetail::class.qualifiedName) return Browser
-            return entries.firstOrNull { it.routeName == route } ?: Projects
+        fun fromDestination(destination: NavDestination?): HomeNavigationTab {
+            if (destination == null) {
+                return Projects
+            }
+
+            if (
+                destination.hasRoute<HomeNavRoute.ProfileAuth>() ||
+                destination.hasRoute<HomeNavRoute.ProfileEdit>()
+            ) {
+                return Settings
+            }
+
+            if (
+                destination.hasRoute<HomeNavRoute.HubLiked>() ||
+                destination.hasRoute<HomeNavRoute.HubDetail>()
+            ) {
+                return Browser
+            }
+
+            return entries.firstOrNull { tab ->
+                destination.hasRoute(route = tab.route::class)
+            } ?: Projects
         }
     }
 }
