@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline.ui
 
+import androidx.compose.foundation.gestures.awaitDragOrCancellation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
@@ -10,6 +11,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -43,9 +45,18 @@ internal fun Modifier.timelineClipGestures(
             press(down.position, currentEvent.keyboardModifiers.isShiftPressed)
             down.consume()
             var overSlop = Offset.Zero
-            val startedDrag = awaitTouchSlopOrCancellation(pointerId = down.id) { change, over ->
-                overSlop = over
-                change.consume()
+            val startedDrag = if (down.type == PointerType.Mouse) {
+                awaitDragOrCancellation(pointerId = down.id)
+                    ?.takeIf { it.pressed }
+                    ?.also { change ->
+                        overSlop = change.positionChange()
+                        change.consume()
+                    }
+            } else {
+                awaitTouchSlopOrCancellation(pointerId = down.id) { change, over ->
+                    overSlop = over
+                    change.consume()
+                }
             }
             if (startedDrag != null) {
                 lastTapTime = null

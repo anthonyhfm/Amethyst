@@ -1065,11 +1065,11 @@
     <string name="issue_071_track_volume_reset">Reset track volume to 0 dB</string>
     <string name="locators_menu">Locators</string>
     <string name="locators_default_name">Locator</string>
-    <string name="locators_add">Add locator at playhead</string>
+    <string name="locators_add">Add locator here</string>
     <string name="locators_edit">Edit locator</string>
     <string name="locators_name">Name</string>
     <string name="locators_beat">Beat (1 = beginning)</string>
-    <string name="locators_help">Locators follow musical beats when BPM changes. Click a flag to jump, drag to move, or double-click to edit. Double-click empty space to add a locator.</string>
+    <string name="locators_help">Locators follow musical beats when BPM changes. Right-click the time ruler to add a locator, or a flag to edit or delete it. Click a flag to jump, drag to move, or double-click to edit. Double-click empty ruler space to add a locator.</string>
     <string name="locators_invalid">Enter a name and a beat of 1 or greater.</string>
     <string name="locators_jump">Jump</string>
     <string name="locators_delete">Delete</string>

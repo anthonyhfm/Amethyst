@@ -1057,11 +1057,11 @@
     <string name="issue_071_track_volume_reset">Tracklautstärke auf 0 dB zurücksetzen</string>
     <string name="locators_menu">Locatoren</string>
     <string name="locators_default_name">Locator</string>
-    <string name="locators_add">Locator am Abspielkopf hinzufügen</string>
+    <string name="locators_add">Locator hier hinzufügen</string>
     <string name="locators_edit">Locator bearbeiten</string>
     <string name="locators_name">Name</string>
     <string name="locators_beat">Beat (1 = Anfang)</string>
-    <string name="locators_help">Locatoren folgen bei BPM-Änderungen den musikalischen Beats. Flagge anklicken zum Anspringen, ziehen zum Verschieben oder doppelklicken zum Bearbeiten. Ein Doppelklick in einen freien Bereich erstellt einen Locator.</string>
+    <string name="locators_help">Locatoren folgen bei BPM-Änderungen den musikalischen Beats. Rechtsklick auf das Zeitlineal zum Hinzufügen oder auf eine Flagge zum Bearbeiten und Löschen. Flagge anklicken zum Anspringen, ziehen zum Verschieben oder doppelklicken zum Bearbeiten. Ein Doppelklick in einen freien Bereich des Zeitlineals erstellt einen Locator.</string>
     <string name="locators_invalid">Bitte einen Namen und einen Beat ab 1 eingeben.</string>
     <string name="locators_jump">Anspringen</string>
     <string name="locators_delete">Löschen</string>
