@@ -1,0 +1,88 @@
+name: Run Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NUCLEUS_REVISION: 6bcffd07c6e3a9c0e17558a098ef8b8c3c4a80b3
+
+jobs:
+  windows:
+    name: Tests (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout Nucleus fork
+        uses: actions/checkout@v4
+        with:
+          repository: anthonyhfm/Nucleus
+          ref: ${{ env.NUCLEUS_REVISION }}
+          path: Nucleus
+          persist-credentials: false
+
+      - name: Fetch ML Graphics
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.ML_GRAPHICS_REPOSITORY }}
+          token: ${{ secrets.ML_GRAPHICS_TOKEN }}
+          path: ml3-graphics
+          sparse-checkout: launchpad
+
+      - name: Copy ML Graphics
+        shell: bash
+        run: mkdir -p composeApp/src/commonMain/composeResources/files && cp -r ml3-graphics/. composeApp/src/commonMain/composeResources/files/
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0 ndk;27.1.12297006'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Run Kotlin tests
+        run: >-
+          ./gradlew.bat :composeApp:desktopTest :nativeEngine:jvmTest
+          '-Pamethyst.nucleus.path=Nucleus'
+          --continue --rerun-tasks --no-configuration-cache --stacktrace
+
+      - name: Run Rust tests
+        if: ${{ !cancelled() }}
+        run: |
+          cargo test --locked --manifest-path nativeEngine/rust/Cargo.toml 2>&1 | Tee-Object -FilePath rust-test-results.log
+          exit $LASTEXITCODE
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-results
+          path: |
+            composeApp/build/reports/tests/
+            composeApp/build/test-results/
+            nativeEngine/build/reports/tests/
+            nativeEngine/build/test-results/
+            rust-test-results.log
+          if-no-files-found: warn
