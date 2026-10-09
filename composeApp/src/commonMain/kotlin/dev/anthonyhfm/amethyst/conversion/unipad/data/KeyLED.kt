@@ -5,6 +5,7 @@ import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.core.util.Palettes
 import dev.anthonyhfm.amethyst.core.util.Timing
+import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
@@ -14,6 +15,7 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceContract
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlinx.coroutines.flow.update
 import kotlin.time.Duration.Companion.milliseconds
@@ -196,10 +198,12 @@ object KeyLED {
                 )
             }
 
-            // chain / c  — chain switch inside LED sequence (not renderable as keyframe, log)
+            // chain / c  — chain switch inside LED sequence
             else if (cmd == "chain" || cmd == "c") {
                 val chainNum = inst.getOrNull(1)?.trim()?.toIntOrNull()
-                println("KeyLED: 'chain $chainNum' inside LED sequence is not yet supported – skipping")
+                if (chainNum != null) {
+                    println("KeyLED: chain switch to page $chainNum configured via MacroControlChainDeviceState")
+                }
             }
 
             else {
@@ -244,6 +248,25 @@ object KeyLED {
         )
     }
 
+    private fun extractChainSwitches(data: ByteArray): List<Int> {
+        return data.decodeToString()
+            .replace("\r\n", "\n")
+            .replace("\r", "\n")
+            .trim()
+            .split("\n")
+            .mapNotNull { line ->
+                val parts = line.trim().split(" ")
+                val command = parts.firstOrNull()?.lowercase()
+
+                if (command == "chain" || command == "c") {
+                    parts.getOrNull(1)?.toIntOrNull()
+                } else {
+                    null
+                }
+            }
+            .distinct()
+    }
+
     fun createChain(page: Int, entries: List<String>): StateChain {
         val groups = mutableListOf<Group>()
 
@@ -273,11 +296,23 @@ object KeyLED {
             if (group.size > 1) {
                 val multiGroups = group.mapNotNull { ledEntry ->
                     val keyLED = UnipadConverter.readEntry(path = ledEntry.path) ?: return@mapNotNull null
+                    val keyframes = convertToKeyframes(keyLED)
+                    val chainSwitches = extractChainSwitches(keyLED)
+
+                    val devices = mutableListOf<DeviceState>(keyframes)
+                    chainSwitches.forEach { chainNum ->
+                        devices.add(
+                            MacroControlChainDeviceState(
+                                macro = 0,
+                                value = chainNum - 1
+                            )
+                        )
+                    }
 
                     Group(
                         name = ledEntry.path,
                         stateChain = StateChain(
-                            devices = listOf(convertToKeyframes(keyLED))
+                            devices = devices
                         )
                     )
                 }
@@ -301,15 +336,26 @@ object KeyLED {
                 val keyLED = UnipadConverter.readEntry(path = ledEntry.path) ?: return@forEachIndexed
                 println("Decoding KeyLED: ${ledEntry.path}")
 
+                val keyframes = convertToKeyframes(keyLED)
+                val chainSwitches = extractChainSwitches(keyLED)
+
+                val devices = mutableListOf<DeviceState>(keyframes)
+                chainSwitches.forEach { chainNum ->
+                    devices.add(
+                        MacroControlChainDeviceState(
+                            macro = 0,
+                            value = chainNum - 1
+                        )
+                    )
+                }
+
                 groups.add(
                     Group(
                         name = "Single ${index + 1}",
                         stateChain = StateChain(
                             devices = listOf(
-                                CoordinateFilterChainDeviceState(filters = listOf(Pair(x, y))),
-
-                                convertToKeyframes(keyLED)
-                            )
+                                CoordinateFilterChainDeviceState(filters = listOf(Pair(x, y)))
+                            ) + devices
                         )
                     )
                 )

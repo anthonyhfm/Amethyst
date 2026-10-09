@@ -2,12 +2,14 @@ package dev.anthonyhfm.amethyst.conversion.unipad.data
 
 import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.devices.DeviceState
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.group.data.Group
 import dev.anthonyhfm.amethyst.devices.effects.macro_filter.MacroFilterChainDeviceState
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDeviceState
+import dev.anthonyhfm.amethyst.devices.effects.switch.MacroControlChainDeviceState
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.core.util.ConversionTempFiles
 import kotlinx.coroutines.CancellationException
@@ -117,7 +119,7 @@ object KeySound {
             val rx = f[2].toInt()
             val ry = f[1].toInt()
             "${f[0]} $rx $ry"
-        }.distinct().forEachIndexed { index, entry ->
+        }.distinct().forEach { entry ->
             val f = entry.split(" ")
             val x = f[1].toInt()
             val y = f[2].toInt()
@@ -142,22 +144,36 @@ object KeySound {
                                     groups = matchingEntries.mapNotNull { line ->
                                         val fields = line.split(" ")
                                         val clipName = fields[3].trim()
+                                        val wormhole = fields.getOrNull(5)?.toIntOrNull()
                                         val audioClip = clipMap[clipName]
 
+                                        val devices = mutableListOf<DeviceState>()
                                         if (audioClip?.isLoaded == true) {
+                                            devices.add(
+                                                SampleChainDeviceState(
+                                                    fileName = audioClip.name,
+                                                    rawData = audioClip.rawData,
+                                                    sampleRate = audioClip.sampleRate,
+                                                    channels = audioClip.channels,
+                                                    bitDepth = audioClip.bitDepth,
+                                                    isLoaded = true
+                                                )
+                                            )
+                                        }
+                                        if (wormhole != null) {
+                                            devices.add(
+                                                MacroControlChainDeviceState(
+                                                    macro = 0,
+                                                    value = wormhole - 1
+                                                )
+                                            )
+                                        }
+
+                                        if (devices.isNotEmpty()) {
                                             Group(
                                                 name = clipName,
                                                 stateChain = StateChain(
-                                                    devices = listOf(
-                                                        SampleChainDeviceState(
-                                                            fileName = audioClip.name,
-                                                            rawData = audioClip.rawData,
-                                                            sampleRate = audioClip.sampleRate,
-                                                            channels = audioClip.channels,
-                                                            bitDepth = audioClip.bitDepth,
-                                                            isLoaded = true
-                                                        )
-                                                    )
+                                                    devices = devices
                                                 )
                                             )
                                         } else {
@@ -175,42 +191,57 @@ object KeySound {
                 val clipName = fields[3].trim()
                 // fields[4] = loop (optional): omitted/1 = once, 0 = infinite, N = repeat N-1 times
                 val loopRaw = fields.getOrNull(4)?.toIntOrNull()
-                // fields[5] = wormhole chain (optional) — logged for now
+                // fields[5] = wormhole chain (optional)
                 val wormhole = fields.getOrNull(5)?.toIntOrNull()
-                if (wormhole != null) {
-                    println("KeySound: wormhole to chain $wormhole at ($x,$y) – wormhole not yet supported by engine")
-                }
 
                 val audioClip = clipMap[clipName]
 
+                if (loopRaw == 0) {
+                    println("KeySound: loop=0 (infinite) at ($x,$y) – looping not yet supported by engine")
+                } else if (loopRaw != null && loopRaw > 1) {
+                    println("KeySound: loop=$loopRaw (repeat ${loopRaw - 1}x) at ($x,$y) – repeat count not yet supported by engine")
+                }
+
+                val devices = mutableListOf<DeviceState>()
+                devices.add(
+                    CoordinateFilterChainDeviceState(
+                        filters = listOf(Pair(x, y))
+                    )
+                )
+
                 if (audioClip?.isLoaded == true) {
-                    if (loopRaw == 0) {
-                        println("KeySound: loop=0 (infinite) at ($x,$y) – looping not yet supported by engine")
-                    } else if (loopRaw != null && loopRaw > 1) {
-                        println("KeySound: loop=$loopRaw (repeat ${loopRaw - 1}x) at ($x,$y) – repeat count not yet supported by engine")
-                    }
-                    groups.add(
-                        Group(
-                            name = "Single $x,$y",
-                            stateChain = StateChain(
-                                devices = listOf(
-                                    CoordinateFilterChainDeviceState(
-                                        filters = listOf(Pair(x, y))
-                                    ),
-                                    SampleChainDeviceState(
-                                        fileName = audioClip.name,
-                                        rawData = audioClip.rawData,
-                                        sampleRate = audioClip.sampleRate,
-                                        channels = audioClip.channels,
-                                        bitDepth = audioClip.bitDepth,
-                                        isLoaded = true
-                                    )
-                                )
-                            )
+                    devices.add(
+                        SampleChainDeviceState(
+                            fileName = audioClip.name,
+                            rawData = audioClip.rawData,
+                            sampleRate = audioClip.sampleRate,
+                            channels = audioClip.channels,
+                            bitDepth = audioClip.bitDepth,
+                            isLoaded = true
                         )
                     )
                 } else {
                     println("Skipping unloaded audio clip: $clipName")
+                }
+
+                if (wormhole != null) {
+                    devices.add(
+                        MacroControlChainDeviceState(
+                            macro = 0,
+                            value = wormhole - 1
+                        )
+                    )
+                }
+
+                if (devices.size > 1) {
+                    groups.add(
+                        Group(
+                            name = "Single $x,$y",
+                            stateChain = StateChain(
+                                devices = devices
+                            )
+                        )
+                    )
                 }
             }
         }
