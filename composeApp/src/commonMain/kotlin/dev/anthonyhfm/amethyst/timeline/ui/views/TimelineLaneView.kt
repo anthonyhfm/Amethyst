@@ -2,9 +2,9 @@ package dev.anthonyhfm.amethyst.timeline.ui.views
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,15 +15,15 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.TimelineAreaSelection
 import dev.anthonyhfm.amethyst.timeline.TimelineClipMoveEngine
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
 import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
@@ -56,12 +57,15 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
 import dev.anthonyhfm.amethyst.timeline.data.timelineTrackRows
+import dev.anthonyhfm.amethyst.timeline.ui.LocalTimelineAreaInteraction
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineAreaInteraction
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCoordinator
 import dev.anthonyhfm.amethyst.timeline.ui.components.PlayheadCursor
 import dev.anthonyhfm.amethyst.timeline.ui.components.TimelineClipDragPreview
 import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromViewport
 import dev.anthonyhfm.amethyst.timeline.utils.computeTimelineContentWidthPx
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.timeline.viewport.TimelineViewportLimits
@@ -143,6 +147,54 @@ fun TimelineLaneView(
     val bpm by WorkspaceRepository.bpm.collectAsState()
     val gridType by WorkspaceRepository.gridType.collectAsState()
     val clipDragCoordinator = remember { TimelineClipDragCoordinator() }
+    val areaInteraction = remember { TimelineAreaInteraction() }
+    areaInteraction.select = { point, extend, snapEnabled ->
+        val surface = clipDragCoordinator.surfaceBoundsInRoot
+        val lane = clipDragCoordinator.laneBoundsInRoot.entries
+            .filter { it.key in tracks.indices && it.value.height > 0f }
+            .minByOrNull { (_, bounds) ->
+                when {
+                    point.y < bounds.top -> bounds.top - point.y
+                    point.y > bounds.bottom -> point.y - bounds.bottom
+                    else -> 0f
+                }
+            }
+        if (lane != null) {
+            val liveViewport = viewportWithTimelineMetrics(base = viewModel.viewport.value)
+            val timeMs = computeSnappedTimeFromViewport(
+                screenX = point.x - surface.left,
+                viewport = liveViewport,
+                bpm = WorkspaceRepository.bpm.value,
+                gridType = WorkspaceRepository.gridType.value,
+                snapEnabled = snapEnabled,
+            )
+            TimelineAreaSelection.select(trackIndex = lane.key, timeMs = timeMs, extend = extend)
+        }
+    }
+    LaunchedEffect(key1 = areaInteraction.pointer != null) {
+        while (areaInteraction.pointer != null) {
+            val point = areaInteraction.pointer ?: break
+            val surface = clipDragCoordinator.surfaceBoundsInRoot
+            val margin = 32f * density
+            fun edgeDelta(value: Float, start: Float, end: Float): Float {
+                return when {
+                    value < start + margin -> -((start + margin - value) / margin).coerceAtMost(maximumValue = 2f) * 12f * density
+                    value > end - margin -> ((value - end + margin) / margin).coerceAtMost(maximumValue = 2f) * 12f * density
+                    else -> 0f
+                }
+            }
+            val dx = edgeDelta(value = point.x, start = surface.left, end = surface.right)
+            val dy = edgeDelta(value = point.y, start = surface.top, end = surface.bottom)
+            if (abs(dx) > 0f) {
+                viewModel.updateViewport { viewport -> viewportWithTimelineMetrics(base = viewport).panBy(dx = dx).clamp() }
+            }
+            if (abs(dy) > 0f) {
+                verticalScrollState.scrollBy(value = dy)
+            }
+            areaInteraction.select(point, true, areaInteraction.snapEnabled)
+            delay(timeMillis = 16L)
+        }
+    }
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
     val clipSnapEnabled = !windowInfo.keyboardModifiers.isShiftPressed
@@ -332,147 +384,168 @@ fun TimelineLaneView(
             }
     ) {
         val selections by SelectionManager.selections.collectAsState()
+        LaunchedEffect(key1 = selections) {
+            if (areaInteraction.pointer == null) {
+                val focusIndex = TimelineAreaSelection.current()?.focus?.trackIndex
+                val lane = clipDragCoordinator.laneBoundsInRoot[focusIndex]
+                val surface = clipDragCoordinator.surfaceBoundsInRoot
+                if (lane != null) {
+                    val margin = 12f * density
+                    val delta = when {
+                        lane.top < surface.top + margin -> lane.top - surface.top - margin
+                        lane.bottom > surface.bottom - margin -> lane.bottom - surface.bottom + margin
+                        else -> 0f
+                    }
+                    if (delta != 0f) {
+                        verticalScrollState.scrollBy(value = delta)
+                    }
+                }
+            }
+        }
 
-        Column(
-            modifier = Modifier
-                .verticalScroll(verticalScrollState)
-                .padding(bottom = 80.dp),
-            verticalArrangement = Arrangement.spacedBy(timelineDimensions.laneSpacing)
-        ) {
-            tracks.timelineTrackRows().forEach { trackRow ->
-                val index = trackRow.trackIndex
-                val track = trackRow.track
-                val laneSelectedTimeMs = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull { it.trackIndex == index }?.timeMs
-                val laneSelectedEntries = selections.filterIsInstance<Selectable.TimelineEntryItem>().filter { it.trackIndex == index }
+        CompositionLocalProvider(LocalTimelineAreaInteraction provides areaInteraction) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(verticalScrollState)
+                    .padding(bottom = 80.dp),
+                verticalArrangement = Arrangement.spacedBy(timelineDimensions.laneSpacing)
+            ) {
+                tracks.timelineTrackRows().forEach { trackRow ->
+                    val index = trackRow.trackIndex
+                    val track = trackRow.track
+                    val laneSelectedTimeMs = selections.filterIsInstance<Selectable.TimelineTime>().firstOrNull { it.trackIndex == index }?.timeMs
+                    val laneSelectedEntries = selections.filterIsInstance<Selectable.TimelineEntryItem>().filter { it.trackIndex == index }
 
-                TimelineLane(
-                    track = track,
-                    trackIndex = index,
-                    nestingLevel = trackRow.nestingLevel,
-                    viewport = renderViewport,
-                    selectedTimeMs = laneSelectedTimeMs,
-                    selectedEntryStarts = laneSelectedEntries.map { it.entryStartMs }.toSet(),
-                    selectedChainEffectIds = laneSelectedEntries.mapNotNull { it.clipId }.toSet(),
-                    onDropInFile = { file, atTimeMs ->
-                        viewModel.addAudioFileToTrack(
-                            trackIndex = index,
-                            file = file,
-                            at = atTimeMs
-                        )
-                    },
-                    onDropInAudioSource = { source, atTimeMs ->
-                        viewModel.addAudioSourceToTrack(
-                            trackIndex = index,
-                            sourceId = source.id,
-                            at = atTimeMs,
-                        )
-                    },
-                    onSelectTime = { rawClickTimeMs ->
-                        val rawTimeMs = rawClickTimeMs.coerceAtLeast(0)
-                        val snapped = if (windowInfo.keyboardModifiers.isAltPressed) {
-                            rawTimeMs
-                        } else {
-                            GridUtils.snapToGrid(
-                                rawTimeMs,
-                                renderViewport.zoomX,
-                                WorkspaceRepository.bpm.value,
-                                WorkspaceRepository.gridType.value,
+                    TimelineLane(
+                        track = track,
+                        trackIndex = index,
+                        nestingLevel = trackRow.nestingLevel,
+                        viewport = renderViewport,
+                        selectedTimeMs = laneSelectedTimeMs,
+                        selectedEntryStarts = laneSelectedEntries.map { it.entryStartMs }.toSet(),
+                        selectedChainEffectIds = laneSelectedEntries.mapNotNull { it.clipId }.toSet(),
+                        onDropInFile = { file, atTimeMs ->
+                            viewModel.addAudioFileToTrack(
+                                trackIndex = index,
+                                file = file,
+                                at = atTimeMs
                             )
-                        }
-                        SelectionManager.select(Selectable.TimelineTime(trackIndex = index, timeMs = snapped))
-                    },
-                    onSelectEntry = { entryStart ->
-                        SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = index, entryStartMs = entryStart))
-                    },
-                    onMoveEntry = { oldStart, newStart ->
-                        when (track) {
-                            is AudioTimelineTrack -> viewModel.moveAudioEntry(index, oldStart, newStart)
-                            is MidiTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
-                        }
-                    },
-                    onTrimAudioEntry = { oldStart, trimmedEntry ->
-                        viewModel.resizeAudioEntry(index, oldStart, trimmedEntry)
-                    },
-                    clipDragCallbacks = { key: TimelineClipKey ->
-                        TimelineClipDragCallbacks(
-                            onStart = { pointerRoot ->
-                                clipDragCoordinator.begin(
-                                    anchorKey = key,
-                                    pointerRoot = pointerRoot,
-                                    viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
-                                    tracks = viewModel.tracks.value,
+                        },
+                        onDropInAudioSource = { source, atTimeMs ->
+                            viewModel.addAudioSourceToTrack(
+                                trackIndex = index,
+                                sourceId = source.id,
+                                at = atTimeMs,
+                            )
+                        },
+                        onSelectTime = { rawClickTimeMs ->
+                            val rawTimeMs = rawClickTimeMs.coerceAtLeast(0)
+                            val snapped = if (windowInfo.keyboardModifiers.isAltPressed) {
+                                rawTimeMs
+                            } else {
+                                GridUtils.snapToGrid(
+                                    rawTimeMs,
+                                    renderViewport.zoomX,
+                                    WorkspaceRepository.bpm.value,
+                                    WorkspaceRepository.gridType.value,
                                 )
-                            },
-                            onDrag = { pointerRoot ->
-                                clipDragCoordinator.updatePointer(pointerRoot)
-                                val surface = clipDragCoordinator.surfaceBoundsInRoot
-                                if (surface.width > 0f) {
-                                    val localX = pointerRoot.x - surface.left
-                                    val edgeWidth = 56f
-                                    val scrollDelta = when {
-                                        localX < edgeWidth -> -((edgeWidth - localX) / edgeWidth * 24f)
-                                        localX > surface.width - edgeWidth ->
-                                            ((localX - (surface.width - edgeWidth)) / edgeWidth * 24f)
-                                        else -> 0f
-                                    }
-                                    if (scrollDelta != 0f) {
-                                        viewModel.updateViewport { current ->
-                                            viewportWithTimelineMetrics(current).panBy(scrollDelta)
+                            }
+                            SelectionManager.select(Selectable.TimelineTime(trackIndex = index, timeMs = snapped))
+                        },
+                        onSelectEntry = { entryStart ->
+                            SelectionManager.select(Selectable.TimelineEntryItem(trackIndex = index, entryStartMs = entryStart))
+                        },
+                        onMoveEntry = { oldStart, newStart ->
+                            when (track) {
+                                is AudioTimelineTrack -> viewModel.moveAudioEntry(index, oldStart, newStart)
+                                is MidiTimelineTrack -> viewModel.moveMidiEntry(index, oldStart, newStart)
+                            }
+                        },
+                        onTrimAudioEntry = { oldStart, trimmedEntry ->
+                            viewModel.resizeAudioEntry(index, oldStart, trimmedEntry)
+                        },
+                        clipDragCallbacks = { key: TimelineClipKey ->
+                            TimelineClipDragCallbacks(
+                                onStart = { pointerRoot ->
+                                    clipDragCoordinator.begin(
+                                        anchorKey = key,
+                                        pointerRoot = pointerRoot,
+                                        viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
+                                        tracks = viewModel.tracks.value,
+                                    )
+                                },
+                                onDrag = { pointerRoot ->
+                                    clipDragCoordinator.updatePointer(pointerRoot)
+                                    val surface = clipDragCoordinator.surfaceBoundsInRoot
+                                    if (surface.width > 0f) {
+                                        val localX = pointerRoot.x - surface.left
+                                        val edgeWidth = 56f
+                                        val scrollDelta = when {
+                                            localX < edgeWidth -> -((edgeWidth - localX) / edgeWidth * 24f)
+                                            localX > surface.width - edgeWidth ->
+                                                ((localX - (surface.width - edgeWidth)) / edgeWidth * 24f)
+                                            else -> 0f
+                                        }
+                                        if (scrollDelta != 0f) {
+                                            viewModel.updateViewport { current ->
+                                                viewportWithTimelineMetrics(current).panBy(scrollDelta)
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            onEnd = {
-                                clipDragCoordinator.buildCommand(
-                                    viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
-                                    bpm = bpm,
-                                    gridType = gridType,
-                                    snapEnabled = !windowInfo.keyboardModifiers.isShiftPressed,
-                                    copy = windowInfo.keyboardModifiers.isAltPressed,
-                                )?.let(TimelineCommandExecutor::execute)
-                                clipDragCoordinator.finish()
-                            },
-                            onCancel = clipDragCoordinator::finish,
-                            hideSource = {
-                                !windowInfo.keyboardModifiers.isAltPressed &&
-                                    clipDragPreview.placements.any { it.source == key }
-                            },
-                            visualStartMs = {
-                                if (windowInfo.keyboardModifiers.isAltPressed) key.entryStartMs else clipDragPreview.placements
-                                    .firstOrNull { it.source == key }
-                                    ?.targetStartMs
-                            },
-                        )
-                    },
-                    onLaneBoundsChanged = clipDragCoordinator::updateLaneBounds,
-                    onResizeEntry = { oldStart, newStart, newDuration ->
-                        when (track) {
-                            is MidiTimelineTrack -> viewModel.resizeMidiEntry(index, oldStart, newStart, newDuration)
-                            else -> { /* ignore for audio for now */ }
-                        }
-                    },
-                    onDoubleClickLane = { timeMs -> onOpenMidiEntryAtTime(index, timeMs) },
-                    onCreateMidiClip = { startMs, endMs -> onCreateMidiEntry(index, startMs, endMs) },
-                    onCreateChainEffect = { startMs -> viewModel.createChainEffectEntry(index, startMs) },
-                    onSelectChainEffect = { clipId -> viewModel.selectChainEffectClip(index, clipId) },
-                    onMoveChainEffect = { clipId, newStart ->
-                        viewModel.moveChainEffect(trackIndex = index, clipId = clipId, requestedStartMs = newStart, snapEnabled = false)
-                    },
-                    onResizeChainEffect = { clipId, newStart, newDuration ->
-                        viewModel.resizeChainEffect(index, clipId, newStart, newDuration)
-                    },
-                    onOpenChainEffect = { clipId -> viewModel.openChainEffect(index, clipId) },
-                    resolveChainEffectEdit = { clipId, mode, deltaMs, snapEnabled ->
-                        viewModel.resolveChainEffectEdit(
-                            trackIndex = index,
-                            clipId = clipId,
-                            mode = mode,
-                            deltaMs = deltaMs,
-                            snapEnabled = snapEnabled,
-                        ) ?: ChainEffectSpan(startMs = 0L, durationMs = 1L)
-                    },
-                )
+                                },
+                                onEnd = {
+                                    clipDragCoordinator.buildCommand(
+                                        viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
+                                        bpm = bpm,
+                                        gridType = gridType,
+                                        snapEnabled = !windowInfo.keyboardModifiers.isShiftPressed,
+                                        copy = windowInfo.keyboardModifiers.isAltPressed,
+                                    )?.let(TimelineCommandExecutor::execute)
+                                    clipDragCoordinator.finish()
+                                },
+                                onCancel = clipDragCoordinator::finish,
+                                hideSource = {
+                                    !windowInfo.keyboardModifiers.isAltPressed &&
+                                        clipDragPreview.placements.any { it.source == key }
+                                },
+                                visualStartMs = {
+                                    if (windowInfo.keyboardModifiers.isAltPressed) key.entryStartMs else clipDragPreview.placements
+                                        .firstOrNull { it.source == key }
+                                        ?.targetStartMs
+                                },
+                            )
+                        },
+                        onLaneBoundsChanged = clipDragCoordinator::updateLaneBounds,
+                        onResizeEntry = { oldStart, newStart, newDuration ->
+                            when (track) {
+                                is MidiTimelineTrack -> viewModel.resizeMidiEntry(index, oldStart, newStart, newDuration)
+                                else -> { /* ignore for audio for now */ }
+                            }
+                        },
+                        onDoubleClickLane = { timeMs -> onOpenMidiEntryAtTime(index, timeMs) },
+                        onCreateMidiClip = { startMs, endMs -> onCreateMidiEntry(index, startMs, endMs) },
+                        onCreateChainEffect = { startMs -> viewModel.createChainEffectEntry(index, startMs) },
+                        onSelectChainEffect = { clipId -> viewModel.selectChainEffectClip(index, clipId) },
+                        onMoveChainEffect = { clipId, newStart ->
+                            viewModel.moveChainEffect(trackIndex = index, clipId = clipId, requestedStartMs = newStart, snapEnabled = false)
+                        },
+                        onResizeChainEffect = { clipId, newStart, newDuration ->
+                            viewModel.resizeChainEffect(index, clipId, newStart, newDuration)
+                        },
+                        onOpenChainEffect = { clipId -> viewModel.openChainEffect(index, clipId) },
+                        resolveChainEffectEdit = { clipId, mode, deltaMs, snapEnabled ->
+                            viewModel.resolveChainEffectEdit(
+                                trackIndex = index,
+                                clipId = clipId,
+                                mode = mode,
+                                deltaMs = deltaMs,
+                                snapEnabled = snapEnabled,
+                            ) ?: ChainEffectSpan(startMs = 0L, durationMs = 1L)
+                        },
+                    )
+                }
             }
+
         }
 
         PlayheadCursor(

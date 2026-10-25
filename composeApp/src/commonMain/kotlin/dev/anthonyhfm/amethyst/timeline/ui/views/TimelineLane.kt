@@ -1,11 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
-import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
-import dev.anthonyhfm.amethyst.timeline.ui.TimelineConsolidateAction
-import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
-
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,14 +16,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -37,80 +32,78 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import io.github.vinceglb.filekit.PlatformFile
-import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
-import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
-import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
-import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
-import dev.anthonyhfm.amethyst.core.engine.echo.Echo
-import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectEditMode
-import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
-import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
-import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
-import kotlin.math.min
-import kotlin.math.roundToInt
-import androidx.compose.foundation.gestures.detectDragGestures
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isAltPressed
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.zIndex
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Plus
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
+import com.mohamedrejeb.compose.dnd.drop.dropTarget
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.TimelineAreaSelection
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
+import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
+import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+import dev.anthonyhfm.amethyst.timeline.data.AudioSource
+import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
+import dev.anthonyhfm.amethyst.timeline.data.usToRoundedMs
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineConsolidateAction
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineExportAction
 import dev.anthonyhfm.amethyst.timeline.ui.components.AudioClip
-import dev.anthonyhfm.amethyst.timeline.ui.components.MidiClip
 import dev.anthonyhfm.amethyst.timeline.ui.components.ChainEffectClip
+import dev.anthonyhfm.amethyst.timeline.ui.components.MidiClip
 import dev.anthonyhfm.amethyst.timeline.ui.components.SelectionCursor
 import dev.anthonyhfm.amethyst.timeline.ui.components.timelineGridOverlay
+import dev.anthonyhfm.amethyst.timeline.ui.timelineAreaGestures
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectEditMode
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromViewport
 import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleTimelineRangePx
 import dev.anthonyhfm.amethyst.timeline.utils.findHeaderEntryHit
 import dev.anthonyhfm.amethyst.timeline.utils.isPointInsideAnyEntry
 import dev.anthonyhfm.amethyst.timeline.utils.trackIndexOf
 import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.ui.components.primitives.SmallShape
+import dev.anthonyhfm.amethyst.ui.dnd.fileDropTarget
+import dev.anthonyhfm.amethyst.ui.modifier.BlockEditorShortcuts
+import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
+import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.extension
 import io.github.vinceglb.filekit.name
-import io.github.vinceglb.filekit.nameWithoutExtension
-import com.composeunstyled.Text
-import com.composeunstyled.theme.Theme
-import com.mohamedrejeb.compose.dnd.drop.dropTarget
-import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
-import dev.anthonyhfm.amethyst.ui.modifier.BlockEditorShortcuts
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
-import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Plus
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.text.font.FontWeight
-import dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import io.github.vinceglb.filekit.path
-import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
-import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
-import dev.anthonyhfm.amethyst.timeline.ui.components.AudioClipSkeletonView
-import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromViewport
-import dev.anthonyhfm.amethyst.timeline.data.AudioSource
-import dev.anthonyhfm.amethyst.timeline.data.usToRoundedMs
-import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
+import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun TimelineLane(
@@ -147,9 +140,6 @@ fun TimelineLane(
     val zoomLevel = viewport.zoomX
     val bpm by WorkspaceRepository.bpm.collectAsState()
     val gridType by WorkspaceRepository.gridType.collectAsState()
-    var rangeStartMs by remember(track, zoomLevel) { mutableStateOf<Long?>(null) }
-    var rangeEndMs by remember(track, zoomLevel) { mutableStateOf<Long?>(null) }
-    var rangeActive by remember { mutableStateOf(false) }
     var isFileHovering by remember { mutableStateOf(false) }
     var isLibraryHovering by remember { mutableStateOf(false) }
     var laneBoundsInRoot by remember { mutableStateOf(Rect.Zero) }
@@ -210,148 +200,52 @@ fun TimelineLane(
     val laneInteractionModifier = if (automationOverlayActive) {
         Modifier
     } else {
-        Modifier
-            .pointerInput(track, zoomLevel, bpm, gridType) {
-                var previousPressTimeMs: Long? = null
-                var previousPressPosition: Offset? = null
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
-                            val change = event.changes.firstOrNull() ?: continue
-                            if (change.isConsumed) {
-                                continue
-                            }
-                            focusManager.clearFocus()
-                            val pos = change.position
-                            val chainHit = (track as? MidiTimelineTrack)?.chainEffectEntries?.values?.firstOrNull { entry ->
-                                val timeMs = currentViewport.value.screenToTimeMs(screenX = pos.x)
-                                timeMs >= entry.startTimeMs && timeMs < entry.endTimeMs
-                            }
-                            if (chainHit != null) {
-                                onSelectChainEffect(chainHit.clipId)
-                                continue
-                            }
-                            val headerHit = findHeaderEntryHit(
-                                track = track,
-                                x = pos.x.toDouble() + currentViewport.value.scrollX.toDouble(),
-                                y = pos.y,
-                                zoom = currentViewport.value.zoomX,
-                                headerHeightPx = headerHeightPx
-                            )
-                            if (headerHit != null) {
-                                onSelectEntry(headerHit)
-                                change.consume()
-                                continue
-                            }
-                            val snappedMs = computeSnappedTimeFromViewport(
-                                screenX = pos.x,
-                                viewport = currentViewport.value,
-                                bpm = bpm,
-                                gridType = gridType,
-                                snapEnabled = currentSnapEnabled.value,
-                            )
-                            val previousTime = previousPressTimeMs
-                            val previousPosition = previousPressPosition
-                            val doubleClickedEmptySpace = track is MidiTimelineTrack &&
-                                !isPointInsideAnyEntry(track = track, timeMs = snappedMs) &&
-                                previousTime != null &&
-                                change.uptimeMillis - previousTime <= viewConfiguration.doubleTapTimeoutMillis &&
-                                previousPosition != null &&
-                                (pos - previousPosition).getDistance() <= viewConfiguration.touchSlop * 2f
-                            if (doubleClickedEmptySpace) {
-                                previousPressTimeMs = null
-                                previousPressPosition = null
-                                onDoubleClickLane(snappedMs)
-                            } else {
-                                previousPressTimeMs = change.uptimeMillis
-                                previousPressPosition = pos
-                                onSelectTime(snappedMs)
-                            }
-                            change.consume()
-                        }
+        Modifier.timelineAreaGestures(
+            onSelectPoint = { position, extend ->
+                val timeMs = computeSnappedTimeFromViewport(
+                    screenX = position.x,
+                    viewport = currentViewport.value,
+                    bpm = bpm,
+                    gridType = gridType,
+                    snapEnabled = currentSnapEnabled.value,
+                )
+                if (extend) {
+                    TimelineAreaSelection.select(trackIndex = trackIndex, timeMs = timeMs, extend = true)
+                } else {
+                    onSelectTime(timeMs)
+                }
+            },
+            onPressOverride = { position ->
+                focusManager.clearFocus()
+                val hit = findHeaderEntryHit(
+                    track = track,
+                    x = position.x.toDouble() + currentViewport.value.scrollX.toDouble(),
+                    y = position.y,
+                    zoom = currentViewport.value.zoomX,
+                    headerHeightPx = headerHeightPx,
+                )
+                if (hit != null) {
+                    onSelectEntry(hit)
+                    true
+                } else {
+                    false
+                }
+            },
+            onDoubleClick = { position ->
+                if (track is MidiTimelineTrack) {
+                    val timeMs = computeSnappedTimeFromViewport(
+                        screenX = position.x,
+                        viewport = currentViewport.value,
+                        bpm = bpm,
+                        gridType = gridType,
+                        snapEnabled = currentSnapEnabled.value,
+                    )
+                    if (!isPointInsideAnyEntry(track = track, timeMs = timeMs)) {
+                        onDoubleClickLane(timeMs)
                     }
                 }
-            }
-            .pointerInput(track, zoomLevel, bpm, gridType) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val headerHit = findHeaderEntryHit(
-                            track = track,
-                            x = offset.x.toDouble() + currentViewport.value.scrollX.toDouble(),
-                            y = offset.y,
-                            zoom = currentViewport.value.zoomX,
-                            headerHeightPx = headerHeightPx
-                        )
-                        if (headerHit != null) {
-                            onSelectEntry(headerHit)
-                            rangeActive = false
-                            rangeStartMs = null
-                            rangeEndMs = null
-                            return@detectDragGestures
-                        }
-                        val startMs = computeSnappedTimeFromViewport(
-                            screenX = offset.x,
-                            viewport = currentViewport.value,
-                            bpm = bpm,
-                            gridType = gridType,
-                            snapEnabled = currentSnapEnabled.value,
-                        )
-                        if (!isPointInsideAnyEntry(track, startMs)) {
-                            rangeStartMs = startMs
-                            rangeEndMs = startMs
-                            rangeActive = true
-                        } else {
-                            rangeActive = false
-                            rangeStartMs = null
-                            rangeEndMs = null
-                        }
-                    },
-                    onDrag = { change, _ ->
-                        if (rangeActive && rangeStartMs != null) {
-                            val currentMs = computeSnappedTimeFromViewport(
-                                screenX = change.position.x,
-                                viewport = currentViewport.value,
-                                bpm = bpm,
-                                gridType = gridType,
-                                snapEnabled = currentSnapEnabled.value,
-                            )
-                            if (currentMs != rangeEndMs) rangeEndMs = currentMs
-                        }
-                        change.consume()
-                    },
-                    onDragEnd = {
-                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                            val start = rangeStartMs!!.coerceAtLeast(0L)
-                            val end = rangeEndMs!!.coerceAtLeast(0L)
-                            val normalizedStart = min(start, end)
-                            val normalizedEnd = maxOf(start, end)
-                            if (normalizedEnd > normalizedStart) {
-                                SelectionManager.select(
-                                    Selectable.TimelineRange(
-                                        trackIndex = trackIndexOf(track),
-                                        startMs = normalizedStart,
-                                        endMs = normalizedEnd
-                                    )
-                                )
-                            } else {
-                                SelectionManager.select(
-                                    Selectable.TimelineTime(
-                                        trackIndex = trackIndexOf(track),
-                                        timeMs = normalizedStart
-                                    )
-                                )
-                            }
-                        }
-                        rangeActive = false
-                    },
-                    onDragCancel = {
-                        rangeActive = false
-                        rangeStartMs = null
-                        rangeEndMs = null
-                    }
-                )
-            }
+            },
+        )
     }
 
     Column(
@@ -592,6 +486,7 @@ fun TimelineLane(
                 properties = PopupProperties(focusable = true),
             ) {
                 ContextMenuContent {
+                    TimelineExportAction(onInvoked = { showContextMenu = false })
                     if (track is AudioTimelineTrack) {
                         TimelineConsolidateAction(
                             onInvoked = { showContextMenu = false },
@@ -636,16 +531,8 @@ fun TimelineLane(
             )
         }
 
-        val overlayStart = when {
-            rangeActive && rangeStartMs != null && rangeEndMs != null -> min(rangeStartMs!!, rangeEndMs!!)
-            selectedRange != null -> selectedRange.startMs
-            else -> null
-        }
-        val overlayEnd = when {
-            rangeActive && rangeStartMs != null && rangeEndMs != null -> maxOf(rangeStartMs!!, rangeEndMs!!)
-            selectedRange != null -> selectedRange.endMs
-            else -> null
-        }
+        val overlayStart = selectedRange?.startMs
+        val overlayEnd = selectedRange?.endMs
         val rangeWindow = if (overlayStart != null && overlayEnd != null) {
             computeVisibleTimelineRangePx(startMs = overlayStart, endMs = overlayEnd, viewport = viewport)
         } else {
@@ -659,7 +546,7 @@ fun TimelineLane(
                     .height(timelineDimensions.laneHeight)
                     .background(timelinePalette.selectionFill)
                     .border(1.dp, timelinePalette.selectionStroke, RoundedCornerShape(timelineDimensions.selectionCornerRadius))
-                    .zIndex(0.5f)
+                    .zIndex(5f)
             ) {}
         }
         // Clips fill the lane Box directly — their offset is computed in screen space.

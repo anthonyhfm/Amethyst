@@ -2,7 +2,24 @@ package dev.anthonyhfm.amethyst.timeline
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.TimelineAreaSelection
+import dev.anthonyhfm.amethyst.core.controls.selection.toTimelineEntrySelection
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.devices.GenericChainDevice
+import dev.anthonyhfm.amethyst.devices.TimelineDuration
+import dev.anthonyhfm.amethyst.devices.TimelineTriggerable
+import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineTimingContext
+import dev.anthonyhfm.amethyst.timeline.data.AudioDecodingManager
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
+import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.ChainEffectEntry
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
@@ -15,39 +32,22 @@ import dev.anthonyhfm.amethyst.timeline.data.copyWithShiftedStartMs
 import dev.anthonyhfm.amethyst.timeline.data.cropAudioEntryEnd
 import dev.anthonyhfm.amethyst.timeline.data.deepCopy
 import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
-import dev.anthonyhfm.amethyst.timeline.data.timelineTrackRows
-import dev.anthonyhfm.amethyst.timeline.data.trimAudioEntry
-import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipContext
-import dev.anthonyhfm.amethyst.timeline.contract.TimelineTimingContext
-import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
-import dev.anthonyhfm.amethyst.core.controls.selection.toTimelineEntrySelection
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectEditMode
-import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
-import dev.anthonyhfm.amethyst.timeline.utils.resolveChainEffectSpan
-import dev.anthonyhfm.amethyst.devices.effects.composition.CompositionChainDevice
-import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
-import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
-import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
-import dev.anthonyhfm.amethyst.core.engine.echo.Echo
-import dev.anthonyhfm.amethyst.core.util.UUID
-import dev.anthonyhfm.amethyst.core.util.randomUUID
-import dev.anthonyhfm.amethyst.timeline.data.AudioDecodingManager
-import dev.anthonyhfm.amethyst.timeline.data.AudioSource
-import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.timeline.data.msToUs
 import dev.anthonyhfm.amethyst.timeline.data.samplesToUs
+import dev.anthonyhfm.amethyst.timeline.data.timelineTrackRows
 import dev.anthonyhfm.amethyst.timeline.data.withDecodedSourceMetadata
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectEditMode
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.utils.resolveChainEffectSpan
+import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.timeline.viewport.TimelineViewportLimits
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
-import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
-import dev.anthonyhfm.amethyst.timeline.viewport.TimelineViewportLimits
-import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.devices.TimelineDuration
-import dev.anthonyhfm.amethyst.devices.TimelineTriggerable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -132,6 +132,7 @@ class TimelineViewModel : ViewModel() {
     }
 
     private fun pruneTimelineSelections(tracks: List<TimelineTrack<*>>) {
+        TimelineAreaSelection.current()
         val visibleTrackIndices = tracks.timelineTrackRows().mapTo(mutableSetOf()) { it.trackIndex }
         val filteredSelections = SelectionManager.selections.value.filter { selection ->
             when (selection) {
@@ -1256,33 +1257,16 @@ class TimelineViewModel : ViewModel() {
     }
 
     private fun nudgeSelectedTimelineTime(direction: Int, extend: Boolean): Boolean {
-        val selection = SelectionManager.selections.value
-            .firstOrNull { it is Selectable.TimelineTime || it is Selectable.TimelineRange }
-            ?: return false
         val intervals = GridUtils.computeWithGridType(
             zoomLevel = _viewport.value.zoomX,
             bpm = WorkspaceRepository.bpm.value,
             gridType = WorkspaceRepository.gridType.value,
         )
-        val targetSelection = adjacentTimelineTimeSelection(
-            selection = selection,
+        val targetTimeMs = TimelineAreaSelection.moveHorizontal(
             intervals = intervals,
             direction = direction,
-            extend = extend
+            extend = extend,
         ) ?: return false
-        val targetTimeMs = when (targetSelection) {
-            is Selectable.TimelineTime -> targetSelection.timeMs
-            is Selectable.TimelineRange -> {
-                if (targetSelection.anchorTimeMs == targetSelection.startMs) {
-                    targetSelection.endMs
-                } else {
-                    targetSelection.startMs
-                }
-            }
-
-            else -> return false
-        }
-        SelectionManager.select(element = targetSelection)
         updateViewport { viewport ->
             val viewportWidth = viewport.viewportWidth
             if (viewportWidth <= 0f) return@updateViewport viewport

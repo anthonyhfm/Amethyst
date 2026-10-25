@@ -1,6 +1,5 @@
 package dev.anthonyhfm.amethyst.workspace.ui.components
 
-import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -42,9 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.GripVertical
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.GripVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Music
 import com.composables.icons.lucide.Pause
@@ -55,25 +54,17 @@ import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
 import com.composeunstyled.Icon
 import com.composeunstyled.Text
-import com.composeunstyled.theme.Theme
 import com.composeunstyled.rememberDialogState
+import com.composeunstyled.theme.Theme
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.reorder.ReorderContainer
 import com.mohamedrejeb.compose.dnd.reorder.ReorderableItem
 import com.mohamedrejeb.compose.dnd.reorder.rememberReorderState
-import dev.anthonyhfm.amethyst.core.util.fileDialogSettings
 import dev.anthonyhfm.amethyst.core.engine.echo.Echo
+import dev.anthonyhfm.amethyst.core.util.fileDialogSettings
 import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.timeline.data.StemKind
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
-import dev.anthonyhfm.amethyst.ui.components.primitives.Button
-import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
-import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
-import dev.anthonyhfm.amethyst.ui.components.primitives.Progress
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialog
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogAction
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogCancel
@@ -81,9 +72,17 @@ import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogDescription
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogFooter
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogHeader
 import dev.anthonyhfm.amethyst.ui.components.primitives.AlertDialogTitle
+import dev.anthonyhfm.amethyst.ui.components.primitives.Button
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonSize
+import dev.anthonyhfm.amethyst.ui.components.primitives.ButtonVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.components.primitives.Dialog
 import dev.anthonyhfm.amethyst.ui.components.primitives.DialogContent
+import dev.anthonyhfm.amethyst.ui.components.primitives.Progress
 import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
 import dev.anthonyhfm.amethyst.ui.components.primitives.Switch
@@ -98,23 +97,24 @@ import dev.anthonyhfm.amethyst.ui.theme.h4
 import dev.anthonyhfm.amethyst.ui.theme.muted
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.mutedText
-import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
+import dev.anthonyhfm.amethyst.ui.theme.primary
 import dev.anthonyhfm.amethyst.ui.theme.secondary
 import dev.anthonyhfm.amethyst.ui.theme.secondaryForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.AudioSourceRemovalResult
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
-import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
 import dev.anthonyhfm.amethyst.workspace.audio.CUDA_RUNTIME_DOWNLOAD_BYTES
-import dev.anthonyhfm.amethyst.workspace.audio.StemSeparationConfig
-import dev.anthonyhfm.amethyst.workspace.audio.StemSeparationModel
+import dev.anthonyhfm.amethyst.workspace.audio.LocalAudioLibraryDragAndDropState
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionJob
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionRepository
 import dev.anthonyhfm.amethyst.workspace.audio.StemExtractionStage
+import dev.anthonyhfm.amethyst.workspace.audio.StemSeparationConfig
+import dev.anthonyhfm.amethyst.workspace.audio.StemSeparationModel
 import dev.anthonyhfm.amethyst.workspace.audio.displayName
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository.AudioSourceRemovalResult
+import dev.anthonyhfm.amethyst.workspace.audio.export.AudioExport
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
@@ -583,6 +583,7 @@ private fun AudioLibraryStemItem(
     }
 
     ContextMenu(modifier = Modifier.fillMaxWidth(), trigger = rowContent) {
+        AudioSourceExportAction(source = source)
         ContextMenuItem(
             onClick = onRemove,
             variant = ContextMenuItemVariant.Destructive,
@@ -720,6 +721,7 @@ private fun AudioLibraryItem(
             modifier = Modifier.fillMaxWidth(),
             trigger = cardContent,
         ) {
+            AudioSourceExportAction(source = source)
             ContextMenuItem(
                 onClick = onExtract,
                 enabled = canSeparateStems,
@@ -1115,5 +1117,15 @@ private fun formatSampleRate(sampleRate: Int): String =
 private fun Modifier.blockParentAudioDrag(): Modifier = pointerInput(Unit) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).consume()
+    }
+}
+
+@Composable
+private fun AudioSourceExportAction(source: AudioSource) {
+    if (AudioExport.isAvailable) {
+        ContextMenuItem(onClick = { AudioExport.openSource(source = source) }) {
+            Text(text = stringResource(resource = Res.string.audio_export_title))
+        }
+        ContextMenuSeparator()
     }
 }

@@ -1091,4 +1091,22 @@
     <string name="timeline_clip_action_consolidate">Consolidate</string>
     <string name="timeline_consolidation_progress">Consolidating…</string>
     <string name="timeline_consolidation_failed">Could not consolidate audio</string>
+    <string name="audio_export_title">Export Audio…</string>
+    <string name="audio_export_heading">Export Audio</string>
+    <string name="audio_export_selection_action">Export Selection as Audio…</string>
+    <string name="audio_export_scope">Export</string>
+    <string name="audio_export_selection">Selection</string>
+    <string name="audio_export_entire">Entire audio timeline</string>
+    <string name="audio_export_range">%1$s – %2$s · Duration %3$s</string>
+    <string name="audio_export_format">Format</string>
+    <string name="audio_export_sample_rate">Sample rate</string>
+    <string name="audio_export_bit_depth">Bit depth</string>
+    <string name="audio_export_quality">MP3 quality</string>
+    <string name="audio_export_empty">Select audio clips or a time range containing audio.</string>
+    <string name="audio_export_muted">All included clips are muted or excluded by global solo. Change mute/solo before opening export again.</string>
+    <string name="audio_export_missing">An audio source is missing. Reimport it before exporting.</string>
+    <string name="audio_export_progress">Exporting… %1$d%%</string>
+    <string name="audio_export_failed">Audio export failed</string>
+    <string name="audio_export_overwrite">A file with this name already exists. Replace it?</string>
+    <string name="audio_export_reveal_failed">Audio saved, but its folder could not be opened</string>
 </resources>

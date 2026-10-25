@@ -14,6 +14,7 @@ androidx-test-junit = "1.2.1"
 compose-multiplatform = "1.12.1"
 filekitCore = "0.16.0"
 junit = "4.13.2"
+jump3r = "1.0.6"
 koinCore = "4.1.0-Beta5"
 kotlin = "2.4.20"
 kotlinx-coroutines = "1.11.0"
@@ -29,6 +30,7 @@ ktor = "3.1.3"
 gobley = "0.3.7"
 
 [libraries]
+jump3r = { module = "io.github.raphimc:jump3r", version.ref = "jump3r" }
 filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "filekitCore" }
 filekit-dialogs = { module = "io.github.vinceglb:filekit-dialogs", version.ref = "filekitCore" }
 jetbrains-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3Version" }

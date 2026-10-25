@@ -12,15 +12,16 @@ import androidx.compose.ui.input.key.type
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
-import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.selection.TimelineAreaSelection
+import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.GridIntervals
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.narrower
 import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.wider
-import dev.anthonyhfm.amethyst.timeline.utils.GridUtils.GridIntervals
 import dev.anthonyhfm.amethyst.timeline.utils.TimelineClipUtils
-import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 
 object TimelineKeyHandler {
@@ -541,21 +542,7 @@ object TimelineKeyHandler {
         val tracks = TimelineRepository.tracks.value
         if (tracks.isEmpty()) return true
 
-        val timeSelection = SelectionManager.selections.value
-            .filterIsInstance<Selectable.TimelineTime>()
-            .firstOrNull()
-        if (timeSelection != null) {
-            val targetIndex = adjacentTimelineTrackIndex(
-                currentTrackIndex = timeSelection.trackIndex,
-                direction = direction,
-                trackCount = tracks.size,
-            ) ?: return true
-            SelectionManager.select(
-                Selectable.TimelineTime(
-                    trackIndex = targetIndex,
-                    timeMs = timeSelection.timeMs,
-                )
-            )
+        if (TimelineAreaSelection.moveVertical(direction = direction, extend = extend)) {
             return true
         }
 

@@ -14,6 +14,7 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationPoint
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.data.deepCopy
+import dev.anthonyhfm.amethyst.workspace.audio.export.captureTimelineExport
 
 object TimelineCommandSurface {
     fun canConsolidateSelection(
@@ -33,16 +34,20 @@ object TimelineCommandSurface {
         entryStartMs: Long? = null,
     ): Boolean {
         val selections = SelectionManager.selections.value
-        if (entryStartMs == null) {
-            return resolveAudioConsolidation(selections = selections).any { target ->
-                target.trackIndex == trackIndex && timeMs * 1_000.0 >= target.startUs && timeMs * 1_000.0 < target.endUs
-            }
-        }
         val inRange = selections.filterIsInstance<Selectable.TimelineRange>().any {
             it.trackIndex == trackIndex && timeMs >= minOf(it.startMs, it.endMs) && timeMs < maxOf(it.startMs, it.endMs)
         }
         val hasAutomationSelection = selections.any {
             it is Selectable.TimelineAutomationLane || it is Selectable.TimelineAutomationPoint
+        }
+        if (entryStartMs == null) {
+            val hasSelectedAudio = inRange && !hasAutomationSelection && captureTimelineExport(
+                tracks = TimelineRepository.tracks.value,
+                selections = selections,
+            ) != null
+            return hasSelectedAudio || resolveAudioConsolidation(selections = selections).any { target ->
+                target.trackIndex == trackIndex && timeMs * 1_000.0 >= target.startUs && timeMs * 1_000.0 < target.endUs
+            }
         }
         if (inRange && !hasAutomationSelection) {
             return true
