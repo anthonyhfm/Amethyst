@@ -106,6 +106,8 @@ internal expect fun mapPcmFile(path: String, expectedBytes: Int): PcmByteStorage
 internal object ProjectPcmFiles {
     private val lock = SynchronizedObject()
     private val temporaryPaths = mutableSetOf<String>()
+    private val pinnedPaths = mutableMapOf<String, Int>()
+    private val pendingDeletion = mutableSetOf<String>()
 
     fun keep(bytes: ByteArray): PcmByteStorage = if (bytes.size >= MAPPED_PCM_THRESHOLD_BYTES) {
         runCatching { store(bytes = bytes) }.getOrElse { InMemoryPcmBytes(bytes = bytes) }
@@ -171,18 +173,65 @@ internal object ProjectPcmFiles {
         }
     }
 
-    fun retain(paths: Set<String>) {
-        val discarded = synchronized(lock = lock) {
-            temporaryPaths.filter { it !in paths }.also { temporaryPaths.removeAll(elements = it.toSet()) }
+    fun pin(paths: Set<String>): () -> Unit {
+        var released = false
+        synchronized(lock = lock) {
+            paths.forEach { path ->
+                pinnedPaths[path] = (pinnedPaths[path] ?: 0) + 1
+            }
         }
-        discarded.forEach { ConversionTempFiles.remove(path = it) }
+        return {
+            val removed = synchronized(lock = lock) {
+                if (released) {
+                    return@synchronized emptyList()
+                }
+                released = true
+                paths.filter { path ->
+                    val remaining = (pinnedPaths[path] ?: 1) - 1
+                    if (remaining > 0) {
+                        pinnedPaths[path] = remaining
+                        false
+                    } else {
+                        pinnedPaths.remove(key = path)
+                        if (pendingDeletion.remove(element = path)) {
+                            temporaryPaths.remove(element = path)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }
+            }
+            removed.forEach { ConversionTempFiles.remove(path = it) }
+        }
+    }
+
+    fun retain(paths: Set<String>) {
+        val removed = synchronized(lock = lock) {
+            pendingDeletion.removeAll(elements = paths)
+            collectDiscardedPaths(paths = temporaryPaths - paths)
+        }
+        removed.forEach { ConversionTempFiles.remove(path = it) }
     }
 
     internal fun discard(paths: Set<String>) {
         val removed = synchronized(lock = lock) {
-            temporaryPaths.filter { it in paths }.also { temporaryPaths.removeAll(elements = it.toSet()) }
+            collectDiscardedPaths(paths = paths)
         }
         removed.forEach { ConversionTempFiles.remove(path = it) }
+    }
+
+    private fun collectDiscardedPaths(paths: Set<String>): List<String> {
+        return temporaryPaths.filter { path ->
+            if (path !in paths) {
+                false
+            } else if (path in pinnedPaths) {
+                pendingDeletion.add(element = path)
+                false
+            } else {
+                true
+            }
+        }.also { temporaryPaths.removeAll(elements = it.toSet()) }
     }
 
     fun clear() = retain(paths = emptySet())

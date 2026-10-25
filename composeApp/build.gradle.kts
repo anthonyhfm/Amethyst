@@ -141,6 +141,7 @@ kotlin {
             implementation(libs.ktor.client.darwin)
         }
         desktopMain.dependencies {
+            implementation(libs.jump3r)
             implementation(compose.desktop.currentOs) {
                 exclude(compose.material)
             }

@@ -1083,4 +1083,22 @@
     <string name="timeline_clip_action_consolidate">Consolidate</string>
     <string name="timeline_consolidation_progress">Audio wird konsolidiert…</string>
     <string name="timeline_consolidation_failed">Audio konnte nicht konsolidiert werden</string>
+    <string name="audio_export_title">Audio exportieren …</string>
+    <string name="audio_export_heading">Audio exportieren</string>
+    <string name="audio_export_selection_action">Auswahl als Audio exportieren …</string>
+    <string name="audio_export_scope">Exportumfang</string>
+    <string name="audio_export_selection">Auswahl</string>
+    <string name="audio_export_entire">Gesamte Audio-Timeline</string>
+    <string name="audio_export_range">%1$s – %2$s · Dauer %3$s</string>
+    <string name="audio_export_format">Format</string>
+    <string name="audio_export_sample_rate">Samplerate</string>
+    <string name="audio_export_bit_depth">Bittiefe</string>
+    <string name="audio_export_quality">MP3-Qualität</string>
+    <string name="audio_export_empty">Wähle Audio-Clips oder einen Zeitbereich mit Audio aus.</string>
+    <string name="audio_export_muted">Alle enthaltenen Clips sind stummgeschaltet oder durch globales Solo ausgeschlossen. Ändere Mute/Solo und öffne den Export erneut.</string>
+    <string name="audio_export_missing">Eine Audioquelle fehlt. Importiere sie vor dem Export erneut.</string>
+    <string name="audio_export_progress">Audio wird exportiert … %1$d%%</string>
+    <string name="audio_export_failed">Audio-Export fehlgeschlagen</string>
+    <string name="audio_export_overwrite">Eine Datei mit diesem Namen existiert bereits. Ersetzen?</string>
+    <string name="audio_export_reveal_failed">Audio gespeichert, aber der Ordner konnte nicht geöffnet werden</string>
 </resources>

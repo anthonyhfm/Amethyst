@@ -1,0 +1,7 @@
+Audio export uses jump3r 1.0.6, a Java port of the LAME MP3 encoder.
+Project and source: https://codeberg.org/RaphiMC/jump3r
+Published source archive: https://repo.maven.apache.org/maven2/io/github/raphimc/jump3r/1.0.6/jump3r-1.0.6-sources.jar
+Contributors include the L.A.M.E. project, Ken Haendel, Vadym Vikulin,
+Hanns Holger Rutz, and RK_01.
+License: GNU Lesser General Public License version 2.1 or later.
+A copy is included in licenses/jump3r-LGPL-2.1.txt.

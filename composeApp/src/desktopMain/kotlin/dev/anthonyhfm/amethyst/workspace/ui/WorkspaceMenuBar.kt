@@ -1,8 +1,6 @@
 package dev.anthonyhfm.amethyst.workspace.ui
 
-import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,17 +25,19 @@ import dev.anthonyhfm.amethyst.ui.theme.AmethystTheme
 import dev.anthonyhfm.amethyst.workspace.WorkspaceMenuCommandSurface
 import dev.anthonyhfm.amethyst.workspace.WorkspacePrimaryMode
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.audio.export.AudioExport
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.launch
 import dev.nucleusframework.application.NucleusDecoratedWindowScope
 import dev.nucleusframework.menu.macos.NativeKeyShortcut
 import dev.nucleusframework.menu.macos.NativeMenuBar
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
@@ -78,6 +78,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
     var showAboutDialog by remember { mutableStateOf(false) }
 
     val aboutLabel = stringResource(Res.string.workspace_menubar_help_about)
+    val exportLabel = stringResource(resource = Res.string.audio_export_title)
     val fileLabel = stringResource(Res.string.workspace_menubar_file)
     val emptyProjectsLabel = stringResource(Res.string.home_projects_empty_title)
     val saveLabel = stringResource(Res.string.workspace_menubar_file_save)
@@ -195,6 +196,11 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
                 onClick = {
                     viewModel.saveProjectAs()
                 }
+            )
+
+            Item(
+                text = exportLabel,
+                onClick = { AudioExport.openTimeline() },
             )
 
             Separator()

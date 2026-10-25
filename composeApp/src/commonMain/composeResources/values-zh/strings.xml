@@ -992,4 +992,22 @@
     <string name="timeline_clip_action_consolidate">合并片段</string>
     <string name="timeline_consolidation_progress">正在合并…</string>
     <string name="timeline_consolidation_failed">无法合并音频</string>
+    <string name="audio_export_title">导出音频…</string>
+    <string name="audio_export_heading">导出音频</string>
+    <string name="audio_export_selection_action">将选区导出为音频…</string>
+    <string name="audio_export_scope">导出范围</string>
+    <string name="audio_export_selection">选区</string>
+    <string name="audio_export_entire">整个音频时间线</string>
+    <string name="audio_export_range">%1$s – %2$s · 时长 %3$s</string>
+    <string name="audio_export_format">格式</string>
+    <string name="audio_export_sample_rate">采样率</string>
+    <string name="audio_export_bit_depth">位深度</string>
+    <string name="audio_export_quality">MP3 音质</string>
+    <string name="audio_export_empty">请选择音频片段或包含音频的时间范围。</string>
+    <string name="audio_export_muted">所有片段均已静音或被全局独奏排除。请调整静音/独奏后重新打开导出。</string>
+    <string name="audio_export_missing">缺少音频源。请重新导入后再导出。</string>
+    <string name="audio_export_progress">正在导出… %1$d%%</string>
+    <string name="audio_export_failed">音频导出失败</string>
+    <string name="audio_export_overwrite">同名文件已存在。是否替换？</string>
+    <string name="audio_export_reveal_failed">音频已保存，但无法打开所在文件夹</string>
 </resources>

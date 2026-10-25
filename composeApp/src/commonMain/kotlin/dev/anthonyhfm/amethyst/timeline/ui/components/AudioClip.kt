@@ -1,13 +1,12 @@
 package dev.anthonyhfm.amethyst.timeline.ui.components
 
-import dev.anthonyhfm.amethyst.timeline.ui.TimelineConsolidateAction
-import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
-
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -17,18 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import com.composeunstyled.Text
-import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.ui.theme.small
-import dev.anthonyhfm.amethyst.ui.theme.typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -39,71 +31,76 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import dev.anthonyhfm.amethyst.core.util.primaryModifierShortcutLabel
-import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.util.primaryModifierShortcutLabel
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
 import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
 import dev.anthonyhfm.amethyst.timeline.TimelineEditCommand
+import dev.anthonyhfm.amethyst.timeline.data.AudioDecodingManager
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
-import dev.anthonyhfm.amethyst.timeline.data.msToUs
 import dev.anthonyhfm.amethyst.timeline.data.resizeLeftTo
 import dev.anthonyhfm.amethyst.timeline.data.resizeRightTo
 import dev.anthonyhfm.amethyst.timeline.data.samplesToUs
 import dev.anthonyhfm.amethyst.timeline.data.usToRoundedMs
-import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
-import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
-import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.timeline.ui.LocalTimelineAreaInteraction
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineConsolidateAction
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineExportAction
+import dev.anthonyhfm.amethyst.timeline.ui.timelineAreaGestures
 import dev.anthonyhfm.amethyst.timeline.ui.timelineClipVisualOffsetPx
-import dev.anthonyhfm.amethyst.timeline.utils.computeSnappedTimeFromViewport
-import dev.anthonyhfm.amethyst.timeline.data.AudioDecodingManager
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
+import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleClipWindowPx
+import dev.anthonyhfm.amethyst.timeline.utils.projectTimelineSpanPx
+import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
 import dev.anthonyhfm.amethyst.ui.components.WaveformView
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
+import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.ui.theme.TimelineClipRole
 import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
-import dev.anthonyhfm.amethyst.ui.modifier.ResizeLeft
-import dev.anthonyhfm.amethyst.ui.modifier.ResizeRight
+import dev.anthonyhfm.amethyst.ui.theme.small
+import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.timeline.utils.computeVisibleClipWindowPx
-import dev.anthonyhfm.amethyst.timeline.utils.projectTimelineSpanPx
 import kotlin.math.round
-import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AudioClip(
@@ -161,9 +158,8 @@ fun AudioClip(
     }
     val waveformColor = TimelineTheme.audioWaveformColor(automationOverlayActive = automationOverlayActive)
 
-    var rangeActive by remember { mutableStateOf(false) }
-    var rangeStartMs by remember { mutableStateOf<Long?>(null) }
-    var rangeEndMs by remember { mutableStateOf<Long?>(null) }
+    val areaGestureKey = "audio:$trackIndex:${audioEntry.startTimeUs}"
+    val rangeActive = LocalTimelineAreaInteraction.current?.gestureOwner == areaGestureKey
     val snapEnabled = !windowInfo.keyboardModifiers.isAltPressed
     val currentSnapEnabled = rememberUpdatedState(snapEnabled)
     val currentViewport = rememberUpdatedState(viewport)
@@ -517,98 +513,13 @@ fun AudioClip(
                     .fillMaxWidth()
                     .then(
                         if (interactionEnabled) {
-                            Modifier.pointerInput(audioEntry.startTimeMs, zoomLevel, bpm, gridType) {
-                                detectDragGestures(
-                                    onDragStart = { offset ->
-                                        val startMs = computeSnappedTimeFromViewport(
-                                            screenX = currentClipScreenLeftPx.value + offset.x,
-                                            viewport = currentViewport.value,
-                                            bpm = bpm,
-                                            gridType = gridType,
-                                            snapEnabled = currentSnapEnabled.value,
-                                        )
-                                        rangeStartMs = startMs
-                                        rangeEndMs = startMs
-                                        rangeActive = true
-                                    },
-                                    onDrag = { change, _ ->
-                                        if (rangeActive && rangeStartMs != null) {
-                                            val currentMs = computeSnappedTimeFromViewport(
-                                                screenX = currentClipScreenLeftPx.value + change.position.x,
-                                                viewport = currentViewport.value,
-                                                bpm = bpm,
-                                                gridType = gridType,
-                                                snapEnabled = currentSnapEnabled.value,
-                                            )
-                                            if (currentMs != rangeEndMs) {
-                                                rangeEndMs = currentMs
-                                            }
-                                            change.consume()
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                                            val start = rangeStartMs!!.coerceAtLeast(0L)
-                                            val end = rangeEndMs!!.coerceAtLeast(0L)
-                                            val normalizedStart = kotlin.math.min(start, end)
-                                            val normalizedEnd = kotlin.math.max(start, end)
-                                            if (normalizedEnd > normalizedStart) {
-                                                SelectionManager.select(
-                                                    Selectable.TimelineRange(
-                                                        trackIndex = trackIndex,
-                                                        startMs = normalizedStart,
-                                                        endMs = normalizedEnd
-                                                    )
-                                                )
-                                            }
-                                        }
-                                        rangeActive = false
-                                        rangeStartMs = null
-                                        rangeEndMs = null
-                                    },
-                                    onDragCancel = {
-                                        rangeActive = false
-                                        rangeStartMs = null
-                                        rangeEndMs = null
-                                    }
-                                )
-                            }
+                            Modifier.timelineAreaGestures(gestureKey = areaGestureKey)
                         } else {
                             Modifier
                         }
                     )
                     .drawWithContent {
                         drawContent()
-                        if (rangeActive && rangeStartMs != null && rangeEndMs != null) {
-                            val start = kotlin.math.min(rangeStartMs!!, rangeEndMs!!)
-                            val end = kotlin.math.max(rangeStartMs!!, rangeEndMs!!)
-                            val clipStartUs = previewAudioEntry.startTimeUs
-                            val clipEndUs = previewAudioEntry.endTimeUs
-                            val visibleStartUs = msToUs(start).coerceIn(clipStartUs, clipEndUs)
-                            val visibleEndUs = msToUs(end).coerceIn(clipStartUs, clipEndUs)
-
-                            if (visibleEndUs > visibleStartUs) {
-                                val localStartPx = projectTimelineSpanPx(
-                                    startTimeMs = visibleStartUs / 1000.0,
-                                    endTimeMs = visibleStartUs / 1000.0,
-                                    zoomX = zoomLevel,
-                                ).startPx - clipWindow.visibleContentStartPx
-                                val localEndPx = projectTimelineSpanPx(
-                                    startTimeMs = visibleEndUs / 1000.0,
-                                    endTimeMs = visibleEndUs / 1000.0,
-                                    zoomX = zoomLevel,
-                                ).startPx - clipWindow.visibleContentStartPx
-                                val startX = localStartPx.toFloat()
-                                val width = (localEndPx - localStartPx).coerceAtLeast(1).toFloat()
-
-                                drawRect(
-                                    color = timelinePalette.selectionFill,
-                                    topLeft = Offset(startX, 0f),
-                                    size = Size(width, size.height)
-                                )
-                            }
-                        }
-
                         if (automationOverlayActive) {
                             drawRect(
                                 color = timelinePalette.laneSurfaceRaised.copy(alpha = 0.34f)
@@ -759,6 +670,7 @@ fun AudioClip(
                 onClick = { TimelineCommandSurface.duplicateEntries(contextEntryTargets) }
             )
             TimelineConsolidateAction()
+            TimelineExportAction()
             ContextMenuSeparator()
             TimelineContextMenuAction(
                 label = if (contextEntryTargets.size > 1) stringResource(Res.string.timeline_clip_action_delete_multiple) else stringResource(Res.string.timeline_clip_action_delete_single),
