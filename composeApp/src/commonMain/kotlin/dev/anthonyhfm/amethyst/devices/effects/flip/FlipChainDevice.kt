@@ -21,7 +21,7 @@ import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.engine.elements.Signal
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 import dev.anthonyhfm.amethyst.devices.DeviceState
-import dev.anthonyhfm.amethyst.devices.LEDChainDevice
+import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.Checkbox
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
@@ -41,7 +41,7 @@ import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOr
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
-class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
+class FlipChainDevice : GenericChainDevice<FlipChainDeviceState>() {
     override fun timelineDuration(context: TimelineDurationContext) =
         TimelineDuration.None
     override val state = MutableStateFlow(FlipChainDeviceState())
@@ -133,40 +133,58 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
         }
     }
 
-    override fun ledSignalEnter(n: List<Signal.LED>) {
+    override fun signalEnter(n: List<Signal>) {
         val state = state.value
 
         val flippedSignals = n.map { signal ->
+            if (signal is Signal.AudioSignal) {
+                return@map signal
+            }
+            val x = when (signal) {
+                is Signal.LED -> signal.x
+                is Signal.Midi -> signal.x
+                else -> return@map signal
+            }
+            val y = when (signal) {
+                is Signal.LED -> signal.y
+                is Signal.Midi -> signal.y
+                else -> return@map signal
+            }
+            fun reposition(x: Int, y: Int): Signal = when (signal) {
+                is Signal.LED -> signal.copy(x = x, y = y)
+                is Signal.Midi -> signal.copy(x = x, y = y)
+                else -> signal
+            }
             val bounds = resolveBounds(signal, state.isolate)
             val rightEdgeX = bounds.first.x + bounds.second.width - 1
             val bottomEdgeY = bounds.first.y + bounds.second.height - 1
 
             when (state.mode) {
                 FlipChainDeviceState.FlipMode.HORIZONTAL -> {
-                    val flippedX = bounds.first.x + (rightEdgeX - signal.x)
+                    val flippedX = bounds.first.x + (rightEdgeX - x)
 
-                    signal.copy(x = flippedX)
+                    reposition(x = flippedX, y = y)
                 }
 
                 FlipChainDeviceState.FlipMode.VERTICAL -> {
-                    val flippedY = bounds.first.y + (bottomEdgeY - signal.y)
+                    val flippedY = bounds.first.y + (bottomEdgeY - y)
 
-                    signal.copy(y = flippedY)
+                    reposition(x = x, y = flippedY)
                 }
 
                 FlipChainDeviceState.FlipMode.DIAGONAL_PLUS -> {
-                    val relativeX = signal.x - bounds.first.x
-                    val relativeY = signal.y - bounds.first.y
+                    val relativeX = x - bounds.first.x
+                    val relativeY = y - bounds.first.y
 
                     val flippedX = bounds.first.x + relativeY
                     val flippedY = bounds.first.y + relativeX
 
-                    signal.copy(x = flippedX, y = flippedY)
+                    reposition(x = flippedX, y = flippedY)
                 }
 
                 FlipChainDeviceState.FlipMode.DIAGONAL_MINUS -> {
-                    val relativeX = signal.x - bounds.first.x
-                    val relativeY = signal.y - bounds.first.y
+                    val relativeX = x - bounds.first.x
+                    val relativeY = y - bounds.first.y
 
                     val flippedRelativeX = bounds.second.height - 1 - relativeY
                     val flippedRelativeY = bounds.second.width - 1 - relativeX
@@ -174,7 +192,7 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
                     val flippedX = bounds.first.x + flippedRelativeX
                     val flippedY = bounds.first.y + flippedRelativeY
 
-                    signal.copy(x = flippedX, y = flippedY)
+                    reposition(x = flippedX, y = flippedY)
                 }
             }
         }
@@ -186,12 +204,22 @@ class FlipChainDevice : LEDChainDevice<FlipChainDeviceState>() {
         })
     }
 
-    private fun resolveBounds(signal: Signal.LED, isolate: Boolean): Pair<IntOffset, IntSize> {
+    private fun resolveBounds(signal: Signal, isolate: Boolean): Pair<IntOffset, IntSize> {
         val workspaceBounds = WorkspaceRepository.bounds.takeIf { it.second.width > 0 && it.second.height > 0 }
             ?: (IntOffset.Zero to IntSize(10, 10))
         if (!isolate) return workspaceBounds
 
-        val device = resolveLaunchpadOrigin(signal.origin, signal.x, signal.y) ?: return workspaceBounds
+        val x = when (signal) {
+            is Signal.LED -> signal.x
+            is Signal.Midi -> signal.x
+            else -> return workspaceBounds
+        }
+        val y = when (signal) {
+            is Signal.LED -> signal.y
+            is Signal.Midi -> signal.y
+            else -> return workspaceBounds
+        }
+        val device = resolveLaunchpadOrigin(signal.origin, x, y) ?: return workspaceBounds
         return Pair(
             first = IntOffset(
                 x = device.position.value.x.toInt(),

@@ -59,10 +59,13 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
             ((state.value.repeat - 1).coerceAtLeast(0).toLong() * interval).coerceAtLeast(0L)
         )
     }
-    private val activeHoldKeys = mutableSetOf<String>()
+    private data class SignalKey(val origin: Any?, val x: Int, val y: Int, val layer: Int?)
+
+    private val activeHoldKeys = mutableSetOf<SignalKey>()
+    private val activeOutputs = mutableMapOf<SignalKey, Signal>()
     private val activeHoldKeysLock = SynchronizedObject()
 
-    private fun isHeld(ownerKey: String): Boolean = synchronized(activeHoldKeysLock) {
+    private fun isHeld(ownerKey: SignalKey): Boolean = synchronized(activeHoldKeysLock) {
         ownerKey in activeHoldKeys
     }
     override val state = MutableStateFlow(LoopChainDeviceState())
@@ -146,6 +149,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                                 checked = deviceState.onHold,
                                 onCheckedChange = { checked ->
                                     val before = state.value
+                                    onChoke()
                                     updateStateFromUser { it.copy(onHold = checked) }
                                     pushStateChange(before, state.value)
                                 },
@@ -253,14 +257,18 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
             }
 
             if (down) {
-                val signalOwner = Pair(this, "${coords.first},${coords.second}")
-                val ownerKey = signalOwner.second as String
+                val signalOwner = Pair(
+                    first = this,
+                    second = SignalKey(
+                        origin = signal.origin,
+                        x = coords.first,
+                        y = coords.second,
+                        layer = (signal as? Signal.LED)?.layer,
+                    ),
+                )
+                val ownerKey = signalOwner.second
 
-                Heaven.cancelJobs { job ->
-                    job.owner is Pair<*, *> &&
-                            job.owner.first == this &&
-                            job.owner.second == ownerKey
-                }
+                Heaven.cancelJobsForOwner(owner = this, identifier = ownerKey)
 
                 if (!state.value.onHold) {
                     // Non-hold mode: schedule all signals at once
@@ -268,8 +276,8 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     for (i in 0..state.value.repeat - 1) {
                         val delay = i * intervalMs
 
-                        Heaven.schedule(delay.toDouble(), owner = signalOwner) {
-                            signalExit?.invoke(listOf(signal))
+                        Heaven.schedule(delay.toDouble(), owner = this, identifier = ownerKey) {
+                            emit(signal = signal)
                         }
                     }
                 } else {
@@ -277,7 +285,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     synchronized(activeHoldKeysLock) {
                         activeHoldKeys.add(ownerKey)
                     }
-                    signalExit?.invoke(listOf(signal))
+                    emit(signal = signal)
 
                     val intervalMs = loopIntervalMs(bpm).coerceAtLeast(minimumValue = 1L).toDouble()
                     val cycleAnchorMs = Heaven.time
@@ -287,9 +295,9 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                         else -> signal
                     }
 
-                    Heaven.schedule(intervalMs / 2.0, owner = signalOwner) {
+                    Heaven.schedule(intervalMs / 2.0, owner = this, identifier = ownerKey) {
                         if (isHeld(ownerKey = ownerKey) && state.value.onHold) {
-                            signalExit?.invoke(listOf(offSignal))
+                            emit(signal = offSignal)
                         }
                     }
 
@@ -303,16 +311,24 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     )
                 }
             } else { // key up
-                val signalOwner = Pair(this, "${coords.first},${coords.second}")
-                val ownerKey = signalOwner.second as String
+                val signalOwner = Pair(
+                    first = this,
+                    second = SignalKey(
+                        origin = signal.origin,
+                        x = coords.first,
+                        y = coords.second,
+                        layer = (signal as? Signal.LED)?.layer,
+                    ),
+                )
+                val ownerKey = signalOwner.second
 
                 if (!state.value.onHold) {
                     val intervalMs = loopIntervalMs(bpm)
                     for (i in 0..state.value.repeat - 1) {
                         val delay = i * intervalMs
 
-                        Heaven.schedule(delay.toDouble(), owner = signalOwner) {
-                            signalExit?.invoke(listOf(signal))
+                        Heaven.schedule(delay.toDouble(), owner = this, identifier = ownerKey) {
+                            emit(signal = signal)
                         }
                     }
                     return@forEach
@@ -322,23 +338,10 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                     activeHoldKeys.remove(ownerKey)
                 }
 
-                // Emit a final off to stop the held loop cleanly
-                signalExit?.invoke(
-                    listOf(
-                        when (signal) {
-                            is Signal.LED -> signal.copy(color = Color.Black)
-                            is Signal.Midi -> signal.copy(velocity = 0)
-                            else -> signal
-                        }
-                    )
-                )
+                emit(signal = signal)
 
                 // Cancel any ongoing loops for this key
-                Heaven.cancelJobs { job ->
-                    job.owner is Pair<*, *> &&
-                            job.owner.first == this &&
-                            job.owner.second == ownerKey
-                }
+                Heaven.cancelJobsForOwner(owner = this, identifier = ownerKey)
             }
         }
     }
@@ -350,7 +353,7 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
         intervalMs: Double,
         iteration: Int
     ) {
-        val ownerKey = (signalOwner as? Pair<*, *>)?.second as? String ?: return
+        val ownerKey = (signalOwner as? Pair<*, *>)?.second as? SignalKey ?: return
         val nextDelayMs = delayUntilIteration(
             cycleAnchorMs = cycleAnchorMs,
             intervalMs = intervalMs,
@@ -358,12 +361,12 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
             nowMs = Heaven.time
         )
 
-        Heaven.schedule(nextDelayMs, owner = signalOwner) {
+        Heaven.schedule(nextDelayMs, owner = this, identifier = ownerKey) {
             if (!isHeld(ownerKey = ownerKey) || !state.value.onHold) {
                 return@schedule
             }
 
-            signalExit?.invoke(listOf(signal))
+            emit(signal = signal)
 
             val offSignal = when (signal) {
                 is Signal.LED -> signal.copy(color = Color.Black)
@@ -371,9 +374,9 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
                 else -> signal
             }
 
-            Heaven.schedule(intervalMs / 2.0, owner = signalOwner) {
+            Heaven.schedule(intervalMs / 2.0, owner = this, identifier = ownerKey) {
                 if (isHeld(ownerKey = ownerKey) && state.value.onHold) {
-                    signalExit?.invoke(listOf(offSignal))
+                    emit(signal = offSignal)
                 }
             }
 
@@ -389,17 +392,56 @@ class LoopChainDevice : GenericChainDevice<LoopChainDeviceState>(), Chokeable {
 
     private fun loopIntervalMs(bpm: Double): Long {
         return (state.value.timing.toMsValue(bpm) * (state.value.gate * 2f)).roundToInt().toLong()
+            .coerceAtLeast(minimumValue = 1L)
+    }
+
+    private fun emit(signal: Signal) {
+        val key = when (signal) {
+            is Signal.LED -> SignalKey(origin = signal.origin, x = signal.x, y = signal.y, layer = signal.layer)
+            is Signal.Midi -> SignalKey(origin = signal.origin, x = signal.x, y = signal.y, layer = null)
+            else -> return
+        }
+        synchronized(activeHoldKeysLock) {
+            val on = when (signal) {
+                is Signal.LED -> signal.color != Color.Black
+                is Signal.Midi -> signal.velocity > 0
+                else -> false
+            }
+            if (on) {
+                activeOutputs[key] = signal
+            } else {
+                activeOutputs.remove(key = key)
+            }
+            signalExit?.invoke(listOf(signal))
+        }
     }
 
     override fun onChoke() {
+        Heaven.cancelJobsForOwner(owner = this)
         synchronized(activeHoldKeysLock) {
             activeHoldKeys.clear()
+            val offSignals = activeOutputs.values.map { signal ->
+                when (signal) {
+                    is Signal.LED -> signal.copy(color = Color.Black)
+                    is Signal.Midi -> signal.copy(velocity = 0, audioTriggerBatch = null)
+                    else -> signal
+                }
+            }
+            activeOutputs.clear()
+            if (offSignals.isNotEmpty()) {
+                signalExit?.invoke(offSignals)
+            }
         }
-        // Cancel all scheduled Heaven tasks owned by this device
-        // The loop device uses Pair(this, "${coords.first},${coords.second}") as owner
-        Heaven.cancelJobs { job ->
-            job.owner is Pair<*, *> && job.owner.first == this
-        }
+    }
+
+    override fun onStateRestored() {
+        onChoke()
+        super.onStateRestored()
+    }
+
+    override fun onRemovedFromChain() {
+        onChoke()
+        super.onRemovedFromChain()
     }
 
     companion object : ChainDeviceFactory<LoopChainDeviceState> {

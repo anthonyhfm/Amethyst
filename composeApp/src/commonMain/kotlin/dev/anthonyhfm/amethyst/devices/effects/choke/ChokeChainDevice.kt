@@ -53,7 +53,7 @@ import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
-class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChainDevice {
+class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChainDevice, Chokeable {
     override val state = MutableStateFlow(ChokeChainDeviceState())
     override val helpRef = "Choke"
     override val capabilities: Set<DeviceCapability> = setOf(
@@ -128,12 +128,25 @@ class ChokeChainDevice : GenericChainDevice<ChokeChainDeviceState>(), NestedChai
         }
     }
 
+    override fun onChoke() {
+        performChoke()
+    }
+
     private fun performChoke() {
-        state.value.chain.devices.value.forEach { device ->
-            if (device is Chokeable) {
-                device.onChoke()
+        val visited = mutableSetOf<Chain>()
+        fun stop(chain: Chain) {
+            if (!visited.add(element = chain)) {
+                return
+            }
+            chain.devices.value.forEach { device ->
+                if (device is Chokeable) {
+                    device.onChoke()
+                } else if (device is NestedChainDevice) {
+                    device.nestedChains().forEach { stop(chain = it) }
+                }
             }
         }
+        stop(chain = state.value.chain)
 
         synchronized(outputLock) {
             val offSignals = outputSignals.drainOffSignals()

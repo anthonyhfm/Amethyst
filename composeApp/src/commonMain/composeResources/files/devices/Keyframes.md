@@ -13,7 +13,7 @@ When a positive (non-black) LED signal enters the device, it plays back the pre-
 The way the device operates depends on the selected playback mode:
 * **Mono** – Starts the animation playback. Any new incoming signal will stop currently running sequences, ensuring only the most recently triggered animation plays.
 * **Poly** – Starts the animation independently for each incoming signal, allowing multiple animations to overlap and play concurrently without interrupting each other.
-* **Loop** – Continuously loops the animation sequence for as long as the incoming signal is held (until an off signal is received).
+* **Loop** – Plays up to the configured Repeats count while the incoming signal is held. Releasing the pad stops playback early; a new press starts the count again. Converted projects using the explicit Continuous mode continue to loop without a repeat limit.
 
 ### Checkboxes & Settings
 

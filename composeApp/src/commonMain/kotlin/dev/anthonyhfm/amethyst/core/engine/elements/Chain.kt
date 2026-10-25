@@ -5,12 +5,23 @@ import androidx.compose.runtime.mutableStateOf
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
+import dev.anthonyhfm.amethyst.devices.Chokeable
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.NestedChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
 
 open class Chain : SignalReceiver() {
+    fun stopOutput() {
+        devices.value.forEach { device ->
+            if (device is Chokeable) {
+                device.onChoke()
+            } else if (device is NestedChainDevice) {
+                device.nestedChains().forEach { it.stopOutput() }
+            }
+        }
+    }
+
     val devices: MutableState<List<GenericChainDevice<*>>> = mutableStateOf(emptyList())
     var collaborationSyncEnabled: Boolean = true
     internal var topologyChangedListener: (() -> Unit)? = null

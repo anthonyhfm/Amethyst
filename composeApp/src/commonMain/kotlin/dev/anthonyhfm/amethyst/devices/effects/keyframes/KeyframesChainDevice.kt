@@ -133,14 +133,14 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     override fun timelineDuration(context: TimelineDurationContext): TimelineDuration {
         val current = state.value
-        if (current.playbackMode == PlaybackMode.Loop || current.playbackMode == PlaybackMode.Continuous) {
+        if (current.playbackMode == PlaybackMode.Continuous) {
             return TimelineDuration.Unbounded
         }
         val duration = current.frames.indices.sumOf { index ->
             val frame = current.frames[index]
             val enteringGate = current.frames.getOrNull(index + 1)?.gate ?: current.terminalGate
             (frame.timing.toMsValue(context.bpm) * (enteringGate * 2f)).toLong()
-        } * current.repeats.coerceAtLeast(0)
+        } * current.repeats.coerceAtLeast(1)
         return TimelineDuration.Finite(duration.coerceAtLeast(0L))
     }
 
@@ -1248,7 +1248,7 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
     private fun startPlayback(triggerSignal: Signal.LED) {
         val stateSnapshot = state.value
-        val repeats = stateSnapshot.repeats
+        val repeats = stateSnapshot.repeats.coerceAtLeast(minimumValue = 1)
         val animation = stateSnapshot.renderedAnimation
         val totalDuration = animation.lastOrNull()?.first ?: 0
         val identifier = if (stateSnapshot.playbackMode == PlaybackMode.Poly) triggerSignal.x * 10 + triggerSignal.y else null
@@ -1286,6 +1286,10 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
 
         fun playOnce() {
             if (!heldSignals.contains(identifier)) return
+            if (stateSnapshot.playbackMode == PlaybackMode.Loop && iteration >= stateSnapshot.repeats.coerceAtLeast(1)) {
+                onPlaybackEnd?.invoke()
+                return
+            }
             animation.forEach { (time, signals) ->
                 Heaven.scheduleAt(
                     targetTimeNanos = keyframeLoopTargetTimeNanos(
