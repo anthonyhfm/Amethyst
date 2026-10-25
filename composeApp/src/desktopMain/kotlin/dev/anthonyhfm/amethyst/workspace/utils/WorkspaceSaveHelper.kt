@@ -1,27 +1,29 @@
 package dev.anthonyhfm.amethyst.workspace.utils
 
-import org.jetbrains.compose.resources.getString
 import amethyst.composeapp.generated.resources.Res
-import amethyst.composeapp.generated.resources.*
-import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
-import dev.anthonyhfm.amethyst.core.util.Zip
+import amethyst.composeapp.generated.resources.workspace_save_failed_title
+import amethyst.composeapp.generated.resources.workspace_save_untitled
+import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.openFileSaver
 import io.github.vinceglb.filekit.path
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToByteArray
-import java.nio.file.Files
 import java.nio.file.Paths
 import javax.swing.JOptionPane
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.getString
 
 object WorkspaceSaveHelper {
     enum class SavePhase {
@@ -37,138 +39,118 @@ object WorkspaceSaveHelper {
         val progress: Float,
     )
 
-    private const val WRITE_CHUNK_SIZE = 1024 * 1024
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val saveMutex = Mutex()
     private val _saveProgress = MutableStateFlow<SaveProgress?>(null)
+    private var pendingSaves = 0
 
     val saveProgress = _saveProgress.asStateFlow()
-    val isSaving: Boolean get() = saveMutex.isLocked
+    val isSaving: Boolean get() = _saveProgress.value != null
 
-    /**
-     * Saves the current workspace, prompting for a file path if not already set.
-     * Returns true if save was successful, false if cancelled.
-     */
-    suspend fun saveWorkspace(): Boolean {
-        if (!saveMutex.tryLock()) return false
+    suspend fun saveWorkspace(): Boolean = requestSave(choosePath = false)
 
-        try {
-            var path = WorkspaceRepository.workspaceMeta?.path
+    suspend fun saveWorkspaceAs(): Boolean = requestSave(choosePath = true)
 
-            if (path == null) {
-                path = FileKit.openFileSaver(
-                    suggestedName = WorkspaceRepository.workspaceMeta?.title
-                        ?: getString(Res.string.workspace_save_untitled),
-                    defaultExtension = "ame"
-                )?.path ?: return false
-            }
-
-            return writeToPath(path)
-        } finally {
-            saveMutex.unlock()
-        }
+    suspend fun awaitPendingSaves() {
+        saveProgress.first { it == null }
     }
 
-    /**
-     * Always opens a file-save dialog, ignoring any existing path (Save As).
-     * Returns true if save was successful, false if cancelled.
-     */
-    suspend fun saveWorkspaceAs(): Boolean {
-        if (!saveMutex.tryLock()) return false
-
-        try {
-            val path = FileKit.openFileSaver(
-                suggestedName = WorkspaceRepository.workspaceMeta?.title
-                    ?: getString(Res.string.workspace_save_untitled),
-                defaultExtension = "ame"
-            )?.path ?: return false
-
-            return writeToPath(path)
-        } finally {
-            saveMutex.unlock()
-        }
-    }
-
-    @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun writeToPath(rawPath: String): Boolean {
-        val path = if (rawPath.endsWith(".ame", ignoreCase = true)) rawPath else "$rawPath.ame"
-        val destination = Paths.get(path).toAbsolutePath().normalize().toString()
-        updateProgress(destination, SavePhase.Preparing, 0.05f)
-
-        val result = try {
-            runCatching {
-                // Give Compose a chance to display the modal before the workspace snapshot is built.
-                yield()
-                val savedRevision = WorkspaceRepository.currentChangeRevision()
-                val workspace = withContext(Dispatchers.Default) {
-                    WorkspaceRepository.saveWorkspace()
-                }
-
-                updateProgress(destination, SavePhase.Compressing, 0.30f)
-                val bytes = withContext(Dispatchers.Default) {
-                    Zip.encode(
-                        data = AmethystProtoBuf.encodeToByteArray(value = workspace)
+    private suspend fun requestSave(choosePath: Boolean): Boolean = withContext(Dispatchers.Main.immediate) {
+        saveScope.async(start = CoroutineStart.UNDISPATCHED) {
+            pendingSaves++
+            try {
+                if (_saveProgress.value == null) {
+                    updateProgress(
+                        destination = WorkspaceRepository.workspaceMeta?.path.orEmpty(),
+                        phase = SavePhase.Preparing,
+                        progress = 0.02f,
                     )
                 }
-
-                updateProgress(destination, SavePhase.Writing, 0.65f)
-                withContext(Dispatchers.IO) {
-                    val outputPath = Paths.get(path)
-                    outputPath.parent?.let { Files.createDirectories(it) }
-                    Files.newOutputStream(outputPath).buffered().use { output ->
-                        var offset = 0
-                        while (offset < bytes.size) {
-                            val count = minOf(WRITE_CHUNK_SIZE, bytes.size - offset)
-                            output.write(bytes, offset, count)
-                            offset += count
-                            val writtenFraction = if (bytes.isEmpty()) 1f else offset.toFloat() / bytes.size
-                            updateProgress(
-                                destination = destination,
-                                phase = SavePhase.Writing,
-                                progress = 0.65f + writtenFraction * 0.30f,
-                            )
-                        }
-                    }
-                }
-
-                updateProgress(destination, SavePhase.Finishing, 0.98f)
-                WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = path)
-                    ?: WorkspaceRepository.workspaceMeta
-
-                HomeRepository.rememberRecentWorkspace(
-                    title = WorkspaceRepository.workspaceMeta?.title
-                        ?: getString(Res.string.workspace_save_untitled),
-                    path = path,
+                val workspaceChain = WorkspaceRepository.lightsChain
+                val workspace = WorkspaceRepository.saveWorkspace()
+                val snapshot = WorkspaceSaveSnapshot.capture(
+                    workspace = workspace,
+                    revision = WorkspaceRepository.currentChangeRevision(),
                 )
+                val requestedPath = workspace.path
 
-                WorkspaceRepository.markSaved(savedRevision)
-                updateProgress(destination, SavePhase.Finishing, 1f)
-                true
+                saveMutex.withLock {
+                    val existingPath = requestedPath ?: WorkspaceRepository.workspaceMeta?.path
+                    val rawPath = if (choosePath || existingPath == null) {
+                        FileKit.openFileSaver(
+                            suggestedName = snapshot.title.ifBlank {
+                                getString(resource = Res.string.workspace_save_untitled)
+                            },
+                            defaultExtension = "ame",
+                        )?.path ?: return@withLock false
+                    } else {
+                        existingPath
+                    }
+                    writeToPath(rawPath = rawPath, snapshot = snapshot, workspaceChain = workspaceChain)
+                }
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (cause: Exception) {
+                cause.printStackTrace()
+                JOptionPane.showMessageDialog(
+                    null,
+                    "Unable to save workspace:\n${cause.message ?: cause::class.simpleName}",
+                    getString(Res.string.workspace_save_failed_title),
+                    JOptionPane.ERROR_MESSAGE,
+                )
+                false
+            } finally {
+                pendingSaves--
+                if (pendingSaves == 0) {
+                    _saveProgress.value = null
+                }
             }
-        } finally {
-            _saveProgress.value = null
+        }.await()
+    }
+
+    private suspend fun writeToPath(
+        rawPath: String,
+        snapshot: WorkspaceSaveSnapshot,
+        workspaceChain: Chain,
+    ): Boolean {
+        val path = if (rawPath.endsWith(suffix = ".ame", ignoreCase = true)) rawPath else "$rawPath.ame"
+        val outputPath = Paths.get(path).toAbsolutePath().normalize()
+        val destination = outputPath.toString()
+        updateProgress(destination = destination, phase = SavePhase.Compressing, progress = 0.05f)
+
+        withContext(Dispatchers.IO) {
+            writeWorkspaceAtomically(destination = outputPath) { output ->
+                snapshot.writeTo(output = output) { fraction ->
+                    updateProgress(
+                        destination = destination,
+                        phase = SavePhase.Compressing,
+                        progress = 0.05f + fraction * 0.90f,
+                    )
+                }
+                updateProgress(destination = destination, phase = SavePhase.Writing, progress = 0.96f)
+            }
         }
 
-        result.exceptionOrNull()?.let { cause ->
-            if (cause is CancellationException) throw cause
+        updateProgress(destination = destination, phase = SavePhase.Finishing, progress = 0.99f)
+        if (WorkspaceRepository.lightsChain === workspaceChain) {
+            WorkspaceRepository.workspaceMeta = WorkspaceRepository.workspaceMeta?.copy(path = destination)
+            WorkspaceRepository.markSaved(revision = snapshot.revision)
         }
-
-        return result.getOrElse { cause ->
-            cause.printStackTrace()
-            JOptionPane.showMessageDialog(
-                null,
-                "Unable to save workspace:\n${cause.message ?: cause::class.simpleName}",
-                getString(Res.string.workspace_save_failed_title),
-                JOptionPane.ERROR_MESSAGE
-            )
-            false
+        withContext(Dispatchers.IO) {
+            runCatching {
+                HomeRepository.rememberRecentWorkspace(title = snapshot.title, path = destination)
+            }.onFailure { cause ->
+                cause.printStackTrace()
+            }
         }
+        return true
     }
 
     private fun updateProgress(destination: String, phase: SavePhase, progress: Float) {
         _saveProgress.value = SaveProgress(
             destination = destination,
             phase = phase,
-            progress = progress.coerceIn(0f, 1f),
+            progress = progress.coerceIn(minimumValue = 0f, maximumValue = 1f),
         )
     }
 }

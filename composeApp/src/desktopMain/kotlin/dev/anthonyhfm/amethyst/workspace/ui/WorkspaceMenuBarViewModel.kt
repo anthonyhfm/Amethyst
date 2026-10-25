@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceProjectOpenResult
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import javax.swing.JOptionPane
 
@@ -29,7 +30,7 @@ class WorkspaceMenuBarViewModel : ViewModel() {
     }
 
     fun saveProject() {
-        viewModelScope.launch {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             if (WorkspaceSaveHelper.saveWorkspace()) {
                 refreshRecentProjects()
             }
@@ -37,7 +38,7 @@ class WorkspaceMenuBarViewModel : ViewModel() {
     }
 
     fun saveProjectAs() {
-        viewModelScope.launch {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             if (WorkspaceSaveHelper.saveWorkspaceAs()) {
                 refreshRecentProjects()
             }

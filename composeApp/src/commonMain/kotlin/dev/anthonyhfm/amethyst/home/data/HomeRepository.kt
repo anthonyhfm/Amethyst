@@ -6,6 +6,7 @@ import dev.anthonyhfm.amethyst.conversion.unipad.UnipadConverter
 import dev.anthonyhfm.amethyst.core.data.settings.GlobalSettings
 import dev.anthonyhfm.amethyst.settings.data.GeneralSettings
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
+import dev.anthonyhfm.amethyst.core.util.readStreamingAmethystWorkspace
 import dev.anthonyhfm.amethyst.core.util.MobileFileStorage
 import dev.anthonyhfm.amethyst.core.util.Platform
 import dev.anthonyhfm.amethyst.core.util.Zip
@@ -463,11 +464,22 @@ object HomeRepository {
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun decodeAmethystWorkspace(file: PlatformFile): SavableWorkspaceData {
-        val bytes = Zip.decode(file.readBytes())
-        val workspace = try {
-            AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(bytes = bytes)
-        } catch (_: SerializationException) {
-            decodeLegacyInlineAudioWorkspace(bytes)
+        readStreamingAmethystWorkspace(file = file)?.let { workspace ->
+            workspace.path = file.path
+            return workspace
+        }
+        val compressed = ProjectLoadMetrics.measureSuspend(stage = "ame.read") {
+            file.readBytes()
+        }
+        val bytes = ProjectLoadMetrics.measure(stage = "ame.decompress") {
+            Zip.decode(data = compressed)
+        }
+        val workspace = ProjectLoadMetrics.measure(stage = "ame.deserialize") {
+            try {
+                AmethystProtoBuf.decodeFromByteArray<SavableWorkspaceData>(bytes = bytes)
+            } catch (_: SerializationException) {
+                decodeLegacyInlineAudioWorkspace(bytes)
+            }
         }
         workspace.path = file.path
         return workspace

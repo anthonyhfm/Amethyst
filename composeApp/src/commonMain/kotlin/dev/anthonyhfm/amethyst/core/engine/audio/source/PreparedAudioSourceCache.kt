@@ -177,6 +177,11 @@ object PreparedAudioSourceCache {
     }
 
     private fun resampleToPcm24(source: AudioSource, outputRate: Int): AudioSource {
+        val input = if (source is PcmAudioSource) {
+            BufferedPcmAudioSource(source = source)
+        } else {
+            source
+        }
         val outputFrames = (
             source.frameCount.toDouble() * outputRate / source.sampleRate
             ).toLong().coerceAtLeast(1L)
@@ -199,7 +204,11 @@ object PreparedAudioSourceCache {
                 val count = minOf(blockFrames, outputFrames.toInt() - outputFrame)
                 var localFrame = 0
                 while (localFrame < count) {
-                    resampler.readFrame(source = source, destination = frame)
+                    if (input is BufferedPcmAudioSource) {
+                        resampler.readBufferedFrame(source = input, destination = frame)
+                    } else {
+                        resampler.readFrame(source = input, destination = frame)
+                    }
                     var channel = 0
                     while (channel < source.channels) {
                         writePcm24(

@@ -131,6 +131,14 @@ internal object ProjectPcmFiles {
         return InMemoryPcmBytes(bytes = outputBytes)
     }
 
+    internal fun storeStreaming(expectedBytes: Int, producer: (PcmFileWriter) -> Unit): PcmByteStorage {
+        return if (expectedBytes >= MAPPED_PCM_THRESHOLD_BYTES) {
+            create(expectedBytes = expectedBytes, producer = producer)
+        } else {
+            prepare(expectedBytes = expectedBytes, producer = producer)
+        }
+    }
+
     private fun create(expectedBytes: Int, producer: (PcmFileWriter) -> Unit): PcmByteStorage {
         val path = ConversionTempFiles.newPath(extension = "pcm")
         try {
@@ -155,6 +163,13 @@ internal object ProjectPcmFiles {
             temporaryPaths.filter { it !in paths }.also { temporaryPaths.removeAll(elements = it.toSet()) }
         }
         discarded.forEach { ConversionTempFiles.remove(path = it) }
+    }
+
+    internal fun discard(paths: Set<String>) {
+        val removed = synchronized(lock = lock) {
+            temporaryPaths.filter { it in paths }.also { temporaryPaths.removeAll(elements = it.toSet()) }
+        }
+        removed.forEach { ConversionTempFiles.remove(path = it) }
     }
 
     fun clear() = retain(paths = emptySet())

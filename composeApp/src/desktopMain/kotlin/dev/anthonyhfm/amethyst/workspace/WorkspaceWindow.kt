@@ -7,6 +7,7 @@ import org.jetbrains.compose.resources.stringResource
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.amethyst_linux
 import amethyst.composeapp.generated.resources.amethyst_windows
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,9 +41,10 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.workspace.ui.SaveChangesDialog
-import dev.anthonyhfm.amethyst.workspace.ui.SavingProgressDialog
+import dev.anthonyhfm.amethyst.workspace.ui.SavingProgressIndicator
 import dev.anthonyhfm.amethyst.workspace.ui.WorkspaceMenuBar
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.Modifier
@@ -62,6 +64,8 @@ fun WorkspaceWindow(
     onExternalCloseConfirmed: () -> Unit = onClose,
     onExternalCloseCancelled: () -> Unit = { },
 ) {
+    var closingWorkspace by remember { mutableStateOf(false) }
+    var waitingForSave by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var pendingCloseAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingCancelAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -71,17 +75,33 @@ fun WorkspaceWindow(
     val windowTitle = "Amethyst - [${projectName ?: stringResource(Res.string.workspace_window_untitled_project)}]"
 
     fun closeWorkspace(afterClose: () -> Unit) {
-        Echo.stopAll()
-        WorkspaceRepository.clean()
-        afterClose()
+        if (closingWorkspace) {
+            return
+        }
+        closingWorkspace = true
+        coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            WorkspaceSaveHelper.awaitPendingSaves()
+            Echo.stopAll()
+            WorkspaceRepository.clean()
+            afterClose()
+        }
     }
 
     fun requestWorkspaceClose(
         afterClose: () -> Unit,
         afterCancel: () -> Unit = { }
     ) {
-        if (WorkspaceSaveHelper.isSaving) {
+        if (closingWorkspace || waitingForSave || showSaveDialog) {
             afterCancel()
+            return
+        }
+        if (WorkspaceSaveHelper.isSaving) {
+            waitingForSave = true
+            coroutineScope.launch {
+                WorkspaceSaveHelper.awaitPendingSaves()
+                waitingForSave = false
+                requestWorkspaceClose(afterClose = afterClose, afterCancel = afterCancel)
+            }
             return
         }
 
@@ -132,7 +152,7 @@ fun WorkspaceWindow(
                 (it.isCtrlPressed || it.isMetaPressed) &&
                 it.key == Key.S
             ) {
-                coroutineScope.launch {
+                coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
                     if (it.isShiftPressed) {
                         WorkspaceSaveHelper.saveWorkspaceAs()
                     } else {
@@ -175,6 +195,18 @@ fun WorkspaceWindow(
                 color = Theme[colors][foreground].copy(alpha = 0.6f),
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
+            saveProgress?.let { progress ->
+                AppLocaleProvider {
+                    AppLocaleRefreshBoundary {
+                        SavingProgressIndicator(
+                            progress = progress,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(end = 12.dp),
+                        )
+                    }
+                }
+            }
         }
 
         WorkspaceMenuBar(
@@ -193,9 +225,12 @@ fun WorkspaceWindow(
                     SaveChangesDialog(
                         onSave = {
                             showSaveDialog = false
-                            coroutineScope.launch {
+                            waitingForSave = true
+                            coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
                                 val saved = WorkspaceSaveHelper.saveWorkspace()
-                                if (saved) {
+                                WorkspaceSaveHelper.awaitPendingSaves()
+                                waitingForSave = false
+                                if (saved && !WorkspaceRepository.hasUnsavedChanges()) {
                                     val closeAction = pendingCloseAction
                                     showSaveDialog = false
                                     pendingCloseAction = null
@@ -221,12 +256,6 @@ fun WorkspaceWindow(
                             cancelAction?.invoke()
                         }
                     )
-                }
-            }
-
-            saveProgress?.let { progress ->
-                AppLocaleRefreshBoundary {
-                    SavingProgressDialog(progress)
                 }
             }
         }
