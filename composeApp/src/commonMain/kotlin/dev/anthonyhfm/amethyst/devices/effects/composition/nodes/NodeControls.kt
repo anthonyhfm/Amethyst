@@ -44,6 +44,7 @@ internal fun LabeledSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     onValueChange: (Float) -> Unit,
+    defaultValue: Float? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = Theme[typography][small], color = Theme[colors][mutedForeground])
@@ -51,6 +52,7 @@ internal fun LabeledSlider(
             value = value.coerceIn(range.start, range.endInclusive),
             onValueChange = onValueChange,
             valueRange = range,
+            defaultValue = defaultValue,
         )
     }
 }

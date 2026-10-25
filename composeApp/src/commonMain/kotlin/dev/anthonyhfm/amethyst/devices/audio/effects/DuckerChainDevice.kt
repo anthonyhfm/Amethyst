@@ -35,6 +35,7 @@ import dev.anthonyhfm.amethyst.devices.SidechainAudioConsumer
 import dev.anthonyhfm.amethyst.devices.audio.sample.SampleChainDevice
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.ui.components.primitives.ChainDeviceShell
+import dev.anthonyhfm.amethyst.ui.components.primitives.SelectItem
 import dev.anthonyhfm.amethyst.ui.components.primitives.Select
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
@@ -260,15 +261,30 @@ class DuckerChainDevice : AudioChainDevice<DuckerChainDeviceState>(), ParameterO
                     )
                     Select(
                         value = selectedLabel,
-                        options = listOf("None") + options.map { it.second },
                         triggerHeight = 32.dp,
-                        onValueChange = { label ->
-                            val before = state.value
-                            val id = options.firstOrNull { it.second == label }?.first
-                            updateStateFromUser { it.copy(sidechainSourceId = id) }
-                            pushStateChange(before, state.value)
-                        },
-                    )
+                        onValueChange = {},
+                    ) {
+                        SelectItem(
+                            text = "None",
+                            selected = deviceState.sidechainSourceId == null,
+                            onClick = {
+                                val before = state.value
+                                updateStateFromUser { it.copy(sidechainSourceId = null) }
+                                pushStateChange(before = before, after = state.value)
+                            },
+                        )
+                        options.forEach { (id, label) ->
+                            SelectItem(
+                                text = label,
+                                selected = deviceState.sidechainSourceId == id,
+                                onClick = {
+                                    val before = state.value
+                                    updateStateFromUser { it.copy(sidechainSourceId = id) }
+                                    pushStateChange(before = before, after = state.value)
+                                },
+                            )
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     EffectDial("attack", "Attack", PARAMETERS[0].normalize(deviceState.attackMs), "${deviceState.attackMs.roundToInt()} ms", startGesture, finishGesture) {

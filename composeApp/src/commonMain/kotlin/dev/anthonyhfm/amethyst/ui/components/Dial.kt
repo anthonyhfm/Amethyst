@@ -182,7 +182,7 @@ fun <T> Dial(
             onStartValueChange = { onStartValueChange(it as T) },
             onValueChange = { onValueChange(it as T) },
             onFinishValueChange = { onFinishValueChange(it as T) },
-            defaultValue = (defaultValue as? Float) ?: 0.5f,
+            defaultValue = (defaultValue as? Float) ?: (value as Float),
             knob = false,
             title = title,
             text = text,
@@ -201,7 +201,7 @@ fun <T> Dial(
             onStartValueChange = { onStartValueChange(it as T) },
             onValueChange = { onValueChange(it as T) },
             onFinishValueChange = { onFinishValueChange(it as T) },
-            defaultValue = (defaultValue as? Float) ?: 0.5f,
+            defaultValue = (defaultValue as? Float) ?: (value as Float),
             knob = true,
             title = title,
             text = text,
@@ -292,10 +292,11 @@ private fun ContinuousDial(
             statusIndicatorColor = statusIndicatorColor,
             onDoubleClick = {
                 isDragging = false
-                dragValue = defaultValue.coerceIn(0f, 1f)
+                val target = defaultValue.takeIf { it.isFinite() && it in 0f..1f } ?: currentProgress
+                dragValue = target
                 onStartValueChange(currentProgress)
-                onValueChange(defaultValue)
-                onFinishValueChange(defaultValue)
+                onValueChange(target)
+                onFinishValueChange(target)
             },
             onIncrement = {
                 changeContinuousValue(currentProgress, 0.01f, onStartValueChange) { next ->
@@ -369,7 +370,7 @@ private fun <T> SteppedDial(
             isAutomated = isAutomated,
             statusIndicatorColor = statusIndicatorColor,
             onDoubleClick = {
-                val target = defaultValue ?: values.first()
+                val target = defaultValue?.takeIf { it in values } ?: values[effectiveIndex]
                 val targetIndex = values.indexOf(target).coerceAtLeast(0)
                 isDragging = false
                 dragIndex = targetIndex
