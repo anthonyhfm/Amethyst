@@ -32,7 +32,6 @@ sealed interface KeyframesChainDeviceContract {
         data class OnChangePinch(val pinch: Float) : Event
         data object OnTogglePinchBilateral : Event
 
-        data object OnImportMidiFile : Event
         data class OnChangeRepeats(val repeats: Int) : Event
         data class OnChangePlaybackMode(val playbackMode: PlaybackMode) : Event
         data class OnChangeRootKey(val rootKey: Int?) : Event

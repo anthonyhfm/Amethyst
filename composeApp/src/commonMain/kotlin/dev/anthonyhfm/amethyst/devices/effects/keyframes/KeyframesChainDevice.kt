@@ -11,10 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.conversion.ableton.utils.MidiFileImporter
 import dev.anthonyhfm.amethyst.devices.ableton.AbletonNoteSpace
 import dev.anthonyhfm.amethyst.core.midi.data.XY_TO_DRUM_RACK
 import dev.anthonyhfm.amethyst.core.engine.elements.isOn
@@ -59,17 +57,12 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.devices.LEDChainDevice
 import dev.anthonyhfm.amethyst.devices.Chokeable
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
-import kotlinx.coroutines.runBlocking
 import kotlin.math.pow
 import kotlin.math.roundToLong
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.util.Pincher
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.LaunchpadViewportElement
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.containsLocalPad
 import dev.anthonyhfm.amethyst.workspace.ui.viewport.elements.resolveLaunchpadOrigin
-import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.snapshotFlow
 import dev.anthonyhfm.amethyst.devices.ChainDeviceFactory
 
@@ -399,6 +392,55 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
         )
     }
 
+    fun replaceFrames(frames: List<Frame>) {
+        require(frames.isNotEmpty())
+
+        stopPreview(refreshCurrentFrame = false)
+        onChoke()
+        isDragging.value = false
+        stateBeforeDrag = null
+        dragVisitedPads.clear()
+
+        val before = state.value
+        if (WorkspaceRepository.mode.value === customMode) {
+            val framePixels = before.frames.flatMap { frame ->
+                frame.entries.mapNotNull { it.resolveGlobal() }
+            }
+            val cachedPixels = synchronized(virtualDeviceColorsLock) {
+                virtualDeviceColors.keys.map { it.x to it.y }
+            }
+            Heaven.midiEnter(
+                signals = (framePixels + cachedPixels).distinct().map { (x, y) ->
+                    Signal.LED(
+                        origin = this,
+                        x = x,
+                        y = y,
+                        color = Color.Black,
+                        layer = 0,
+                    )
+                },
+            )
+        }
+        clearVirtualDeviceColors()
+        state.value = before.copy(
+            frames = frames,
+            currentFrameIndex = 0,
+            renderedAnimation = emptyList(),
+            useOwnershipTracking = false,
+            ownershipId = "",
+            terminalGate = 0.5f,
+            apolloPattern = false,
+            apolloLaunchpadId = null,
+        )
+        renderAnimation()
+        SelectionManager.clear()
+        SelectionManager.select(
+            element = Selectable.KeyframeItem(parent = this, frameIndex = 0),
+        )
+        refreshVirtualDevices()
+        pushStateChange(before = before, after = state.value)
+    }
+
     fun onEvent(event: Event) {
         when (event) {
             is Event.OnPaintButton -> {
@@ -628,41 +670,6 @@ class KeyframesChainDevice : LEDChainDevice<KeyframesChainDeviceState>(), Chokea
                     )
                 }
                 pushStateChange(before, state.value)
-            }
-
-            is Event.OnImportMidiFile -> {
-                runBlocking {
-                    val file = FileKit.openFilePicker(
-                        type = FileKitType.File(
-                            extension = "mid"
-                        ),
-                    )
-
-                    if (file == null) return@runBlocking
-
-                    try {
-                        val launchpad = Heaven.devices.firstOrNull() ?: return@runBlocking
-                        val data = MidiFileImporter.loadData(
-                            data = file.readBytes(),
-                            bpm = WorkspaceRepository.bpm.value,
-                            launchpad = MidiFileImporter.DeviceTarget(
-                                launchpadId = launchpad.launchpadId,
-                                offset = IntOffset(
-                                    x = launchpad.position.value.x.toInt(),
-                                    y = launchpad.position.value.y.toInt(),
-                                ),
-                            ),
-                        )
-
-                        val before = this@KeyframesChainDevice.state.value
-                        this@KeyframesChainDevice.state.update {
-                            data
-                        }
-                        pushStateChange(before, this@KeyframesChainDevice.state.value)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
             }
 
             is Event.OnChangeInfinity -> {
