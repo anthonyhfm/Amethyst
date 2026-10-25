@@ -17,15 +17,16 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.util.AmethystProtoBuf
 import dev.anthonyhfm.amethyst.core.util.Zip
 import dev.anthonyhfm.amethyst.home.data.HomeRepository
+import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
 import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LayoutWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.PerformanceWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.openFileSaver
@@ -62,6 +63,10 @@ object ShortcutManager {
         selections: List<Selectable> = SelectionManager.selections.value
     ): Boolean {
         if (!canCopySelection(selections)) return false
+        val pianoRoll = WorkspaceRepository.mode.value as? PianoRollWorkspaceMode
+        if (pianoRoll != null) {
+            return pianoRoll.copySelectedNotes()
+        }
         ClipboardManager.copy(selections)
         return true
     }
@@ -83,6 +88,13 @@ object ShortcutManager {
     ): Boolean {
         if (clipboard == null) return false
 
+        val mode = WorkspaceRepository.mode.value
+        if (mode is PianoRollWorkspaceMode) {
+            return clipboard is ClipboardData.PianoRollNotes
+        }
+        if (clipboard is ClipboardData.PianoRollNotes) {
+            return false
+        }
         val hasGroupSelection = selections.any { it is Selectable.GroupChainItem }
         return when (clipboard) {
             is ClipboardData.GroupChainItem -> hasGroupSelection
@@ -153,7 +165,7 @@ object ShortcutManager {
             is LightsChainWorkspaceMode -> WorkspaceRepository.lightsChain.devices.value.isNotEmpty()
             is SamplingChainWorkspaceMode -> WorkspaceRepository.samplingChain.devices.value.isNotEmpty()
             is TimelineWorkspaceMode -> TimelineRepository.tracks.value.isNotEmpty()
-            is dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode -> mode.currentEntry?.notes?.isNotEmpty() == true
+            is PianoRollWorkspaceMode -> mode.currentEntry?.notes?.isNotEmpty() == true
             else -> false
         }
     }
@@ -287,7 +299,7 @@ object ShortcutManager {
 
         return when (val mode = WorkspaceRepository.mode.value) {
             is LightsChainWorkspaceMode -> {
-                val chain = WorkspaceRepository.lightsChain
+                val chain = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>().firstOrNull()?.parent ?: WorkspaceRepository.lightsChain
                 val devices = chain.devices.value
                 if (devices.isNotEmpty()) {
                     SelectionManager.clear()
@@ -298,7 +310,7 @@ object ShortcutManager {
                 } else false
             }
             is SamplingChainWorkspaceMode -> {
-                val chain = WorkspaceRepository.samplingChain
+                val chain = SelectionManager.selections.value.filterIsInstance<Selectable.ChainDevice>().firstOrNull()?.parent ?: WorkspaceRepository.samplingChain
                 val devices = chain.devices.value
                 if (devices.isNotEmpty()) {
                     SelectionManager.clear()
@@ -318,7 +330,7 @@ object ShortcutManager {
                     true
                 } else false
             }
-            is dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode -> {
+            is PianoRollWorkspaceMode -> {
                 mode.selectAllNotes()
             }
             else -> false

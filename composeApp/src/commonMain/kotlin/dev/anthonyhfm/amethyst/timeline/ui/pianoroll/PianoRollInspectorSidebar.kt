@@ -53,7 +53,11 @@ fun PianoRollInspectorSidebar(
     enabled: Boolean,
     selectionCount: Int,
     hasMultipleSelection: Boolean,
-    onApplyTransform: ((List<MidiNote>) -> List<MidiNote>) -> Unit,
+    onApplyTransform: ((List<MidiNote>) -> List<MidiNote>, Boolean) -> Unit,
+    pinchValue: Float,
+    onPinchValueChange: (Float) -> Unit,
+    pinchBilateral: Boolean,
+    onPinchBilateralChange: (Boolean) -> Unit,
     onGradientSpread: () -> Unit,
     onRandomizeColors: () -> Unit,
     modifier: Modifier = Modifier
@@ -181,6 +185,10 @@ fun PianoRollInspectorSidebar(
                     enabled = enabled,
                     hasMultipleSelection = hasMultipleSelection,
                     onApplyTransform = onApplyTransform,
+                    pinchValue = pinchValue,
+                    onPinchValueChange = onPinchValueChange,
+                    pinchBilateral = pinchBilateral,
+                    onPinchBilateralChange = onPinchBilateralChange,
                     onGradientSpread = onGradientSpread,
                     onRandomizeColors = onRandomizeColors
                 )

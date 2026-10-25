@@ -5,6 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import com.composeunstyled.Icon
 import androidx.compose.runtime.*
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.platform.LocalWindowInfo
+import dev.anthonyhfm.amethyst.ui.components.primitives.Input
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -36,13 +41,25 @@ import dev.anthonyhfm.amethyst.ui.theme.typography
 fun PianoRollTransformPanel(
     enabled: Boolean,
     hasMultipleSelection: Boolean,
-    onApplyTransform: ((List<MidiNote>) -> List<MidiNote>) -> Unit,
+    onApplyTransform: ((List<MidiNote>) -> List<MidiNote>, Boolean) -> Unit,
+    pinchValue: Float,
+    onPinchValueChange: (Float) -> Unit,
+    pinchBilateral: Boolean,
+    onPinchBilateralChange: (Boolean) -> Unit,
     onGradientSpread: () -> Unit,
     onRandomizeColors: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var pinchValue by remember { mutableStateOf(0f) }
-    var pinchBilateral by remember { mutableStateOf(false) }
+    val windowInfo = LocalWindowInfo.current
+    val applyTransform: ((List<MidiNote>) -> List<MidiNote>) -> Unit = { transform ->
+        onApplyTransform(transform, windowInfo.keyboardModifiers.isAltPressed)
+    }
+    var pinchText by remember { mutableStateOf(pinchValue.toString()) }
+    LaunchedEffect(pinchValue) {
+        if (parsePinchValue(text = pinchText) != pinchValue) {
+            pinchText = pinchValue.toString()
+        }
+    }
     val contentColor = Theme[colors][foreground]
 
     Column(
@@ -58,19 +75,19 @@ fun PianoRollTransformPanel(
         SectionLabel("Shift in XY Grid")
         ButtonRow {
             LabeledIconButton(Lucide.ArrowUp, description = "Shift Up", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.shiftUp(it) }
+                applyTransform { PianoRollTransforms.shiftUp(it) }
             }
             Separator()
             LabeledIconButton(Lucide.ArrowDown, description = "Shift Down", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.shiftDown(it) }
+                applyTransform { PianoRollTransforms.shiftDown(it) }
             }
             Separator()
             LabeledIconButton(Lucide.ArrowLeft, description = "Shift Left", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.shiftLeft(it) }
+                applyTransform { PianoRollTransforms.shiftLeft(it) }
             }
             Separator()
             LabeledIconButton(Lucide.ArrowRight, description = "Shift Right", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.shiftRight(it) }
+                applyTransform { PianoRollTransforms.shiftRight(it) }
             }
         }
 
@@ -78,22 +95,22 @@ fun PianoRollTransformPanel(
         SectionLabel("Speed")
         ButtonRow {
             LabeledIconButton(Lucide.Rabbit, "×2", "Double Speed", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.doubleSpeed(it) }
+                applyTransform { PianoRollTransforms.doubleSpeed(it) }
             }
             Separator()
             LabeledIconButton(Lucide.Snail, "÷2", "Halve Speed", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.halveSpeed(it) }
+                applyTransform { PianoRollTransforms.halveSpeed(it) }
             }
         }
 
         SectionLabel("Scramble")
         ButtonRow {
             LabeledIconButton(Lucide.Shuffle, "Pads", "Scramble pads as groups", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.scrambleByPad(it) }
+                applyTransform { PianoRollTransforms.scrambleByPad(it) }
             }
             Separator()
             LabeledIconButton(Lucide.Dices, "All", "Scramble every note", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.scrambleAll(it) }
+                applyTransform { PianoRollTransforms.scrambleAll(it) }
             }
         }
 
@@ -101,16 +118,16 @@ fun PianoRollTransformPanel(
         SectionLabel("Note Length")
         ButtonRow {
             LabeledIconButton(Lucide.Expand, "×2", "Double Length", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.doubleLength(it) }
+                applyTransform { PianoRollTransforms.doubleLength(it) }
             }
             Separator()
             LabeledIconButton(Lucide.Minimize2, "÷2", "Halve Length", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.halveLength(it) }
+                applyTransform { PianoRollTransforms.halveLength(it) }
             }
         }
 
         // Pinch
-        SectionLabel("Pinch")
+        SectionLabel("Pinch (−2 to 2)")
         Row(
             modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.4f),
             verticalAlignment = Alignment.CenterVertically,
@@ -118,26 +135,45 @@ fun PianoRollTransformPanel(
         ) {
             PinchGraph(
                 pinch = pinchValue,
-                onPinchChange = { pinchValue = it },
+                onPinchChange = onPinchValueChange,
                 bilateral = pinchBilateral,
-                onToggleBilateral = { pinchBilateral = !pinchBilateral },
+                onToggleBilateral = { onPinchBilateralChange(!pinchBilateral) },
                 modifier = Modifier.size(56.dp)
             )
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    "${(pinchValue * 100f).toInt() / 100f}",
-                    style = Theme[typography][small].copy(color = contentColor)
+                Input(
+                    value = pinchText,
+                    onValueChange = { text ->
+                        pinchText = text
+                        parsePinchValue(text = text)?.let(onPinchValueChange)
+                    },
+                    enabled = enabled,
+                    modifier = Modifier
+                        .width(100.dp)
+                        .onFocusChanged { focus ->
+                            if (!focus.isFocused) {
+                                pinchText = pinchValue.toString()
+                            }
+                        }
+                        .onPreviewKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
+                                pinchText = pinchValue.toString()
+                                true
+                            } else {
+                                false
+                            }
+                        },
                 )
                 Button(
                     onClick = {
                         if (pinchValue != 0f) {
-                            onApplyTransform { notes -> PianoRollTransforms.pinch(notes, pinchValue, pinchBilateral) }
-                            pinchValue = 0f
+                            pinchText = pinchValue.toString()
+                            applyTransform { notes -> PianoRollTransforms.pinch(notes, pinchValue, pinchBilateral) }
                         }
                     },
                     variant = ButtonVariant.Secondary,
                     size = ButtonSize.Small,
-                    enabled = enabled && pinchValue != 0f
+                    enabled = enabled && pinchValue != 0f && parsePinchValue(text = pinchText) != null
                 ) {
                     Text("Apply", style = Theme[typography][small].copy(color = contentColor))
                 }
@@ -148,15 +184,15 @@ fun PianoRollTransformPanel(
         SectionLabel("Rotate")
         ButtonRow {
             LabeledIconButton(Lucide.RotateCcw, "−90°", "Rotate Counter-Clockwise", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.rotateCCW(it) }
+                applyTransform { PianoRollTransforms.rotateCCW(it) }
             }
             Separator()
             LabeledIconButton(Lucide.RefreshCw, "180°", "Rotate 180°", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.rotate180(it) }
+                applyTransform { PianoRollTransforms.rotate180(it) }
             }
             Separator()
             LabeledIconButton(Lucide.RotateCw, "+90°", "Rotate Clockwise", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.rotateCW(it) }
+                applyTransform { PianoRollTransforms.rotateCW(it) }
             }
         }
 
@@ -164,11 +200,11 @@ fun PianoRollTransformPanel(
         SectionLabel("Mirror")
         ButtonRow {
             LabeledIconButton(Lucide.FlipHorizontal2, "Horiz", "Mirror Horizontal", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.mirrorHorizontal(it) }
+                applyTransform { PianoRollTransforms.mirrorHorizontal(it) }
             }
             Separator()
             LabeledIconButton(Lucide.FlipVertical2, "Vert", "Mirror Vertical", enabled = enabled) {
-                onApplyTransform { PianoRollTransforms.mirrorVertical(it) }
+                applyTransform { PianoRollTransforms.mirrorVertical(it) }
             }
         }
 
@@ -179,7 +215,14 @@ fun PianoRollTransformPanel(
                 .background(Theme[colors][border])
         )
 
-        // Gradient Spread
+        Text(
+            text = "Option/Alt + click copies transformed notes",
+            style = Theme[typography][small].copy(color = Theme[colors][mutedForeground]),
+        )
+        Text(
+            text = "Gradient Spread blends the first and last selected note colors in time order. Select at least 3 notes with different endpoint colors for a visible blend.",
+            style = Theme[typography][small].copy(color = Theme[colors][mutedForeground]),
+        )
         Button(
             onClick = onGradientSpread,
             modifier = Modifier.fillMaxWidth(),
@@ -259,4 +302,10 @@ private fun ButtonRow(content: @Composable RowScope.() -> Unit) {
             .border(1.dp, Theme[colors][border], SmallShape),
         content = content
     )
+}
+
+internal fun parsePinchValue(text: String): Float? {
+    return text.trim().replace(oldChar = ',', newChar = '.').toFloatOrNull()
+        ?.takeIf { it.isFinite() }
+        ?.coerceIn(minimumValue = -2f, maximumValue = 2f)
 }

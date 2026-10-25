@@ -192,6 +192,12 @@ object ClipboardManager {
     }
 
     fun paste() {
+        val activeMode = WorkspaceRepository.mode.value
+        if (activeMode is dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode &&
+            clipboardData.value !is ClipboardData.PianoRollNotes
+        ) {
+            return
+        }
         val mode = WorkspaceRepository.mode.value
 
         when (val clip = clipboardData.value) {

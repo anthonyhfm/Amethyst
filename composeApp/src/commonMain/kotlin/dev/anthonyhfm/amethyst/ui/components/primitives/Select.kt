@@ -64,6 +64,7 @@ import dev.anthonyhfm.amethyst.ui.theme.popover
 import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.ui.modifier.BlockEditorShortcuts
 import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 
 private val LocalSelectDismissRequest = staticCompositionLocalOf<() -> Unit> { {} }
@@ -89,6 +90,8 @@ fun Select(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val reducedMotion = rememberReducedMotion()
+    BlockEditorShortcuts(active = expanded)
+
     val interactionSource = remember { MutableInteractionSource() }
     val density = LocalDensity.current
     var triggerWidth by remember { mutableStateOf(0.dp) }

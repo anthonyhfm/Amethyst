@@ -190,7 +190,20 @@ object WorkspaceRepository {
     private val _bpm = MutableStateFlow(120.00)
     val bpm: StateFlow<Double> = _bpm.asStateFlow()
 
-    var isInputFocused: Boolean = false
+    private var textInputFocused: Boolean = false
+    var editorShortcutBlockCount: Int = 0
+        private set
+
+    var isInputFocused: Boolean
+        get() = textInputFocused || editorShortcutBlockCount > 0
+        set(value) {
+            textInputFocused = value
+        }
+
+    fun blockEditorShortcuts(): () -> Unit {
+        editorShortcutBlockCount++
+        return { editorShortcutBlockCount = (editorShortcutBlockCount - 1).coerceAtLeast(minimumValue = 0) }
+    }
     
     private val _projectName = MutableStateFlow<String?>(null)
     val projectName: StateFlow<String?> = _projectName.asStateFlow()

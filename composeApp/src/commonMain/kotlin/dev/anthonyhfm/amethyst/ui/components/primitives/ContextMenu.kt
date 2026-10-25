@@ -54,6 +54,7 @@ import com.composeunstyled.ProvideTextStyle
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.modifier.BlockEditorShortcuts
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
 import dev.anthonyhfm.amethyst.ui.theme.accent
 import dev.anthonyhfm.amethyst.ui.theme.accentForeground
@@ -131,6 +132,8 @@ fun ContextMenu(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    BlockEditorShortcuts(active = expanded)
+
     var cursorPosition by remember { mutableStateOf(Offset.Zero) }
 
     Box(

@@ -1,13 +1,11 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
-import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
-
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import amethyst.composeapp.generated.resources.Res
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -20,8 +18,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
@@ -43,6 +41,8 @@ import com.composeunstyled.UnstyledDialog
 import com.composeunstyled.UnstyledDialogPanel
 import com.composeunstyled.UnstyledScrim
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.modifier.BlockEditorShortcuts
+import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
 import dev.anthonyhfm.amethyst.ui.theme.background
 import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
@@ -52,7 +52,7 @@ import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.p
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
-import dev.anthonyhfm.amethyst.ui.modifier.rememberReducedMotion
+import org.jetbrains.compose.resources.stringResource
 
 internal val LocalDialogDismiss = staticCompositionLocalOf<() -> Unit> { {} }
 
@@ -63,6 +63,8 @@ fun Dialog(
     content: @Composable () -> Unit,
 ) {
     val reducedMotion = rememberReducedMotion()
+    BlockEditorShortcuts(active = state.visible)
+
     UnstyledDialog(
         state = state,
         onDismiss = onDismiss,

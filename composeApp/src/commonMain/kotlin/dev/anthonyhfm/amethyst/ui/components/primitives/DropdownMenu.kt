@@ -22,8 +22,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +44,7 @@ import com.composeunstyled.UnstyledButton
 import com.composeunstyled.UnstyledDropdownMenu
 import com.composeunstyled.UnstyledDropdownMenuPanel
 import com.composeunstyled.theme.Theme
+import dev.anthonyhfm.amethyst.ui.modifier.BlockEditorShortcuts
 import dev.anthonyhfm.amethyst.ui.theme.accent
 import dev.anthonyhfm.amethyst.ui.theme.accentForeground
 import dev.anthonyhfm.amethyst.ui.theme.border
@@ -98,6 +99,7 @@ fun DropdownMenuContent(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    BlockEditorShortcuts(active = expanded)
     UnstyledDropdownMenuPanel(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
