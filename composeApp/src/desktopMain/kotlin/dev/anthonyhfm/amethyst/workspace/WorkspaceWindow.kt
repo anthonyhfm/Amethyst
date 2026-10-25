@@ -152,6 +152,9 @@ fun WorkspaceWindow(
                 (it.isCtrlPressed || it.isMetaPressed) &&
                 it.key == Key.S
             ) {
+                if (WorkspaceSaveHelper.isSaving) {
+                    return@DecoratedWindow true
+                }
                 coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
                     if (it.isShiftPressed) {
                         WorkspaceSaveHelper.saveWorkspaceAs()

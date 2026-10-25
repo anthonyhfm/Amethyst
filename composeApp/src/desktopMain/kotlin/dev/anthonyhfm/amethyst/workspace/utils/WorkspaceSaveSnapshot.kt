@@ -21,6 +21,7 @@ internal class WorkspaceSaveSnapshot(
         val totalBytes = metadata.size.toLong() + audioSources.sumOf { it.pcmByteCount.toLong() }
         var writtenBytes = metadata.size.toLong()
         output.write(metadata)
+        val buffer = ByteArray(size = AUDIO_CHUNK_SIZE)
         for (source in audioSources) {
             val header = AmethystProtoBuf.encodeToByteArray(
                 value = AudioSourceHeader(
@@ -43,11 +44,11 @@ internal class WorkspaceSaveSnapshot(
             output.writeVarInt(value = length)
             var offset = 0
             while (offset < length) {
-                val end = minOf(offset.toLong() + AUDIO_CHUNK_SIZE, length.toLong()).toInt()
-                val bytes = source.pcmRegionBytes(fromIndex = offset, toIndex = end)
-                output.write(bytes)
-                writtenBytes += bytes.size
-                offset = end
+                val count = minOf(buffer.size, length - offset)
+                source.readPcmInto(destination = buffer, sourceOffset = offset, length = count)
+                output.write(buffer, 0, count)
+                writtenBytes += count
+                offset += count
                 onProgress(writtenBytes.toFloat() / totalBytes.coerceAtLeast(minimumValue = 1L))
             }
         }

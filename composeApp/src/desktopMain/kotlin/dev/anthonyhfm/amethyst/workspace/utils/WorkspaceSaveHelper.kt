@@ -20,8 +20,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.getString
 
@@ -40,9 +38,7 @@ object WorkspaceSaveHelper {
     )
 
     private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val saveMutex = Mutex()
     private val _saveProgress = MutableStateFlow<SaveProgress?>(null)
-    private var pendingSaves = 0
 
     val saveProgress = _saveProgress.asStateFlow()
     val isSaving: Boolean get() = _saveProgress.value != null
@@ -56,16 +52,17 @@ object WorkspaceSaveHelper {
     }
 
     private suspend fun requestSave(choosePath: Boolean): Boolean = withContext(Dispatchers.Main.immediate) {
+        if (isSaving) {
+            return@withContext false
+        }
+
         saveScope.async(start = CoroutineStart.UNDISPATCHED) {
-            pendingSaves++
             try {
-                if (_saveProgress.value == null) {
-                    updateProgress(
-                        destination = WorkspaceRepository.workspaceMeta?.path.orEmpty(),
-                        phase = SavePhase.Preparing,
-                        progress = 0.02f,
-                    )
-                }
+                updateProgress(
+                    destination = WorkspaceRepository.workspaceMeta?.path.orEmpty(),
+                    phase = SavePhase.Preparing,
+                    progress = 0.02f,
+                )
                 val workspaceChain = WorkspaceRepository.lightsChain
                 val workspace = WorkspaceRepository.saveWorkspace()
                 val snapshot = WorkspaceSaveSnapshot.capture(
@@ -74,20 +71,18 @@ object WorkspaceSaveHelper {
                 )
                 val requestedPath = workspace.path
 
-                saveMutex.withLock {
-                    val existingPath = requestedPath ?: WorkspaceRepository.workspaceMeta?.path
-                    val rawPath = if (choosePath || existingPath == null) {
-                        FileKit.openFileSaver(
-                            suggestedName = snapshot.title.ifBlank {
-                                getString(resource = Res.string.workspace_save_untitled)
-                            },
-                            defaultExtension = "ame",
-                        )?.path ?: return@withLock false
-                    } else {
-                        existingPath
-                    }
-                    writeToPath(rawPath = rawPath, snapshot = snapshot, workspaceChain = workspaceChain)
+                val existingPath = requestedPath ?: WorkspaceRepository.workspaceMeta?.path
+                val rawPath = if (choosePath || existingPath == null) {
+                    FileKit.openFileSaver(
+                        suggestedName = snapshot.title.ifBlank {
+                            getString(resource = Res.string.workspace_save_untitled)
+                        },
+                        defaultExtension = "ame",
+                    )?.path ?: return@async false
+                } else {
+                    existingPath
                 }
+                writeToPath(rawPath = rawPath, snapshot = snapshot, workspaceChain = workspaceChain)
             } catch (cause: CancellationException) {
                 throw cause
             } catch (cause: Exception) {
@@ -100,10 +95,7 @@ object WorkspaceSaveHelper {
                 )
                 false
             } finally {
-                pendingSaves--
-                if (pendingSaves == 0) {
-                    _saveProgress.value = null
-                }
+                _saveProgress.value = null
             }
         }.await()
     }

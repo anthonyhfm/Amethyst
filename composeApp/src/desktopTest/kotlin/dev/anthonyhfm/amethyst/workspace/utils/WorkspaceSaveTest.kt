@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -172,26 +173,35 @@ class WorkspaceSaveTest {
     }
 
     @Test
-    fun queuedSavesKeepTheirSnapshotsAndLeaveLaterEditsDirty() = runTest {
-        Dispatchers.setMain(dispatcher = StandardTestDispatcher(scheduler = testScheduler))
-        val directory = Files.createTempDirectory("amethyst-save-queue")
+    fun busySavesRejectRepeatedSaveAndSaveAsRequestsUntilComplete() = runTest {
+        Dispatchers.setMain(dispatcher = UnconfinedTestDispatcher(scheduler = testScheduler))
+        val directory = Files.createTempDirectory("amethyst-save-busy")
         val destination = directory.resolve("project.ame")
         WorkspaceRepository.clean()
         val previousRecents = GlobalSettings.recentWorkspaces
         try {
             WorkspaceRepository.workspaceMeta = WorkspaceMeta(path = destination.toString())
             WorkspaceRepository.setBpm(bpm = 121.0, undoable = false)
-            val first = async { WorkspaceSaveHelper.saveWorkspace() }
-            testScheduler.runCurrent()
-            WorkspaceRepository.setBpm(bpm = 122.0, undoable = false)
-            val second = async { WorkspaceSaveHelper.saveWorkspace() }
-            testScheduler.runCurrent()
-            WorkspaceRepository.setBpm(bpm = 123.0, undoable = false)
+            val repeatedRequests = launch(context = Dispatchers.Unconfined) {
+                WorkspaceSaveHelper.saveProgress.first { it?.phase == WorkspaceSaveHelper.SavePhase.Compressing }
+                WorkspaceRepository.setBpm(bpm = 122.0, undoable = false)
+                repeat(times = 20) {
+                    assertFalse(actual = WorkspaceSaveHelper.saveWorkspace())
+                    assertFalse(actual = WorkspaceSaveHelper.saveWorkspaceAs())
+                }
+                assertTrue(actual = WorkspaceSaveHelper.isSaving)
+                assertFalse(actual = Files.exists(destination))
+            }
+            val first = async(start = CoroutineStart.UNDISPATCHED) { WorkspaceSaveHelper.saveWorkspace() }
+            repeatedRequests.join()
             assertTrue(actual = first.await())
-            assertTrue(actual = second.await())
-            val saved = readWorkspace(path = destination)
-            assertEquals(expected = 122.0, actual = saved.settings.bpm)
+            assertEquals(expected = 121.0, actual = readWorkspace(path = destination).settings.bpm)
             assertTrue(actual = WorkspaceRepository.hasUnsavedChanges())
+            assertFalse(actual = WorkspaceSaveHelper.isSaving)
+
+            assertTrue(actual = WorkspaceSaveHelper.saveWorkspace())
+            assertEquals(expected = 122.0, actual = readWorkspace(path = destination).settings.bpm)
+            assertFalse(actual = WorkspaceRepository.hasUnsavedChanges())
             assertFalse(actual = WorkspaceSaveHelper.isSaving)
         } finally {
             WorkspaceSaveHelper.awaitPendingSaves()

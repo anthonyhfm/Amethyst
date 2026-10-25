@@ -27,6 +27,28 @@ class FileBackedPcmTest {
     }
 
     @Test
+    fun bulkReadsReuseTheDestinationAndPreserveItsUnusedTail() {
+        val bytes = ByteArray(size = 1000) { (it * 37).toByte() }
+        val storages = listOf(
+            InMemoryPcmBytes(bytes = bytes),
+            ProjectPcmFiles.store(bytes = bytes),
+        )
+        val destination = ByteArray(size = 64)
+        for (storage in storages) {
+            for ((offset, count) in listOf(0 to 64, 127 to 17, 936 to 64, 1000 to 0)) {
+                destination.fill(element = 85)
+                storage.readInto(destination = destination, sourceOffset = offset, length = count)
+                assertContentEquals(
+                    expected = bytes.copyOfRange(fromIndex = offset, toIndex = offset + count),
+                    actual = destination.copyOfRange(fromIndex = 0, toIndex = count),
+                )
+                assertTrue(actual = destination.drop(n = count).all { it == 85.toByte() })
+            }
+            assertContentEquals(expected = bytes, actual = storage.readAll())
+        }
+    }
+
+    @Test
     fun mappedPcmPreservesEverySupportedSampleFormatAndBoundaries() {
         listOf(8, 16, 24, 32).forEach { depth ->
             val bytes = ByteArray(size = depth / 8 * 2 * 128) { index -> (index * 37).toByte() }
