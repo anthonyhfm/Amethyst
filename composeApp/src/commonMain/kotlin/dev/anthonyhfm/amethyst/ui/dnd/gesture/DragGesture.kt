@@ -24,6 +24,7 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItemState
 import com.mohamedrejeb.compose.dnd.utils.awaitPointerSlopOrCancellation
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -39,6 +40,7 @@ internal suspend fun <T> PointerInputScope.detectDragStartGesture(
 
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = requireFirstDownUnconsumed, pass = PointerEventPass.Main)
+        ModifierKeysState.updateFromPointerModifiers(modifiers = currentEvent.keyboardModifiers)
         var drag: PointerInputChange?
         if (dragAfterLongPress) {
             drag = awaitLongPressOrCancellation(down.id)

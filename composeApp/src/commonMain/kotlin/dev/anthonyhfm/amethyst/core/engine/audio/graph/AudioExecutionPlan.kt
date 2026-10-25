@@ -53,7 +53,7 @@ class AudioExecutionPlan private constructor(
             metrics: AudioRenderMetrics = AudioRenderMetrics(),
         ): AudioExecutionPlan {
             val compiler = AudioGraphCompiler(configuration, metrics)
-            val root = compiler.compileSerial(chain.devices.value)
+            val root = compiler.compileSerial(chain.devices.value, ancestorEnabled = !chain.isMuted)
             return AudioExecutionPlan(
                 root = root,
                 sources = compiler.sources.toTypedArray(),
@@ -283,7 +283,7 @@ private class AudioGraphCompiler(
                 is NestedChainDevice -> {
                     val enabled = ancestorEnabled && !device.isMuted
                     val childNodes = device.audioNestedChains().map { child ->
-                        compileSerial(child.devices.value, ancestorEnabled = enabled)
+                        compileSerial(child.devices.value, ancestorEnabled = enabled && !child.isMuted)
                     }
                     val maximumLatency = childNodes.maxOfOrNull(SerialAudioNode::latencyFrames) ?: 0
                     val branches = childNodes.map { childNode ->

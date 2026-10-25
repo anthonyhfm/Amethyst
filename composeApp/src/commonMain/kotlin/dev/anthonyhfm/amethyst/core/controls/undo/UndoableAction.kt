@@ -21,6 +21,14 @@ import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryUnlink
 
 sealed interface UndoableAction {
+    data class MuteChange(
+        val before: Boolean,
+        val after: Boolean,
+        val apply: (Boolean) -> Unit,
+    )
+
+    data class MuteSelection(val changes: List<MuteChange>) : UndoableAction
+
     data class TimelineLocatorsChange(
         val beforeLocators: List<dev.anthonyhfm.amethyst.timeline.data.TimelineLocator>,
         val afterLocators: List<dev.anthonyhfm.amethyst.timeline.data.TimelineLocator>,

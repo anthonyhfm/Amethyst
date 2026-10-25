@@ -7,14 +7,98 @@ import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
+import dev.anthonyhfm.amethyst.timeline.data.MidiNote
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationLaneKey
 import dev.anthonyhfm.amethyst.timeline.data.TimelineAutomationPoint
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.data.deepCopy
-import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 
 object TimelineCommandSurface {
+    fun addTrack(audio: Boolean): Boolean {
+        val track = if (audio) {
+            AudioTimelineTrack()
+        } else {
+            MidiTimelineTrack()
+        }
+        val index = TimelineRepository.tracks.value.size
+        TimelineRepository.addTrack(track = track)
+        UndoManager.addAction(
+            action = UndoableAction.TrackAddition(
+                trackIndex = index,
+                track = track,
+            ),
+        )
+        SelectionManager.selectTimelineTracks(trackIndices = listOf(index), anchorTrackIndex = index)
+        return true
+    }
+
+    fun toggleEntriesMute(targets: List<TimelineClipKey>): Boolean {
+        val before = TimelineRepository.tracks.value
+        val targetSet = targets.toSet()
+        val selected = targets.mapNotNull { key ->
+            when (val track = before.getOrNull(key.trackIndex)) {
+                is AudioTimelineTrack -> track.entries[key.entryStartMs]
+                is MidiTimelineTrack -> if (key.clipId == null) {
+                    track.entries[key.entryStartMs]
+                } else {
+                    track.chainEffectEntries.values.firstOrNull { it.clipId == key.clipId }
+                }
+                else -> null
+            }
+        }
+        if (selected.isEmpty()) {
+            return false
+        }
+        val muted = selected.any { !it.isMuted }
+        val touched = targets.map { it.trackIndex }.filter { it in before.indices }.distinct()
+        val after = before.mapIndexed { index, track ->
+            if (index !in touched) {
+                return@mapIndexed track
+            }
+            when (track) {
+                is AudioTimelineTrack -> track.copyWithEntries(
+                    entriesToCopy = track.entries.mapValues { (start, entry) ->
+                        if (TimelineClipKey(trackIndex = index, entryStartMs = start) in targetSet) {
+                            entry.copy(isMuted = muted)
+                        } else {
+                            entry
+                        }
+                    },
+                )
+                is MidiTimelineTrack -> track.copyWithEntries(
+                    entriesToCopy = track.entries.mapValues { (start, entry) ->
+                        if (TimelineClipKey(trackIndex = index, entryStartMs = start) in targetSet) {
+                            entry.copy(isMuted = muted)
+                        } else {
+                            entry
+                        }
+                    },
+                    chainEffectsToCopy = track.chainEffectEntries.mapValues { (_, entry) ->
+                        if (TimelineClipKey(trackIndex = index, entryStartMs = entry.startTimeMs, clipId = entry.clipId) in targetSet) {
+                            entry.copy(isMuted = muted)
+                        } else {
+                            entry
+                        }
+                    },
+                )
+                else -> track
+            }
+        }
+        val selections = SelectionManager.selections.value
+        TimelineRepository.updateTracksSnapshot(updatedTracks = after)
+        UndoManager.addAction(
+            action = UndoableAction.TimelineMultiTrackChange(
+                beforeTracks = touched.associateWith { before[it].deepCopy() },
+                afterTracks = touched.associateWith { after[it].deepCopy() },
+                beforeSelections = selections,
+                afterSelections = selections,
+            ),
+        )
+        return true
+    }
+
     private data class PendingTrackStateChange(
         val trackIndex: Int,
         val beforeTrack: TimelineTrack<*>,

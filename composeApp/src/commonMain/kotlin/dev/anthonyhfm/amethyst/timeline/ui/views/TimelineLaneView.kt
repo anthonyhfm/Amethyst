@@ -1,77 +1,80 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.zIndex
+import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.timeline.TimelineClipMoveEngine
+import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
 import dev.anthonyhfm.amethyst.timeline.TimelineKeyHandler
 import dev.anthonyhfm.amethyst.timeline.TimelineViewModel
+import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.endTimeUs
 import dev.anthonyhfm.amethyst.timeline.data.timelineTrackRows
-import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
-import dev.anthonyhfm.amethyst.timeline.viewport.TimelineViewportLimits
-import dev.anthonyhfm.amethyst.timeline.viewport.zoomTimelineViewport
-import dev.anthonyhfm.amethyst.timeline.viewport.wheelZoomScaleFactor
-import kotlin.math.abs
-import kotlin.math.roundToInt
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
-import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
-import dev.anthonyhfm.amethyst.timeline.TimelineClipMoveEngine
-import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
-import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
-import androidx.compose.ui.input.pointer.isCtrlPressed
-import androidx.compose.ui.input.pointer.isMetaPressed
-import androidx.compose.ui.input.pointer.isShiftPressed
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.timeline.ui.components.PlayheadCursor
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
 import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCoordinator
-import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
-import dev.anthonyhfm.amethyst.timeline.TimelineCommandExecutor
-import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
-import dev.anthonyhfm.amethyst.ui.modifier.scaleGestureZoom
+import dev.anthonyhfm.amethyst.timeline.ui.components.PlayheadCursor
+import dev.anthonyhfm.amethyst.timeline.ui.components.TimelineClipDragPreview
+import dev.anthonyhfm.amethyst.timeline.utils.ChainEffectSpan
+import dev.anthonyhfm.amethyst.timeline.utils.GridUtils
 import dev.anthonyhfm.amethyst.timeline.utils.computeTimelineContentWidthPx
+import dev.anthonyhfm.amethyst.timeline.viewport.EditorViewportState
+import dev.anthonyhfm.amethyst.timeline.viewport.TimelineViewportLimits
+import dev.anthonyhfm.amethyst.timeline.viewport.wheelZoomScaleFactor
+import dev.anthonyhfm.amethyst.timeline.viewport.zoomTimelineViewport
+import dev.anthonyhfm.amethyst.ui.modifier.scaleGestureZoom
+import dev.anthonyhfm.amethyst.ui.theme.TimelineTheme
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun TimelineLaneView(
@@ -142,13 +145,14 @@ fun TimelineLaneView(
     val clipDragCoordinator = remember { TimelineClipDragCoordinator() }
     val timelinePalette = TimelineTheme.palette
     val timelineDimensions = TimelineTheme.dimensions
-    val clipSnapEnabled = !windowInfo.keyboardModifiers.isAltPressed
+    val clipSnapEnabled = !windowInfo.keyboardModifiers.isShiftPressed
     val clipDragPreview = if (clipDragCoordinator.isActive) {
         clipDragCoordinator.preview(
             viewport = renderViewport,
             bpm = bpm,
             gridType = gridType,
             snapEnabled = clipSnapEnabled,
+            copy = windowInfo.keyboardModifiers.isAltPressed,
         )
     } else {
         TimelineClipMoveEngine.Preview(false)
@@ -184,6 +188,7 @@ fun TimelineLaneView(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .clipToBounds()
             .background(timelinePalette.canvas)
             .onSizeChanged { viewportWidthPx = it.width }
             .onGloballyPositioned { clipDragCoordinator.updateSurfaceBounds(it.boundsInRoot()) }
@@ -422,13 +427,18 @@ fun TimelineLaneView(
                                     viewport = viewportWithTimelineMetrics(viewModel.viewport.value),
                                     bpm = bpm,
                                     gridType = gridType,
-                                    snapEnabled = !windowInfo.keyboardModifiers.isAltPressed,
+                                    snapEnabled = !windowInfo.keyboardModifiers.isShiftPressed,
+                                    copy = windowInfo.keyboardModifiers.isAltPressed,
                                 )?.let(TimelineCommandExecutor::execute)
                                 clipDragCoordinator.finish()
                             },
                             onCancel = clipDragCoordinator::finish,
+                            hideSource = {
+                                !windowInfo.keyboardModifiers.isAltPressed &&
+                                    clipDragPreview.placements.any { it.source == key }
+                            },
                             visualStartMs = {
-                                clipDragPreview.placements
+                                if (windowInfo.keyboardModifiers.isAltPressed) key.entryStartMs else clipDragPreview.placements
                                     .firstOrNull { it.source == key }
                                     ?.targetStartMs
                             },
@@ -490,27 +500,42 @@ fun TimelineLaneView(
                         .zIndex(21f),
                 )
             }
-            // Same-track clips render themselves at the authoritative snapped position.
-            // A lightweight placement preview is only needed while crossing track lanes.
             clipDragPreview.placements
-                .filter { it.source.trackIndex != it.targetTrackIndex }
                 .forEach { placement ->
                     val lane = clipDragCoordinator.laneBoundsInRoot[placement.targetTrackIndex] ?: return@forEach
-                    val widthPx = (placement.durationMs * renderViewport.zoomX).coerceAtLeast(1f)
-                    Box(
-                        modifier = Modifier
-                            .offset {
-                                IntOffset(
-                                    renderViewport.timeMsToScreenX(placement.targetStartMs.toDouble()).roundToInt(),
-                                    (lane.top - surface.top).roundToInt(),
+                    key(placement.source) {
+                        val widthPx = (placement.durationMs * renderViewport.zoomX).coerceAtLeast(1f)
+                        Box(
+                            modifier = Modifier
+                                .offset {
+                                    IntOffset(
+                                        renderViewport.timeMsToScreenX(placement.targetStartMs.toDouble()).roundToInt(),
+                                        (lane.top - surface.top).roundToInt(),
+                                    )
+                                }
+                                .width(width = with(LocalDensity.current) { widthPx.toDp() })
+                                .height(with(LocalDensity.current) { lane.height.toDp() })
+                                .zIndex(20f),
+                        ) {
+                            val sourceTrack = tracks.getOrNull(placement.source.trackIndex)
+                            val entry = when (sourceTrack) {
+                                is AudioTimelineTrack -> sourceTrack.entries[placement.source.entryStartMs]
+                                is MidiTimelineTrack -> if (placement.source.clipId == null) {
+                                    sourceTrack.entries[placement.source.entryStartMs]
+                                } else {
+                                    sourceTrack.chainEffectEntries.values.firstOrNull { it.clipId == placement.source.clipId }
+                                }
+                                else -> null
+                            }
+                            if (entry != null) {
+                                TimelineClipDragPreview(
+                                    entry = entry,
+                                    valid = clipDragPreview.isValid,
+                                    zoomX = renderViewport.zoomX,
                                 )
                             }
-                            .width(with(LocalDensity.current) { widthPx.toDp() })
-                            .height(with(LocalDensity.current) { lane.height.toDp() })
-                            .background(timelinePalette.selectionFill, RoundedCornerShape(timelineDimensions.clipCornerRadius))
-                            .border(2.dp, timelinePalette.selectionStroke, RoundedCornerShape(timelineDimensions.clipCornerRadius))
-                            .zIndex(20f),
-                    )
+                        }
+                    }
                 }
         }
     }

@@ -89,11 +89,29 @@ object TimelineKeyHandler {
 
     fun duplicateSelection(): Boolean = handleDuplicate()
 
+    private var trackShortcutHeld = false
+
     fun handleKeyInput(keyEvent: KeyEvent): Boolean {
+        if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.T) {
+            trackShortcutHeld = false
+        }
         if (keyEvent.type != KeyEventType.KeyDown) return false
         if (WorkspaceRepository.isInputFocused) return false
 
         return when {
+            keyEvent.hasPrimaryShortcutModifier() && !keyEvent.isAltPressed && keyEvent.key == Key.T -> {
+                if (!trackShortcutHeld) {
+                    trackShortcutHeld = true
+                    TimelineCommandSurface.addTrack(audio = !keyEvent.isShiftPressed)
+                }
+                true
+            }
+            keyEvent.key == Key.Zero && keyEvent.hasNoShortcutModifier() -> {
+                TimelineCommandSurface.toggleEntriesMute(
+                    targets = SelectionManager.selections.value.filterIsInstance<Selectable.TimelineEntryItem>()
+                        .map { dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey(trackIndex = it.trackIndex, entryStartMs = it.entryStartMs, clipId = it.clipId) },
+                )
+            }
             keyEvent.key == Key.Tab && keyEvent.isShiftPressed &&
                 !keyEvent.hasPrimaryShortcutModifier() && !keyEvent.isAltPressed ->
                 togglePianoRollView?.invoke() == true

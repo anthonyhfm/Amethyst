@@ -9,7 +9,8 @@ enum class TimelineClipKind {
 
 data class TimelineClipKey(
     val trackIndex: Int,
-    val entryStartMs: Long
+    val entryStartMs: Long,
+    val clipId: String? = null,
 )
 
 data class TimelineClipContext(

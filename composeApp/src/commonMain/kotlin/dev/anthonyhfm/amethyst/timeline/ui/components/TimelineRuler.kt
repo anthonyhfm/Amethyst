@@ -209,6 +209,12 @@ fun TimelineRuler(
                         onDrag = { change, _ ->
                             if (draggingId != null) {
                                 dragTimeMs = timeAt(x = change.position.x - dragOffsetX)
+                            } else if (viewport.zoomX > 0f) {
+                                TimelineRepository.setPlayheadPosition(
+                                    positionMs = viewport.screenToTimeMs(screenX = change.position.x)
+                                        .toLong()
+                                        .coerceAtLeast(minimumValue = 0L),
+                                )
                             }
                         },
                         onDragEnd = {

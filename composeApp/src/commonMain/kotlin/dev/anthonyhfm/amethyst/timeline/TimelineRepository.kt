@@ -163,13 +163,13 @@ object TimelineRepository {
         val positionUs = msToUs(positionMs)
         return positionUs >= entry.startTimeUs &&
             positionUs < entry.endTimeUs &&
-            isPlaybackEnabled(track, anySoloedTrack)
+            isPlaybackEnabled(track, anySoloedTrack) && !entry.isMuted
     }
 
     private fun TrackMidiEntry.shouldPlayAt(positionMs: Long, anySoloedTrack: Boolean): Boolean {
         return positionMs >= entry.startTimeMs &&
             positionMs < entry.endTimeMs &&
-            isPlaybackEnabled(track, anySoloedTrack)
+            isPlaybackEnabled(track, anySoloedTrack) && !entry.isMuted
     }
 
     private fun TrackMidiEntry.overlapsPlaybackWindow(
@@ -179,13 +179,13 @@ object TimelineRepository {
     ): Boolean {
         return entry.startTimeMs <= endInclusiveMs &&
             entry.endTimeMs > startExclusiveMs &&
-            isPlaybackEnabled(track, anySoloedTrack)
+            isPlaybackEnabled(track, anySoloedTrack) && !entry.isMuted
     }
 
     private fun TrackChainEffectEntry.shouldPlayAt(positionMs: Long, anySoloedTrack: Boolean): Boolean =
         positionMs >= entry.startTimeMs &&
             positionMs < entry.endTimeMs &&
-            isPlaybackEnabled(track, anySoloedTrack) &&
+            isPlaybackEnabled(track, anySoloedTrack) && !entry.isMuted &&
             chainEffectRuntimes[entry.clipId]?.isPlayable == true
 
     private fun TrackChainEffectEntry.overlapsPlaybackWindow(
@@ -194,7 +194,7 @@ object TimelineRepository {
         anySoloedTrack: Boolean,
     ): Boolean = entry.startTimeMs <= endInclusiveMs &&
         entry.endTimeMs > startExclusiveMs &&
-        isPlaybackEnabled(track, anySoloedTrack) &&
+        isPlaybackEnabled(track, anySoloedTrack) && !entry.isMuted &&
         chainEffectRuntimes[entry.clipId]?.isPlayable == true
 
     fun chainEffectRuntime(clipId: String): ChainEffectRuntime? = chainEffectRuntimes[clipId]
@@ -880,7 +880,7 @@ object TimelineRepository {
             val iterator = activeEntries.iterator()
             while (iterator.hasNext()) {
                 val e = iterator.next()
-                if (currentUs >= e.entry.endTimeUs || !isPlaybackEnabled(e.track, anySoloedTrack)) {
+                if (currentUs >= e.entry.endTimeUs || e.entry.isMuted || !isPlaybackEnabled(e.track, anySoloedTrack)) {
                     e.entry.stop(); iterator.remove(); println("TimelineInc: Stopped ${e.entry.fileName} @${currentMs}ms")
                 } else {
                     e.entry.updateAutomation(

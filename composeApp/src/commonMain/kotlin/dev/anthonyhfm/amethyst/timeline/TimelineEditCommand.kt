@@ -11,6 +11,7 @@ sealed interface TimelineEditCommand {
         val anchorKey: TimelineClipKey,
         val targetTrackIndex: Int,
         val targetStartMs: Long,
+        val copy: Boolean = false,
     ) : TimelineEditCommand
 
     data class DeleteTracks(

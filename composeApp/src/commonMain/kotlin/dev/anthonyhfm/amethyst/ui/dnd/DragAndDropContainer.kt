@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import com.mohamedrejeb.compose.dnd.drag.DraggedItemShadow
 import com.mohamedrejeb.compose.dnd.utils.fastForEach
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import kotlinx.coroutines.launch
 
 /**
@@ -74,12 +75,14 @@ fun <T> DragAndDropContainer(
                     state.pointerId?.let { pointerId ->
                         if (
                             drag(pointerId) {
+                                ModifierKeysState.updateFromPointerModifiers(modifiers = currentEvent.keyboardModifiers)
                                 scope.launch {
                                     state.handleDrag(it.position + positionInRoot.value)
                                 }
                                 it.consume()
                             }
                         ) {
+                            ModifierKeysState.updateFromPointerModifiers(modifiers = currentEvent.keyboardModifiers)
                             // consume up if we quit drag gracefully with the up
                             currentEvent.changes.fastForEach {
                                 if (it.changedToUp()) it.consume()

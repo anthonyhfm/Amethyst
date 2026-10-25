@@ -133,6 +133,10 @@ object UndoManager {
             val action = undoStack.removeAt(undoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.MuteSelection -> {
+                    action.changes.forEach { it.apply(it.before) }
+                    redoStack.add(action)
+                }
                 is UndoableAction.TimelineLocatorsChange -> {
                     dev.anthonyhfm.amethyst.timeline.locators.TimelineLocatorRepository.load(locators = action.beforeLocators)
                     redoStack.add(element = action)
@@ -372,7 +376,10 @@ object UndoManager {
                 is UndoableAction.GroupEditorStateChange<*> -> {
                     @Suppress("UNCHECKED_CAST")
                     val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<DeviceState>
-                    device.state.value = action.beforeState
+                    val restored = action.beforeState
+                    restored.isMuted = device.isMuted
+                    restored.isCollapsed = device.isCollapsed
+                    device.state.value = restored
                     device.onStateRestored()
                     restoreGroupSelectionForDevice(
                         device = action.device,
@@ -786,6 +793,10 @@ object UndoManager {
             val action = redoStack.removeAt(redoStack.lastIndex)
 
             when (action) {
+                is UndoableAction.MuteSelection -> {
+                    action.changes.forEach { it.apply(it.after) }
+                    undoStack.add(action)
+                }
                 is UndoableAction.TimelineLocatorsChange -> {
                     dev.anthonyhfm.amethyst.timeline.locators.TimelineLocatorRepository.load(locators = action.afterLocators)
                     undoStack.add(element = action)
@@ -1039,7 +1050,10 @@ object UndoManager {
                 is UndoableAction.GroupEditorStateChange<*> -> {
                     @Suppress("UNCHECKED_CAST")
                     val device = action.device as dev.anthonyhfm.amethyst.devices.GenericChainDevice<DeviceState>
-                    device.state.value = action.afterState
+                    val restored = action.afterState
+                    restored.isMuted = device.isMuted
+                    restored.isCollapsed = device.isCollapsed
+                    device.state.value = restored
                     device.onStateRestored()
                     restoreGroupSelectionForDevice(
                         device = action.device,

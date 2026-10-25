@@ -26,6 +26,8 @@ data class StateChain(
     val mutedDeviceIndices: List<Int> = emptyList(),
     @ProtoNumber(3)
     val deviceIds: List<String> = emptyList(),
+    @ProtoNumber(4)
+    val isMuted: Boolean = false,
 ) {
     fun unpack(): Chain = unpackInto(Chain())
 
@@ -58,6 +60,7 @@ data class StateChain(
             }
 
             chain.restoreDevices(restored = restored)
+            chain.setMuted(muted = isMuted)
             ensureUniqueDeviceIds(root = chain)
             return chain
         } catch (failure: Throwable) {
@@ -87,6 +90,7 @@ data class StateChain(
                 devices = devList.map { packDevice(it) },
                 mutedDeviceIndices = mutedIndices,
                 deviceIds = devList.map(GenericChainDevice<*>::selectionUUID),
+                isMuted = chain.isMuted,
             )
         }
 
@@ -97,7 +101,8 @@ data class StateChain(
         }
 
         fun unpackDevice(deviceState: DeviceState): GenericChainDevice<*> {
-            val device = DeviceRegistry.unpack(deviceState.withoutNestedDeviceIds())
+            val independent = DeviceRegistry.deepCopyState(state = deviceState.withoutNestedDeviceIds())
+            val device = DeviceRegistry.unpack(state = independent)
             device.state.value.isMuted = deviceState.isMuted
             return device
         }

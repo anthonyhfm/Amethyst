@@ -17,6 +17,7 @@ import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.math.abs
 
 interface TimelineEntry {
+    val isMuted: Boolean get() = false
     val startTimeMs: Long
     val durationMs: Long
     val endTimeMs: Long get() = startTimeMs + durationMs
@@ -77,6 +78,8 @@ data class AudioEntry(
     val startTimeUs: Long = msToUs(startTimeMs),
     @ProtoNumber(15)
     val durationUs: Long = msToUs(durationMs),
+    @ProtoNumber(16)
+    override val isMuted: Boolean = false,
 ) : TimelineEntry {
     @Transient
     private var audioSourceId: String? = null
@@ -136,6 +139,9 @@ data class AudioEntry(
     }
 
     override fun start(startAt: Long?, automation: TimelineTrackAutomationState) {
+        if (isMuted) {
+            return
+        }
         val actualStartTime = startAt ?: startTimeMs
         if (source() == null) {
             println("No audio source in library for: $fileName (sourceId=$sourceId)")
@@ -213,7 +219,8 @@ data class MidiEntry(
     override val startTimeMs: Long,
     override val durationMs: Long,
     val notes: List<MidiNote> = emptyList(),
-    var name: String = "MIDI Clip"
+    var name: String = "MIDI Clip",
+    override val isMuted: Boolean = false,
 ) : TimelineEntry {
     @kotlinx.serialization.Transient
     private val activeSignalOwner = Any()
@@ -233,6 +240,9 @@ data class MidiEntry(
     }
 
     override fun start(startAt: Long?, automation: TimelineTrackAutomationState) {
+        if (isMuted) {
+            return
+        }
         val offsetMs = playbackOffsetMs(startAt)
         syncActiveNotesAt(offsetMs)
         lastProcessedOffsetMs = offsetMs
@@ -251,6 +261,10 @@ data class MidiEntry(
     }
 
     fun processAtTime(currentTimeMs: Long) {
+        if (isMuted) {
+            stop()
+            return
+        }
         val currentOffsetMs = playbackOffsetMs(currentTimeMs)
         val previousOffsetMs = lastProcessedOffsetMs
 

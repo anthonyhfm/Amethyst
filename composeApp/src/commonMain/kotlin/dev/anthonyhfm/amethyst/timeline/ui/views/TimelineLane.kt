@@ -714,6 +714,12 @@ fun TimelineLane(
                                     viewport = viewport,
                                     isSelected = chainEntry.clipId in selectedChainEffectIds,
                                     onSelect = { onSelectChainEffect(chainEntry.clipId) },
+                                    dragCallbacks = clipDragCallbacks(TimelineClipKey(trackIndex = trackIndex, entryStartMs = chainEntry.startTimeMs, clipId = chainEntry.clipId)),
+                                    onToggleMute = {
+                                        dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface.toggleEntriesMute(
+                                            targets = listOf(TimelineClipKey(trackIndex = trackIndex, entryStartMs = chainEntry.startTimeMs, clipId = chainEntry.clipId)),
+                                        )
+                                    },
                                     onMove = { newStart -> onMoveChainEffect(chainEntry.clipId, newStart) },
                                     onResize = { newStart, newDuration ->
                                         onResizeChainEffect(chainEntry.clipId, newStart, newDuration)

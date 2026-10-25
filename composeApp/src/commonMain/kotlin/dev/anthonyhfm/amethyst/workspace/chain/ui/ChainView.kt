@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.mohamedrejeb.compose.dnd.DragAndDropState
 import com.mohamedrejeb.compose.dnd.drag.DraggableItem
 import com.mohamedrejeb.compose.dnd.rememberDragAndDropState
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
@@ -40,11 +41,12 @@ import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.devices.LocalChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.choke.ChokeChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
-import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.mask.MaskChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.DefaultShape
 import dev.anthonyhfm.amethyst.ui.modifier.clickableWithDoubleTap
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import kotlin.reflect.KClass
 
 @Composable
@@ -242,7 +244,7 @@ fun ChainView(
 
                                     Box(
                                         modifier = Modifier
-                                            .chainDeviceMuteEffect(deviceState.isMuted)
+                                            .chainDeviceMuteEffect(isMuted = device.isMuted)
                                             .then(
                                                 if (hasRemoteFocus) {
                                                     Modifier.border(2.dp, remoteFocusColor, DefaultShape)
@@ -306,7 +308,7 @@ private fun ChainDeviceDragPreview(
     val isCollapsed by device.isCollapsedState
 
     Box(
-        modifier = Modifier.chainDeviceMuteEffect(deviceState.isMuted)
+        modifier = Modifier.chainDeviceMuteEffect(isMuted = device.isMuted)
     ) {
         CompositionLocalProvider(LocalChainDevice provides device) {
             if (isCollapsed) {
@@ -332,12 +334,28 @@ internal fun moveChainDevices(
     draggedDevices: List<GenericChainDevice<*>>,
     originChain: Chain,
     insertionIndex: Int,
+    copy: Boolean = ModifierKeysState.isAltPressed,
 ) {
     if (draggedDevices.isEmpty() || draggedDevices.any { it.selectionUUID == parentSelectionUUID }) {
         return
     }
 
     val sourceDevices = originChain.devices.value
+    if (draggedDevices.any { it !in sourceDevices }) {
+        return
+    }
+    if (copy) {
+        val copies = draggedDevices.map { device ->
+            StateChain.unpackDevice(
+                deviceState = StateChain.packDevice(device = device),
+            )
+        }
+        chain.addAll(devicesToAdd = copies, atIndex = insertionIndex)
+        SelectionManager.replaceSelections(
+            updatedSelections = copies.map { Selectable.ChainDevice(parent = chain, device = it) },
+        )
+        return
+    }
     val draggedIds = draggedDevices.mapTo(mutableSetOf()) { it.selectionUUID }
     val baseIndex = if (originChain === chain) {
         insertionIndex - sourceDevices.take(insertionIndex).count { it.selectionUUID in draggedIds }

@@ -1,9 +1,7 @@
 package dev.anthonyhfm.amethyst.workspace.chain.ui
 
-import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
-
+import amethyst.composeapp.generated.resources.Res
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,6 +21,7 @@ import com.composables.icons.lucide.VolumeX
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.extractDevicesFromChainEffectEntry
+import dev.anthonyhfm.amethyst.core.controls.shortcuts.EditorMuteCommands
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
@@ -31,6 +30,7 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.workspace.help.GetHelpWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ChainDeviceContextMenu(
@@ -52,7 +52,7 @@ fun ChainDeviceContextMenu(
                 label = stringResource(Res.string.workspace_chain_chaineditor_unmute),
                 icon = Lucide.Volume2,
                 onClick = {
-                    device.setMuted(false)
+                    EditorMuteCommands.setDevices(devices = listOf(device), muted = false)
                     onDismiss()
                 }
             )
@@ -61,7 +61,7 @@ fun ChainDeviceContextMenu(
                 label = stringResource(Res.string.workspace_chain_chaineditor_mute),
                 icon = Lucide.VolumeX,
                 onClick = {
-                    device.setMuted(true)
+                    EditorMuteCommands.setDevices(devices = listOf(device), muted = true)
                     onDismiss()
                 }
             )
@@ -91,14 +91,13 @@ fun ChainDeviceContextMenu(
             label = stringResource(Res.string.workspace_chain_chaineditor_copy),
             icon = Lucide.Copy,
             onClick = {
-                ClipboardManager.setClipboardData(
-                    ClipboardData.ChainDevice(
-                        states = listOf(device.state.value),
-                        type = when (WorkspaceRepository.mode.value) {
-                            is SamplingChainWorkspaceMode -> ClipboardData.ChainDevice.ChainType.Sampling
-                            else -> ClipboardData.ChainDevice.ChainType.Lights
-                        }
-                    )
+                ClipboardManager.copy(
+                    data = listOf(
+                        dev.anthonyhfm.amethyst.core.controls.selection.Selectable.ChainDevice(
+                            parent = chain,
+                            device = device,
+                        )
+                    ),
                 )
                 onDismiss()
             }
@@ -141,7 +140,7 @@ fun ChainDeviceContextMenu(
                     val newDevices = (currentClipboard as ClipboardData.ChainDevice).states.map {
                         StateChain.unpackDevice(it)
                     }
-                    chain.addAll(newDevices, atIndex = index + 1)
+                    chain.addAll(devicesToAdd = newDevices, atIndex = index)
                     onDismiss()
                 }
             )
@@ -170,7 +169,7 @@ fun ChainDeviceContextMenu(
                     val devicesToPaste = (currentClipboard as ClipboardData.TimelineChainEffects).entries.flatMap {
                         extractDevicesFromChainEffectEntry(it)
                     }
-                    chain.addAll(devicesToPaste, atIndex = index + 1)
+                    chain.addAll(devicesToAdd = devicesToPaste, atIndex = index)
                     onDismiss()
                 }
             )

@@ -11,6 +11,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -97,6 +102,15 @@ fun TimelineView(
         }
 
         val verticalScrollState = rememberScrollState()
+        var previousTrackCount by remember { mutableIntStateOf(value = tracks.size) }
+        LaunchedEffect(tracks.size) {
+            val addedTrack = tracks.size > previousTrackCount
+            previousTrackCount = tracks.size
+            if (addedTrack && SelectionManager.lastSelectedTimelineTrackIndex == tracks.lastIndex) {
+                withFrameNanos { }
+                verticalScrollState.scrollTo(value = verticalScrollState.maxValue)
+            }
+        }
 
         Row(
             modifier = Modifier

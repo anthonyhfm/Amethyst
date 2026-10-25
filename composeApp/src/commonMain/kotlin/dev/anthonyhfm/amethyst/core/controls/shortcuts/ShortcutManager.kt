@@ -178,6 +178,11 @@ object ShortcutManager {
         if (WorkspaceRepository.isInputFocused) return false
 
         val isCtrl = keyEvent.isCtrlPressed || keyEvent.isMetaPressed
+        if (!isCtrl && !keyEvent.isAltPressed && !keyEvent.isShiftPressed && keyEvent.key == Key.Zero &&
+            (WorkspaceRepository.mode.value is LightsChainWorkspaceMode || WorkspaceRepository.mode.value is SamplingChainWorkspaceMode)
+        ) {
+            return EditorMuteCommands.toggleSelection()
+        }
         if (keyEvent.key == Key.Tab && keyEvent.isShiftPressed && !isCtrl && !keyEvent.isAltPressed) {
             return TimelineKeyHandler.togglePianoRollView?.invoke() == true
         }

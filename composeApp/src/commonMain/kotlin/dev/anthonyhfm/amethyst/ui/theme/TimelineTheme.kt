@@ -298,6 +298,16 @@ object TimelineTheme {
     }
 
     @Composable
+    fun audioWaveformColor(automationOverlayActive: Boolean = false): Color {
+        val color = clipColors(role = TimelineClipRole.Audio, selected = false).content
+        return if (automationOverlayActive) {
+            color.copy(alpha = 0.44f)
+        } else {
+            color
+        }
+    }
+
+    @Composable
     fun clipColors(role: TimelineClipRole, selected: Boolean): TimelineClipColors {
         return if (selected) {
             when (role) {

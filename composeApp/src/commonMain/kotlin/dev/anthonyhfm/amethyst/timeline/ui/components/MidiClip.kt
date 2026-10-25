@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -256,6 +257,8 @@ fun MidiClip(
 
     ContextMenu(
         modifier = Modifier
+            .alpha(alpha = if (dragCallbacks?.hideSource?.invoke() == true) 0f else 1f)
+            .alpha(alpha = if (midiEntry.isMuted) 0.45f else 1f)
             .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
             .width(finalWidthDp)
             .height(timelineDimensions.laneHeight)
@@ -596,6 +599,11 @@ fun MidiClip(
             }
         }
     ) {
+        TimelineContextMenuAction(
+            label = if (midiEntry.isMuted) "Unmute Clips" else "Mute Clips",
+            shortcut = "0",
+            onClick = { TimelineCommandSurface.toggleEntriesMute(targets = contextEntryTargets) },
+        )
         TimelineContextMenuAction(
             label = stringResource(Res.string.timeline_clip_action_rename),
             shortcut = primaryModifierShortcutLabel("R"),

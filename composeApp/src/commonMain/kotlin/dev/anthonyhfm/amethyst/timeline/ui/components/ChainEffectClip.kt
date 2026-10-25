@@ -26,6 +26,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineClipDragCallbacks
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineContextMenuAction
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -68,11 +75,14 @@ fun ChainEffectClip(
     onResize: (Long, Long) -> Unit,
     onDoubleClick: () -> Unit,
     resolveEdit: (ChainEffectEditMode, Long, Boolean) -> ChainEffectSpan,
+    dragCallbacks: TimelineClipDragCallbacks? = null,
+    onToggleMute: () -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
     val windowInfo = LocalWindowInfo.current
     val dimensions = TimelineTheme.dimensions
 
+    var clipCoordinates by remember { mutableStateOf<LayoutCoordinates?>(value = null) }
     var dragDeltaPx by remember(entry.clipId, entry.startTimeMs) { mutableFloatStateOf(0f) }
     var resizeLeftDeltaPx by remember(entry.clipId, entry.startTimeMs) { mutableFloatStateOf(0f) }
     var resizeRightDeltaPx by remember(entry.clipId, entry.durationMs) { mutableFloatStateOf(0f) }
@@ -85,7 +95,7 @@ fun ChainEffectClip(
         resizeLeftDeltaPx != 0f -> resolve(mode = ChainEffectEditMode.LEFT_EDGE, deltaPx = resizeLeftDeltaPx)
         resizeRightDeltaPx != 0f -> resolve(mode = ChainEffectEditMode.RIGHT_EDGE, deltaPx = resizeRightDeltaPx)
         dragDeltaPx != 0f -> resolve(mode = ChainEffectEditMode.MOVE, deltaPx = dragDeltaPx)
-        else -> ChainEffectSpan(startMs = entry.startTimeMs, durationMs = entry.durationMs)
+        else -> ChainEffectSpan(startMs = dragCallbacks?.visualStartMs?.invoke() ?: entry.startTimeMs, durationMs = entry.durationMs)
     }
     val projectedSpan = projectTimelineSpanPx(
         startTimeMs = preview.startMs.toDouble(),
@@ -116,129 +126,159 @@ fun ChainEffectClip(
         selected = isSelected,
     )
 
-    Box(
-        modifier = Modifier
-            .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
-            .width(finalWidthDp)
-            .height(dimensions.laneHeight)
-            .clip(clipShape)
-            .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
-            .border(if (isSelected) 1.5.dp else 1.dp, clipColors.border, clipShape)
-            .timelineClipGestures(
-                gestureKey = entry.clipId,
-                onPress = { _, _ ->
-                    focusManager.clearFocus()
-                    onSelect()
-                },
-                onDragStart = { dragDeltaPx = 0f },
-                onDrag = { change, amount ->
-                    dragDeltaPx += amount.x
-                    change.consume()
-                },
-                onDragEnd = {
-                    val span = resolve(mode = ChainEffectEditMode.MOVE, deltaPx = dragDeltaPx)
-                    if (span.startMs != entry.startTimeMs) {
-                        onMove(span.startMs)
-                    }
-                    dragDeltaPx = 0f
-                },
-                onDragCancel = { dragDeltaPx = 0f },
-                onDoubleClick = onDoubleClick,
-            )
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
+    ContextMenu(
+        trigger = {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(dimensions.clipHeaderHeight)
-                    .background(clipColors.header, clipHeaderShape)
-                    .padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .alpha(
+                        alpha = when {
+                            dragCallbacks?.hideSource?.invoke() == true -> 0f
+                            entry.isMuted -> 0.45f
+                            else -> 1f
+                        },
+                    )
+                    .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
+                    .width(finalWidthDp)
+                    .height(dimensions.laneHeight)
+                    .onGloballyPositioned { clipCoordinates = it }
+                    .clip(clipShape)
+                    .background(clipColors.background.copy(alpha = if (isSelected) 0.98f else 0.90f))
+                    .border(if (isSelected) 1.5.dp else 1.dp, clipColors.border, clipShape)
+                    .timelineClipGestures(
+                        gestureKey = entry.clipId,
+                        onPress = { _, _ ->
+                            focusManager.clearFocus()
+                            onSelect()
+                        },
+                        onDragStart = { position ->
+                            dragDeltaPx = 0f
+                            clipCoordinates?.let { dragCallbacks?.onStart?.invoke(it.localToRoot(relativeToLocal = position)) }
+                        },
+                        onDrag = { change, amount ->
+                            if (dragCallbacks == null) {
+                                dragDeltaPx += amount.x
+                            } else {
+                                clipCoordinates?.let { dragCallbacks.onDrag(it.localToRoot(relativeToLocal = change.position)) }
+                            }
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            val span = resolve(mode = ChainEffectEditMode.MOVE, deltaPx = dragDeltaPx)
+                            if (dragCallbacks != null) {
+                                dragCallbacks.onEnd()
+                            } else if (span.startMs != entry.startTimeMs) {
+                                onMove(span.startMs)
+                            }
+                            dragDeltaPx = 0f
+                        },
+                        onDragCancel = {
+                            dragDeltaPx = 0f
+                            dragCallbacks?.onCancel?.invoke()
+                        },
+                        onDoubleClick = onDoubleClick,
+                    )
             ) {
-                Icon(
-                    imageVector = if (entry.isPlayable) Icons.Default.AutoAwesome else Icons.Default.Add,
-                    contentDescription = null,
-                    tint = clipColors.content,
-                    modifier = Modifier.size(12.dp),
-                )
-                Text(
-                    text = entry.name,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = clipColors.content,
-                    style = Theme[typography][small],
-                )
-                if (entry.isCapped) {
-                    Icon(
-                        imageVector = Icons.Default.VerticalAlignBottom,
-                        contentDescription = "Capped",
-                        tint = clipColors.content,
-                        modifier = Modifier.size(11.dp),
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(dimensions.clipHeaderHeight)
+                            .background(clipColors.header, clipHeaderShape)
+                            .padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = if (entry.isPlayable) Icons.Default.AutoAwesome else Icons.Default.Add,
+                            contentDescription = null,
+                            tint = clipColors.content,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Text(
+                            text = entry.name,
+                            modifier = Modifier.weight(1f).padding(start = 4.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = clipColors.content,
+                            style = Theme[typography][small],
+                        )
+                        if (entry.isCapped) {
+                            Icon(
+                                imageVector = Icons.Default.VerticalAlignBottom,
+                                contentDescription = "Capped",
+                                tint = clipColors.content,
+                                modifier = Modifier.size(11.dp),
+                            )
+                        }
+                    }
+                }
+
+                if (clipWindow.isLeftEdgeVisible) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .width(dimensions.resizeHandleWidth)
+                            .fillMaxHeight()
+                            .pointerHoverIcon(PointerIcon.ResizeLeft)
+                            .pointerInput(entry.clipId, entry.startTimeMs, viewport.zoomX) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        focusManager.clearFocus()
+                                        onSelect()
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        resizeLeftDeltaPx += amount.x
+                                    },
+                                    onDragEnd = {
+                                        if (resizeLeftDeltaPx != 0f) {
+                                            val span = resolve(mode = ChainEffectEditMode.LEFT_EDGE, deltaPx = resizeLeftDeltaPx)
+                                            onResize(span.startMs, span.durationMs)
+                                        }
+                                        resizeLeftDeltaPx = 0f
+                                    },
+                                    onDragCancel = { resizeLeftDeltaPx = 0f },
+                                )
+                            }
+                    )
+                }
+
+                if (clipWindow.isRightEdgeVisible) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(dimensions.resizeHandleWidth)
+                            .fillMaxHeight()
+                            .pointerHoverIcon(PointerIcon.ResizeRight)
+                            .pointerInput(entry.clipId, entry.durationMs, viewport.zoomX) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        focusManager.clearFocus()
+                                        onSelect()
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        resizeRightDeltaPx += amount.x
+                                    },
+                                    onDragEnd = {
+                                        if (resizeRightDeltaPx != 0f) {
+                                            val span = resolve(mode = ChainEffectEditMode.RIGHT_EDGE, deltaPx = resizeRightDeltaPx)
+                                            onResize(span.startMs, span.durationMs)
+                                        }
+                                        resizeRightDeltaPx = 0f
+                                    },
+                                    onDragCancel = { resizeRightDeltaPx = 0f },
+                                )
+                            }
                     )
                 }
             }
-        }
-
-        if (clipWindow.isLeftEdgeVisible) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .width(dimensions.resizeHandleWidth)
-                    .fillMaxHeight()
-                    .pointerHoverIcon(PointerIcon.ResizeLeft)
-                    .pointerInput(entry.clipId, entry.startTimeMs, viewport.zoomX) {
-                        detectDragGestures(
-                            onDragStart = {
-                                focusManager.clearFocus()
-                                onSelect()
-                            },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                resizeLeftDeltaPx += amount.x
-                            },
-                            onDragEnd = {
-                                if (resizeLeftDeltaPx != 0f) {
-                                    val span = resolve(mode = ChainEffectEditMode.LEFT_EDGE, deltaPx = resizeLeftDeltaPx)
-                                    onResize(span.startMs, span.durationMs)
-                                }
-                                resizeLeftDeltaPx = 0f
-                            },
-                            onDragCancel = { resizeLeftDeltaPx = 0f },
-                        )
-                    }
-            )
-        }
-
-        if (clipWindow.isRightEdgeVisible) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(dimensions.resizeHandleWidth)
-                    .fillMaxHeight()
-                    .pointerHoverIcon(PointerIcon.ResizeRight)
-                    .pointerInput(entry.clipId, entry.durationMs, viewport.zoomX) {
-                        detectDragGestures(
-                            onDragStart = {
-                                focusManager.clearFocus()
-                                onSelect()
-                            },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                resizeRightDeltaPx += amount.x
-                            },
-                            onDragEnd = {
-                                if (resizeRightDeltaPx != 0f) {
-                                    val span = resolve(mode = ChainEffectEditMode.RIGHT_EDGE, deltaPx = resizeRightDeltaPx)
-                                    onResize(span.startMs, span.durationMs)
-                                }
-                                resizeRightDeltaPx = 0f
-                            },
-                            onDragCancel = { resizeRightDeltaPx = 0f },
-                        )
-                    }
-            )
-        }
+        },
+    ) {
+        TimelineContextMenuAction(
+            label = if (entry.isMuted) "Unmute Clip" else "Mute Clip",
+            shortcut = "0",
+            onClick = onToggleMute,
+        )
     }
 }
 

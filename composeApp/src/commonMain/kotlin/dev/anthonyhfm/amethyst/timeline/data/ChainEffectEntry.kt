@@ -19,6 +19,7 @@ data class ChainEffectEntry(
     /** Sticky user/collision choke point. Null means follow the natural device duration. */
     val maxDurationMs: Long? = null,
     var name: String = "Chain Effect",
+    override val isMuted: Boolean = false,
 ) : TimelineEntry {
     val isPlayable: Boolean get() = source != null
     val isCapped: Boolean get() = maxDurationMs != null

@@ -54,6 +54,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -72,7 +73,6 @@ import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -96,11 +96,13 @@ import com.mohamedrejeb.compose.dnd.reorder.ReorderContainer
 import com.mohamedrejeb.compose.dnd.reorder.ReorderableItem
 import com.mohamedrejeb.compose.dnd.reorder.ReorderableItemScope
 import com.mohamedrejeb.compose.dnd.reorder.rememberReorderState
+import dev.anthonyhfm.amethyst.core.controls.ModifierKeysState
 import dev.anthonyhfm.amethyst.core.controls.automapping.AutomappingManager
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.shortcuts.EditorMuteCommands
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.engine.elements.Chain
@@ -120,11 +122,11 @@ import dev.anthonyhfm.amethyst.ui.modifier.hoverTweenSpec
 import dev.anthonyhfm.amethyst.ui.modifier.onFocusSelectAll
 import dev.anthonyhfm.amethyst.ui.modifier.rememberDelayedHoverAsState
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.chainBorder
 import dev.anthonyhfm.amethyst.ui.theme.chainColorTokens
 import dev.anthonyhfm.amethyst.ui.theme.chainSurface
 import dev.anthonyhfm.amethyst.ui.theme.chainSurfaceRaised
-import dev.anthonyhfm.amethyst.ui.theme.border
 import dev.anthonyhfm.amethyst.ui.theme.colors
 import dev.anthonyhfm.amethyst.ui.theme.destructive
 import dev.anthonyhfm.amethyst.ui.theme.foreground
@@ -136,13 +138,13 @@ import dev.anthonyhfm.amethyst.ui.theme.selectionForeground
 import dev.anthonyhfm.amethyst.ui.theme.selectionSurface
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 import dev.anthonyhfm.amethyst.workspace.chain.ui.DeviceInsertionAnimator
 import dev.anthonyhfm.amethyst.workspace.chain.ui.LocalTitleBarModifier
 import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import dev.anthonyhfm.amethyst.workspace.chain.ui.ChainView
 
 internal data class GroupEditorActions(
     val onAddGroup: (Int?) -> Unit,
@@ -385,13 +387,17 @@ internal fun GroupEditorList(
                         data = group,
                         enabled = groups.size > 1,
                         useDragAnchor = true,
-                        onDragEnter = { draggedState ->
-                            val fromIndex = groups.indexOfFirst { currentGroup ->
-                                currentGroup.id == draggedState.data.id
-                            }
-
-                            if (fromIndex != -1 && fromIndex != index) {
-                                actions.onMoveGroup(fromIndex, index)
+                        onDrop = { draggedState ->
+                            val fromIndex = groups.indexOfFirst { it.id == draggedState.data.id }
+                            if (fromIndex >= 0) {
+                                if (ModifierKeysState.isAltPressed) {
+                                    when (parentDevice) {
+                                        is GroupChainDevice -> parentDevice.duplicateGroup(index = fromIndex, toIndex = index)
+                                        is MultiGroupChainDevice -> parentDevice.duplicateGroup(index = fromIndex, toIndex = index)
+                                    }
+                                } else if (fromIndex != index) {
+                                    actions.onMoveGroup(fromIndex, index)
+                                }
                             }
                         },
                     ) {
@@ -581,7 +587,7 @@ private fun ReorderableItemScope.GroupEditorListItem(
             ) {
                 if (!renameEnabled) {
                     Text(
-                        text = group.name.replace("#", "${index + 1}"),
+                        text = group.name.replace("#", "${index + 1}") + if (group.chain.isMuted) " (Muted)" else "",
                         style = Theme[typography][small],
                         lineHeight = Theme[typography][small].fontSize,
                         modifier = Modifier
@@ -666,6 +672,13 @@ private fun ReorderableItemScope.GroupEditorListItem(
             ContextMenuSeparator()
         }
 
+        GroupEditorContextMenuItem(
+            label = if (group.chain.isMuted) "Unmute Chain" else "Mute Chain",
+            icon = Lucide.Copy,
+            onClick = {
+                EditorMuteCommands.toggleChains(chains = listOf(group.chain))
+            },
+        )
         GroupEditorContextMenuItem(
             label = "Copy",
             icon = Lucide.Copy,

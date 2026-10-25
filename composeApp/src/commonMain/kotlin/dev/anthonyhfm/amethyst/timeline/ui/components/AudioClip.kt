@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -135,10 +136,6 @@ fun AudioClip(
         role = TimelineClipRole.Audio,
         selected = isSelected
     )
-    val unselectedClipColors = TimelineTheme.clipColors(
-        role = TimelineClipRole.Audio,
-        selected = false
-    )
     val interactionEnabled = !automationOverlayActive
     val clipBackgroundColor = if (automationOverlayActive) {
         clipColors.background.copy(alpha = if (isSelected) 0.54f else 0.42f)
@@ -160,11 +157,7 @@ fun AudioClip(
     } else {
         clipColors.content
     }
-    val waveformColor = if (automationOverlayActive) {
-        unselectedClipColors.content.copy(alpha = 0.44f)
-    } else {
-        unselectedClipColors.content
-    }
+    val waveformColor = TimelineTheme.audioWaveformColor(automationOverlayActive = automationOverlayActive)
 
     var rangeActive by remember { mutableStateOf(false) }
     var rangeStartMs by remember { mutableStateOf<Long?>(null) }
@@ -364,6 +357,8 @@ fun AudioClip(
     }
 
     val outerModifier = Modifier
+        .alpha(alpha = if (dragCallbacks?.hideSource?.invoke() == true) 0f else 1f)
+        .alpha(alpha = if (audioEntry.isMuted) 0.45f else 1f)
         .offset { IntOffset(clipWindow.visibleLeftPx, 0) }
         .height(timelineDimensions.laneHeight)
         .width(widthDp)
@@ -731,6 +726,11 @@ fun AudioClip(
             modifier = outerModifier,
             trigger = clipContent
         ) {
+            TimelineContextMenuAction(
+                label = if (audioEntry.isMuted) "Unmute Clips" else "Mute Clips",
+                shortcut = "0",
+                onClick = { TimelineCommandSurface.toggleEntriesMute(targets = contextEntryTargets) },
+            )
             TimelineContextMenuAction(
                 label = stringResource(Res.string.timeline_clip_action_rename),
                 shortcut = primaryModifierShortcutLabel("R"),

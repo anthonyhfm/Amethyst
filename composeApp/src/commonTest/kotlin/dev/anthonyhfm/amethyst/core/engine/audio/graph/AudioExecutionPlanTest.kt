@@ -30,6 +30,27 @@ class AudioExecutionPlanTest {
     )
 
     @Test
+    fun mutingNestedChainSilencesOnlyItsBranchAndUnmuteRestoresAudio() {
+        val branchA = Chain().apply { add(device = ConstantDevice(value = 1f), fromUser = false) }
+        val branchB = Chain().apply { add(device = ConstantDevice(value = 2f), fromUser = false) }
+        val chain = AudioChain().apply {
+            add(device = TestContainerDevice(chains = listOf(branchA, branchB)), fromUser = false)
+            prepareAudio(configuration = configuration)
+        }
+        try {
+            assertTrue(actual = render(chain = chain).all { it == 3f })
+            branchA.setMuted(muted = true)
+            assertTrue(actual = render(chain = chain).all { it == 2f })
+            branchA.setMuted(muted = false)
+            assertTrue(actual = render(chain = chain).all { it == 3f })
+            chain.setMuted(muted = true)
+            assertTrue(actual = render(chain = chain).all { it == 0f })
+        } finally {
+            chain.dispose()
+        }
+    }
+
+    @Test
     fun branchEffectOnlyProcessesItsOwnBranchAndMasterProcessesTheSum() {
         val branchA = Chain().apply {
             add(ConstantDevice(1f), fromUser = false)

@@ -827,42 +827,11 @@ class TimelineViewModel : ViewModel() {
      * Add an audio track to the timeline
      */
     fun addAudioTrack() {
-        viewModelScope.launch {
-            val newTrack = AudioTimelineTrack()
-            val currentTracks = _tracks.value.toMutableList()
-            val trackIndex = currentTracks.size
-            currentTracks.add(newTrack)
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.addTrack(newTrack)
-            
-            UndoManager.addAction(
-                UndoableAction.TrackAddition(
-                    trackIndex = trackIndex,
-                    track = newTrack
-                )
-            )
-        }
+        TimelineCommandSurface.addTrack(audio = true)
     }
 
-    /**
-     * Add a MIDI track to the timeline
-     */
     fun addMidiTrack() {
-        viewModelScope.launch {
-            val newTrack = MidiTimelineTrack()
-            val currentTracks = _tracks.value.toMutableList()
-            val trackIndex = currentTracks.size
-            currentTracks.add(newTrack)
-            _tracks.value = currentTracks.toList()
-            TimelineRepository.addTrack(newTrack)
-            
-            UndoManager.addAction(
-                UndoableAction.TrackAddition(
-                    trackIndex = trackIndex,
-                    track = newTrack
-                )
-            )
-        }
+        TimelineCommandSurface.addTrack(audio = false)
     }
 
 

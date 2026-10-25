@@ -1,7 +1,9 @@
 package dev.anthonyhfm.amethyst.core.engine.elements
 
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
 import dev.anthonyhfm.amethyst.core.network.sync.ChainSyncCoordinator
@@ -12,6 +14,23 @@ import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.chain.ui.SignalIndicatorManager
 
 open class Chain : SignalReceiver() {
+    private var mutedState by mutableStateOf(false)
+    val isMuted: Boolean get() = mutedState
+
+    fun setMuted(muted: Boolean) {
+        if (isMuted == muted) {
+            return
+        }
+        if (muted) {
+            stopOutput()
+        }
+        mutedState = muted
+        onDeviceRuntimeStateChanged()
+        if (isWorkspaceChain()) {
+            WorkspaceRepository.markDirty()
+        }
+    }
+
     fun stopOutput() {
         devices.value.forEach { device ->
             if (device is Chokeable) {
@@ -62,9 +81,12 @@ open class Chain : SignalReceiver() {
     }
 
     override fun signalEnter(n: List<Signal>) {
+        if (isMuted) {
+            return
+        }
         SignalIndicatorManager.trigger(this@Chain, 0)
 
-        val firstUnmuted = devices.value.firstOrNull { !it.state.value.isMuted }
+        val firstUnmuted = devices.value.firstOrNull { !it.isMuted }
         if (firstUnmuted == null) {
             signalExit?.invoke(n)
         } else {
@@ -95,7 +117,9 @@ open class Chain : SignalReceiver() {
                     signalExit?.invoke(signals)
                 }
             }
-            if (!current.state.value.isMuted) nextUnmutedIndex = i
+            if (!current.isMuted) {
+                nextUnmutedIndex = i
+            }
         }
     }
 

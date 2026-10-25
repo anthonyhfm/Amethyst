@@ -191,8 +191,12 @@ internal fun rememberWaveformEnvelope(
     timelineStartUs: Long = 0L,
     widthPx: Int? = null,
 ): FloatArray {
-    val range = listOf(startSample, endSample, zoomLevel, sampleRate, timelineStartUs, widthPx)
-    var envelope by remember(source, range) { mutableStateOf(value = FloatArray(size = 0)) }
+    val range = if (widthPx != null && widthPx > 0) {
+        listOf(startSample, endSample, widthPx)
+    } else {
+        listOf(startSample, endSample, zoomLevel, sampleRate, timelineStartUs, widthPx)
+    }
+    var envelope by remember(source) { mutableStateOf(value = FloatArray(size = 0)) }
     LaunchedEffect(source, range) {
         envelope = withContext(context = Dispatchers.Default) {
             if (source == null) {

@@ -32,6 +32,7 @@ data class TimelineClipDragCallbacks(
     val onCancel: () -> Unit,
     /** Current authoritative start used by both the visual clip and the drop preview. */
     val visualStartMs: () -> Long? = { null },
+    val hideSource: () -> Boolean = { false },
 )
 
 @Stable
@@ -70,18 +71,21 @@ class TimelineClipDragCoordinator {
         val anchorTrack = tracks.getOrNull(anchorKey.trackIndex) ?: return
         val anchorExists = when (anchorTrack) {
             is AudioTimelineTrack -> anchorTrack.entries.containsKey(anchorKey.entryStartMs)
-            is MidiTimelineTrack -> anchorTrack.entries.containsKey(anchorKey.entryStartMs)
+            is MidiTimelineTrack -> if (anchorKey.clipId == null) {
+                anchorTrack.entries.containsKey(key = anchorKey.entryStartMs)
+            } else {
+                anchorTrack.chainEffectEntries.values.any { it.clipId == anchorKey.clipId }
+            }
             else -> false
         }
         if (!anchorExists) return
 
         val selectedKeys = SelectionManager.selections.value
             .filterIsInstance<Selectable.TimelineEntryItem>()
-            .filter { it.clipId == null }
-            .map { TimelineClipKey(it.trackIndex, it.entryStartMs) }
+            .map { TimelineClipKey(trackIndex = it.trackIndex, entryStartMs = it.entryStartMs, clipId = it.clipId) }
         val anchorWasSelected = anchorKey in selectedKeys
         if (!anchorWasSelected) {
-            SelectionManager.select(Selectable.TimelineEntryItem(anchorKey.trackIndex, anchorKey.entryStartMs))
+            SelectionManager.select(element = Selectable.TimelineEntryItem(trackIndex = anchorKey.trackIndex, entryStartMs = anchorKey.entryStartMs, clipId = anchorKey.clipId))
         }
         val sameKindKeys = (if (anchorWasSelected) selectedKeys else listOf(anchorKey)).filter { key ->
             tracks.getOrNull(key.trackIndex)?.let { it::class == anchorTrack::class } == true
@@ -100,6 +104,7 @@ class TimelineClipDragCoordinator {
         bpm: Double,
         gridType: GridUtils.GridType,
         snapEnabled: Boolean,
+        copy: Boolean = false,
     ): TimelineEditCommand.MoveEntries? {
         val active = session ?: return null
         if (pointerInRoot.x.isNaN() || pointerInRoot.y.isNaN()) return null
@@ -119,6 +124,7 @@ class TimelineClipDragCoordinator {
             anchorKey = active.anchorKey,
             targetTrackIndex = targetTrackIndex,
             targetStartMs = targetStart,
+            copy = copy,
         )
     }
 
@@ -127,7 +133,8 @@ class TimelineClipDragCoordinator {
         bpm: Double,
         gridType: GridUtils.GridType,
         snapEnabled: Boolean,
-    ): TimelineClipMoveEngine.Preview = buildCommand(viewport, bpm, gridType, snapEnabled)
+        copy: Boolean = false,
+    ): TimelineClipMoveEngine.Preview = buildCommand(viewport, bpm, gridType, snapEnabled, copy)
         ?.let(TimelineClipMoveEngine::preview)
         ?: TimelineClipMoveEngine.Preview(false)
 
@@ -141,7 +148,11 @@ class TimelineClipDragCoordinator {
             val track = dev.anthonyhfm.amethyst.timeline.TimelineRepository.tracks.value.getOrNull(key.trackIndex)
             return when (track) {
                 is AudioTimelineTrack -> track.entries[key.entryStartMs]?.startTimeMs
-                is MidiTimelineTrack -> track.entries[key.entryStartMs]?.startTimeMs
+                is MidiTimelineTrack -> if (key.clipId == null) {
+                    track.entries[key.entryStartMs]?.startTimeMs
+                } else {
+                    track.chainEffectEntries.values.firstOrNull { it.clipId == key.clipId }?.startTimeMs
+                }
                 else -> null
             }
         }

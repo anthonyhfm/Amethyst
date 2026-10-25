@@ -4,31 +4,32 @@ import dev.anthonyhfm.amethyst.core.controls.automapping.buildChainDeviceFromTim
 import dev.anthonyhfm.amethyst.core.controls.automapping.buildChainDevicesFromTimelineAudioRange
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
+import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.devices.DeviceRegistry
 import dev.anthonyhfm.amethyst.devices.GenericChainDevice
-import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
-import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
 import dev.anthonyhfm.amethyst.devices.effects.group.GroupChainDevice
 import dev.anthonyhfm.amethyst.devices.effects.multi.MultiGroupChainDevice
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
-import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
-import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
-import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.ChainEffectEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
+import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.TimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.buildSegment
 import dev.anthonyhfm.amethyst.timeline.data.copyWithShiftedStartMs
 import dev.anthonyhfm.amethyst.timeline.data.cropAudioEntryEnd
 import dev.anthonyhfm.amethyst.timeline.data.deepCopy
-import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
-import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
-import dev.anthonyhfm.amethyst.core.util.UUID
-import dev.anthonyhfm.amethyst.core.util.randomUUID
+import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
+import dev.anthonyhfm.amethyst.workspace.chain.data.StateChain
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 object ClipboardManager {
     private val _clipboardData: MutableStateFlow<ClipboardData?> = MutableStateFlow(null)
@@ -122,11 +123,15 @@ object ClipboardManager {
                 
                 setClipboardData(
                     data = ClipboardData.ChainDevice(
-                        states = sortedDevices.map { it.device.state.value },
-                        type = if (WorkspaceRepository.mode.value is LightsChainWorkspaceMode) {
-                            ClipboardData.ChainDevice.ChainType.Lights
-                        } else {
+                        states = sortedDevices.map { selection ->
+                            DeviceRegistry.deepCopyState(
+                                state = StateChain.packDevice(device = selection.device),
+                            ).also { state -> state.isMuted = selection.device.isMuted }
+                        },
+                        type = if (WorkspaceRepository.mode.value is SamplingChainWorkspaceMode) {
                             ClipboardData.ChainDevice.ChainType.Sampling
+                        } else {
+                            ClipboardData.ChainDevice.ChainType.Lights
                         }
                     )
                 )
@@ -340,7 +345,7 @@ object ClipboardManager {
                         val indices = selectedChainDevices.filter { it.parent == parentChain }.map { sel ->
                             parentChain.devices.value.indexOfFirst { it.selectionUUID == sel.device.selectionUUID }
                         }.filter { it >= 0 }
-                        (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
+                        (indices.minOrNull()) ?: parentChain.devices.value.size
                     } else {
                         targetChain.devices.value.size
                     }
@@ -403,7 +408,7 @@ object ClipboardManager {
                     val indices = selectedChainDevices.filter { it.parent == parentChain }.map { sel ->
                         sel.parent.devices.value.indexOfFirst { it.selectionUUID == sel.device.selectionUUID }
                     }.filter { it >= 0 }
-                    (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
+                    (indices.minOrNull()) ?: parentChain.devices.value.size
                 } else {
                     targetChain.devices.value.size
                 }
@@ -534,7 +539,7 @@ object ClipboardManager {
                     parentChain.devices.value.indexOfFirst { it.selectionUUID == selection.device.selectionUUID }
                 }
                 .filter { it >= 0 }
-            (indices.maxOrNull()?.plus(1)) ?: parentChain.devices.value.size
+            (indices.minOrNull()) ?: parentChain.devices.value.size
         } else {
             WorkspaceRepository.samplingChain.devices.value.size
         }

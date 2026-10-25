@@ -4,7 +4,11 @@ import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoManager
 import dev.anthonyhfm.amethyst.core.controls.undo.UndoableAction
+import dev.anthonyhfm.amethyst.core.util.UUID
+import dev.anthonyhfm.amethyst.core.util.randomUUID
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineClipKey
+import dev.anthonyhfm.amethyst.timeline.data.ChainEffectEntry
+import dev.anthonyhfm.amethyst.timeline.data.TimelineEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioEntry
 import dev.anthonyhfm.amethyst.timeline.data.AudioTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.MidiEntry
@@ -38,7 +42,7 @@ object TimelineClipMoveEngine {
         tracks: List<TimelineTrack<*>>,
     ): Preview {
         val anchorTrack = tracks.getOrNull(command.anchorKey.trackIndex) ?: return Preview(false)
-        val anchorEntry = anchorTrack.regularEntry(command.anchorKey.entryStartMs) ?: return Preview(false)
+        val anchorEntry = anchorTrack.entryAt(key = command.anchorKey) ?: return Preview(false)
         val trackDelta = command.targetTrackIndex - command.anchorKey.trackIndex
         val timeDelta = command.targetStartMs.coerceAtLeast(0L) - anchorEntry.startTimeMs
         val uniqueKeys = command.entryKeys.distinct().ifEmpty { listOf(command.anchorKey) }
@@ -46,7 +50,10 @@ object TimelineClipMoveEngine {
         val placements = uniqueKeys.map { key ->
             val sourceTrack = tracks.getOrNull(key.trackIndex) ?: return Preview(false)
             if (sourceTrack::class != anchorTrack::class) return@map null
-            val entry = sourceTrack.regularEntry(key.entryStartMs) ?: return Preview(false)
+            val entry = sourceTrack.entryAt(key = key) ?: return Preview(false)
+            if (entry::class != anchorEntry::class) {
+                return@map null
+            }
             val targetTrackIndex = key.trackIndex + trackDelta
             val targetTrack = tracks.getOrNull(targetTrackIndex) ?: return Preview(false)
             if (targetTrack::class != sourceTrack::class) return Preview(false)
@@ -58,15 +65,27 @@ object TimelineClipMoveEngine {
         if (placements.none { it.source == command.anchorKey }) return Preview(false)
         if (placements.isEmpty()) return Preview(false)
 
-        // Experimental chain-effect clips share a MIDI lane but are deliberately not
-        // part of this drag system, so a regular MIDI move may not overwrite them.
+        val movingEffectIds = if (command.copy) emptySet() else placements.mapNotNull { it.source.clipId }.toSet()
         val blockedByChainEffect = placements.any { placement ->
             val target = tracks[placement.targetTrackIndex] as? MidiTimelineTrack ?: return@any false
-            target.chainEffectEntries.values.any { effect ->
-                effect.startTimeMs < placement.targetEndMs && effect.endTimeMs > placement.targetStartMs
+            val overlapsEffect = target.chainEffectEntries.values.any { effect ->
+                effect.clipId !in movingEffectIds &&
+                    effect.startTimeMs < placement.targetEndMs && effect.endTimeMs > placement.targetStartMs
             }
+            val overlapsRegular = placement.source.clipId != null && target.entries.values.any { entry ->
+                entry.startTimeMs < placement.targetEndMs && entry.endTimeMs > placement.targetStartMs
+            }
+            overlapsEffect || overlapsRegular
         }
-        return Preview(isValid = !blockedByChainEffect, placements = placements)
+        val blockedCopy = command.copy && placements.any { placement ->
+            val entries = when (val target = tracks[placement.targetTrackIndex]) {
+                is AudioTimelineTrack -> target.entries.values
+                is MidiTimelineTrack -> target.entries.values
+                else -> emptyList()
+            }
+            entries.any { it.startTimeMs < placement.targetEndMs && it.endTimeMs > placement.targetStartMs }
+        }
+        return Preview(isValid = !blockedByChainEffect && !blockedCopy, placements = placements)
     }
 
     fun execute(command: TimelineEditCommand.MoveEntries): TimelineCommandResult {
@@ -79,12 +98,33 @@ object TimelineClipMoveEngine {
         val beforeSnapshots = touchedIndices.associateWith { beforeTracks[it].deepTimelineCopy() }
         val working = beforeTracks.map { it.deepTimelineCopy() }.toMutableList()
         val movingEntries = preview.placements.associateWith { placement ->
-            working[placement.source.trackIndex].removeRegularEntry(placement.source.entryStartMs)
-                ?: return TimelineCommandResult()
+            val source = working[placement.source.trackIndex]
+            if (command.copy) {
+                source.entryAt(key = placement.source)
+            } else {
+                source.removeEntryAt(key = placement.source)
+            } ?: return TimelineCommandResult()
         }
 
         preview.placements.groupBy(Placement::targetTrackIndex).forEach { (trackIndex, placements) ->
+            if (placements.all { it.source.clipId != null }) {
+                return@forEach
+            }
             val occupied = mergeIntervals(placements.map { it.targetStartMs until it.targetEndMs })
+            if (command.copy && placements.any { placement ->
+                    working[trackIndex].let { track ->
+                        when (track) {
+                            is AudioTimelineTrack -> track.entries.values
+                            is MidiTimelineTrack -> track.entries.values
+                            else -> emptyList()
+                        }
+                    }.any { entry ->
+                        entry.startTimeMs < placement.targetEndMs && entry.endTimeMs > placement.targetStartMs
+                    }
+                }
+            ) {
+                return TimelineCommandResult()
+            }
             when (val target = working[trackIndex]) {
                 is AudioTimelineTrack -> {
                     val survivors = target.entries.values.flatMap { entry ->
@@ -108,12 +148,28 @@ object TimelineClipMoveEngine {
             }
         }
 
+        val placedEffectIds = mutableMapOf<Placement, String>()
         preview.placements.forEach { placement ->
             when (val entry = movingEntries.getValue(placement)) {
+                is ChainEffectEntry -> {
+                    val placed = entry.deepCopy(
+                        clipId = if (command.copy) UUID.randomUUID() else entry.clipId,
+                        startTimeMs = placement.targetStartMs,
+                    )
+                    (working[placement.targetTrackIndex] as MidiTimelineTrack).chainEffectEntries[placement.targetStartMs] = placed
+                    placedEffectIds[placement] = placed.clipId
+                }
                 is AudioEntry -> (working[placement.targetTrackIndex] as AudioTimelineTrack)
                     .entries[placement.targetStartMs] = entry.copyWithShiftedStartMs(placement.targetStartMs)
                 is MidiEntry -> (working[placement.targetTrackIndex] as MidiTimelineTrack)
-                    .entries[placement.targetStartMs] = entry.copy(startTimeMs = placement.targetStartMs)
+                    .entries[placement.targetStartMs] = entry.copy(
+                        startTimeMs = placement.targetStartMs,
+                        notes = if (command.copy) {
+                            entry.notes.map { it.copy(noteId = UUID.randomUUID()) }
+                        } else {
+                            entry.notes
+                        },
+                    )
             }
         }
 
@@ -121,11 +177,11 @@ object TimelineClipMoveEngine {
         val beforeSelections = SelectionManager.selections.value
         val movedSources = preview.placements.mapTo(mutableSetOf(), Placement::source)
         val retainedSelections = beforeSelections.filterNot { selection ->
-            selection is Selectable.TimelineEntryItem && selection.clipId == null &&
-                TimelineClipKey(selection.trackIndex, selection.entryStartMs) in movedSources
+            selection is Selectable.TimelineEntryItem &&
+                TimelineClipKey(trackIndex = selection.trackIndex, entryStartMs = selection.entryStartMs, clipId = selection.clipId) in movedSources
         }
         val afterSelections = retainedSelections + preview.placements.map {
-            Selectable.TimelineEntryItem(it.targetTrackIndex, it.targetStartMs)
+            Selectable.TimelineEntryItem(trackIndex = it.targetTrackIndex, entryStartMs = it.targetStartMs, clipId = placedEffectIds[it])
         }
 
         TimelineRepository.updateTracksSnapshot(working)
@@ -141,15 +197,24 @@ object TimelineClipMoveEngine {
         return TimelineCommandResult(didChange = true)
     }
 
-    private fun TimelineTrack<*>.regularEntry(startMs: Long) = when (this) {
-        is AudioTimelineTrack -> entries[startMs]
-        is MidiTimelineTrack -> entries[startMs]
+    private fun TimelineTrack<*>.entryAt(key: TimelineClipKey): TimelineEntry? = when (this) {
+        is AudioTimelineTrack -> entries[key.entryStartMs]
+        is MidiTimelineTrack -> if (key.clipId == null) {
+            entries[key.entryStartMs]
+        } else {
+            chainEffectEntries.values.firstOrNull { it.clipId == key.clipId }
+        }
         else -> null
     }
 
-    private fun TimelineTrack<*>.removeRegularEntry(startMs: Long) = when (this) {
-        is AudioTimelineTrack -> entries.remove(startMs)
-        is MidiTimelineTrack -> entries.remove(startMs)
+    private fun TimelineTrack<*>.removeEntryAt(key: TimelineClipKey): TimelineEntry? = when (this) {
+        is AudioTimelineTrack -> entries.remove(key = key.entryStartMs)
+        is MidiTimelineTrack -> if (key.clipId == null) {
+            entries.remove(key = key.entryStartMs)
+        } else {
+            val entry = chainEffectEntries.values.firstOrNull { it.clipId == key.clipId }
+            entry?.let { chainEffectEntries.remove(key = it.startTimeMs) }
+        }
         else -> null
     }
 

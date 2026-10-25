@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.devices
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -124,8 +126,10 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     var parentChain: Chain? = null
 
+    private var mutedOverride by mutableStateOf<Boolean?>(value = null)
+
     val isMuted: Boolean
-        get() = state.value.isMuted
+        get() = mutedOverride ?: state.value.isMuted
 
     val isCollapsed: Boolean
         get() = isCollapsedState.value
@@ -159,8 +163,16 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     fun setMuted(muted: Boolean) {
         val current = state.value
-        if (current.isMuted != muted) {
+        if (isMuted != muted) {
+            if (muted) {
+                if (this is Chokeable) {
+                    onChoke()
+                } else if (this is NestedChainDevice) {
+                    nestedChains().forEach { it.stopOutput() }
+                }
+            }
             current.isMuted = muted
+            mutedOverride = muted
             state.update { current }
             parentChain?.onDeviceRuntimeStateChanged()
             if (parentChain?.isWorkspaceChain() == true) {
@@ -180,7 +192,9 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
     }
 
     open fun onStateRestored() {
+        mutedOverride = state.value.isMuted
         isCollapsedState.value = state.value.isCollapsed
+        parentChain?.onDeviceRuntimeStateChanged()
     }
 
     @Composable
@@ -334,7 +348,13 @@ abstract class GenericChainDevice <State : @Serializable DeviceState> : SignalRe
 
     protected fun updateStateFromUser(transform: (State) -> State) {
         val before = state.value
-        state.update(transform)
+        val muted = isMuted
+        state.update { current ->
+            transform(current).also { updated ->
+                updated.isMuted = muted
+                updated.isCollapsed = current.isCollapsed
+            }
+        }
         if (before != state.value && parentChain?.isWorkspaceChain() == true) {
             WorkspaceRepository.markDirty()
         }
