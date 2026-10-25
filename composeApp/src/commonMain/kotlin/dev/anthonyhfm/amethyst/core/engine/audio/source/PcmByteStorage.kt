@@ -9,6 +9,12 @@ internal interface PcmByteStorage {
     val filePath: String? get() = null
     operator fun get(index: Int): Byte
     fun readAll(): ByteArray
+    fun readInto(destination: ByteArray, sourceOffset: Int, length: Int) {
+        require(sourceOffset in 0..size && length in 0..size - sourceOffset && length <= destination.size)
+        repeat(times = length) { index ->
+            destination[index] = get(index = sourceOffset + index)
+        }
+    }
     fun readRange(fromIndex: Int, toIndex: Int): ByteArray {
         require(fromIndex in 0..toIndex && toIndex <= size)
         return ByteArray(size = toIndex - fromIndex) { get(index = fromIndex + it) }
@@ -75,6 +81,13 @@ internal class InMemoryPcmBytes(val bytes: ByteArray) : PcmByteStorage {
     override val size: Int get() = bytes.size
     override fun get(index: Int): Byte = bytes[index]
     override fun readAll(): ByteArray = bytes
+    override fun readInto(destination: ByteArray, sourceOffset: Int, length: Int) {
+        bytes.copyInto(
+            destination = destination,
+            startIndex = sourceOffset,
+            endIndex = sourceOffset + length,
+        )
+    }
     override fun readRange(fromIndex: Int, toIndex: Int): ByteArray = bytes.copyOfRange(fromIndex = fromIndex, toIndex = toIndex)
     override fun contentHash(): Int = bytes.contentHashCode()
 }

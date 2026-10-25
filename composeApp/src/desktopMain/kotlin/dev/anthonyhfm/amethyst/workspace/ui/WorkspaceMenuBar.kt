@@ -178,6 +178,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
             Item(
                 text = saveLabel,
+                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("s"),
                 onClick = {
                     viewModel.saveProject()
@@ -186,6 +187,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
             Item(
                 text = saveAsLabel,
+                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("s", shift = true),
                 onClick = {
                     viewModel.saveProjectAs()

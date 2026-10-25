@@ -94,6 +94,10 @@ class AudioSource private constructor(
         toIndex = toIndex,
     )
 
+    internal fun readPcmInto(destination: ByteArray, sourceOffset: Int, length: Int) {
+        pcmBytes.readInto(destination = destination, sourceOffset = sourceOffset, length = length)
+    }
+
     internal fun writePcm(path: String) = pcmBytes.writeTo(path = path)
 
     internal fun withPcmStorage(storage: PcmByteStorage): AudioSource = AudioSource(

@@ -31,6 +31,9 @@ private class MappedPcmBytes(override val filePath: String, buffer: ByteBuffer) 
             }
         }
     }
+    override fun readInto(destination: ByteArray, sourceOffset: Int, length: Int) {
+        buffer.get(sourceOffset, destination, 0, length)
+    }
     override fun readRange(fromIndex: Int, toIndex: Int): ByteArray {
         require(fromIndex in 0..toIndex && toIndex <= size)
         return ByteArray(size = toIndex - fromIndex).also { bytes ->
