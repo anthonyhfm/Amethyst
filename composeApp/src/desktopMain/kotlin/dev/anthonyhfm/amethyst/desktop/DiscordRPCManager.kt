@@ -115,10 +115,9 @@ actual object DiscordRPCManager {
                 
                 details = if (showProject && projectName != null) {
                     projectName
+                } else if (projectName != null) {
+                    WORKSPACE_PRESENCE_LABEL
                 } else {
-                    // Never resolve Compose resources from this background scope.
-                    // On macOS that reaches AWT's Toolkit and can deadlock Tao's
-                    // AppKit main thread while the first window is being attached.
                     HOME_PRESENCE_LABEL
                 }
                 
@@ -149,7 +148,7 @@ actual object DiscordRPCManager {
             is KeyframesWorkspaceMode -> "Editing Keyframes"
             is CoordinateFilterWorkspaceMode -> "Editing Coordinate Filters"
 
-            else -> "Working on Project"
+            else -> "Working on a Project"
         }
     }
 
@@ -173,4 +172,5 @@ actual object DiscordRPCManager {
     }
 
     private const val HOME_PRESENCE_LABEL = "Home"
+    private const val WORKSPACE_PRESENCE_LABEL = "Working on a project"
 }
