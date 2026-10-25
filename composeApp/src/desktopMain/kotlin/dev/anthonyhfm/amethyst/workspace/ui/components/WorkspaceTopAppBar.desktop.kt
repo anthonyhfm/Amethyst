@@ -75,6 +75,7 @@ import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.LaunchpadSelectionWorkspaceMode
 import kotlinx.coroutines.launch
 
 @Composable
@@ -82,6 +83,12 @@ actual fun WorkspaceTopAppBar(
     onBack: () -> Unit,
     mode: dev.anthonyhfm.amethyst.workspace.modes.WorkspaceMode,
 ) {
+    val keyframesImporter = rememberKeyframesImporter()
+    if (mode is LaunchpadSelectionWorkspaceMode) {
+        mode.TopAppBar()
+        return
+    }
+
     val automappingState by AutomappingManager.state.collectAsState()
     val liveCollaborationEnabled by ExperimentalSettings.liveCollaboration.flow.collectAsState()
     val collaborationState by CollaborationManager.connectionState.collectAsState()
@@ -128,7 +135,7 @@ actual fun WorkspaceTopAppBar(
         }
 
         if (mode is KeyframesWorkspaceMode) {
-            KeyframesOptions(mode)
+            KeyframesOptions(mode = mode, importer = keyframesImporter)
         }
 
         BPMChanger()
@@ -295,7 +302,7 @@ private fun AutomappingStatusIndicator(armed: Boolean) {
 }
 
 @Composable
-private fun KeyframesOptions(mode: KeyframesWorkspaceMode) {
+private fun KeyframesOptions(mode: KeyframesWorkspaceMode, importer: KeyframesImporter) {
     val state by mode.state.collectAsState()
     var pickingRootKey by remember { mutableStateOf(false) }
 
@@ -348,6 +355,8 @@ private fun KeyframesOptions(mode: KeyframesWorkspaceMode) {
     }
 
     WorkspaceToolbarSurface {
+        KeyframesImportButton(mode = mode, importer = importer)
+
         Button(
             onClick = {
                 if (state.rootKey != null && !pickingRootKey) {

@@ -1080,4 +1080,12 @@
     <string name="timeline_metronome_disabled">Off</string>
     <string name="piano_roll_note_zoom_in">Increase note height</string>
     <string name="piano_roll_note_zoom_out">Decrease note height</string>
+    <string name="keyframes_import_action">Import…</string>
+    <string name="keyframes_import_busy">Importing…</string>
+    <string name="keyframes_import_picker">Import keyframes</string>
+    <string name="keyframes_import_target_title">Choose a Launchpad</string>
+    <string name="keyframes_import_error_title">Import failed</string>
+    <string name="keyframes_import_close">Close</string>
+    <string name="launchpad_selection_cancel">Cancel</string>
+    <string name="launchpad_selection_choose">Select %1$s</string>
 </resources>

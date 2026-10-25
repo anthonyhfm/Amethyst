@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
 import dev.anthonyhfm.amethyst.core.controls.selection.SelectionManager
@@ -76,6 +77,7 @@ fun WorkspaceViewport(
     viewportState: ViewportState = rememberViewportState(viewportKey),
     elements: List<ViewportElement> = ViewportRepository.devices.collectAsState().value,
     config: ViewportConfig = ViewportConfig(),
+    onLaunchpadPicked: ((LaunchpadViewportElement) -> Unit)? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current.density
@@ -322,12 +324,12 @@ fun WorkspaceViewport(
         }
 
         elements.forEachIndexed { index, element ->
-            val selected = selections.any { it.selectionUUID == element.selectionUUID }
+            val selected = onLaunchpadPicked == null && selections.any { it.selectionUUID == element.selectionUUID }
             val focusingUser = remoteFocuses.entries
                 .firstOrNull { it.value == element.selectionUUID }
                 ?.key
                 ?.let { userId -> remoteCursors[userId]?.user }
-            val focusColor = focusingUser?.let { Color(it.color) }
+            val focusColor = focusingUser?.takeIf { onLaunchpadPicked == null }?.let { Color(it.color) }
 
             var draggingOffset by remember { mutableStateOf(Offset.Zero) }
 
@@ -410,18 +412,24 @@ fun WorkspaceViewport(
                             Modifier
                         }
                     )
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) {
-                        if (WorkspaceRepository.mode.value is LayoutWorkspaceMode && config.draggableObjects) {
-                            SelectionManager.select(
-                                Selectable.VirtualViewportDevice(
-                                    element = element as LaunchpadViewportElement
-                                )
-                            )
-                        }
-                    }
+                    .then(
+                        other = if (onLaunchpadPicked == null) {
+                            Modifier.clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() },
+                            ) {
+                                if (WorkspaceRepository.mode.value is LayoutWorkspaceMode && config.draggableObjects) {
+                                    SelectionManager.select(
+                                        element = Selectable.VirtualViewportDevice(
+                                            element = element as LaunchpadViewportElement,
+                                        ),
+                                    )
+                                }
+                            }
+                        } else {
+                            Modifier
+                        },
+                    )
             ) {
                 val launchpadElement = element as? LaunchpadViewportElement
                 val animatedRotation by animateFloatAsState(
@@ -433,8 +441,29 @@ fun WorkspaceViewport(
                     label = "launchpad-rotation",
                 )
 
-                Box(modifier = Modifier.graphicsLayer { rotationZ = animatedRotation }) {
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer { rotationZ = animatedRotation }
+                        .then(
+                            other = if (onLaunchpadPicked != null) {
+                                Modifier.clearAndSetSemantics {}
+                            } else {
+                                Modifier
+                            },
+                        ),
+                ) {
                     element.Content()
+                }
+
+                if (launchpadElement != null && onLaunchpadPicked != null) {
+                    LaunchpadPickerOverlay(
+                        launchpad = launchpadElement,
+                        index = index,
+                        zoom = viewportState.zoom,
+                        onPick = onLaunchpadPicked,
+                        modifier = Modifier
+                            .matchParentSize(),
+                    )
                 }
             }
         }

@@ -32,6 +32,7 @@ import dev.anthonyhfm.amethyst.core.engine.echo.Echo
 import dev.anthonyhfm.amethyst.desktop.DesktopPlatform
 import dev.anthonyhfm.amethyst.devices.effects.coordinate_filter.CoordinateFilterWorkspaceMode
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
+import dev.anthonyhfm.amethyst.workspace.modes.LaunchpadSelectionWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.AppLocaleProvider
 import dev.anthonyhfm.amethyst.settings.AppLocaleRefreshBoundary
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
@@ -115,7 +116,11 @@ fun WorkspaceWindow(
         minimumSize = DpSize(750.dp, 550.dp),
         onKeyEvent = {
             // Mode-specific handlers have priority over global shortcuts.
-            if (WorkspaceRepository.mode.value.onKeyEvent(it)) return@DecoratedWindow true
+            val mode = WorkspaceRepository.mode.value
+            if (mode.onKeyEvent(it)) return@DecoratedWindow true
+            if (mode is LaunchpadSelectionWorkspaceMode) {
+                return@DecoratedWindow false
+            }
             ShortcutManager.handleShortcut(it)
         },
         onPreviewKeyEvent = {
@@ -147,7 +152,7 @@ fun WorkspaceWindow(
                     mode.onKeyEvent(it)
                 }
 
-                (mode is KeyframesWorkspaceMode || mode is CoordinateFilterWorkspaceMode) &&
+                (mode is KeyframesWorkspaceMode || mode is CoordinateFilterWorkspaceMode || mode is LaunchpadSelectionWorkspaceMode) &&
                     (it.key == Key.Escape || ((it.isCtrlPressed || it.isMetaPressed) && it.key == Key.W)) -> {
                     mode.onKeyEvent(it)
                 }

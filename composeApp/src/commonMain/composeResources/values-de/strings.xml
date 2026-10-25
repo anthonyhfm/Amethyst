@@ -1072,4 +1072,12 @@
     <string name="timeline_metronome_disabled">Aus</string>
     <string name="piano_roll_note_zoom_in">Notenhöhe vergrößern</string>
     <string name="piano_roll_note_zoom_out">Notenhöhe verkleinern</string>
+    <string name="keyframes_import_action">Importieren…</string>
+    <string name="keyframes_import_busy">Wird importiert…</string>
+    <string name="keyframes_import_picker">Keyframes importieren</string>
+    <string name="keyframes_import_target_title">Launchpad auswählen</string>
+    <string name="keyframes_import_error_title">Import fehlgeschlagen</string>
+    <string name="keyframes_import_close">Schließen</string>
+    <string name="launchpad_selection_cancel">Abbrechen</string>
+    <string name="launchpad_selection_choose">%1$s auswählen</string>
 </resources>
