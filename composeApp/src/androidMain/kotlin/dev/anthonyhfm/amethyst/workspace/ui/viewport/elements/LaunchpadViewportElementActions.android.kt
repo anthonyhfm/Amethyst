@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Delete
@@ -70,13 +69,12 @@ actual fun LaunchpadViewportElementActions(
 
         IconButton(
             onClick = {
-                element.rotationDegrees.floatValue += 90f
-                DeviceSyncCoordinator.onDeviceRotationChanged(element)
+                WorkspaceRepository.openDevicePicker(replacingDeviceId = element.launchpadId)
             },
         ) {
             Icon(
-                imageVector = Icons.Outlined.Rotate90DegreesCw,
-                contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_rotate),
+                imageVector = Icons.Outlined.SwapHoriz,
+                contentDescription = stringResource(resource = Res.string.workspace_viewport_launchpad_actions_swap),
             )
         }
 
@@ -94,11 +92,14 @@ actual fun LaunchpadViewportElementActions(
         }
 
         IconButton(
-            onClick = { WorkspaceRepository.openDevicePicker(replacingDeviceId = element.launchpadId) },
+            onClick = {
+                element.rotationDegrees.floatValue += 90f
+                DeviceSyncCoordinator.onDeviceRotationChanged(element)
+            },
         ) {
             Icon(
-                imageVector = Icons.Outlined.SwapHoriz,
-                contentDescription = stringResource(resource = Res.string.workspace_viewport_launchpad_actions_swap),
+                imageVector = Icons.Outlined.Rotate90DegreesCw,
+                contentDescription = stringResource(Res.string.workspace_viewport_launchpad_actions_rotate),
             )
         }
 

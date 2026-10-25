@@ -128,24 +128,23 @@ private fun UIVisualEffectView.rebuildLaunchpadActions(
     val buttons = buildList {
         add(
             actionButton(
-                systemImageName = "arrow.left.arrow.right",
-                accessibilityLabel = swapLabel,
-                tintColor = UIColor.labelColor,
-                onClick = {
-                    WorkspaceRepository.openDevicePicker(replacingDeviceId = element.launchpadId)
-                    IosWorkspaceBridge.onShowDevicePicker?.invoke()
-                },
-            ),
-        )
-
-        add(
-            actionButton(
                 systemImageName = "cable.connector",
                 accessibilityLabel = connectionLabel,
                 tintColor = UIColor.labelColor,
                 onClick = {
                     IosWorkspaceBridge.onShowDeviceConfigurator?.invoke(element.selectionUUID)
                         ?: WorkspaceRepository.openDeviceConfigurator(element.selectionUUID)
+                },
+            ),
+        )
+
+        add(
+            actionButton(
+                systemImageName = "arrow.left.arrow.right",
+                accessibilityLabel = swapLabel,
+                tintColor = UIColor.labelColor,
+                onClick = {
+                    WorkspaceRepository.openDevicePicker(replacingDeviceId = element.launchpadId)
                 },
             ),
         )

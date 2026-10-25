@@ -7,8 +7,13 @@ actual fun WorkspaceDeviceDialogs(
     deviceConfigurationUuid: String?,
     showDevicePicker: Boolean,
 ) {
-    DefaultWorkspaceDeviceDialogs(
-        deviceConfigurationUuid = deviceConfigurationUuid,
-        showDevicePicker = showDevicePicker,
-    )
+    if (deviceConfigurationUuid != null) {
+        DeviceSettingsDialog(
+            uuid = deviceConfigurationUuid,
+        )
+    }
+
+    if (showDevicePicker) {
+        InsertLaunchpadDialog()
+    }
 }
