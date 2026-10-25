@@ -16,6 +16,51 @@ import dev.anthonyhfm.amethyst.timeline.data.TimelineTrackAutomationTarget
 import dev.anthonyhfm.amethyst.timeline.data.deepCopy
 
 object TimelineCommandSurface {
+    fun canConsolidateSelection(
+        selections: List<Selectable> = SelectionManager.selections.value
+    ): Boolean {
+        return TimelineAudioConsolidation.progress.value == null &&
+            resolveAudioConsolidation(selections = selections).isNotEmpty()
+    }
+
+    fun consolidateSelection(): Boolean {
+        return TimelineAudioConsolidation.start(selections = SelectionManager.selections.value)
+    }
+
+    fun selectAudioContext(
+        trackIndex: Int,
+        timeMs: Double,
+        entryStartMs: Long? = null,
+    ): Boolean {
+        val selections = SelectionManager.selections.value
+        if (entryStartMs == null) {
+            return resolveAudioConsolidation(selections = selections).any { target ->
+                target.trackIndex == trackIndex && timeMs * 1_000.0 >= target.startUs && timeMs * 1_000.0 < target.endUs
+            }
+        }
+        val inRange = selections.filterIsInstance<Selectable.TimelineRange>().any {
+            it.trackIndex == trackIndex && timeMs >= minOf(it.startMs, it.endMs) && timeMs < maxOf(it.startMs, it.endMs)
+        }
+        val hasAutomationSelection = selections.any {
+            it is Selectable.TimelineAutomationLane || it is Selectable.TimelineAutomationPoint
+        }
+        if (inRange && !hasAutomationSelection) {
+            return true
+        }
+        val selected = selections.filterIsInstance<Selectable.TimelineEntryItem>().any {
+            it.trackIndex == trackIndex && it.entryStartMs == entryStartMs && it.clipId == null
+        }
+        if (!selected || hasAutomationSelection || selections.any { it is Selectable.TimelineRange }) {
+            SelectionManager.select(
+                element = Selectable.TimelineEntryItem(
+                    trackIndex = trackIndex,
+                    entryStartMs = entryStartMs,
+                ),
+            )
+        }
+        return true
+    }
+
     fun addTrack(audio: Boolean): Boolean {
         val track = if (audio) {
             AudioTimelineTrack()

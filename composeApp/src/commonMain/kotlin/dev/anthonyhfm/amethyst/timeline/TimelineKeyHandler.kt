@@ -125,6 +125,8 @@ object TimelineKeyHandler {
             keyEvent.key == Key.A && keyEvent.hasNoShortcutModifier() -> handleToggleAutomation()
             keyEvent.key == Key.M && keyEvent.hasNoShortcutModifier() -> handleToggleMute()
             keyEvent.key == Key.S && keyEvent.hasNoShortcutModifier() -> handleToggleSolo()
+            keyEvent.hasPrimaryShortcutModifier() && !keyEvent.isShiftPressed && !keyEvent.isAltPressed && keyEvent.key == Key.J ->
+                TimelineCommandSurface.consolidateSelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.E -> handleCutAtSelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.C -> copySelection()
             keyEvent.hasPrimaryShortcutModifier() && keyEvent.key == Key.X -> cutSelection()

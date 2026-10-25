@@ -599,6 +599,7 @@ object TimelineRepository {
     }
 
     fun loadTracks(loadedTracks: List<TimelineTrack<*>>) {
+        TimelineAudioConsolidation.reset()
         stop()
         SelectionManager.clear()
         isLoadingTracks = true
