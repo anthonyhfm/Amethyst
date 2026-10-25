@@ -1,5 +1,7 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
+import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineConsolidateAction
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -84,6 +86,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import com.mohamedrejeb.compose.dnd.drop.dropTarget
 import dev.anthonyhfm.amethyst.ui.modifier.rightClickable
+import dev.anthonyhfm.amethyst.ui.modifier.BlockEditorShortcuts
 import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuContent
 import dev.anthonyhfm.amethyst.ui.components.ContextMenuItem
 import com.composables.icons.lucide.Lucide
@@ -187,6 +190,7 @@ fun TimelineLane(
     }
 
     var showContextMenu by remember { mutableStateOf(false) }
+    BlockEditorShortcuts(active = showContextMenu)
     var contextMenuPosition by remember { mutableStateOf(Offset.Zero) }
     val selections by SelectionManager.selections.collectAsState()
     val selectedRange = selections.filterIsInstance<Selectable.TimelineRange>().firstOrNull { it.trackIndex == trackIndexOf(
@@ -437,6 +441,17 @@ fun TimelineLane(
                 .clipToBounds()
                 .rightClickable { position ->
                     val timeMs = currentViewport.value.screenToTimeMs(screenX = position.x).toLong()
+                    if (track is AudioTimelineTrack && !isPointInsideAnyEntry(track = track, timeMs = timeMs)) {
+                        val hasAudioSelection = TimelineCommandSurface.selectAudioContext(
+                            trackIndex = trackIndex,
+                            timeMs = currentViewport.value.screenToTimeMs(screenX = position.x),
+                        )
+                        if (hasAudioSelection) {
+                            focusManager.clearFocus()
+                            contextMenuPosition = position
+                        }
+                        showContextMenu = hasAudioSelection
+                    }
                     if (track is MidiTimelineTrack && !isPointInsideAnyEntry(track = track, timeMs = timeMs)) {
                         focusManager.clearFocus()
                         contextMenuPosition = position
@@ -544,7 +559,7 @@ fun TimelineLane(
                 }
             }
         }
-        if (showContextMenu && track is MidiTimelineTrack) {
+        if (showContextMenu) {
             val targetStartMs: Long
             val targetEndMs: Long
             if (selectedRange != null) {
@@ -577,26 +592,32 @@ fun TimelineLane(
                 properties = PopupProperties(focusable = true),
             ) {
                 ContextMenuContent {
-                    ContextMenuItem(
-                        label = stringResource(Res.string.timeline_lane_create_midi_clip),
-                        icon = Lucide.Plus,
-                        onClick = {
-                            onCreateMidiClip(targetStartMs, targetEndMs)
-                            showContextMenu = false
-                        }
-                    )
-
-                    if (ExperimentalSettings.timelineChainEffects.value) {
-                        ContextMenuSeparator()
-                        
+                    if (track is AudioTimelineTrack) {
+                        TimelineConsolidateAction(
+                            onInvoked = { showContextMenu = false },
+                        )
+                    } else {
                         ContextMenuItem(
-                            label = stringResource(Res.string.timeline_lane_create_chain_effect),
+                            label = stringResource(Res.string.timeline_lane_create_midi_clip),
                             icon = Lucide.Plus,
                             onClick = {
-                                onCreateChainEffect(targetStartMs)
+                                onCreateMidiClip(targetStartMs, targetEndMs)
                                 showContextMenu = false
                             }
                         )
+
+                        if (ExperimentalSettings.timelineChainEffects.value) {
+                            ContextMenuSeparator()
+
+                            ContextMenuItem(
+                                label = stringResource(Res.string.timeline_lane_create_chain_effect),
+                                icon = Lucide.Plus,
+                                onClick = {
+                                    onCreateChainEffect(targetStartMs)
+                                    showContextMenu = false
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -716,7 +737,7 @@ fun TimelineLane(
                                     onSelect = { onSelectChainEffect(chainEntry.clipId) },
                                     dragCallbacks = clipDragCallbacks(TimelineClipKey(trackIndex = trackIndex, entryStartMs = chainEntry.startTimeMs, clipId = chainEntry.clipId)),
                                     onToggleMute = {
-                                        dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface.toggleEntriesMute(
+                                        TimelineCommandSurface.toggleEntriesMute(
                                             targets = listOf(TimelineClipKey(trackIndex = trackIndex, entryStartMs = chainEntry.startTimeMs, clipId = chainEntry.clipId)),
                                         )
                                     },

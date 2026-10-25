@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline.ui.components
 
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineConsolidateAction
 import amethyst.composeapp.generated.resources.Res
 import amethyst.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -54,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
@@ -391,7 +393,7 @@ fun AudioClip(
                                         awaitPointerEventScope {
                                             while (true) {
                                                 val event = awaitPointerEvent()
-                                                if (event.type == PointerEventType.Press) {
+                                                if (event.type == PointerEventType.Press && event.buttons.isPrimaryPressed) {
                                                     val change = event.changes.firstOrNull()
                                                     if (change != null) {
                                                         val isShiftPressed = event.keyboardModifiers.isShiftPressed
@@ -724,6 +726,13 @@ fun AudioClip(
     if (interactionEnabled) {
         ContextMenu(
             modifier = outerModifier,
+            onRightClick = { position ->
+                TimelineCommandSurface.selectAudioContext(
+                    trackIndex = trackIndex,
+                    entryStartMs = entryStartMs,
+                    timeMs = currentViewport.value.screenToTimeMs(screenX = currentClipScreenLeftPx.value + position.x),
+                )
+            },
             trigger = clipContent
         ) {
             TimelineContextMenuAction(
@@ -749,6 +758,7 @@ fun AudioClip(
                 shortcut = primaryModifierShortcutLabel("D"),
                 onClick = { TimelineCommandSurface.duplicateEntries(contextEntryTargets) }
             )
+            TimelineConsolidateAction()
             ContextMenuSeparator()
             TimelineContextMenuAction(
                 label = if (contextEntryTargets.size > 1) stringResource(Res.string.timeline_clip_action_delete_multiple) else stringResource(Res.string.timeline_clip_action_delete_single),

@@ -1088,4 +1088,7 @@
     <string name="keyframes_import_close">Close</string>
     <string name="launchpad_selection_cancel">Cancel</string>
     <string name="launchpad_selection_choose">Select %1$s</string>
+    <string name="timeline_clip_action_consolidate">Consolidate</string>
+    <string name="timeline_consolidation_progress">Consolidating…</string>
+    <string name="timeline_consolidation_failed">Could not consolidate audio</string>
 </resources>

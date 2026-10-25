@@ -19,6 +19,7 @@ import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesChainDeviceCon
 import dev.anthonyhfm.amethyst.devices.effects.keyframes.KeyframesWorkspaceMode
 import dev.anthonyhfm.amethyst.settings.SettingsDialog
 import dev.anthonyhfm.amethyst.timeline.PianoRollWorkspaceMode
+import dev.anthonyhfm.amethyst.timeline.TimelineAudioConsolidation
 import dev.anthonyhfm.amethyst.timeline.TimelineRepository
 import dev.anthonyhfm.amethyst.timeline.contract.GridResolution
 import dev.anthonyhfm.amethyst.timeline.contract.TimelineEditorTool
@@ -56,7 +57,8 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
     val saveProgress by WorkspaceSaveHelper.saveProgress.collectAsState()
     val isSaving = saveProgress != null
 
-    val editState = remember(mode, selections, clipboard, undoState) {
+    val consolidationProgress by TimelineAudioConsolidation.progress.collectAsState()
+    val editState = remember(mode, selections, clipboard, undoState, timelineTracks, consolidationProgress) {
         WorkspaceMenuCommandSurface.editState(
             mode = mode,
             selections = selections,
@@ -87,6 +89,7 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
     val pasteLabel = stringResource(Res.string.workspace_menubar_edit_paste)
     val deleteLabel = stringResource(Res.string.workspace_menubar_edit_delete)
     val duplicateLabel = stringResource(Res.string.workspace_menubar_edit_duplicate)
+    val consolidateLabel = stringResource(Res.string.timeline_clip_action_consolidate)
     val renameLabel = stringResource(Res.string.device_group_editor_rename)
     val selectAllLabel = stringResource(Res.string.workspace_menubar_edit_select_all)
     val viewLabel = stringResource(Res.string.workspace_menubar_view)
@@ -269,6 +272,13 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
                 onClick = {
                     WorkspaceMenuCommandSurface.duplicate()
                 }
+            )
+
+            Item(
+                text = consolidateLabel,
+                enabled = editState.canConsolidate,
+                shortcut = NativeKeyShortcut("j"),
+                onClick = { WorkspaceMenuCommandSurface.consolidate() },
             )
 
             Item(

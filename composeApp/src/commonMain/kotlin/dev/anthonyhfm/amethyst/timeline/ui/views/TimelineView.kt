@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.timeline.ui.views
 
+import dev.anthonyhfm.amethyst.timeline.ui.TimelineConsolidationFeedback
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,105 +58,107 @@ fun TimelineView(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(timelinePalette.canvas)
-    ) {
-        Row(
+    TimelineConsolidationFeedback {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(timelineDimensions.rulerHeight)
+                .fillMaxSize()
+                .background(timelinePalette.canvas)
         ) {
-            Box(
+            Row(
                 modifier = Modifier
-                    .width(timelineDimensions.trackHeaderWidth)
-                    .fillMaxHeight()
-                    .drawBehind {
-                        val stroke = 1.dp.toPx()
-                        drawLine(
-                            color = timelinePalette.rulerHighlight.copy(alpha = 0.92f),
-                            start = Offset(0f, stroke / 2f),
-                            end = Offset(size.width, stroke / 2f),
-                            strokeWidth = stroke
-                        )
-                        drawLine(
-                            color = timelinePalette.shellBorder,
-                            start = Offset(size.width - stroke / 2f, 0f),
-                            end = Offset(size.width - stroke / 2f, size.height),
-                            strokeWidth = stroke
-                        )
-                        drawLine(
-                            color = timelinePalette.shellBorder,
-                            start = Offset(0f, size.height - stroke / 2f),
-                            end = Offset(size.width, size.height - stroke / 2f),
-                            strokeWidth = stroke
-                        )
-                    }
-            )
-            TimelineRuler(
-                modifier = Modifier.weight(1f),
-                viewport = viewport,
-                bpm = bpm,
-                gridType = gridType
-            )
-        }
-
-        val verticalScrollState = rememberScrollState()
-        var previousTrackCount by remember { mutableIntStateOf(value = tracks.size) }
-        LaunchedEffect(tracks.size) {
-            val addedTrack = tracks.size > previousTrackCount
-            previousTrackCount = tracks.size
-            if (addedTrack && SelectionManager.lastSelectedTimelineTrackIndex == tracks.lastIndex) {
-                withFrameNanos { }
-                verticalScrollState.scrollTo(value = verticalScrollState.maxValue)
+                    .fillMaxWidth()
+                    .height(timelineDimensions.rulerHeight)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(timelineDimensions.trackHeaderWidth)
+                        .fillMaxHeight()
+                        .drawBehind {
+                            val stroke = 1.dp.toPx()
+                            drawLine(
+                                color = timelinePalette.rulerHighlight.copy(alpha = 0.92f),
+                                start = Offset(0f, stroke / 2f),
+                                end = Offset(size.width, stroke / 2f),
+                                strokeWidth = stroke
+                            )
+                            drawLine(
+                                color = timelinePalette.shellBorder,
+                                start = Offset(size.width - stroke / 2f, 0f),
+                                end = Offset(size.width - stroke / 2f, size.height),
+                                strokeWidth = stroke
+                            )
+                            drawLine(
+                                color = timelinePalette.shellBorder,
+                                start = Offset(0f, size.height - stroke / 2f),
+                                end = Offset(size.width, size.height - stroke / 2f),
+                                strokeWidth = stroke
+                            )
+                        }
+                )
+                TimelineRuler(
+                    modifier = Modifier.weight(1f),
+                    viewport = viewport,
+                    bpm = bpm,
+                    gridType = gridType
+                )
             }
-        }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        ) {
-            TrackListView(
-                tracks = tracks,
-                verticalScrollState = verticalScrollState,
-                onTrackVolumeChange = { trackIndex, value ->
-                    viewModel.setTrackBaseAutomation(trackIndex, TimelineTrackAutomationTarget.VOLUME, value)
-                },
-                onTrackSoloToggle = { trackIndex ->
-                    viewModel.toggleTrackSolo(trackIndex)
-                },
-                onTrackMuteToggle = { trackIndex ->
-                    viewModel.toggleTrackMute(trackIndex)
-                },
-                onTrackReorder = { fromIndex, toIndex ->
-                    viewModel.reorderTracks(fromIndex, toIndex)
-                },
-                onAddLightsTrack = { viewModel.addMidiTrack() },
-                onAddAudioTrack = { viewModel.addAudioTrack() }
-            )
-
-            TimelineLaneView(
-                modifier = Modifier.weight(1f),
-                viewModel = viewModel,
-                verticalScrollState = verticalScrollState,
-                onOpenMidiEntryAtTime = { trackIndex, timeMs ->
-                    viewModel.onDoubleClickMidiTrack(trackIndex, timeMs)
-                },
-                onCreateMidiEntry = { trackIndex, startMs, endMs ->
-                    viewModel.createMidiEntry(trackIndex, startMs, endMs)
+            val verticalScrollState = rememberScrollState()
+            var previousTrackCount by remember { mutableIntStateOf(value = tracks.size) }
+            LaunchedEffect(tracks.size) {
+                val addedTrack = tracks.size > previousTrackCount
+                previousTrackCount = tracks.size
+                if (addedTrack && SelectionManager.lastSelectedTimelineTrackIndex == tracks.lastIndex) {
+                    withFrameNanos { }
+                    verticalScrollState.scrollTo(value = verticalScrollState.maxValue)
                 }
-            )
-        }
+            }
 
-        val experimentalChainEffectEnabled by dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings.timelineChainEffects.flow.collectAsState()
-        if (experimentalChainEffectEnabled && openChainEffectClipId != null) {
-            TimelineChainEffectPanel(
-                viewModel = viewModel,
-                clipId = openChainEffectClipId!!,
-                modifier = Modifier.fillMaxWidth().height(320.dp),
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
+                TrackListView(
+                    tracks = tracks,
+                    verticalScrollState = verticalScrollState,
+                    onTrackVolumeChange = { trackIndex, value ->
+                        viewModel.setTrackBaseAutomation(trackIndex, TimelineTrackAutomationTarget.VOLUME, value)
+                    },
+                    onTrackSoloToggle = { trackIndex ->
+                        viewModel.toggleTrackSolo(trackIndex)
+                    },
+                    onTrackMuteToggle = { trackIndex ->
+                        viewModel.toggleTrackMute(trackIndex)
+                    },
+                    onTrackReorder = { fromIndex, toIndex ->
+                        viewModel.reorderTracks(fromIndex, toIndex)
+                    },
+                    onAddLightsTrack = { viewModel.addMidiTrack() },
+                    onAddAudioTrack = { viewModel.addAudioTrack() }
+                )
+
+                TimelineLaneView(
+                    modifier = Modifier.weight(1f),
+                    viewModel = viewModel,
+                    verticalScrollState = verticalScrollState,
+                    onOpenMidiEntryAtTime = { trackIndex, timeMs ->
+                        viewModel.onDoubleClickMidiTrack(trackIndex, timeMs)
+                    },
+                    onCreateMidiEntry = { trackIndex, startMs, endMs ->
+                        viewModel.createMidiEntry(trackIndex, startMs, endMs)
+                    }
+                )
+            }
+
+            val experimentalChainEffectEnabled by dev.anthonyhfm.amethyst.settings.data.ExperimentalSettings.timelineChainEffects.flow.collectAsState()
+            if (experimentalChainEffectEnabled && openChainEffectClipId != null) {
+                TimelineChainEffectPanel(
+                    viewModel = viewModel,
+                    clipId = openChainEffectClipId!!,
+                    modifier = Modifier.fillMaxWidth().height(320.dp),
+                )
+            }
         }
     }
 }

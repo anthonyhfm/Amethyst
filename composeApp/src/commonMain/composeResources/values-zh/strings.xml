@@ -989,4 +989,7 @@
     <string name="workspace_device_settings_description">为此布局元素选择 MIDI 设备。</string>
     <string name="workspace_device_settings_disconnected">所选设备已断开连接。请重新连接或选择其他选项。</string>
     <string name="workspace_insert_launchpad_description">选择要添加到工作区的控制器布局。</string>
+    <string name="timeline_clip_action_consolidate">合并片段</string>
+    <string name="timeline_consolidation_progress">正在合并…</string>
+    <string name="timeline_consolidation_failed">无法合并音频</string>
 </resources>

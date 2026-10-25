@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.workspace
 
+import dev.anthonyhfm.amethyst.timeline.TimelineCommandSurface
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardData
 import dev.anthonyhfm.amethyst.core.controls.clipboard.ClipboardManager
 import dev.anthonyhfm.amethyst.core.controls.selection.Selectable
@@ -28,6 +29,7 @@ data class WorkspaceMenuEditState(
     val canPaste: Boolean,
     val canDelete: Boolean,
     val canDuplicate: Boolean,
+    val canConsolidate: Boolean,
     val canRename: Boolean,
     val canSelectAll: Boolean,
     val canCloseCurrentTool: Boolean
@@ -94,6 +96,8 @@ object WorkspaceMenuCommandSurface {
                 is PianoRollWorkspaceMode -> selections.any { it is Selectable.PianoRollNote }
                 else -> ShortcutManager.canDuplicateSelection(selections)
             },
+            canConsolidate = mode is TimelineWorkspaceMode &&
+                TimelineCommandSurface.canConsolidateSelection(selections = selections),
             canRename = when (mode) {
                 is TimelineWorkspaceMode -> TimelineKeyHandler.canRenameSelection(selections)
                 else -> ShortcutManager.canRenameSelection(selections)
@@ -167,6 +171,12 @@ object WorkspaceMenuCommandSurface {
             is PianoRollWorkspaceMode -> mode.duplicateSelectedNotes()
             else -> ShortcutManager.duplicateSelection()
         }
+    }
+
+    fun consolidate(): Boolean {
+        return WorkspaceRepository.mode.value is TimelineWorkspaceMode &&
+            !WorkspaceRepository.isInputFocused &&
+            TimelineCommandSurface.consolidateSelection()
     }
 
     fun rename(): Boolean {
