@@ -109,6 +109,49 @@ class PolyphaseSincResampler(
         return true
     }
 
+    internal fun readBufferedFrame(source: BufferedPcmAudioSource, destination: FloatArray): Boolean {
+        require(source.sampleRate == sourceRate)
+        require(source.channels == channels)
+        require(destination.size >= channels)
+        if (
+            isEqualRate || taps > source.samples.size / channels - DEFAULT_TAPS ||
+            sourcePosition < 0.0 || sourcePosition >= source.frameCount
+        ) {
+            return readFrame(source = source, destination = destination)
+        }
+
+        val integralPosition = floor(sourcePosition).toLong()
+        val fraction = sourcePosition - integralPosition
+        val phase = (fraction * phaseCount).roundToInt().coerceIn(minimumValue = 0, maximumValue = phaseCount - 1)
+        val firstFrame = integralPosition - taps / 2 + 1
+        source.prepareWindow(firstFrame = firstFrame, lastFrame = firstFrame + taps - 1L)
+        val coefficientOffset = phase * taps
+        val sampleOffset = ((firstFrame - source.firstCachedFrame) * channels).toInt()
+        val samples = source.samples
+        val completeWindow = firstFrame >= 0L && firstFrame + taps <= source.frameCount
+        var channel = 0
+        while (channel < channels) {
+            var sum = 0.0
+            var tap = 0
+            if (completeWindow) {
+                while (tap < taps) {
+                    sum += samples[sampleOffset + tap * channels + channel] * coefficients[coefficientOffset + tap]
+                    tap++
+                }
+            } else {
+                while (tap < taps) {
+                    if (firstFrame + tap in 0 until source.frameCount) {
+                        sum += samples[sampleOffset + tap * channels + channel] * coefficients[coefficientOffset + tap]
+                    }
+                    tap++
+                }
+            }
+            destination[channel] = sum.toFloat()
+            channel++
+        }
+        return true
+    }
+
     fun advance(outputFrames: Int = 1) {
         require(outputFrames >= 0)
         sourcePosition += sourceFramesPerOutputFrame * outputFrames

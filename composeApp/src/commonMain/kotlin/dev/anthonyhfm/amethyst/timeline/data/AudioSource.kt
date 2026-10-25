@@ -96,6 +96,17 @@ class AudioSource private constructor(
 
     internal fun writePcm(path: String) = pcmBytes.writeTo(path = path)
 
+    internal fun withPcmStorage(storage: PcmByteStorage): AudioSource = AudioSource(
+        id = id,
+        fileName = fileName,
+        pcmBytes = storage,
+        sampleRate = sampleRate,
+        channels = channels,
+        bitDepth = bitDepth,
+        stemMetadata = stemMetadata,
+        isLibraryAsset = isLibraryAsset,
+    )
+
     internal fun copyFromPcmFile(path: String): AudioSource? {
         val storage = mapPcmFile(path = path, expectedBytes = -1) ?: return null
         return AudioSource(

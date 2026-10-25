@@ -9,6 +9,7 @@ import dev.anthonyhfm.amethyst.timeline.data.AudioSource
 import dev.anthonyhfm.amethyst.workspace.audio.AudioLibraryRepository
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -17,6 +18,35 @@ class SamplePreparedAudioSharingTest {
     @AfterTest
     fun tearDown() {
         AudioLibraryRepository.clear()
+    }
+
+    @Test
+    fun longProjectSamplesAreFullyPreparedBeforeTheFirstTrigger() {
+        val source = AudioSource(
+            id = "long-project-sample",
+            fileName = "long.wav",
+            rawData = ByteArray(size = 44100 * 2 * 3),
+            sampleRate = 44100,
+            channels = 2,
+            bitDepth = 24,
+        )
+        AudioLibraryRepository.load(sources = listOf(source))
+        val state = SampleChainDeviceState(
+            sourceId = source.id,
+            fileName = source.fileName,
+            sampleRate = source.sampleRate,
+            channels = source.channels,
+            bitDepth = source.bitDepth,
+            isLoaded = true,
+        )
+        val prepared = checkNotNull(SampleRenderSnapshot.prepareSource(state = state, outputSampleRate = 48000))
+        assertEquals(expected = 48000, actual = prepared.sampleRate)
+        assertEquals(expected = 48000L, actual = prepared.frameCount)
+        assertNotSame(illegal = source.pcmSource(), actual = prepared)
+        assertSame(
+            expected = prepared,
+            actual = SampleRenderSnapshot.prepareSource(state = state, outputSampleRate = 48000),
+        )
     }
 
     @Test

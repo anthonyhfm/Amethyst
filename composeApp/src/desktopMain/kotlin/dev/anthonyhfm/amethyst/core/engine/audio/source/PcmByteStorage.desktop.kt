@@ -31,6 +31,12 @@ private class MappedPcmBytes(override val filePath: String, buffer: ByteBuffer) 
             }
         }
     }
+    override fun readRange(fromIndex: Int, toIndex: Int): ByteArray {
+        require(fromIndex in 0..toIndex && toIndex <= size)
+        return ByteArray(size = toIndex - fromIndex).also { bytes ->
+            buffer.duplicate().position(fromIndex).get(bytes)
+        }
+    }
     override fun readAll(): ByteArray = ByteArray(size = size).also { buffer.duplicate().get(it) }
 }
 

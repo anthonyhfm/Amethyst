@@ -32,6 +32,7 @@ import dev.anthonyhfm.amethyst.workspace.modes.defaults.TimelineWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.LightsChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.modes.defaults.SamplingChainWorkspaceMode
 import dev.anthonyhfm.amethyst.workspace.utils.WorkspaceSaveHelper
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import dev.nucleusframework.application.NucleusDecoratedWindowScope
 import dev.nucleusframework.menu.macos.NativeKeyShortcut
@@ -108,11 +109,14 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
     val gridOptions = pianoRollGridOptions()
 
     fun requestProjectChange(action: () -> Unit) {
-        if (WorkspaceRepository.hasUnsavedChanges()) {
-            pendingProjectChangeAction = action
-            showProjectChangeDialog = true
-        } else {
-            action()
+        coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            WorkspaceSaveHelper.awaitPendingSaves()
+            if (WorkspaceRepository.hasUnsavedChanges()) {
+                pendingProjectChangeAction = action
+                showProjectChangeDialog = true
+            } else {
+                action()
+            }
         }
     }
 
@@ -174,7 +178,6 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
             Item(
                 text = saveLabel,
-                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("s"),
                 onClick = {
                     viewModel.saveProject()
@@ -183,7 +186,6 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
 
             Item(
                 text = saveAsLabel,
-                enabled = !isSaving,
                 shortcut = NativeKeyShortcut("s", shift = true),
                 onClick = {
                     viewModel.saveProjectAs()
@@ -482,7 +484,8 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
                     showProjectChangeDialog = false
                     coroutineScope.launch {
                         val saved = WorkspaceSaveHelper.saveWorkspace()
-                        if (saved) {
+                        WorkspaceSaveHelper.awaitPendingSaves()
+                        if (saved && !WorkspaceRepository.hasUnsavedChanges()) {
                             pendingProjectChangeAction = null
                             pendingAction?.invoke()
                         } else {
@@ -494,7 +497,10 @@ fun NucleusDecoratedWindowScope.WorkspaceMenuBar(
                     val pendingAction = pendingProjectChangeAction
                     showProjectChangeDialog = false
                     pendingProjectChangeAction = null
-                    pendingAction?.invoke()
+                    coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                        WorkspaceSaveHelper.awaitPendingSaves()
+                        pendingAction?.invoke()
+                    }
                 },
                 onCancel = {
                     showProjectChangeDialog = false
