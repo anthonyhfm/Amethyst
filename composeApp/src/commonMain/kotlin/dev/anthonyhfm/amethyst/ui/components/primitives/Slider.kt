@@ -1,5 +1,6 @@
 package dev.anthonyhfm.amethyst.ui.components.primitives
 
+import dev.anthonyhfm.amethyst.ui.modifier.resetOnDoubleClick
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -86,6 +87,7 @@ fun Slider(
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     steps: Int = 0,
     enabled: Boolean = true,
+    defaultValue: Float? = null,
 ) {
     val nodeChangeCallbacks = LocalNodeChangeCallbacks.current
     val state = rememberSliderState(
@@ -109,7 +111,15 @@ fun Slider(
 
     Slider(
         state = state,
-        modifier = modifier.then(
+        modifier = modifier
+            .resetOnDoubleClick(enabled = enabled && defaultValue != null && defaultValue.isFinite() && defaultValue in valueRange) {
+                val target = defaultValue ?: return@resetOnDoubleClick
+                nodeChangeCallbacks.onStart()
+                state.value = target
+                currentOnValueChange(target)
+                nodeChangeCallbacks.onFinish()
+            }
+            .then(
             Modifier.pointerInput(nodeChangeCallbacks) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)

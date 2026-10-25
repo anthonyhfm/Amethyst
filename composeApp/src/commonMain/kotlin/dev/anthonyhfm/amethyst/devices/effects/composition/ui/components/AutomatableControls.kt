@@ -1,85 +1,86 @@
 package dev.anthonyhfm.amethyst.devices.effects.composition.ui.components
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Alignment
-import kotlin.math.atan2
-import kotlin.math.PI
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalAutomationHandler
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSub
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSubContent
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSubTrigger
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
-import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
-import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem as PrimitiveContextMenuItem
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
-import com.composeunstyled.Icon
-import com.composeunstyled.Text
-import com.composeunstyled.theme.Theme
-import dev.anthonyhfm.amethyst.ui.theme.colors
-import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
-import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
-import dev.anthonyhfm.amethyst.ui.theme.destructive
-import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Plus
-import com.composables.icons.lucide.Pencil
-import com.composables.icons.lucide.Trash2
-import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
-import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalNodeChangeCallbacks
-import dev.anthonyhfm.amethyst.ui.components.DialType
-import dev.anthonyhfm.amethyst.ui.components.primitives.Dial as PrimitiveDial
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.platform.LocalDensity
-import kotlin.math.min
-import kotlin.math.pow
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LinePoint
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledSlider as PrimitiveLabeledSlider
-import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledRangeSlider as PrimitiveLabeledRangeSlider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import dev.anthonyhfm.amethyst.devices.LocalChainDevice
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Pencil
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Trash2
+import com.composeunstyled.Icon
+import com.composeunstyled.Text
+import com.composeunstyled.theme.Theme
 import dev.anthonyhfm.amethyst.core.controls.automation.DialAutomationLane
+import dev.anthonyhfm.amethyst.core.parameter.ParameterAddress
+import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
+import dev.anthonyhfm.amethyst.devices.AudioChainDevice
+import dev.anthonyhfm.amethyst.devices.LocalChainDevice
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.automationParameters
+import dev.anthonyhfm.amethyst.devices.effects.composition.automation.lane
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledRangeSlider as PrimitiveLabeledRangeSlider
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LabeledSlider as PrimitiveLabeledSlider
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LinePoint
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalAutomationHandler
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalCompositionNode
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.LocalNodeChangeCallbacks
+import dev.anthonyhfm.amethyst.devices.effects.composition.nodes.NodeRegistry
+import dev.anthonyhfm.amethyst.ui.components.DialType
+import dev.anthonyhfm.amethyst.ui.components.FlatDial
 import dev.anthonyhfm.amethyst.ui.components.automation.ParameterAutomationPopover
 import dev.anthonyhfm.amethyst.ui.components.automation.ParameterMappingDialog
-import dev.anthonyhfm.amethyst.core.parameter.ParameterAddress
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenu
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItem as PrimitiveContextMenuItem
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuItemVariant
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSeparator
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSub
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSubContent
+import dev.anthonyhfm.amethyst.ui.components.primitives.ContextMenuSubTrigger
+import dev.anthonyhfm.amethyst.ui.components.primitives.Dial as PrimitiveDial
+import dev.anthonyhfm.amethyst.ui.components.primitives.ScrollArea
+import dev.anthonyhfm.amethyst.ui.theme.colors
+import dev.anthonyhfm.amethyst.ui.theme.destructive
+import dev.anthonyhfm.amethyst.ui.theme.foreground
+import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
+import dev.anthonyhfm.amethyst.ui.theme.popoverForeground
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import dev.anthonyhfm.amethyst.workspace.data.ParameterMapping
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.withFrameNanos
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
-import dev.anthonyhfm.amethyst.ui.components.FlatDial
-import dev.anthonyhfm.amethyst.devices.AudioChainDevice
-import dev.anthonyhfm.amethyst.core.parameter.ParameterOwner
-import dev.anthonyhfm.amethyst.ui.theme.foreground
 
 @Composable
 fun <T> AutomatableDial(
@@ -479,6 +480,9 @@ fun AutomatableSlider(
             value = value,
             range = range,
             onValueChange = onValueChange,
+            defaultValue = node?.let { current ->
+                parameter?.valueOf(node = current.copy(state = NodeRegistry.defaultStateFor(current.type)))
+            },
         )
     }
 
