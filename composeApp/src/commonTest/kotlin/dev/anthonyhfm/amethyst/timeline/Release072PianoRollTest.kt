@@ -12,6 +12,7 @@ import dev.anthonyhfm.amethyst.timeline.data.MidiNote
 import dev.anthonyhfm.amethyst.timeline.data.MidiTimelineTrack
 import dev.anthonyhfm.amethyst.timeline.data.NoteGradientStop
 import dev.anthonyhfm.amethyst.timeline.transforms.PianoRollTransforms
+import dev.anthonyhfm.amethyst.timeline.ui.pianoroll.formatPinchValue
 import dev.anthonyhfm.amethyst.timeline.ui.pianoroll.parsePinchValue
 import dev.anthonyhfm.amethyst.workspace.WorkspaceRepository
 import kotlin.random.Random
@@ -149,6 +150,9 @@ class Release072PianoRollTest {
         assertEquals(expected = 1.25f, actual = parsePinchValue(text = "1,25"))
         assertEquals(expected = 2f, actual = parsePinchValue(text = "99"))
         assertEquals(expected = -2f, actual = parsePinchValue(text = "-99"))
+        assertEquals(expected = -0.56f, actual = parsePinchValue(text = "-0.56470525"))
+        assertEquals(expected = "-0.56", actual = formatPinchValue(value = -0.56470525f))
+        assertEquals(expected = "1.25", actual = formatPinchValue(value = 1.25f))
         listOf("", "x", "NaN", "Infinity").forEach { assertNull(actual = parsePinchValue(text = it)) }
     }
 
