@@ -95,6 +95,7 @@ internal class KeyframesImporter(private val scope: CoroutineScope) {
     private suspend fun importFile(mode: KeyframesWorkspaceMode, file: PlatformFile, launchpadId: String?) {
         val device = requireNotNull(mode.parentDevice)
         val previousFrames = device.state.value.frames
+        WorkspaceRepository.updateWorkspaceBounds()
         val bounds = WorkspaceRepository.bounds
         val bpm = WorkspaceRepository.bpm.value
         val targets = ViewportRepository.devices.value.map {
