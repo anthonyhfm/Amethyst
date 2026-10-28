@@ -36,6 +36,7 @@ import dev.anthonyhfm.amethyst.ui.theme.foreground
 import dev.anthonyhfm.amethyst.ui.theme.mutedForeground
 import dev.anthonyhfm.amethyst.ui.theme.small
 import dev.anthonyhfm.amethyst.ui.theme.typography
+import kotlin.math.roundToInt
 
 @Composable
 fun PianoRollTransformPanel(
@@ -54,10 +55,15 @@ fun PianoRollTransformPanel(
     val applyTransform: ((List<MidiNote>) -> List<MidiNote>) -> Unit = { transform ->
         onApplyTransform(transform, windowInfo.keyboardModifiers.isAltPressed)
     }
-    var pinchText by remember { mutableStateOf(pinchValue.toString()) }
-    LaunchedEffect(pinchValue) {
+    var pinchText by remember {
+        mutableStateOf(
+            value = formatPinchValue(value = pinchValue)
+        )
+    }
+
+    LaunchedEffect(key1 = pinchValue) {
         if (parsePinchValue(text = pinchText) != pinchValue) {
-            pinchText = pinchValue.toString()
+            pinchText = formatPinchValue(value = pinchValue)
         }
     }
     val contentColor = Theme[colors][foreground]
@@ -127,56 +133,84 @@ fun PianoRollTransformPanel(
         }
 
         // Pinch
-        SectionLabel("Pinch (−2 to 2)")
+        SectionLabel(label = "Pinch (−2 to 2)")
+
         Row(
-            modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.4f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(
+                    alpha = if (enabled) {
+                        1f
+                    } else {
+                        0.4f
+                    }
+                ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(space = 8.dp)
         ) {
             PinchGraph(
                 pinch = pinchValue,
-                onPinchChange = onPinchValueChange,
+                onPinchChange = { newValue ->
+                    val rounded = (newValue * 100f).roundToInt() / 100f
+
+                    onPinchValueChange(rounded)
+                },
                 bilateral = pinchBilateral,
-                onToggleBilateral = { onPinchBilateralChange(!pinchBilateral) },
-                modifier = Modifier.size(56.dp)
+                onToggleBilateral = {
+                    onPinchBilateralChange(!pinchBilateral)
+                },
+                modifier = Modifier
+                    .size(size = 56.dp)
             )
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Input(
-                    value = pinchText,
-                    onValueChange = { text ->
-                        pinchText = text
-                        parsePinchValue(text = text)?.let(onPinchValueChange)
-                    },
-                    enabled = enabled,
-                    modifier = Modifier
-                        .width(100.dp)
-                        .onFocusChanged { focus ->
-                            if (!focus.isFocused) {
-                                pinchText = pinchValue.toString()
-                            }
+
+            Input(
+                value = pinchText,
+                onValueChange = { text ->
+                    pinchText = text
+
+                    parsePinchValue(text = text)?.let(onPinchValueChange)
+                },
+                enabled = enabled,
+                modifier = Modifier
+                    .weight(weight = 1f)
+                    .onFocusChanged { focus ->
+                        if (!focus.isFocused) {
+                            pinchText = formatPinchValue(value = pinchValue)
                         }
-                        .onPreviewKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
-                                pinchText = pinchValue.toString()
-                                true
-                            } else {
-                                false
-                            }
-                        },
+                    }
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
+                            pinchText = formatPinchValue(value = pinchValue)
+
+                            true
+                        } else {
+                            false
+                        }
+                    }
+            )
+
+            Button(
+                onClick = {
+                    if (pinchValue != 0f) {
+                        pinchText = formatPinchValue(value = pinchValue)
+
+                        applyTransform { notes ->
+                            PianoRollTransforms.pinch(
+                                notes = notes,
+                                factor = pinchValue,
+                                bilateral = pinchBilateral
+                            )
+                        }
+                    }
+                },
+                variant = ButtonVariant.Secondary,
+                size = ButtonSize.Small,
+                enabled = enabled && pinchValue != 0f && parsePinchValue(text = pinchText) != null
+            ) {
+                Text(
+                    text = "Apply",
+                    style = Theme[typography][small].copy(color = contentColor)
                 )
-                Button(
-                    onClick = {
-                        if (pinchValue != 0f) {
-                            pinchText = pinchValue.toString()
-                            applyTransform { notes -> PianoRollTransforms.pinch(notes, pinchValue, pinchBilateral) }
-                        }
-                    },
-                    variant = ButtonVariant.Secondary,
-                    size = ButtonSize.Small,
-                    enabled = enabled && pinchValue != 0f && parsePinchValue(text = pinchText) != null
-                ) {
-                    Text("Apply", style = Theme[typography][small].copy(color = contentColor))
-                }
             }
         }
 
@@ -215,14 +249,6 @@ fun PianoRollTransformPanel(
                 .background(Theme[colors][border])
         )
 
-        Text(
-            text = "Option/Alt + click copies transformed notes",
-            style = Theme[typography][small].copy(color = Theme[colors][mutedForeground]),
-        )
-        Text(
-            text = "Gradient Spread blends the first and last selected note colors in time order. Select at least 3 notes with different endpoint colors for a visible blend.",
-            style = Theme[typography][small].copy(color = Theme[colors][mutedForeground]),
-        )
         Button(
             onClick = onGradientSpread,
             modifier = Modifier.fillMaxWidth(),
@@ -304,8 +330,19 @@ private fun ButtonRow(content: @Composable RowScope.() -> Unit) {
     )
 }
 
+internal fun formatPinchValue(value: Float): String {
+    val rounded = (value * 100f).roundToInt() / 100f
+
+    return rounded.toString()
+}
+
 internal fun parsePinchValue(text: String): Float? {
     return text.trim().replace(oldChar = ',', newChar = '.').toFloatOrNull()
-        ?.takeIf { it.isFinite() }
+        ?.takeIf {
+            it.isFinite()
+        }
         ?.coerceIn(minimumValue = -2f, maximumValue = 2f)
+        ?.let {
+            (it * 100f).roundToInt() / 100f
+        }
 }
