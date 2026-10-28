@@ -11,7 +11,6 @@ import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import org.w3c.dom.Node
 import kotlin.math.floor
-import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
 
 internal object KeyframesImageImporter {
@@ -62,11 +61,8 @@ internal object KeyframesImageImporter {
 
                 try {
                     val count = reader.getNumImages(true)
-                    val padCount = targets.sumOf { it.size.width.toLong() * it.size.height }
 
-                    require(count in 1..10_000 && padCount * count <= 2_000_000L) {
-                        "This animation is too large for the workspace. Use fewer frames or a smaller workspace."
-                    }
+                    require(count > 0) { "Choose a valid PNG or GIF image." }
 
                     val palette = stream?.child(name = "GlobalColorTable")
                     val backgroundIndex = palette?.int(name = "backgroundColorIndex")
@@ -149,9 +145,10 @@ internal object KeyframesImageImporter {
         bounds: Pair<IntOffset, IntSize>,
         targets: List<Target>,
     ): List<KeyframesEntry> {
-        val scale = min(bounds.second.width.toDouble() / image.width, bounds.second.height.toDouble() / image.height)
-        val left = bounds.first.x + (bounds.second.width - image.width * scale) / 2.0
-        val top = bounds.first.y + (bounds.second.height - image.height * scale) / 2.0
+        val scaleX = bounds.second.width.toDouble() / image.width
+        val scaleY = bounds.second.height.toDouble() / image.height
+        val left = bounds.first.x.toDouble()
+        val top = bounds.first.y.toDouble()
 
         return buildList {
             targets.forEach { target ->
@@ -160,8 +157,8 @@ internal object KeyframesImageImporter {
                         val globalX = target.position.x + x
                         val globalY = target.position.y + y
 
-                        val sourceX = floor((globalX + 0.5 - left) / scale).toInt()
-                        val sourceY = floor((globalY + 0.5 - top) / scale).toInt()
+                        val sourceX = floor((globalX + 0.5 - left) / scaleX).toInt()
+                        val sourceY = floor((globalY + 0.5 - top) / scaleY).toInt()
 
                         if (sourceX !in 0 until image.width || sourceY !in 0 until image.height) {
                             continue
